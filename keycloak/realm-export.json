@@ -1,0 +1,171 @@
+{
+  "realm": "rtk",
+  "displayName": "RTK EdTech CRM",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "defaultSignatureAlgorithm": "RS256",
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+
+  "roles": {
+    "realm": [
+      { "name": "admin", "description": "Администратор платформы" },
+      { "name": "manager", "description": "Руководитель" },
+      { "name": "curator", "description": "Куратор" },
+      { "name": "user", "description": "Пользователь" }
+    ],
+    "client": {}
+  },
+
+  "defaultRoles": ["offline_access", "uma_authorization"],
+
+  "clientScopes": [
+    {
+      "name": "basic",
+      "description": "OpenID Connect built-in scope: basic (sub, auth_time)",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "false", "display.on.consent.screen": "false", "gui.order": "", "consent.screen.text": "" },
+      "protocolMappers": [
+        { "name": "sub", "protocol": "openid-connect", "protocolMapper": "oidc-sub-mapper", "consentRequired": false, "config": { "introspection.token.claim": "true", "access.token.claim": "true" } },
+        { "name": "auth_time", "protocol": "openid-connect", "protocolMapper": "oidc-usersessionmodel-note-mapper", "consentRequired": false, "config": { "user.session.note": "AUTH_TIME", "introspection.token.claim": "true", "userinfo.token.claim": "true", "id.token.claim": "true", "access.token.claim": "true", "claim.name": "auth_time", "jsonType.label": "long" } }
+      ]
+    },
+    {
+      "name": "profile",
+      "description": "OpenID Connect built-in scope: profile",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "true", "display.on.consent.screen": "true", "gui.order": "", "consent.screen.text": "${profileScopeConsentText}" },
+      "protocolMappers": [
+        { "name": "given name", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-property-mapper", "consentRequired": false, "config": { "userinfo.token.claim": "true", "user.attribute": "firstName", "id.token.claim": "true", "access.token.claim": "true", "claim.name": "given_name", "jsonType.label": "String" } },
+        { "name": "family name", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-property-mapper", "consentRequired": false, "config": { "userinfo.token.claim": "true", "user.attribute": "lastName", "id.token.claim": "true", "access.token.claim": "true", "claim.name": "family_name", "jsonType.label": "String" } },
+        { "name": "full name", "protocol": "openid-connect", "protocolMapper": "oidc-full-name-mapper", "consentRequired": false, "config": { "id.token.claim": "true", "access.token.claim": "true", "userinfo.token.claim": "true" } },
+        { "name": "username", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-property-mapper", "consentRequired": false, "config": { "userinfo.token.claim": "true", "user.attribute": "username", "id.token.claim": "true", "access.token.claim": "true", "claim.name": "preferred_username", "jsonType.label": "String" } }
+      ]
+    },
+    {
+      "name": "email",
+      "description": "OpenID Connect built-in scope: email",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "true", "display.on.consent.screen": "true", "gui.order": "", "consent.screen.text": "${emailScopeConsentText}" },
+      "protocolMappers": [
+        { "name": "email", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-property-mapper", "consentRequired": false, "config": { "userinfo.token.claim": "true", "user.attribute": "email", "id.token.claim": "true", "access.token.claim": "true", "claim.name": "email", "jsonType.label": "String" } },
+        { "name": "email verified", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-property-mapper", "consentRequired": false, "config": { "userinfo.token.claim": "true", "user.attribute": "emailVerified", "id.token.claim": "true", "access.token.claim": "true", "claim.name": "email_verified", "jsonType.label": "boolean" } }
+      ]
+    },
+    {
+      "name": "roles",
+      "description": "OpenID Connect built-in scope: roles",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "false", "display.on.consent.screen": "true", "gui.order": "", "consent.screen.text": "${rolesScopeConsentText}" },
+      "protocolMappers": [
+        { "name": "realm roles", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-realm-role-mapper", "consentRequired": false, "config": { "user.attribute": "foo", "access.token.claim": "true", "claim.name": "realm_access.roles", "jsonType.label": "String", "multivalued": "true", "id.token.claim": "false", "userinfo.token.claim": "false" } },
+        { "name": "client roles", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-client-role-mapper", "consentRequired": false, "config": { "user.attribute": "foo", "access.token.claim": "true", "claim.name": "resource_access.${client_id}.roles", "jsonType.label": "String", "multivalued": "true", "id.token.claim": "false", "userinfo.token.claim": "false" } },
+        { "name": "audience resolve", "protocol": "openid-connect", "protocolMapper": "oidc-audience-resolve-mapper", "consentRequired": false, "config": {} }
+      ]
+    },
+    {
+      "name": "web-origins",
+      "description": "OpenID Connect built-in scope: web-origins",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "false", "display.on.consent.screen": "false", "gui.order": "", "consent.screen.text": "" },
+      "protocolMappers": [
+        { "name": "allowed web origins", "protocol": "openid-connect", "protocolMapper": "oidc-allowed-origins-mapper", "consentRequired": false, "config": {} }
+      ]
+    },
+    {
+      "name": "rtk-api-audience",
+      "description": "Adds aud=rtk-api to the access token for the FastAPI backend",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "true", "display.on.consent.screen": "false", "gui.order": "", "consent.screen.text": "" },
+      "protocolMappers": [
+        { "name": "rtk-api audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper", "consentRequired": false, "config": { "included.client.audience": "rtk-api", "id.token.claim": "false", "access.token.claim": "true" } }
+      ]
+    }
+  ],
+
+  "clients": [
+    {
+      "clientId": "rtk-frontend",
+      "name": "RTK Frontend (React, public)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": ["http://localhost:3000/*"],
+      "webOrigins": ["http://localhost:3000"],
+      "defaultClientScopes": ["web-origins", "basic", "profile", "roles", "email", "rtk-api-audience"],
+      "optionalClientScopes": [],
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:3000/*",
+        "pkce.code.challenge.method": "S256"
+      }
+    }
+  ],
+
+  "users": [
+    {
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@example.local",
+      "emailVerified": true,
+      "firstName": "Demo",
+      "lastName": "Admin",
+      "credentials": [{ "type": "password", "value": "admin123", "temporary": false }],
+      "realmRoles": ["admin", "offline_access", "uma_authorization"],
+      "clientRoles": {},
+      "requiredActions": [],
+      "groups": []
+    },
+    {
+      "username": "manager",
+      "enabled": true,
+      "email": "manager@example.local",
+      "emailVerified": true,
+      "firstName": "Demo",
+      "lastName": "Manager",
+      "credentials": [{ "type": "password", "value": "manager123", "temporary": false }],
+      "realmRoles": ["manager", "offline_access", "uma_authorization"],
+      "clientRoles": {},
+      "requiredActions": [],
+      "groups": []
+    },
+    {
+      "username": "curator",
+      "enabled": true,
+      "email": "curator@example.local",
+      "emailVerified": true,
+      "firstName": "Demo",
+      "lastName": "Curator",
+      "credentials": [{ "type": "password", "value": "curator123", "temporary": false }],
+      "realmRoles": ["curator", "offline_access", "uma_authorization"],
+      "clientRoles": {},
+      "requiredActions": [],
+      "groups": []
+    },
+    {
+      "username": "user",
+      "enabled": true,
+      "email": "user@example.local",
+      "emailVerified": true,
+      "firstName": "Demo",
+      "lastName": "User",
+      "credentials": [{ "type": "password", "value": "user123", "temporary": false }],
+      "realmRoles": ["user", "offline_access", "uma_authorization"],
+      "clientRoles": {},
+      "requiredActions": [],
+      "groups": []
+    }
+  ]
+}

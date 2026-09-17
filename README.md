@@ -100,3 +100,63 @@ CRM позволит контролировать взаимодействие �
 | Техническая экспертиза | 30 сентября – 14 октября | онлайн |
 | Презентация проектов | 23 октября | онлайн |
 | Церемония награждения | 30 октября | офлайн в Москве |
+
+&nbsp;
+## 🚀 Quick Start — Minimal Auth Stack
+
+Этап 1: рабочий стенд авторизации `Browser → React → Keycloak → FastAPI (JWT + RBAC)`.
+Запуск одной командой:
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+После запуска:
+
+| Сервис   | URL                          |
+|----------|------------------------------|
+| Frontend | http://localhost:3000        |
+| Backend  | http://localhost:8000        |
+| Swagger  | http://localhost:8000/docs   |
+| Keycloak | http://localhost:8081        |
+
+Сценарий: открыть Frontend → **Войти** → логин на странице Keycloak →
+возврат в React → профиль + роль + кнопки **Проверить Backend** / **Проверить Admin доступ**.
+
+### 👥 Demo-пользователи (DEMO ONLY, не для production)
+
+| Username  | Email                 | Пароль     | Роль    |
+|-----------|-----------------------|------------|---------|
+| `admin`   | admin@example.local   | `admin123` | admin   |
+| `manager` | manager@example.local | `manager123` | manager |
+| `curator` | curator@example.local | `curator123` | curator |
+| `user`    | user@example.local    | `user123`  | user    |
+
+Realm `rtk` импортируется автоматически из `keycloak/realm-export.json`
+при первом старте (`start-dev --import-realm`). Access token содержит `aud=rtk-api`
+через client scope `rtk-api-audience`; Backend проверяет signature/exp/iss/aud
+по JWKS (`AUTH_DEV_BYPASS=false` в compose — fail closed).
+
+### ♻️ Полный пересброс dev-Keycloak
+
+Импорт выполняется только на пустых данных. Для пересоздания с нуля:
+
+```bash
+docker compose down
+docker compose up --build keycloak   # ждём healthy, затем остальное
+docker compose up --build
+```
+
+### 🧪 Backend-тесты (без реального Keycloak, JWKS мокируется)
+
+```bash
+cd backend
+PYTHONPATH=. python -m pytest tests/ -q
+```
+
+### ⏭️ Следующий этап
+
+STOP. Далее — проектирование и реализация PostgreSQL-схемы предметной области
+(universities/teachers/programs/workflow/…). Доменные модули лежат в
+`backend/app/modules/` и в auth-стенде не монтируются.
