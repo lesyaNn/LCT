@@ -13,6 +13,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
+from app.schemas.catalog import ProductShort, ProgramShort
 from app.schemas.common import (
     DocumentStatus,
     DocumentType,
@@ -46,14 +47,6 @@ class StageShort(BaseModel):
     name: str = Field(examples=["Переговоры"])
 
 
-class ProgramShort(BaseModel):
-    id: uuid.UUID
-    name: str
-    direction_name: str | None = None
-
-    model_config = {"from_attributes": True}
-
-
 class TeacherShort(BaseModel):
     id: uuid.UUID
     full_name: str
@@ -69,15 +62,6 @@ class StudentsSummary(BaseModel):
     graduated: int = 0
     expelled: int = 0
     academic_leave: int = 0
-
-
-class ProductShort(BaseModel):
-    id: uuid.UUID
-    name: str
-    version: str | None = None
-    vendor_name: str | None = None
-
-    model_config = {"from_attributes": True}
 
 
 class LicenseShort(BaseModel):
@@ -211,8 +195,6 @@ __all__ = [
     "InteractionShort",
     "LicenseShort",
     "MeetingShort",
-    "ProductShort",
-    "ProgramShort",
     "ResponsibleDetail",
     "ResponsibleShort",
     "StageShort",
