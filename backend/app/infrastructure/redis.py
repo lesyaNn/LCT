@@ -1,4 +1,5 @@
 """Redis client: cache / jobs / rate-limit. Falls back to in-memory dict."""
+import logging
 import time
 
 try:
@@ -8,6 +9,8 @@ except ImportError:  # pragma: no cover
 
 from app.config import settings
 
+logger = logging.getLogger("rtk")
+
 _memory: dict = {}
 _client = None
 
@@ -16,7 +19,16 @@ if redis is not None:
         _client = redis.Redis.from_url(settings.redis_url, socket_connect_timeout=2)
         _client.ping()
     except Exception:
+        logger.warning(
+            "redis unavailable at %s — using in-memory fallback (jobs/cache are node-local)",
+            settings.redis_url,
+        )
         _client = None
+
+
+def get_client():
+    """Raw redis client or None (callers must handle the fallback)."""
+    return _client
 
 
 def cache_get(key: str):

@@ -101,7 +101,8 @@ def test_me_curator_permissions(client):
     r = client.get("/api/v1/auth/me", headers=auth(mint(client, ("curator",))))
     assert r.status_code == 200
     assert r.json()["permissions"] == [
-        "university.edit", "university.read", "workflow.change_status", "workflow.read",
+        "catalog.read", "import.read", "university.edit", "university.read",
+        "workflow.change_status", "workflow.read",
     ]
 
 

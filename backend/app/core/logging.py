@@ -11,6 +11,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 
 async def request_log_middleware(request: Request, call_next):
     request_id = request.headers.get("X-Request-ID", uuid.uuid4().hex[:12])
+    request.state.request_id = request_id
     start = time.perf_counter()
     response = await call_next(request)
     duration_ms = int((time.perf_counter() - start) * 1000)

@@ -10,7 +10,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.security import CurrentUser, get_current_user
+from app.core.permissions import require_permission
+from app.core.security import CurrentUser
 from app.db.session import get_db
 from app.models.catalog import (
     ITDirection,
@@ -38,10 +39,17 @@ ERROR_RESPONSES = {
     responses=ERROR_RESPONSES,
 )
 def catalog_overview(
-    limit: int = Query(100, ge=1, le=500, description="Максимум строк лицензий"),
+    page: int = Query(1, ge=1, description="Страница, с 1"),
+    page_size: int = Query(100, ge=1, le=500, description="Строк лицензий на странице"),
+    limit: int | None = Query(
+        None, ge=1, le=500,
+        description="Deprecated: use page_size. Overrides page_size when set.",
+    ),
     db: Session = Depends(get_db),
-    _u: CurrentUser = Depends(get_current_user),
+    _u: CurrentUser = Depends(require_permission("catalog.read")),
 ):
+    size = limit if limit is not None else page_size
+    offset = (page - 1) * size
     total_universities = db.execute(
         select(func.count()).select_from(University)
     ).scalar() or 0
@@ -67,7 +75,8 @@ def catalog_overview(
                 selectinload(License.direction),
             )
             .order_by(License.expires_at)
-            .limit(limit)
+            .limit(size)
+            .offset(offset)
         )
         .scalars()
         .all()
@@ -127,6 +136,8 @@ def catalog_overview(
     return {
         "total_universities": total_universities,
         "total_licenses": total_licenses,
+        "page": page,
+        "page_size": size,
         "rows": rows,
         "directions": [
             {

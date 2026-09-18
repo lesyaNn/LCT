@@ -1,8 +1,11 @@
 """File storage: MinIO/S3 in prod, local ./var/files fallback for demo."""
+import logging
 import os
 import uuid
 
 from app.config import settings
+
+logger = logging.getLogger("rtk")
 
 LOCAL_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "var", "files")
 os.makedirs(LOCAL_DIR, exist_ok=True)
@@ -26,6 +29,10 @@ def save_file(filename: str, content: bytes) -> str:
         client.put_object(settings.s3_bucket, key, io.BytesIO(content), len(content))
         return f"s3://{settings.s3_bucket}/{key}"
     except Exception:
+        logger.warning(
+            "minio unavailable at %s — storing %s locally (node-local, not shared)",
+            settings.s3_endpoint, filename,
+        )
         key = f"{uuid.uuid4().hex}_{filename}"
         with open(os.path.join(LOCAL_DIR, key), "wb") as f:
             f.write(content)

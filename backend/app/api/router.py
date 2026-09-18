@@ -1,8 +1,11 @@
 """API v1 router.
 
-MINIMAL AUTH STAGE: only `auth` is mounted.
-Domain routers (universities/teachers/programs/workflow/documents/...)
-will be re-enabled at the next stage (PostgreSQL domain schema).
+Mounted (production contract): ``auth / import / passport / catalog``.
+Everything else in ``app.modules`` is DEFERRED forward scaffolding for the
+next stages — see ``docs/AUDIT.md`` (§0) for the module table and the
+reactivation checklist. Do NOT mount a deferred router without completing
+that checklist (UUID PKs, keycloak_sub identity, SQL migration, RBAC,
+pagination, tests).
 """
 
 from fastapi import APIRouter

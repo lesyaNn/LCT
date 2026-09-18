@@ -1,13 +1,10 @@
-export type Me = {
-  id: string;
-  username: string | null;
-  email: string | null;
-  name: string | null;
-  roles: string[];
-  permissions: string[];
-};
+import type { Me } from "../types";
+
+export type { Me } from "../types";
 
 export function UserCard({ me }: { me: Me }) {
+  const roles = me.roles ?? [];
+  const permissions = me.permissions ?? [];
   return (
     <div className="card">
       <h2>Вы вошли в систему</h2>
@@ -18,13 +15,13 @@ export function UserCard({ me }: { me: Me }) {
       </dl>
       <h3>Роль</h3>
       <div className="chips">
-        {me.roles.map((r) => (
+        {roles.map((r) => (
           <span key={r} className="chip">{r}</span>
         ))}
       </div>
       <h3>Права</h3>
       <ul className="perms">
-        {me.permissions.map((p) => (
+        {permissions.map((p) => (
           <li key={p}>• {p}</li>
         ))}
       </ul>

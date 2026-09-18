@@ -1,9 +1,15 @@
+"""DEFERRED module — forward stub, see ``docs/AUDIT.md`` (§0).
+
+Forward file-registry stub overlapping the canon ``documents`` table;
+isolated on ``DeferredBase`` metadata. Canon:
+``app.models.interactions.Document``.
+"""
 from datetime import datetime
 
 from sqlalchemy import DateTime, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base
+from app.db.deferred import DeferredBase as Base
 
 
 class FileMeta(Base):

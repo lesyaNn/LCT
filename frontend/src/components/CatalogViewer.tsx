@@ -1,38 +1,28 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "../api/client";
+import type { CatalogOverview } from "../types";
 
-export type CatalogRow = {
-  university: string | null;
-  vendor: string | null;
-  product: string | null;
-  contract_number: string | null;
-  signed_at: string | null;
-  expires_at: string | null;
-  transfer_status: string | null;
-  manager: string | null;
-  responsibles: string[];
-  comment: string | null;
-  direction: string | null;
-};
-
-export type CatalogDirection = { code: string; name: string; programs: number };
-
-export type CatalogOverview = {
-  total_universities: number;
-  total_licenses: number;
-  rows: CatalogRow[];
-  directions: CatalogDirection[];
-};
+export type { CatalogDirection, CatalogOverview, CatalogRow } from "../types";
 
 export function CatalogViewer() {
   const [data, setData] = useState<CatalogOverview | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const ctrlRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => ctrlRef.current?.abort(), []);
+
   const load = async () => {
+    ctrlRef.current?.abort();
+    const ctrl = new AbortController();
+    ctrlRef.current = ctrl;
     setLoading(true);
     setError(null);
-    const r = await apiFetch<CatalogOverview>("/api/v1/catalog/overview?limit=100");
+    const r = await apiFetch<CatalogOverview>("/api/v1/catalog/overview?page_size=100", {
+      signal: ctrl.signal,
+    });
+    if (ctrl.signal.aborted) return;
     setLoading(false);
     if (r.ok) {
       setData(r.data);
@@ -50,7 +40,7 @@ export function CatalogViewer() {
           {loading ? "Загрузка…" : data ? "Обновить" : "Показать данные"}
         </button>
       </div>
-      {error && <p className="err">{error}</p>}
+      {error && <p className="err" role="alert">{error}</p>}
       {data && (
         <>
           <p>

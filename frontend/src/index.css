@@ -82,3 +82,17 @@ body {
 .table th, .table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
 .table th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
 .table tbody tr:hover { background: #f1f5f9; }
+.btn:focus-visible, a:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 2px;
+}
+.btn:disabled { opacity: 0.6; cursor: default; }
+
+@media (max-width: 640px) {
+  .hero { padding: 28px 18px; }
+  .hero h1 { font-size: 28px; }
+  .hero p { font-size: 16px; }
+  .content { padding: 12px; }
+  .card { padding: 16px; }
+  .topbar { flex-wrap: wrap; gap: 8px; padding: 10px 14px; }
+}

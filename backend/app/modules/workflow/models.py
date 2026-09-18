@@ -1,9 +1,16 @@
+"""DEFERRED module — forward stub, see ``docs/AUDIT.md`` (§0).
+
+Forward stub for the interaction pipeline written before the P1 UUID
+decision (int PKs); isolated on ``DeferredBase`` metadata so it never
+pollutes the canonical P1 schema. Reactivation requires UUID migration
++ SQL migration + router mounting (checklist in ``docs/AUDIT.md`` §0).
+"""
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base
+from app.db.deferred import DeferredBase as Base
 
 
 class WorkflowStatus(Base):

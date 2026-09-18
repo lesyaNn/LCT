@@ -2,7 +2,7 @@ import json
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, Uuid, func
+from sqlalchemy import DateTime, ForeignKey, Index, String, Text, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -14,8 +14,8 @@ class AuditEvent(Base):
     P1-04-05 addition: nullable ``university_id`` (UUID, SET NULL) so audit
     events can be attributed to UUID universities and filtered per-university
     in SQL (``WHERE university_id = ? ORDER BY created_at DESC LIMIT 5``).
-    The legacy ``entity_type``/``entity_id`` (Integer) columns are kept
-    untouched for backward compatibility.
+    Migration 000010: ``user_id``/``entity_id`` are TEXT so Keycloak ``sub``
+    (str) and UUID entity ids fit; legacy integer values round-trip.
     """
 
     __tablename__ = "audit_events"
@@ -25,9 +25,9 @@ class AuditEvent(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(Integer)
+    user_id: Mapped[str] = mapped_column(Text)
     entity_type: Mapped[str] = mapped_column(String(64))
-    entity_id: Mapped[int] = mapped_column(Integer)
+    entity_id: Mapped[str] = mapped_column(Text)
     action: Mapped[str] = mapped_column(String(32))
     before_data: Mapped[str] = mapped_column(Text, default="{}")
     after_data: Mapped[str] = mapped_column(Text, default="{}")
