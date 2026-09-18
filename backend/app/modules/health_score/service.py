@@ -56,10 +56,10 @@ class HealthScoreService:
         self.db = db
 
     def calculate(self, university_id: int, signals: dict | None = None) -> HealthScoreHistory:
-        # Local import: the legacy workflow tables use int FKs (incl. a
-        # reference to a nonexistent ``programs`` table) and must NOT be
-        # registered on Base.metadata as a side effect of importing this
-        # service (it would break metadata-wide create_all / migrations).
+        # Local import: the legacy workflow tables are excluded from the
+        # canonical SQL schema (int FKs, one pointing at a nonexistent
+        # ``programs`` table), so they must never be registered on
+        # Base.metadata as a side effect of importing this service.
         from app.modules.workflow.models import Task
 
         signals = signals or {}

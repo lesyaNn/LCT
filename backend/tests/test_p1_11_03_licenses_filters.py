@@ -14,9 +14,11 @@ Scope (honest, no invented API):
 * Region bug (P1-10-02): ``University.region`` does not exist; the fixed
   repository accepts and safely ignores the legacy param (Variant A+C).
 
-SQLite by default; PostgreSQL via ``TEST_DATABASE_URL`` pointing at the
-dedicated ``rtk_p1_test`` DB (schema reset per test, same as P1-11-01/02).
-PG-only assertions (23503/23505/EXPLAIN) are dialect-gated.
+DB integration tests require PostgreSQL via ``TEST_DATABASE_URL`` pointing at
+the dedicated ``rtk_p1_test`` DB (schema reset per test via canonical SQL
+migrations, same as P1-11-01/02). Unit-level pins (enum layer, discovery
+table, 409 mapping, OpenAPI) run anywhere. PG-only assertions
+(23503/23505/EXPLAIN) are dialect-gated.
 """
 
 import inspect
@@ -27,13 +29,12 @@ from datetime import date, timedelta
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, delete as sa_delete, event, func, select, text
+from sqlalchemy import delete as sa_delete, func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401 (register metadata on Base)
 from app.core.errors import CONFLICT_DETAIL, register_error_handlers
-from app.db.base import Base
 from app.models.catalog import (
     Contract,
     ITDirection,
@@ -71,23 +72,11 @@ def _pgcode(exc: IntegrityError) -> str | None:
 
 
 @pytest.fixture()
-def engine(tmp_path):
-    url = TEST_URL
-    if url == "sqlite://":
-        url = f"sqlite:///{tmp_path}/p1_11_03_test.db"
-    eng = create_engine(url)
-    if eng.dialect.name == "sqlite":
+def engine():
+    """Isolated PG DB per test (canonical SQL migrations; skips w/o PG)."""
+    from tests.db_helpers import require_pg_engine
 
-        @event.listens_for(eng, "connect")
-        def _fk_on(dbapi_conn, _rec):  # pragma: no cover
-            dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-        Base.metadata.drop_all(eng)
-    else:
-        with eng.begin() as conn:
-            conn.execute(text("DROP SCHEMA public CASCADE"))
-            conn.execute(text("CREATE SCHEMA public"))
-    Base.metadata.create_all(eng)
+    eng = require_pg_engine(TEST_URL)
     yield eng
     eng.dispose()
 

@@ -1,7 +1,8 @@
 #!/bin/sh
-# Backend entrypoint: wait for PostgreSQL, run Alembic, start API.
+# Backend entrypoint: wait for PostgreSQL, run SQL migrations, start API.
 # Race-free: postgres healthcheck in compose + retry loop here (60s),
 # single backend replica runs migrations (no concurrent writers).
+# SQL files in migrations/ are the ONLY schema source (scripts/migrate.py).
 set -e
 
 if [ -n "$DATABASE_URL" ]; then
@@ -21,8 +22,12 @@ for i in range(60):
             raise SystemExit(f"[entrypoint] database {host}:{port} unreachable after 60s")
         time.sleep(1)
 EOF
-  echo "[entrypoint] alembic upgrade head..."
-  python -m alembic upgrade head
+  echo "[entrypoint] adopting legacy Alembic DB if needed (strict, data-preserving)..."
+  python scripts/migrate.py baseline || true
+  echo "[entrypoint] sql migrations up..."
+  python scripts/migrate.py up
+  echo "[entrypoint] verifying schema..."
+  python scripts/migrate.py verify
 else
   echo "[entrypoint] DATABASE_URL not set, skipping migrations (SQLite dev mode)."
 fi

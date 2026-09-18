@@ -1,6 +1,7 @@
 """P1-04-05 passport include tests (health_score + audit blocks).
 
-SQLite by default, PostgreSQL via TEST_DATABASE_URL. Reuses seed helpers
+PostgreSQL integration via TEST_DATABASE_URL (canonical SQL migrations).
+Reuses seed helpers
 from the base passport test module (no duplication).
 """
 
@@ -11,18 +12,17 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, event, select
+from sqlalchemy import event, select
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401
 import test_university_passport as base_t
 from app.config import settings
-from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 from app.modules.audit.models import AuditEvent
 from app.modules.audit.service import AuditService
-from app.modules.health_score.service import HealthScoreService, compute_score
+from app.modules.health_score.service import compute_score
 from app.modules.universities import passport_service as ps
 from app.modules.universities.passport_schemas import UniversityPassport
 
@@ -30,19 +30,11 @@ TEST_URL = os.getenv("TEST_DATABASE_URL", "sqlite://")
 
 
 @pytest.fixture()
-def engine(tmp_path):
-    url = TEST_URL
-    if url == "sqlite://":
-        url = f"sqlite:///{tmp_path}/passport_inc_test.db"
-    eng = create_engine(url)
-    if eng.dialect.name == "sqlite":
+def engine():
+    """PostgreSQL integration DB (canonical SQL migrations; skips w/o PG)."""
+    from tests.db_helpers import require_pg_engine
 
-        @event.listens_for(eng, "connect")
-        def _fk_on(dbapi_conn, _rec):  # pragma: no cover
-            dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    Base.metadata.drop_all(eng)
-    Base.metadata.create_all(eng)
+    eng = require_pg_engine(TEST_URL)
     yield eng
     eng.dispose()
 
@@ -143,8 +135,15 @@ def test_parse_include_unknown_is_422():
 # ------------------------------------------------- compute_score guard ---
 
 
-def test_compute_score_matches_legacy_formula(engine):
-    """The extracted pure function preserves HealthScoreService.calculate."""
+def test_compute_score_matches_legacy_formula():
+    """Pure-unit guard: the extracted formula preserves the legacy scoring.
+
+    DB-free by design (no engine fixture): persistence through
+    ``HealthScoreService.calculate`` is intentionally NOT covered here —
+    it depends on the legacy workflow ``tasks`` table, which is excluded
+    from the canonical SQL schema (int FKs, reference to a nonexistent
+    ``programs`` table), so no Python DDL path may create it.
+    """
     score, details = compute_score(overdue_tasks=3, signals={"missing_license": True})
     assert score == 100 - 30 - 15 == 55
     assert details["overdue_tasks"].startswith("-30")
@@ -163,36 +162,6 @@ def test_compute_score_matches_legacy_formula(engine):
         },
     )
     assert full == 100 - 15 - 10 - 10 - 15 - 15 == 35
-
-    # calculate() must keep writing the same score. The legacy workflow
-    # tables are toxic to metadata-wide create_all (FK to nonexistent
-    # ``programs`` table), so the tasks table is created standalone here
-    # and unregistered afterwards — global metadata stays clean.
-    # NOTE: HealthScoreHistory.university_id inherits the Uuid type from
-    # universities.id via FK inference, so calculate() requires a UUID
-    # (legacy int ids never worked — the Uuid bind processor rejects them).
-    # The Task overdue query compares an INTEGER column to the UUID, which
-    # PostgreSQL rejects -> persistence check is SQLite-only.
-    # P1-10-02: the skip MUST precede the import — importing the legacy
-    # workflow models registers the unresolvable ``workflows`` table on
-    # global metadata, and a skip after the import leaks it into every
-    # later fixture (NoReferencedTableError on PostgreSQL combined runs).
-    if os.getenv("TEST_DATABASE_URL"):
-        pytest.skip("legacy Task overdue query is SQLite-only")
-    from app.modules.workflow.models import Task  # noqa: E402
-    try:
-        Task.__table__.create(bind=engine, checkfirst=True)
-        with Session(engine) as s:
-            uni = base_t._university(s, "Uni HS Legacy")
-            s.commit()
-            row = HealthScoreService(s).calculate(uni.id, {"missing_license": True})
-            assert row.score == compute_score(0, {"missing_license": True})[0] == 85
-    finally:
-        Task.__table__.drop(bind=engine, checkfirst=True)
-        for name in ("tasks", "workflows", "workflow_statuses", "workflow_transitions"):
-            tbl = Base.metadata.tables.get(name)
-            if tbl is not None:
-                Base.metadata.remove(tbl)
 
 
 # ------------------------------------------------------------ no include ---

@@ -152,46 +152,58 @@ docker compose up --build
 
 ```bash
 cd backend
-PYTHONPATH=. python -m pytest tests/ -q
+PYTHONPATH=. python -m pytest tests/ -q   # pure-unit; DB-интеграция скипается без PG
+# Полная интеграция (схема только из SQL-миграций):
+TEST_DATABASE_URL=postgresql+psycopg://rtk:change-me@localhost:5433/rtk_p1_test \
+  PYTHONPATH=. python -m pytest tests/ -q
 ```
 
-### 🗄️ P1 — ядро схемы БД (PostgreSQL + Alembic + seed)
+### 🗄️ P1 — ядро схемы БД (PostgreSQL + SQL migrations + seed)
 
-Канонические модели: `backend/app/models/` (20 таблиц: universities,
-it_directions, it_programs, vendors, it_products, contracts, licenses,
-responsibles, university_responsibles, teachers, teacher_qualifications,
-teacher_certificates, teacher_programs, students, university_programs,
-university_products, meetings, meeting_documents, documents,
-interaction_notes). Все PK — UUID, все даты — `timestamptz`,
-статусы лицензий/договоров/готовности — вычисляемые `@property`
-(см. `IMPORTANT DECISIONS` в отчёте P1 о CASCADE/RESTRICT).
+SQL-файлы `backend/migrations/` — **единственный источник истины схемы**
+(8 версий: `000001_core_catalog` … `000008_readiness_perf_indexes`).
+Python ORM (`backend/app/models/` + `audit_events`) — только runtime-описание,
+схемой не управляет (`create_all`/`drop_all`/Alembic DDL удалены из активных
+путей; история Alembic лежит в `backend/alembic/` как read-only архив).
+21 таблица: universities, it_directions, it_programs, vendors, it_products,
+contracts, licenses, responsibles, university_responsibles, teachers,
+teacher_qualifications, teacher_certificates, teacher_programs, students,
+university_programs, university_products, meetings, meeting_documents,
+documents, interaction_notes, audit_events. Все PK — UUID (генерирует
+приложение, без `gen_random_uuid()`), все даты — `timestamptz`,
+статусы лицензий/договоров/готовности — вычисляемые `@property`.
 
 ```bash
 # 1. Поднять инфраструктуру (postgres healthy -> backend сам применит миграции)
 cp .env.example .env
 docker compose up -d --build
 
-# 2. Локально (без compose): указать БД и применить миграции
+# 2. Локально (без compose): создать БД и применить миграции
 cd backend
 DATABASE_URL=postgresql+psycopg://rtk:change-me@localhost:5433/rtk \
-  python -m alembic upgrade head
+  python scripts/migrate.py up
 
-# 3. Проверить версию и голову
-python -m alembic current
-python -m alembic heads        # ровно один head: 7f3a1c9e2b06 (passport perf + readiness indexes)
+# 3. Проверить версию (latest: 000008_readiness_perf_indexes)
+DATABASE_URL=... python scripts/migrate.py status
+DATABASE_URL=... python scripts/migrate.py verify
 
-# 4. Загрузить демо-данные (идемпотентно, повтор безопасен)
+# 4. Загрузить демо-данные (идемпотентно, повтор безопасен; только ПОСЛЕ migrate)
 DATABASE_URL=... python -m app.db.seed
 # или:  DATABASE_URL=... python scripts/seed_demo.py
+# perf-нагрузка (тоже только после migrate, таблицы не создаёт):
+#   DATABASE_URL=... python scripts/seed_performance.py
 
-# 5. Инспекция схемы (таблицы, FK, индексы, timestamptz, версия Alembic)
+# 5. Инспекция схемы (таблицы, FK, индексы, timestamptz, версия миграций)
 DATABASE_URL=... python scripts/db_inspect.py
 
 # 6. EXPLAIN по ключевым запросам (паспорт, преподаватели, лицензии, встречи)
 DATABASE_URL=... python scripts/check_explain.py
 
-# 7. Тесты (SQLite по умолчанию; PostgreSQL через TEST_DATABASE_URL)
+# 7. Тесты: без PG — только pure-unit (DB-тесты скипаются, никакого SQLite DDL);
+#    полная интеграция — через TEST_DATABASE_URL (схема только из SQL-миграций)
 python -m pytest tests/ -q
+TEST_DATABASE_URL=postgresql+psycopg://rtk:change-me@localhost:5433/rtk_p1_test \
+  python -m pytest tests/ -q
 TEST_DATABASE_URL=postgresql+psycopg://postgres@localhost:55433/rtk_p1_test \
   python -m pytest tests/test_p1_schema.py -q
 ```
@@ -200,12 +212,31 @@ TEST_DATABASE_URL=postgresql+psycopg://postgres@localhost:55433/rtk_p1_test \
 
 ```bash
 cd backend
-DATABASE_URL=... python -m alembic downgrade base  # чистит схему P1 полностью
-DATABASE_URL=... python -m alembic upgrade head    # создаёт заново без ошибок
+DATABASE_URL=... python scripts/migrate.py down --to base --yes  # чистит схему P1 полностью
+DATABASE_URL=... python scripts/migrate.py up                     # создаёт заново без ошибок
+# Частичный откат: DATABASE_URL=... python scripts/migrate.py down --to 000007_passport_perf_indexes --yes
+```
+
+Переход существующей БД со старого Alembic-head (`7f3a1c9e2b06`):
+
+```bash
+cd backend
+DATABASE_URL=... python scripts/migrate.py baseline  # строгая проверка + mark applied, данные целы
+DATABASE_URL=... python scripts/migrate.py verify
 ```
 
 Проверка seed: повторный `python -m app.db.seed` печатает те же счётчики
 (10 вузов, 34 преподавателя, 750 студентов, …) — дубликатов нет.
+
+Проверка эквивалентности старой и новой схемы (каталог + pg_dump):
+
+```bash
+cd backend
+python scripts/check_migrations.py \
+  --source postgresql://rtk:change-me@localhost:5433/rtk_schema_source \
+  --target postgresql://rtk:change-me@localhost:5433/rtk_schema_target
+# -> SCHEMA EQUIVALENCE: PASS (21 tables, 173 columns)
+```
 
 ### 🗄️ PostgreSQL: две базы — `rtk` (приложение) и `keycloak` (авторизация)
 
@@ -213,9 +244,9 @@ DATABASE_URL=... python -m alembic upgrade head    # создаёт заново
 
 ```text
 PostgreSQL
-├── rtk      — application database, managed by Alembic
+├── rtk      — application database, managed by SQL migrations (scripts/migrate.py)
 │   ├── universities, teachers, students, licenses, contracts, ...
-│   └── alembic_version
+│   └── schema_migrations (+ legacy alembic_version row on adopted DBs)
 └── keycloak — authentication database, managed by Keycloak (Liquibase)
     ├── KEYCLOAK INTERNAL TABLES (realm, client, user_entity, ...)
     └── realm `rtk` + client `rtk-frontend` (import из keycloak/realm-export.json)
@@ -224,8 +255,8 @@ PostgreSQL
 * Backend работает только с `rtk` (`DATABASE_URL=...@postgres:5432/rtk`), к таблицам
   Keycloak не обращается — только JWT/OIDC по JWKS.
 * Keycloak работает только с `keycloak` (`KC_DB=postgres`,
-  `KC_DB_URL=jdbc:postgresql://postgres:5432/keycloak`). Alembic таблиц Keycloak
-  не создаёт; Keycloak не трогает таблицы `rtk`.
+  `KC_DB_URL=jdbc:postgresql://postgres:5432/keycloak`). SQL-миграции таблиц Keycloak
+  не создают; Keycloak не трогает таблицы `rtk`.
 * Bootstrap обеих БД на чистом pgdata: `docker/postgres/init-databases.sh`
   (монтируется в `/docker-entrypoint-initdb.d/` сервиса `postgres`).
   Переменные: `KEYCLOAK_DB` / `KEYCLOAK_DB_USER` / `KEYCLOAK_DB_PASSWORD`
@@ -237,9 +268,9 @@ PostgreSQL
 ```bash
 # Проверка изоляции
 docker compose exec postgres psql -U rtk -d rtk -c "\l"            # есть rtk и keycloak
-docker compose exec postgres psql -U rtk -d rtk -c "\dt"           # только P1 + alembic_version
+docker compose exec postgres psql -U rtk -d rtk -c "\dt"           # только P1 + schema_migrations
 docker compose exec postgres psql -U rtk -d keycloak -t \
-  -c "SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tablename IN ('universities','teachers','students','licenses','alembic_version');"
+  -c "SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tablename IN ('universities','teachers','students','licenses','schema_migrations','alembic_version');"
 # -> 0 (P1-таблиц в keycloak нет)
 
 # Одноразовый bootstrap keycloak-БД на СУЩЕСТВУЮЩЕМ volume (на fresh pgdata не нужен):

@@ -1,10 +1,10 @@
-"""PostgreSQL schema inspection (P1 task §20).
+"""PostgreSQL schema inspection.
 
 Usage (from backend/):
     DATABASE_URL=postgresql+psycopg://postgres@localhost:55433/rtk_p1 \
         python scripts/db_inspect.py
 
-Prints: tables, key FKs, indexes, alembic version.
+Prints: tables, key FKs, indexes, SQL migration version.
 """
 
 import os
@@ -54,11 +54,19 @@ with engine.connect() as conn:
         print(f"  - {r[0]}.{r[1]}: {r[2]}")
     print(f"  => {'ALL TIMESTAMPTZ' if not bad else 'MISMATCH: ' + str(bad)}")
 
-print("\nALEMBIC VERSION:")
+print("\nMIGRATION VERSION (schema_migrations; alembic_version = legacy only):")
 with engine.connect() as conn:
+    try:
+        rows = conn.execute(text("SELECT version FROM schema_migrations ORDER BY 1")).fetchall()
+        for r in rows:
+            print(f"  - {r[0]}")
+        if not rows:
+            print("  - (no applied SQL migrations)")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  - (no schema_migrations table: {exc})")
     try:
         rows = conn.execute(text("SELECT version_num FROM alembic_version")).fetchall()
         for r in rows:
-            print(f"  - {r[0]}")
-    except Exception as exc:  # noqa: BLE001
-        print(f"  - (no version table: {exc})")
+            print(f"  - legacy alembic: {r[0]}")
+    except Exception:  # noqa: BLE001
+        print("  - (no legacy alembic_version table)")

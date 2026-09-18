@@ -8,10 +8,12 @@ Scope (honest, no invented endpoints):
 * HTTP-level tests only where real mounted routes exist: auth/RBAC
   mechanism, central IntegrityError mapping, gap pins proving the legacy
   CRUD routers stay unmounted, OpenAPI sanity.
-* SQLite by default (fast); PostgreSQL when ``TEST_DATABASE_URL`` is set
-  (``postgresql+psycopg://rtk:change-me@localhost:5433/rtk_p1_test``).
-  UNIQUE/FK/RESTRICT/composite-constraint tests MUST be verified on PG
-  (§3, §30) — PG-only assertions are gated on dialect, nothing is mocked.
+* DB integration tests require PostgreSQL (``TEST_DATABASE_URL`` pointing at
+  the dedicated ``rtk_p1_test`` DB); the schema always comes from the
+  canonical SQL migrations. Pure-unit tests (RBAC mechanism, 409 mapping,
+  gap pins, OpenAPI sanity) run anywhere.
+* UNIQUE/FK/RESTRICT/composite-constraint tests run on PG (§3, §30) —
+  PG-only assertions are gated on dialect, nothing is mocked.
 
 Known gaps (PARTIAL, see final report): no mounted HTTP CRUD for the six
 entities; legacy ``universities``/``programs``/``teachers`` routers on disk
@@ -27,13 +29,12 @@ import pytest
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
-from sqlalchemy import create_engine, event, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401  (register metadata on Base)
 from app.core.errors import CONFLICT_DETAIL, register_error_handlers
-from app.db.base import Base
 from app.models.catalog import (
     Contract,
     ITDirection,
@@ -84,34 +85,15 @@ def _core_delete(db: Session, model, pk):
 
 
 @pytest.fixture()
-def engine(tmp_path):
-    """Fresh isolated DB per test (file SQLite or dedicated PG test DB).
+def engine():
+    """Fresh isolated PG DB per test (canonical SQL migrations, never ORM).
 
-    Same convention as test_p1_schema / passport tests: no parallel test
-    infrastructure, per-test reset => order-independent.
-    PG note: module tables (audit_events, health_score_history, ...) live in
-    the test DB but are NOT registered on Base.metadata (pre-existing P1-10-02
-    condition, also breaking test_p1_schema on PG), so plain drop_all cannot
-    order DDL. Reset the schema instead — test-only, dedicated test DB.
+    Same convention as the other suites: no parallel test infrastructure,
+    per-test schema reset => order-independent. Requires TEST_DATABASE_URL.
     """
-    from sqlalchemy import text
+    from tests.db_helpers import require_pg_engine
 
-    url = TEST_URL
-    if url == "sqlite://":
-        url = f"sqlite:///{tmp_path}/p1_crud_test.db"
-    eng = create_engine(url)
-    if eng.dialect.name == "sqlite":
-
-        @event.listens_for(eng, "connect")
-        def _fk_on(dbapi_conn, _rec):  # pragma: no cover
-            dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-        Base.metadata.drop_all(eng)
-    else:
-        with eng.begin() as conn:
-            conn.execute(text("DROP SCHEMA public CASCADE"))
-            conn.execute(text("CREATE SCHEMA public"))
-    Base.metadata.create_all(eng)
+    eng = require_pg_engine(TEST_URL)
     yield eng
     eng.dispose()
 

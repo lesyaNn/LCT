@@ -1,6 +1,6 @@
 """P1-04-06 passport performance regression tests.
 
-SQLite by default, PostgreSQL via TEST_DATABASE_URL. Covers:
+PostgreSQL integration via TEST_DATABASE_URL (canonical SQL migrations). Covers:
 
 * base passport SELECT count (<= 8) with an exact per-run count;
 * ``?include=`` deltas (health +0, audit +1, both +1);
@@ -19,13 +19,12 @@ from datetime import date, datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, event, select
+from sqlalchemy import event, select
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401
 import test_university_passport as base_t
 from app.config import settings
-from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 from app.models.catalog import (
@@ -51,19 +50,11 @@ TEST_URL = os.getenv("TEST_DATABASE_URL", "sqlite://")
 
 
 @pytest.fixture()
-def engine(tmp_path):
-    url = TEST_URL
-    if url == "sqlite://":
-        url = f"sqlite:///{tmp_path}/passport_perf_test.db"
-    eng = create_engine(url)
-    if eng.dialect.name == "sqlite":
+def engine():
+    """PostgreSQL integration DB (canonical SQL migrations; skips w/o PG)."""
+    from tests.db_helpers import require_pg_engine
 
-        @event.listens_for(eng, "connect")
-        def _fk_on(dbapi_conn, _rec):  # pragma: no cover
-            dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    Base.metadata.drop_all(eng)
-    Base.metadata.create_all(eng)
+    eng = require_pg_engine(TEST_URL)
     yield eng
     eng.dispose()
 

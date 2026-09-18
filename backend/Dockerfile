@@ -2,9 +2,8 @@ FROM python:3.12-slim
 WORKDIR /code
 COPY pyproject.toml ./
 RUN pip install --no-cache-dir "fastapi" "uvicorn[standard]" sqlalchemy alembic "psycopg[binary]" pydantic pydantic-settings "python-jose[cryptography]" python-multipart httpx pytest
-COPY alembic.ini ./alembic.ini
-COPY alembic ./alembic
 COPY scripts ./scripts
+COPY migrations ./migrations
 COPY app ./app
 COPY entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh

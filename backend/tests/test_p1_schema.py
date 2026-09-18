@@ -1,24 +1,23 @@
 """P1 schema integration tests (task §16).
 
-Runs on SQLite by default (zero-setup, fast) for logic-level checks
-(FKs via PRAGMA, UNIQUE, CASCADE/SET NULL/RESTRICT, M:N, timestamps,
-derived statuses, readiness, seed idempotency, alembic chain).
+Runs that need a database are PostgreSQL integration tests (canonical SQL
+migrations via ``tests/db_helpers.py``). Pure-unit checks (timestamp tz-awareness
+on metadata, derived statuses on transient objects, readiness math, migration
+chain shape) run anywhere.
 
-PostgreSQL-specific checks (timestamptz storage, real ON DELETE behaviour
-in PG, live upgrade/downgrade) run when ``TEST_DATABASE_URL`` is set, e.g.::
+DB tests need PostgreSQL::
 
-    TEST_DATABASE_URL=postgresql+psycopg://postgres@localhost:55433/rtk_p1_test \\
+    TEST_DATABASE_URL=postgresql+psycopg://rtk:change-me@localhost:5433/rtk_p1_test \\
         python -m pytest tests/test_p1_schema.py -q
 """
 
 import os
-import re
 import time
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
-from sqlalchemy import create_engine, event, inspect, select
+from sqlalchemy import create_engine, inspect, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -65,17 +64,11 @@ TEST_URL = os.getenv("TEST_DATABASE_URL", "sqlite://")
 
 
 @pytest.fixture()
-def engine(tmp_path):
-    url = TEST_URL
-    if url == "sqlite://":
-        url = f"sqlite:///{tmp_path}/p1_test.db"
-    eng = create_engine(url)
-    if eng.dialect.name == "sqlite":
-        @event.listens_for(eng, "connect")
-        def _fk_on(dbapi_conn, _rec):  # pragma: no cover
-            dbapi_conn.execute("PRAGMA foreign_keys=ON")
-    Base.metadata.drop_all(eng)
-    Base.metadata.create_all(eng)
+def engine():
+    """PostgreSQL integration DB (canonical SQL migrations; skips w/o PG)."""
+    from tests.db_helpers import require_pg_engine
+
+    eng = require_pg_engine(TEST_URL)
     yield eng
     eng.dispose()
 
@@ -414,34 +407,30 @@ def test_seed_idempotent(engine):
         assert n_links >= 10
 
 
-# ------------------------------------------------------------ alembic chain
+# ------------------------------------------------------------ migration chain
 
-def test_alembic_single_head_chain():
+def test_sql_migration_single_head_chain():
+    """SQL files are the single schema source: 000001..000008, paired up/down."""
+    import re as _re
+
     versions = os.path.join(os.path.dirname(os.path.dirname(
-        os.path.abspath(__file__))), "alembic", "versions")
-    revs, downs = {}, set()
+        os.path.abspath(__file__))), "migrations")
+    ups, downs = set(), set()
     for fname in os.listdir(versions):
-        if not fname.endswith(".py"):
-            continue
-        src = open(os.path.join(versions, fname), encoding="utf-8").read()
-        rev = re.search(r'^revision:\s*str\s*=\s*"([^"]+)"', src, re.M).group(1)
-        m = re.search(r'^down_revision[^=]*=\s*("([^"]+)"|None)',
-                      src, re.M)
-        down = m.group(2) if m else None
-        revs[rev] = fname
-        if down:
-            downs.add(down)
-    heads = set(revs) - downs
-    assert len(heads) == 1, f"multiple heads: {heads}"
-    assert len(revs) >= 3
+        m = _re.match(r"^(\d{6}_[a-z0-9_]+)\.(up|down)\.sql$", fname)
+        assert m, f"bad migration filename: {fname}"
+        (ups if m.group(2) == "up" else downs).add(m.group(1))
+    assert ups == downs, f"unpaired migrations: up^down={ups ^ downs}"
+    assert sorted(ups)[-1] == "000008_readiness_perf_indexes"
+    assert len(ups) == 8
 
 
 @pytest.mark.skipif(not os.getenv("TEST_DATABASE_URL"),
                     reason="needs TEST_DATABASE_URL=postgresql...")
-def test_alembic_upgrade_downgrade_cycle():
+def test_sql_migrate_upgrade_downgrade_cycle():
     import subprocess
     backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    # Start from a truly clean DB (no create_all leftovers, no version).
+    # Start from a truly clean DB (schema reset, test-only dedicated DB).
     eng = create_engine(os.environ["TEST_DATABASE_URL"])
     try:
         with eng.connect() as conn:
@@ -452,8 +441,8 @@ def test_alembic_upgrade_downgrade_cycle():
         eng.dispose()
     env = dict(os.environ)
     env["DATABASE_URL"] = os.environ["TEST_DATABASE_URL"]
-    for cmd in (["python", "-m", "alembic", "downgrade", "base"],
-                ["python", "-m", "alembic", "upgrade", "head"]):
+    for cmd in (["python", "scripts/migrate.py", "down", "--to", "base", "--yes"],
+                ["python", "scripts/migrate.py", "up"]):
         subprocess.run(cmd, cwd=backend_dir, env=env, check=True,
                        capture_output=True)
     eng = create_engine(os.environ["TEST_DATABASE_URL"])

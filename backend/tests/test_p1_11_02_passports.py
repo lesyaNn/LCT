@@ -35,10 +35,10 @@ passport pipeline (``get_passport`` / HTTP), never through private loaders:
 * OpenAPI passport paths (§64);
 * central 409 handler coexistence with 404/403/422 (§65).
 
-SQLite by default (fast); PostgreSQL via ``TEST_DATABASE_URL`` pointing at a
-DEDICATED test database (``rtk_p1_test``). The PG fixture resets the schema
-(``DROP SCHEMA public CASCADE``) exactly like ``test_p1_crud.py`` — the
-pre-existing metadata/drop_all condition (§66) is worked around, not fixed.
+DB integration tests require PostgreSQL via ``TEST_DATABASE_URL`` pointing at a
+DEDICATED test database (``rtk_p1_test``): the fixture resets the schema
+(``DROP SCHEMA public CASCADE``) and applies the canonical SQL migrations.
+Pure-unit tests (readiness math, discovery pins) run anywhere.
 """
 
 import base64
@@ -52,7 +52,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
-from sqlalchemy import create_engine, event, select, text
+from sqlalchemy import event, select
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401  (register catalog/interactions/teachers metadata)
@@ -60,7 +60,6 @@ import test_passport_performance as perf
 import test_university_passport as base_t
 from app.config import settings
 from app.core.errors import CONFLICT_DETAIL, register_error_handlers
-from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 from app.models.catalog import Contract, License
@@ -92,24 +91,11 @@ def _is_pg(engine) -> bool:
 
 
 @pytest.fixture()
-def engine(tmp_path):
-    """Isolated DB per test: file SQLite or dedicated PG test DB (schema reset)."""
-    url = TEST_URL
-    if url == "sqlite://":
-        url = f"sqlite:///{tmp_path}/p1_11_02_test.db"
-    eng = create_engine(url)
-    if eng.dialect.name == "sqlite":
+def engine():
+    """Isolated PG DB per test (canonical SQL migrations; skips w/o PG)."""
+    from tests.db_helpers import require_pg_engine
 
-        @event.listens_for(eng, "connect")
-        def _fk_on(dbapi_conn, _rec):  # pragma: no cover
-            dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-        Base.metadata.drop_all(eng)
-    else:
-        with eng.begin() as conn:
-            conn.execute(text("DROP SCHEMA public CASCADE"))
-            conn.execute(text("CREATE SCHEMA public"))
-    Base.metadata.create_all(eng)
+    eng = require_pg_engine(TEST_URL)
     yield eng
     eng.dispose()
 
