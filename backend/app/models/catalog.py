@@ -24,7 +24,6 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.models.enums import EXPIRY_WARNING_DAYS
 from app.models.mixins import TimestampMixin, UUIDPKMixin
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -167,27 +166,16 @@ class Contract(UUIDPKMixin, TimestampMixin, Base):
 
     @property
     def days_to_expiry(self) -> int | None:
-        if self.expires_at is None:
-            return None
-        return (self.expires_at - date.today()).days
+        from app.services.license_status import days_to_expiry as _dte
+
+        return _dte(self.expires_at)
 
     @property
     def derived_status(self) -> str:
-        """P1-06-02 contract status logic (centralized single source)."""
-        from app.models.enums import ContractStatusRaw
+        """P1-06-02 contract status logic (delegates to the shared service)."""
+        from app.services.license_status import derive_contract_status
 
-        if self.status_raw == ContractStatusRaw.TERMINATED.value:
-            return ContractStatusRaw.TERMINATED.value
-        if self.status_raw == ContractStatusRaw.DRAFT.value:
-            return ContractStatusRaw.DRAFT.value
-        if self.expires_at is None:
-            return "active"
-        days_left = (self.expires_at - date.today()).days
-        if days_left < 0:
-            return "expired"
-        if days_left <= EXPIRY_WARNING_DAYS:
-            return "expires_soon"
-        return "active"
+        return derive_contract_status(self.status_raw, self.expires_at)
 
 
 class License(UUIDPKMixin, TimestampMixin, Base):
@@ -232,21 +220,16 @@ class License(UUIDPKMixin, TimestampMixin, Base):
 
     @property
     def days_to_expiry(self) -> int | None:
-        if self.expires_at is None:
-            return None
-        return (self.expires_at - date.today()).days
+        from app.services.license_status import days_to_expiry as _dte
+
+        return _dte(self.expires_at)
 
     @property
     def derived_status(self) -> str:
-        """P1-06-02 license status logic (centralized single source)."""
-        if self.expires_at is None:
-            return "active"
-        days_left = (self.expires_at - date.today()).days
-        if days_left < 0:
-            return "expired"
-        if days_left <= EXPIRY_WARNING_DAYS:
-            return "expires_soon"
-        return "active"
+        """P1-06-02 license status logic (delegates to the shared service)."""
+        from app.services.license_status import derive_license_status
+
+        return derive_license_status(self.expires_at)
 
 
 class Responsible(UUIDPKMixin, TimestampMixin, Base):

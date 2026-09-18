@@ -18,10 +18,10 @@ from app.schemas.common import (
     DocumentStatus,
     DocumentType,
     HealthScoreStatus,
-    LicenseStatus,
     MeetingType,
     TeacherReadiness,
 )
+from app.schemas.licenses import ContractShort, LicenseShort
 
 
 # ------------------------------------------------------- nested short DTOs
@@ -62,30 +62,6 @@ class StudentsSummary(BaseModel):
     graduated: int = 0
     expelled: int = 0
     academic_leave: int = 0
-
-
-class LicenseShort(BaseModel):
-    """Passport-oriented license row. ``status``/``days_to_expiry`` are
-    derived (P1-06-02) and filled by the service at serialization time."""
-
-    id: uuid.UUID
-    license_number: str
-    product_name: str | None = None
-    status: LicenseStatus = LicenseStatus.ACTIVE
-    expires_at: date | None = None
-    days_to_expiry: int | None = None
-
-    model_config = {"from_attributes": True}
-
-
-class ContractShort(BaseModel):
-    id: uuid.UUID
-    contract_number: str
-    status: str = "active"
-    expires_at: date | None = None
-    days_to_expiry: int | None = None
-
-    model_config = {"from_attributes": True}
 
 
 class DocumentShort(BaseModel):
@@ -190,10 +166,8 @@ class UniversityPassport(BaseModel):
 
 
 __all__ = [
-    "ContractShort",
     "DocumentShort",
     "InteractionShort",
-    "LicenseShort",
     "MeetingShort",
     "ResponsibleDetail",
     "ResponsibleShort",
