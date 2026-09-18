@@ -4,11 +4,13 @@ NOTE (minimal auth stage): only the auth module is mounted.
 Domain modules (universities/teachers/programs/workflow/...) stay on disk
 but are NOT imported — no domain tables are created at this stage.
 """
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import v1
 from app.config import settings
+from app.core.errors import register_error_handlers
 from app.core.logging import request_log_middleware
 
 app = FastAPI(
@@ -16,6 +18,7 @@ app = FastAPI(
     version="0.1.0",
     description="Minimal auth stack: Keycloak JWT -> FastAPI RBAC",
 )
+register_error_handlers(app)
 app.middleware("http")(request_log_middleware)
 app.add_middleware(
     CORSMiddleware,

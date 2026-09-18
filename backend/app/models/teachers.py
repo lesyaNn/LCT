@@ -50,7 +50,14 @@ class Teacher(UUIDPKMixin, TimestampMixin, Base):
 
 class TeacherQualification(UUIDPKMixin, TimestampMixin, Base):
     __tablename__ = "teacher_qualifications"
-    __table_args__ = (Index("ix_teacher_qualifications_teacher_id", "teacher_id"),)
+    __table_args__ = (
+        Index("ix_teacher_qualifications_teacher_id", "teacher_id"),
+        # P1-10-02: passport readiness scalars filter
+        # ``teacher_id = ? AND expires_at < / BETWEEN ...`` per teacher
+        # (loops scale with teachers x programs); the composite turns the
+        # per-loop Bitmap Heap Scan + Filter into an Index (Only) Scan.
+        Index("ix_teacher_qualifications_teacher_expires", "teacher_id", "expires_at"),
+    )
 
     teacher_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("teachers.id",
@@ -74,6 +81,9 @@ class TeacherCertificate(UUIDPKMixin, TimestampMixin, Base):
         Index("ix_teacher_certificates_teacher_id", "teacher_id"),
         Index("ix_teacher_certificates_expires_at", "expires_at"),
         Index("ix_teacher_certificates_mandatory", "is_mandatory", "expires_at"),
+        # P1-10-02: same rationale as qualifications above; the mandatory
+        # flag stays a Filter (3 rows/teacher), the range becomes Index Cond.
+        Index("ix_teacher_certificates_teacher_expires", "teacher_id", "expires_at"),
     )
 
     teacher_id: Mapped[uuid.UUID] = mapped_column(

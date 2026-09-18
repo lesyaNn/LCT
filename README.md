@@ -178,7 +178,7 @@ DATABASE_URL=postgresql+psycopg://rtk:change-me@localhost:5433/rtk \
 
 # 3. Проверить версию и голову
 python -m alembic current
-python -m alembic heads        # ровно один head: 7f3a1c9e2b03
+python -m alembic heads        # ровно один head: 7f3a1c9e2b06 (passport perf + readiness indexes)
 
 # 4. Загрузить демо-данные (идемпотентно, повтор безопасен)
 DATABASE_URL=... python -m app.db.seed

@@ -1,0 +1,403 @@
+{
+  "university": {
+    "id": "65d68622-f174-4395-9306-96efc22f6a19",
+    "name": "Дальневосточный федеральный университет",
+    "city": "Владивосток"
+  },
+  "programs": [
+    {
+      "id": "5e515b04-d1ac-4696-88d5-11012a9c8ec4",
+      "name": "Кибербезопасность",
+      "direction_name": "Информационная безопасность",
+      "status": "planned",
+      "launch_date": null,
+      "responsible_name": "Морозова Анна А.",
+      "teachers_count": 2,
+      "students_count": 30
+    },
+    {
+      "id": "e0b2c92d-fe11-4b75-8830-ba347efe6fc6",
+      "name": "Программная инженерия",
+      "direction_name": "Информационные системы и технологии",
+      "status": "planned",
+      "launch_date": null,
+      "responsible_name": "Морозова Анна А.",
+      "teachers_count": 1,
+      "students_count": 30
+    },
+    {
+      "id": "d2e93f87-aa37-443a-aaf5-e0a460c0e339",
+      "name": "Анализ данных",
+      "direction_name": "Прикладная математика и информатика",
+      "status": "planned",
+      "launch_date": null,
+      "responsible_name": "Морозова Анна А.",
+      "teachers_count": 0,
+      "students_count": 30
+    }
+  ],
+  "teachers": [
+    {
+      "id": "1196974b-d48e-4670-b55b-3c8651a2fa05",
+      "full_name": "Петрова Анна В.0",
+      "email": "teacher.u7.t0@example.local",
+      "position": "доцент",
+      "readiness": "ready",
+      "next_qualification_date": "2027-07-15",
+      "programs": [
+        {
+          "id": "5e515b04-d1ac-4696-88d5-11012a9c8ec4",
+          "name": "Кибербезопасность",
+          "direction_name": "Информационная безопасность",
+          "status": "planned",
+          "launch_date": null,
+          "responsible_name": "Морозова Анна А.",
+          "teachers_count": 2,
+          "students_count": 30
+        }
+      ]
+    },
+    {
+      "id": "c25deb02-21c2-4006-9489-e711787d15dd",
+      "full_name": "Сидоров Наталья В.1",
+      "email": "teacher.u7.t1@example.local",
+      "position": "старший преподаватель",
+      "readiness": "ready",
+      "next_qualification_date": "2027-07-15",
+      "programs": [
+        {
+          "id": "5e515b04-d1ac-4696-88d5-11012a9c8ec4",
+          "name": "Кибербезопасность",
+          "direction_name": "Информационная безопасность",
+          "status": "planned",
+          "launch_date": null,
+          "responsible_name": "Морозова Анна А.",
+          "teachers_count": 2,
+          "students_count": 30
+        },
+        {
+          "id": "e0b2c92d-fe11-4b75-8830-ba347efe6fc6",
+          "name": "Программная инженерия",
+          "direction_name": "Информационные системы и технологии",
+          "status": "planned",
+          "launch_date": null,
+          "responsible_name": "Морозова Анна А.",
+          "teachers_count": 1,
+          "students_count": 30
+        }
+      ]
+    }
+  ],
+  "students_summary": {
+    "total": 90,
+    "active": 72,
+    "graduated": 6,
+    "by_status": {
+      "academic_leave": 6,
+      "active": 72,
+      "expelled": 6,
+      "graduated": 6
+    },
+    "by_program": [
+      {
+        "program_id": "d2e93f87-aa37-443a-aaf5-e0a460c0e339",
+        "program_name": "Анализ данных",
+        "total": 30,
+        "active": 24,
+        "graduated": 2
+      },
+      {
+        "program_id": "5e515b04-d1ac-4696-88d5-11012a9c8ec4",
+        "program_name": "Кибербезопасность",
+        "total": 30,
+        "active": 24,
+        "graduated": 2
+      },
+      {
+        "program_id": "e0b2c92d-fe11-4b75-8830-ba347efe6fc6",
+        "program_name": "Программная инженерия",
+        "total": 30,
+        "active": 24,
+        "graduated": 2
+      }
+    ]
+  },
+  "products": [
+    {
+      "id": "9c99888c-3feb-4bb1-a867-a21ad3c51c84",
+      "name": "РЕД ОС",
+      "version": "8.0",
+      "vendor_name": "РЕД СОФТ",
+      "status": "active",
+      "license": {
+        "id": "471bfd6d-1a87-4d22-957e-838d57bba2e6",
+        "license_number": "LIC-07-00",
+        "product_name": "РЕД ОС",
+        "vendor_name": "РЕД СОФТ",
+        "signed_at": "2025-10-18",
+        "expires_at": "2027-04-06",
+        "status": "active",
+        "transfer_status": "accepted",
+        "days_to_expiry": 200,
+        "contract_number": "DOG-07-00"
+      }
+    }
+  ],
+  "licenses": [
+    {
+      "id": "471bfd6d-1a87-4d22-957e-838d57bba2e6",
+      "license_number": "LIC-07-00",
+      "product_name": "РЕД ОС",
+      "vendor_name": "РЕД СОФТ",
+      "signed_at": "2025-10-18",
+      "expires_at": "2027-04-06",
+      "status": "active",
+      "transfer_status": "accepted",
+      "days_to_expiry": 200,
+      "contract_number": "DOG-07-00"
+    }
+  ],
+  "contracts": [
+    {
+      "id": "6e4aaaf1-6cd0-433a-8fc0-e11a936cd19d",
+      "contract_number": "DOG-07-FW",
+      "signed_at": "2026-06-10",
+      "expires_at": "2028-05-10",
+      "status": "active",
+      "vendor_name": ""
+    },
+    {
+      "id": "d9a0c410-d730-40ed-bdf6-c898aa20300d",
+      "contract_number": "DOG-07-00",
+      "signed_at": "2025-10-18",
+      "expires_at": "2027-04-06",
+      "status": "active",
+      "vendor_name": "РЕД СОФТ"
+    }
+  ],
+  "documents": [
+    {
+      "id": "480df26c-34fb-45d5-bffc-5dceb780966c",
+      "document_type": "protocol",
+      "title": "Документ 4 (Дальневост)",
+      "file_name": "doc3.pdf",
+      "file_size": 105472,
+      "mime_type": "application/pdf",
+      "signed_at": "2026-05-21",
+      "expires_at": null,
+      "status": "draft",
+      "uploaded_by": "system-seed",
+      "created_at": "2026-09-18T08:43:52.325107Z"
+    },
+    {
+      "id": "c8eeceec-71ca-4132-9be0-b8c6b7664062",
+      "document_type": "act",
+      "title": "Документ 3 (Дальневост)",
+      "file_name": "doc2.pdf",
+      "file_size": 104448,
+      "mime_type": "application/pdf",
+      "signed_at": "2026-05-21",
+      "expires_at": null,
+      "status": "draft",
+      "uploaded_by": "system-seed",
+      "created_at": "2026-09-18T08:43:52.324209Z"
+    },
+    {
+      "id": "cbe2eb6d-0e52-4fb7-bc39-8b7005fba0a3",
+      "document_type": "license",
+      "title": "Документ 2 (Дальневост)",
+      "file_name": "doc1.pdf",
+      "file_size": 103424,
+      "mime_type": "application/pdf",
+      "signed_at": "2026-05-21",
+      "expires_at": "2026-07-30",
+      "status": "signed",
+      "uploaded_by": "system-seed",
+      "created_at": "2026-09-18T08:43:52.323259Z"
+    },
+    {
+      "id": "bb760c33-9e63-4e0e-9038-b8076dc28499",
+      "document_type": "contract",
+      "title": "Документ 1 (Дальневост)",
+      "file_name": "doc0.pdf",
+      "file_size": 102400,
+      "mime_type": "application/pdf",
+      "signed_at": "2026-05-21",
+      "expires_at": "2026-07-30",
+      "status": "signed",
+      "uploaded_by": "system-seed",
+      "created_at": "2026-09-18T08:43:52.321841Z"
+    }
+  ],
+  "meetings": [
+    {
+      "id": "a3adb322-3207-44d2-8fe4-e37a30b544dd",
+      "meeting_type": "email",
+      "subject": "Встреча 1: Дальневосточ",
+      "participants": [
+        "Иванов И.И.",
+        "Петров П.П."
+      ],
+      "outcome": "Итог встречи 1",
+      "next_action": "Подготовить документы",
+      "next_action_due": null,
+      "meeting_at": "2026-09-11T08:43:52.325334Z",
+      "created_by": "system-seed"
+    },
+    {
+      "id": "6578fe27-4feb-499a-85eb-ea3170d2fc89",
+      "meeting_type": "online",
+      "subject": "Встреча 2: Дальневосточ",
+      "participants": [
+        "Иванов И.И.",
+        "Петров П.П."
+      ],
+      "outcome": "Итог встречи 2",
+      "next_action": null,
+      "next_action_due": null,
+      "meeting_at": "2026-08-02T08:43:52.326931Z",
+      "created_by": "system-seed"
+    },
+    {
+      "id": "e52160c0-a92c-4558-bdc5-12a67835489b",
+      "meeting_type": "offline",
+      "subject": "Встреча 3: Дальневосточ",
+      "participants": [
+        "Иванов И.И.",
+        "Петров П.П."
+      ],
+      "outcome": "Итог встречи 3",
+      "next_action": null,
+      "next_action_due": null,
+      "meeting_at": "2026-06-23T08:43:52.328329Z",
+      "created_by": "system-seed"
+    },
+    {
+      "id": "a624d7e3-e0a5-412f-ab86-68db5ba2c140",
+      "meeting_type": "phone",
+      "subject": "Встреча 4: Дальневосточ",
+      "participants": [
+        "Иванов И.И.",
+        "Петров П.П."
+      ],
+      "outcome": "Итог встречи 4",
+      "next_action": null,
+      "next_action_due": null,
+      "meeting_at": "2026-05-14T08:43:52.329168Z",
+      "created_by": "system-seed"
+    }
+  ],
+  "responsibles": [
+    {
+      "id": "0ba0f913-153a-4460-8693-b2a3b8a4f517",
+      "full_name": "Волков Александр Б.",
+      "email": "contact2.u7@example.local",
+      "phone": "+7 (495) 000-00-071",
+      "role": "university_contact"
+    },
+    {
+      "id": "b51f67f0-4d38-4bb2-b36c-b076b502b4ac",
+      "full_name": "Менеджеров Менеджер 2",
+      "email": "manager2@example.local",
+      "phone": null,
+      "role": "our_manager"
+    },
+    {
+      "id": "8d9c3786-6bb0-493d-8ee4-35311e275832",
+      "full_name": "Морозова Анна А.",
+      "email": "contact1.u7@example.local",
+      "phone": "+7 (495) 000-00-070",
+      "role": "university_contact"
+    }
+  ],
+  "workflow_summary": {
+    "instance_id": null,
+    "template_name": null,
+    "current_stage": null,
+    "progress_percent": 0.0,
+    "overdue_stages": 0,
+    "next_due_date": null
+  },
+  "last_interactions": [
+    {
+      "id": "e1cc7ab3-5edd-4553-b73d-389e3ab51b15",
+      "type": "note",
+      "title": "Заметка 2 по Дальневосточный феде",
+      "description": "Заметка 2 по Дальневосточный феде",
+      "author": "system-seed",
+      "created_at": "2026-09-18T08:43:52.331422Z"
+    },
+    {
+      "id": "28904f79-f114-456c-87df-b41080d4f117",
+      "type": "note",
+      "title": "Заметка 1 по Дальневосточный феде",
+      "description": "Заметка 1 по Дальневосточный феде",
+      "author": "system-seed",
+      "created_at": "2026-09-18T08:43:52.330699Z"
+    },
+    {
+      "id": "480df26c-34fb-45d5-bffc-5dceb780966c",
+      "type": "document",
+      "title": "Документ 4 (Дальневост)",
+      "description": "protocol: doc3.pdf",
+      "author": "system-seed",
+      "created_at": "2026-09-18T08:43:52.325107Z"
+    },
+    {
+      "id": "c8eeceec-71ca-4132-9be0-b8c6b7664062",
+      "type": "document",
+      "title": "Документ 3 (Дальневост)",
+      "description": "act: doc2.pdf",
+      "author": "system-seed",
+      "created_at": "2026-09-18T08:43:52.324209Z"
+    },
+    {
+      "id": "cbe2eb6d-0e52-4fb7-bc39-8b7005fba0a3",
+      "type": "document",
+      "title": "Документ 2 (Дальневост)",
+      "description": "license: doc1.pdf",
+      "author": "system-seed",
+      "created_at": "2026-09-18T08:43:52.323259Z"
+    },
+    {
+      "id": "bb760c33-9e63-4e0e-9038-b8076dc28499",
+      "type": "document",
+      "title": "Документ 1 (Дальневост)",
+      "description": "contract: doc0.pdf",
+      "author": "system-seed",
+      "created_at": "2026-09-18T08:43:52.321841Z"
+    },
+    {
+      "id": "a3adb322-3207-44d2-8fe4-e37a30b544dd",
+      "type": "meeting",
+      "title": "Встреча 1: Дальневосточ",
+      "description": "Итог встречи 1",
+      "author": "system-seed",
+      "created_at": "2026-09-11T08:43:52.325334Z"
+    },
+    {
+      "id": "6578fe27-4feb-499a-85eb-ea3170d2fc89",
+      "type": "meeting",
+      "title": "Встреча 2: Дальневосточ",
+      "description": "Итог встречи 2",
+      "author": "system-seed",
+      "created_at": "2026-08-02T08:43:52.326931Z"
+    },
+    {
+      "id": "e52160c0-a92c-4558-bdc5-12a67835489b",
+      "type": "meeting",
+      "title": "Встреча 3: Дальневосточ",
+      "description": "Итог встречи 3",
+      "author": "system-seed",
+      "created_at": "2026-06-23T08:43:52.328329Z"
+    },
+    {
+      "id": "a624d7e3-e0a5-412f-ab86-68db5ba2c140",
+      "type": "meeting",
+      "title": "Встреча 4: Дальневосточ",
+      "description": "Итог встречи 4",
+      "author": "system-seed",
+      "created_at": "2026-05-14T08:43:52.329168Z"
+    }
+  ]
+}
