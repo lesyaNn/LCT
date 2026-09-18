@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 WORKDIR /code
 COPY pyproject.toml ./
-RUN pip install --no-cache-dir "fastapi" "uvicorn[standard]" sqlalchemy alembic "psycopg[binary]" pydantic pydantic-settings "python-jose[cryptography]" python-multipart httpx pytest
+RUN pip install --no-cache-dir "fastapi" "uvicorn[standard]" sqlalchemy alembic "psycopg[binary]" pydantic pydantic-settings "python-jose[cryptography]" python-multipart httpx pytest openpyxl
 COPY alembic.ini ./alembic.ini
 COPY alembic ./alembic
 COPY scripts ./scripts
