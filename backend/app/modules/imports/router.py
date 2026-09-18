@@ -20,13 +20,30 @@ from app.modules.imports.schemas import (
     ImportJobStatus,
     ImportPreview,
 )
+from app.schemas.common import ErrorResponse
 
-router = APIRouter(prefix="/import", tags=["import"])
+router = APIRouter(prefix="/import", tags=["Import"])
+
+ERROR_RESPONSES = {
+    400: {"model": ErrorResponse, "description": "Ошибка валидации файла/маппинга"},
+    401: {"model": ErrorResponse, "description": "AUTH_REQUIRED — нет Bearer токена"},
+    422: {"model": ErrorResponse, "description": "Ошибка валидации запроса"},
+}
 
 
-@router.post("/preview", response_model=ImportPreview)
+@router.post(
+    "/preview",
+    response_model=ImportPreview,
+    summary="Загрузка XLSX и предпросмотр",
+    description=(
+        "Принимает .xlsx (multipart/form-data), сохраняет его под file_id "
+        "и возвращает заголовки, первые 10 строк и число строк. "
+        "file_id используется в POST /import/execute."
+    ),
+    responses=ERROR_RESPONSES,
+)
 def import_preview(
-    file: UploadFile = File(...),
+    file: UploadFile = File(..., description="XLSX файл каталогов (до 10 МБ)"),
     _u: CurrentUser = Depends(get_current_user),
 ):
     try:
@@ -45,7 +62,17 @@ def import_preview(
     )
 
 
-@router.post("/execute", response_model=ImportExecuteResponse)
+@router.post(
+    "/execute",
+    response_model=ImportExecuteResponse,
+    summary="Запуск импорта по маппингу",
+    description=(
+        "Применяет mapping (колонка файла → поле БД) к сохранённому файлу. "
+        "Плохие строки пропускаются с ошибками (не роняют импорт). "
+        "Возвращает job_id; итог — в GET /import/jobs/{job_id}."
+    ),
+    responses=ERROR_RESPONSES,
+)
 def import_execute(
     req: ImportExecuteRequest,
     db: Session = Depends(get_db),
@@ -66,7 +93,17 @@ def import_execute(
     return ImportExecuteResponse(job_id=job_id)
 
 
-@router.get("/jobs/{job_id}", response_model=ImportJobStatus)
+@router.get(
+    "/jobs/{job_id}",
+    response_model=ImportJobStatus,
+    summary="Статус import job",
+    description="Возвращает статус задачи и summary импорта (inserted/updated/skipped/errors).",
+    responses={
+        401: ERROR_RESPONSES[401],
+        404: {"model": ErrorResponse, "description": "Job не найден"},
+        422: ERROR_RESPONSES[422],
+    },
+)
 def import_job_status(
     job_id: str,
     _u: CurrentUser = Depends(get_current_user),
