@@ -1,6 +1,6 @@
-"""XLSX catalog import: staging, parsing, validation, execution (P4-10-01).
+"""XLSX/XLS catalog import: staging, parsing, validation, execution (P4-10-01).
 
-MVP scope (per task notes): ``.xlsx`` only, basic mapping, simple
+Scope: ``.xlsx`` + ``.xls`` (legacy Excel 97-2003), basic mapping, simple
 validation. Bad rows are skipped with per-row errors — they never abort
 the whole import. Idempotency via natural keys (``contract_number`` is
 UNIQUE; licenses match on ``(university, product, license_number)``).
@@ -13,11 +13,11 @@ matches the background-worker design from P4-06-01.
 from __future__ import annotations
 
 import os
+import re
 import uuid
 from datetime import date, datetime
 from typing import Any
 
-from openpyxl import load_workbook
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -35,6 +35,8 @@ MAX_FILE_BYTES = 10 * 1024 * 1024
 MAX_ROWS = 5000
 PREVIEW_ROWS = 10
 STAGING_DIR = os.getenv("IMPORT_STAGING_DIR", "/tmp/rtk-imports")
+
+ALLOWED_EXTS = frozenset({".xlsx", ".xls"})
 
 #: file column -> model field paths accepted in ``mapping`` (P4-10-01 §2).
 TARGET_FIELDS = frozenset({
@@ -61,15 +63,28 @@ class ImportValidationError(ValueError):
 
 
 def parse_date(value: Any, field: str) -> date | None:
-    """Coerce an openpyxl cell value to ``date`` (``None`` for empty)."""
+    """Coerce an openpyxl/xlrd cell value to ``date`` (``None`` for empty).
+
+    Accepts datetime/date, full date strings (several formats) and a plain
+    year (``"2027"`` / ``2027`` / ``2027.0``) — year maps to Dec 31 of that
+    year, as the spec column is "Срок действия лицензии (год)".
+    """
     if value is None or (isinstance(value, str) and not value.strip()):
         return None
     if isinstance(value, datetime):
         return value.date()
     if isinstance(value, date):
         return value
+    if isinstance(value, (int, float)):
+        # xlrd may give years as float (2027.0); Excel dates as float are
+        # already converted by the .xls reader, so here float == year.
+        if float(value).is_integer() and 1900 <= int(value) <= 2100:
+            return date(int(value), 12, 31)
+        raise ImportValidationError(f"Неверный формат даты в поле '{field}': {value!r}")
     if isinstance(value, str):
         text = value.strip()
+        if re.fullmatch(r"(19|20)\d{2}", text):
+            return date(int(text), 12, 31)
         for fmt in _DATE_FORMATS:
             try:
                 return datetime.strptime(text, fmt).date()
@@ -92,9 +107,9 @@ def _cell_text(value: Any) -> str:
 def stage_upload(filename: str, content: bytes) -> str:
     """Validate + persist an uploaded workbook, return its ``file_id``."""
     ext = os.path.splitext(filename or "")[1].lower()
-    if ext != ".xlsx":
+    if ext not in ALLOWED_EXTS:
         raise ImportValidationError(
-            f"Поддерживается только .xlsx (MVP), получено: {filename!r}"
+            f"Поддерживается только .xlsx/.xls, получено: {filename!r}"
         )
     if len(content) > MAX_FILE_BYTES:
         raise ImportValidationError(
@@ -104,21 +119,31 @@ def stage_upload(filename: str, content: bytes) -> str:
         raise ImportValidationError("Пустой файл")
     os.makedirs(STAGING_DIR, exist_ok=True)
     file_id = uuid.uuid4().hex
-    with open(os.path.join(STAGING_DIR, f"{file_id}.xlsx"), "wb") as fh:
+    with open(os.path.join(STAGING_DIR, f"{file_id}{ext}"), "wb") as fh:
         fh.write(content)
     return file_id
 
 
 def _staged_path(file_id: str) -> str:
-    path = os.path.join(STAGING_DIR, f"{file_id}.xlsx")
-    if not os.path.exists(path):
-        raise ImportValidationError(f"Файл {file_id} не найден (загрузите заново)")
-    return path
+    # New layout: <STAGING_DIR>/<file_id>.<ext>. Legacy (MVP) layout stored
+    # everything as <file_id>.xlsx — keep reading it for backward compat.
+    candidates = [
+        os.path.join(STAGING_DIR, f"{file_id}{ext}") for ext in (".xlsx", ".xls")
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    # file_id may already include extension (defensive, not part of API).
+    direct = os.path.join(STAGING_DIR, file_id)
+    if os.path.exists(direct):
+        return direct
+    raise ImportValidationError(f"Файл {file_id} не найден (загрузите заново)")
 
 
-def read_sheet(file_id: str) -> tuple[str, list[str], list[dict[str, Any]]]:
-    """Return ``(sheet_name, headers, data_rows)`` for a staged workbook."""
-    wb = load_workbook(_staged_path(file_id), read_only=True, data_only=True)
+def _read_xlsx(path: str) -> tuple[str, list[str], list[dict[str, Any]]]:
+    from openpyxl import load_workbook
+
+    wb = load_workbook(path, read_only=True, data_only=True)
     ws = wb.active
     if ws is None:
         raise ImportValidationError("В книге нет листов")
@@ -130,6 +155,49 @@ def read_sheet(file_id: str) -> tuple[str, list[str], list[dict[str, Any]]]:
     if len(data) > MAX_ROWS:
         raise ImportValidationError(f"Больше лимита {MAX_ROWS} строк")
     return ws.title or "Sheet1", headers, data
+
+
+def _read_xls(path: str) -> tuple[str, list[str], list[dict[str, Any]]]:
+    """Read legacy Excel 97-2003 (.xls) via xlrd. Same shape as _read_xlsx."""
+    import xlrd
+
+    try:
+        book = xlrd.open_workbook(path, logfile=open(os.devnull, "w"))
+    except Exception as exc:
+        raise ImportValidationError(f"Не удалось прочитать .xls: {exc}") from exc
+    if book.nsheets == 0:
+        raise ImportValidationError("В книге нет листов")
+    sh = book.sheet_by_index(0)
+    if sh.nrows == 0:
+        raise ImportValidationError("Пустой лист")
+    headers = [_cell_text(sh.cell_value(0, c)) or f"col_{c}" for c in range(sh.ncols)]
+    data: list[dict[str, Any]] = []
+    for r in range(1, sh.nrows):
+        row: dict[str, Any] = {}
+        for c in range(sh.ncols):
+            ctype = sh.cell_type(r, c)
+            cval = sh.cell_value(r, c)
+            if ctype == xlrd.XL_CELL_DATE:
+                try:
+                    cval = xlrd.xldate_as_datetime(cval, book.datemode).date()
+                except Exception:
+                    pass
+            elif ctype == xlrd.XL_CELL_EMPTY or ctype == xlrd.XL_CELL_BLANK:
+                cval = None
+            row[headers[c]] = cval
+        data.append(row)
+    if len(data) > MAX_ROWS:
+        raise ImportValidationError(f"Больше лимита {MAX_ROWS} строк")
+    return sh.name or "Sheet1", headers, data
+
+
+def read_sheet(file_id: str) -> tuple[str, list[str], list[dict[str, Any]]]:
+    """Return ``(sheet_name, headers, data_rows)`` for a staged workbook."""
+    path = _staged_path(file_id)
+    ext = os.path.splitext(path)[1].lower()
+    if ext == ".xls":
+        return _read_xls(path)
+    return _read_xlsx(path)
 
 
 def parse_preview(file_id: str) -> dict[str, Any]:
@@ -385,6 +453,7 @@ def execute_import(
 
 
 __all__ = [
+    "ALLOWED_EXTS",
     "ImportValidationError",
     "TARGET_FIELDS",
     "apply_row",

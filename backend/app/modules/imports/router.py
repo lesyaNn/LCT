@@ -1,4 +1,4 @@
-"""XLSX import endpoints (P4-10-01).
+"""XLSX/XLS import endpoints (P4-10-01).
 
 ``POST /import/preview`` stages the workbook and returns headers + first
 rows; ``POST /import/execute`` runs the import synchronously in the MVP
@@ -34,16 +34,16 @@ ERROR_RESPONSES = {
 @router.post(
     "/preview",
     response_model=ImportPreview,
-    summary="Загрузка XLSX и предпросмотр",
+    summary="Загрузка XLSX/XLS и предпросмотр",
     description=(
-        "Принимает .xlsx (multipart/form-data), сохраняет его под file_id "
+        "Принимает .xlsx/.xls (multipart/form-data), сохраняет его под file_id "
         "и возвращает заголовки, первые 10 строк и число строк. "
         "file_id используется в POST /import/execute."
     ),
     responses=ERROR_RESPONSES,
 )
 def import_preview(
-    file: UploadFile = File(..., description="XLSX файл каталогов (до 10 МБ)"),
+    file: UploadFile = File(..., description="XLSX/XLS файл каталогов (до 10 МБ)"),
     _u: CurrentUser = Depends(get_current_user),
 ):
     try:

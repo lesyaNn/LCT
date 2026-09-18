@@ -1,4 +1,4 @@
-"""XLSX import DTOs (P4-10-01).
+"""XLSX/XLS import DTOs (P4-10-01).
 
 Flow: ``POST /import/preview`` (multipart) -> mapping on the frontend ->
 ``POST /import/execute`` (returns ``job_id``) -> ``GET /import/jobs/{id}``.
