@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "./api/client";
 import { useAuth } from "./auth/useAuth";
+import { CatalogViewer } from "./components/CatalogViewer";
 import { UserCard } from "./components/UserCard";
 import type { Me } from "./components/UserCard";
 
@@ -69,6 +70,7 @@ export default function App() {
       </header>
       <main className="content">
         {me && <UserCard me={me} />}
+        <CatalogViewer />
         <div className="card">
           <p>Backend API: {backendUp === null ? "…" : backendUp ? "✅ доступен" : "❌ недоступен"}</p>
           <div className="row">

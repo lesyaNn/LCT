@@ -410,7 +410,7 @@ def test_seed_idempotent(engine):
 # ------------------------------------------------------------ migration chain
 
 def test_sql_migration_single_head_chain():
-    """SQL files are the single schema source: 000001..000008, paired up/down."""
+    """SQL files are the single schema source: 000001..000009, paired up/down."""
     import re as _re
 
     versions = os.path.join(os.path.dirname(os.path.dirname(
@@ -421,8 +421,8 @@ def test_sql_migration_single_head_chain():
         assert m, f"bad migration filename: {fname}"
         (ups if m.group(2) == "up" else downs).add(m.group(1))
     assert ups == downs, f"unpaired migrations: up^down={ups ^ downs}"
-    assert sorted(ups)[-1] == "000008_readiness_perf_indexes"
-    assert len(ups) == 8
+    assert sorted(ups)[-1] == "000009_license_row_links"
+    assert len(ups) == 9
 
 
 @pytest.mark.skipif(not os.getenv("TEST_DATABASE_URL"),

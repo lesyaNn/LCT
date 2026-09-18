@@ -179,12 +179,18 @@ class Contract(UUIDPKMixin, TimestampMixin, Base):
 
 
 class License(UUIDPKMixin, TimestampMixin, Base):
-    """Лицензии. Derived ``status`` is a @property, never a column (P1-06-02)."""
+    """Лицензии. Derived ``status`` is a @property, never a column (P1-06-02).
+
+    ``program_id`` — направление/программа конкретной строки импорта
+    (одна строка = один договор/лицензия на один продукт для одного вуза).
+    """
 
     __tablename__ = "licenses"
     __table_args__ = (
         Index("ix_licenses_university_id", "university_id"),
         Index("ix_licenses_product_id", "product_id"),
+        Index("ix_licenses_program_id", "program_id"),
+        Index("ix_licenses_direction_id", "direction_id"),
         Index("ix_licenses_expires_at", "expires_at"),
         Index("ix_licenses_transfer_status_raw", "transfer_status_raw"),
         Index("ix_licenses_univ_expires", "university_id", "expires_at"),
@@ -206,6 +212,18 @@ class License(UUIDPKMixin, TimestampMixin, Base):
         nullable=True,
         default=None,
     )
+    program_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("it_programs.id", name="fk_licenses_program_id_it_programs",
+                   ondelete="SET NULL"),
+        nullable=True,
+        default=None,
+    )
+    direction_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("it_directions.id", name="fk_licenses_direction_id_it_directions",
+                   ondelete="SET NULL"),
+        nullable=True,
+        default=None,
+    )
     license_number: Mapped[str] = mapped_column(String(256), nullable=False)
     signed_at: Mapped[date] = mapped_column(Date, nullable=False)
     expires_at: Mapped[date] = mapped_column(Date, nullable=False)
@@ -217,6 +235,8 @@ class License(UUIDPKMixin, TimestampMixin, Base):
     university: Mapped["University"] = relationship(back_populates="licenses")
     product: Mapped["ITProduct"] = relationship(back_populates="licenses")
     contract: Mapped["Contract | None"] = relationship(back_populates="licenses")
+    program: Mapped["ITProgram | None"] = relationship()
+    direction: Mapped["ITDirection | None"] = relationship()
 
     @property
     def days_to_expiry(self) -> int | None:
