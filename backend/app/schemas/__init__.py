@@ -56,6 +56,10 @@ from app.schemas.catalog import (  # noqa: F401
     VendorShort,
     VendorUpdate,
 )
+from app.schemas.licenses import (  # noqa: F401
+    ContractShort,
+    LicenseShort,
+)
 from app.schemas.teacher import (  # noqa: F401
     CertificateShort,
     QualificationShort,
@@ -68,10 +72,8 @@ from app.schemas.teacher import (  # noqa: F401
     TrainingShort,
 )
 from app.schemas.university import (  # noqa: F401
-    ContractShort,
     DocumentShort,
     InteractionShort,
-    LicenseShort,
     MeetingShort,
     ResponsibleDetail,
     ResponsibleShort,
