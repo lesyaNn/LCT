@@ -56,6 +56,17 @@ from app.schemas.catalog import (  # noqa: F401
     VendorShort,
     VendorUpdate,
 )
+from app.schemas.teacher import (  # noqa: F401
+    CertificateShort,
+    QualificationShort,
+    TeacherBase,
+    TeacherCreate,
+    TeacherDetail,
+    TeacherList,
+    TeacherPassport,
+    TeacherUpdate,
+    TrainingShort,
+)
 from app.schemas.university import (  # noqa: F401
     ContractShort,
     DocumentShort,
