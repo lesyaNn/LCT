@@ -155,6 +155,104 @@ cd backend
 PYTHONPATH=. python -m pytest tests/ -q
 ```
 
+### 🗄️ P1 — ядро схемы БД (PostgreSQL + Alembic + seed)
+
+Канонические модели: `backend/app/models/` (20 таблиц: universities,
+it_directions, it_programs, vendors, it_products, contracts, licenses,
+responsibles, university_responsibles, teachers, teacher_qualifications,
+teacher_certificates, teacher_programs, students, university_programs,
+university_products, meetings, meeting_documents, documents,
+interaction_notes). Все PK — UUID, все даты — `timestamptz`,
+статусы лицензий/договоров/готовности — вычисляемые `@property`
+(см. `IMPORTANT DECISIONS` в отчёте P1 о CASCADE/RESTRICT).
+
+```bash
+# 1. Поднять инфраструктуру (postgres healthy -> backend сам применит миграции)
+cp .env.example .env
+docker compose up -d --build
+
+# 2. Локально (без compose): указать БД и применить миграции
+cd backend
+DATABASE_URL=postgresql+psycopg://rtk:change-me@localhost:5433/rtk \
+  python -m alembic upgrade head
+
+# 3. Проверить версию и голову
+python -m alembic current
+python -m alembic heads        # ровно один head: 7f3a1c9e2b03
+
+# 4. Загрузить демо-данные (идемпотентно, повтор безопасен)
+DATABASE_URL=... python -m app.db.seed
+# или:  DATABASE_URL=... python scripts/seed_demo.py
+
+# 5. Инспекция схемы (таблицы, FK, индексы, timestamptz, версия Alembic)
+DATABASE_URL=... python scripts/db_inspect.py
+
+# 6. EXPLAIN по ключевым запросам (паспорт, преподаватели, лицензии, встречи)
+DATABASE_URL=... python scripts/check_explain.py
+
+# 7. Тесты (SQLite по умолчанию; PostgreSQL через TEST_DATABASE_URL)
+python -m pytest tests/ -q
+TEST_DATABASE_URL=postgresql+psycopg://postgres@localhost:55433/rtk_p1_test \
+  python -m pytest tests/test_p1_schema.py -q
+```
+
+Откат и пересоздание схемы с нуля:
+
+```bash
+cd backend
+DATABASE_URL=... python -m alembic downgrade base  # чистит схему P1 полностью
+DATABASE_URL=... python -m alembic upgrade head    # создаёт заново без ошибок
+```
+
+Проверка seed: повторный `python -m app.db.seed` печатает те же счётчики
+(10 вузов, 34 преподавателя, 750 студентов, …) — дубликатов нет.
+
+### 🗄️ PostgreSQL: две базы — `rtk` (приложение) и `keycloak` (авторизация)
+
+Один PostgreSQL service, две изолированные databases:
+
+```text
+PostgreSQL
+├── rtk      — application database, managed by Alembic
+│   ├── universities, teachers, students, licenses, contracts, ...
+│   └── alembic_version
+└── keycloak — authentication database, managed by Keycloak (Liquibase)
+    ├── KEYCLOAK INTERNAL TABLES (realm, client, user_entity, ...)
+    └── realm `rtk` + client `rtk-frontend` (import из keycloak/realm-export.json)
+```
+
+* Backend работает только с `rtk` (`DATABASE_URL=...@postgres:5432/rtk`), к таблицам
+  Keycloak не обращается — только JWT/OIDC по JWKS.
+* Keycloak работает только с `keycloak` (`KC_DB=postgres`,
+  `KC_DB_URL=jdbc:postgresql://postgres:5432/keycloak`). Alembic таблиц Keycloak
+  не создаёт; Keycloak не трогает таблицы `rtk`.
+* Bootstrap обеих БД на чистом pgdata: `docker/postgres/init-databases.sh`
+  (монтируется в `/docker-entrypoint-initdb.d/` сервиса `postgres`).
+  Переменные: `KEYCLOAK_DB` / `KEYCLOAK_DB_USER` / `KEYCLOAK_DB_PASSWORD`
+  (см. `.env.example`). Для уже существующего volume скрипт не выполняется
+  (особенность postgres image) — одноразово выполнить SQL из README ниже.
+* `start-dev --import-realm` сохранён; повторный импорт безопасен
+  (стратегия `IGNORE_EXISTING`: «Realm already exists. Import skipped»).
+
+```bash
+# Проверка изоляции
+docker compose exec postgres psql -U rtk -d rtk -c "\l"            # есть rtk и keycloak
+docker compose exec postgres psql -U rtk -d rtk -c "\dt"           # только P1 + alembic_version
+docker compose exec postgres psql -U rtk -d keycloak -t \
+  -c "SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tablename IN ('universities','teachers','students','licenses','alembic_version');"
+# -> 0 (P1-таблиц в keycloak нет)
+
+# Одноразовый bootstrap keycloak-БД на СУЩЕСТВУЮЩЕМ volume (на fresh pgdata не нужен):
+docker compose exec postgres psql -U rtk -d rtk -v ON_ERROR_STOP=1 <<'EOSQL'
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'keycloak') THEN
+CREATE ROLE keycloak WITH LOGIN PASSWORD 'change-me';
+ELSE ALTER ROLE keycloak WITH LOGIN PASSWORD 'change-me'; END IF; END $$;
+SELECT 'CREATE DATABASE "keycloak" OWNER "keycloak"'
+WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'keycloak')\gexec
+GRANT ALL PRIVILEGES ON DATABASE "keycloak" TO "keycloak";
+EOSQL
+```
+
 ### ⏭️ Следующий этап
 
 STOP. Далее — проектирование и реализация PostgreSQL-схемы предметной области

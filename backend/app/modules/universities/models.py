@@ -1,19 +1,30 @@
-from datetime import datetime
+"""Legacy import shim — canonical P1 models live in ``app.models``.
 
-from sqlalchemy import DateTime, ForeignKey, String, func
-from sqlalchemy.orm import Mapped, mapped_column
+The old integer-based ``University`` definition was replaced by the P1 schema
+(UUID PK, ``universities`` without a direct responsible column). Old imports
+keep working; the table is defined exactly once (in ``app.models.catalog``).
+"""
 
-from app.db.base import Base
+from app.models.catalog import (  # noqa: F401
+    Contract,
+    ITDirection,
+    ITProduct,
+    ITProgram,
+    License,
+    Responsible,
+    University,
+    UniversityResponsible,
+    Vendor,
+)
 
-
-class University(Base):
-    __tablename__ = "universities"
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(512))
-    region: Mapped[str] = mapped_column(String(256), default="")
-    city: Mapped[str] = mapped_column(String(256), default="")
-    address: Mapped[str] = mapped_column(String(512), default="")
-    status: Mapped[str] = mapped_column(String(64), default="new")
-    responsible_person_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+__all__ = [
+    "University",
+    "ITDirection",
+    "ITProgram",
+    "Vendor",
+    "ITProduct",
+    "Contract",
+    "License",
+    "Responsible",
+    "UniversityResponsible",
+]
