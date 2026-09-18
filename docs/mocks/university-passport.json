@@ -1,0 +1,210 @@
+{
+  "university": {
+    "id": "fc9987b7-e8cc-47c7-9b19-23dadb260580",
+    "name": "МГУ им. М.В. Ломоносова",
+    "city": "Москва",
+    "responsible": {
+      "id": "b923680d-d1ce-4620-a540-be9a19f26501",
+      "full_name": "Иванов Александр А.",
+      "email": "contact1.u0@example.local",
+      "phone": "+7 (495) 000-00-000",
+      "role": "university_contact"
+    },
+    "health_score": 92,
+    "health_status": "green",
+    "created_at": "2026-09-18T09:15:11.310474",
+    "updated_at": "2026-09-18T09:15:11.310475"
+  },
+  "programs": [
+    {
+      "id": "b8bd243d-fdb4-4c93-a8fc-6f344b8f27e4",
+      "name": "Искусственный интеллект",
+      "direction_name": "Информатика и вычислительная техника"
+    },
+    {
+      "id": "c10e9db4-0c91-4d71-b716-be6511cf3092",
+      "name": "Кибербезопасность",
+      "direction_name": "Информационная безопасность"
+    }
+  ],
+  "teachers": [
+    {
+      "id": "c6956c99-7a9f-46ae-8adf-c0738a581031",
+      "full_name": "Иванов Александр В.0",
+      "position": "доцент",
+      "readiness": "ready"
+    },
+    {
+      "id": "2e743f0b-0095-4af3-b23f-9dcd8f5bbe0b",
+      "full_name": "Кузнецова Сергей В.3",
+      "position": "старший преподаватель",
+      "readiness": "ready"
+    },
+    {
+      "id": "ccb86b48-3088-472d-b772-3ea7621b2d64",
+      "full_name": "Петрова Дмитрий В.1",
+      "position": "старший преподаватель",
+      "readiness": "ready"
+    },
+    {
+      "id": "bc54238f-1d5c-4c3c-a8bd-c567d5f751ba",
+      "full_name": "Сидоров Игорь В.2",
+      "position": "доцент",
+      "readiness": "ready"
+    },
+    {
+      "id": "b4b9d205-4a60-485c-bbff-fccb86c497ac",
+      "full_name": "Смирнов Павел В.4",
+      "position": "доцент",
+      "readiness": "ready"
+    }
+  ],
+  "students_summary": {
+    "total": 60,
+    "active": 48,
+    "graduated": 4,
+    "expelled": 4,
+    "academic_leave": 4
+  },
+  "products": [
+    {
+      "id": "f1747e82-f646-4e81-b48c-168817154665",
+      "name": "РТК Платформа ВКС",
+      "version": "4.2",
+      "vendor_name": "Ростелеком"
+    },
+    {
+      "id": "acd8cd8f-9f38-4ce7-ab95-5f28812dcfb2",
+      "name": "РТК Облако",
+      "version": "2.7",
+      "vendor_name": "Ростелеком"
+    }
+  ],
+  "licenses": [
+    {
+      "id": "b134a225-6be8-4411-b165-5a7c1ab67093",
+      "license_number": "LIC-00-00",
+      "product_name": "РТК Платформа ВКС",
+      "expires_at": "2026-09-23",
+      "status": "expires_soon",
+      "days_to_expiry": 5
+    },
+    {
+      "id": "98c9ab77-cfbd-4079-b686-4866932d9420",
+      "license_number": "LIC-00-01",
+      "product_name": "РТК Облако",
+      "expires_at": "2027-10-23",
+      "status": "active",
+      "days_to_expiry": 400
+    }
+  ],
+  "contracts": [
+    {
+      "id": "5ec9a443-c7c5-466e-9819-9eb964567a81",
+      "contract_number": "DOG-00-00",
+      "expires_at": "2026-09-23",
+      "status": "active",
+      "days_to_expiry": 5
+    },
+    {
+      "id": "25cbd83f-8703-41c6-8f76-cf3c78117629",
+      "contract_number": "DOG-00-01",
+      "expires_at": "2027-10-23",
+      "status": "active",
+      "days_to_expiry": 400
+    },
+    {
+      "id": "146cf87b-80ef-466f-8786-8c83b8bf57f5",
+      "contract_number": "DOG-00-FW",
+      "expires_at": "2028-05-10",
+      "status": "active",
+      "days_to_expiry": 600
+    }
+  ],
+  "documents": [
+    {
+      "id": "e6494e82-653e-4c5f-b568-713a627ed2ea",
+      "document_type": "contract",
+      "title": "Документ 1 (МГУ им. М.)",
+      "status": "signed",
+      "expires_at": "2027-04-06"
+    },
+    {
+      "id": "a492d0c6-a7dc-49c4-909b-4048a0457668",
+      "document_type": "license",
+      "title": "Документ 2 (МГУ им. М.)",
+      "status": "draft",
+      "expires_at": "2027-05-06"
+    },
+    {
+      "id": "bf11eae4-48ea-4314-a40f-35467dbb8d95",
+      "document_type": "act",
+      "title": "Документ 3 (МГУ им. М.)",
+      "status": "signed",
+      "expires_at": "2027-06-05"
+    },
+    {
+      "id": "e04fa8e8-7339-4094-89d3-548014c22bec",
+      "document_type": "protocol",
+      "title": "Документ 4 (МГУ им. М.)",
+      "status": "draft",
+      "expires_at": "2027-07-05"
+    }
+  ],
+  "meetings": [
+    {
+      "id": "a9401510-1946-4f84-a87a-0c5f76715d48",
+      "meeting_type": "online",
+      "subject": "Встреча 1: МГУ им. М.В.",
+      "meeting_at": "2026-09-18T09:15:11.335279"
+    },
+    {
+      "id": "f0b9ed1c-be57-4d02-b08d-d8f8eae95326",
+      "meeting_type": "offline",
+      "subject": "Встреча 2: МГУ им. М.В.",
+      "meeting_at": "2026-08-09T09:15:11.337741"
+    },
+    {
+      "id": "9f187c8f-9d47-4adb-b9e8-131c752a1d53",
+      "meeting_type": "phone",
+      "subject": "Встреча 3: МГУ им. М.В.",
+      "meeting_at": "2026-06-30T09:15:11.338723"
+    }
+  ],
+  "responsibles": [
+    {
+      "id": "b923680d-d1ce-4620-a540-be9a19f26501",
+      "full_name": "Иванов Александр А."
+    },
+    {
+      "id": "33490447-ec01-4ae4-88cf-a49d559c2aa9",
+      "full_name": "Петрова Елена Б."
+    },
+    {
+      "id": "b4656839-1250-462f-96c7-6255ffa8fd42",
+      "full_name": "Менеджеров Менеджер 1"
+    }
+  ],
+  "workflow_summary": {
+    "current_stage": {
+      "code": "control",
+      "name": "Контроль исполнения"
+    },
+    "stages_total": 14,
+    "stages_completed": 14
+  },
+  "last_interactions": [
+    {
+      "id": "d463ded1-5cc8-4718-9df0-02d295148b7e",
+      "content": "Заметка 2 по МГУ им. М.В. Ломонос",
+      "is_internal": true,
+      "created_at": "2026-09-18T09:15:11.340839"
+    },
+    {
+      "id": "902aefbc-5f0c-4784-ac68-37634a14e80c",
+      "content": "Заметка 1 по МГУ им. М.В. Ломонос",
+      "is_internal": true,
+      "created_at": "2026-09-18T09:15:11.340349"
+    }
+  ]
+}
