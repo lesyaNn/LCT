@@ -180,6 +180,7 @@ class Document(UUIDPKMixin, TimestampMixin, Base):
             name="ck_documents_single_link",
         ),
         Index("ix_documents_university_id", "university_id"),
+        Index("ix_documents_univ_created", "university_id", "created_at"),
         Index("ix_documents_status_raw", "status_raw"),
         Index("ix_documents_license_id", "license_id"),
         Index("ix_documents_contract_id", "contract_id"),
@@ -225,6 +226,7 @@ class InteractionNote(UUIDPKMixin, TimestampMixin, Base):
     __table_args__ = (
         Index("ix_interaction_notes_university_id", "university_id"),
         Index("ix_interaction_notes_created_at", "created_at"),
+        Index("ix_interaction_notes_univ_created", "university_id", "created_at"),
     )
 
     university_id: Mapped[uuid.UUID] = mapped_column(

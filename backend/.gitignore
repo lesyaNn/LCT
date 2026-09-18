@@ -3,3 +3,12 @@ __pycache__/
 dev.db
 var/
 .env
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+*.log
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db

@@ -11,6 +11,7 @@ from fastapi.openapi.utils import get_openapi
 
 from app.api.router import v1
 from app.config import settings
+from app.core.errors import register_error_handlers
 from app.core.logging import request_log_middleware
 
 app = FastAPI(
@@ -34,6 +35,7 @@ app = FastAPI(
         {"name": "Service", "description": "Служебные проверки состояния"},
     ],
 )
+register_error_handlers(app)
 app.middleware("http")(request_log_middleware)
 app.add_middleware(
     CORSMiddleware,
