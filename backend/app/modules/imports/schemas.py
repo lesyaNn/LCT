@@ -8,7 +8,23 @@ Mapping UI itself is P3-owned (P3-11-01); the backend only accepts the
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+#: Ключи — заголовки колонок файла, значения — поля БД (см. TARGET_FIELDS).
+#: Swagger подставляет этот пример в "Try it out" целиком.
+EXAMPLE_MAPPING: dict[str, str] = {
+    "Название ВУЗа": "university.name",
+    "Вендор": "vendor.name",
+    "ПО": "product.name",
+    "Номер договора": "contract.contract_number",
+    "Подписание лицензии": "license.signed_at",
+    "Срок действия лицензии (год)": "license.expires_at",
+    "Статус по передачи": "license.transfer_status",
+    "ФИО Менеджера": "responsible.full_name",
+    "Ответственные от ВУЗа": "university_responsibles",
+    "Комментарий": "license.comment",
+    "IT направление": "direction.name",
+}
 
 
 class ImportPreview(BaseModel):
@@ -27,17 +43,22 @@ class ImportOptions(BaseModel):
 
 
 class ImportExecuteRequest(BaseModel):
-    file_id: str
-    mapping: dict[str, str] = Field(
-        examples=[
-            {
-                "ВУЗ": "university.name",
-                "Вендор": "vendor.name",
-                "ПО": "product.name",
-                "Номер договора": "contract.contract_number",
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "file_id": "вставьте file_id из POST /import/preview",
+                "mapping": EXAMPLE_MAPPING,
+                "options": {
+                    "skip_header": True,
+                    "update_existing": True,
+                    "dry_run": False,
+                },
             }
-        ]
+        }
     )
+
+    file_id: str
+    mapping: dict[str, str] = Field(examples=[EXAMPLE_MAPPING])
     options: ImportOptions = Field(default_factory=ImportOptions)
 
 
@@ -68,6 +89,7 @@ class ImportJobStatus(BaseModel):
 
 
 __all__ = [
+    "EXAMPLE_MAPPING",
     "ImportExecuteRequest",
     "ImportExecuteResponse",
     "ImportJobStatus",

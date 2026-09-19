@@ -569,10 +569,18 @@ def test_filter_discovery_table():
     assert table[("university", "region")] is True
     assert table[("university", "city")] is False
     assert table[("teacher", "readiness")] is False
-    # legacy routers stay unmounted (P1-11-01 gap, still true)
+    # legacy routers stay unmounted (P1-11-01 gap, still true;
+    # FastAPI>=0.120 nests included routers, so walk original_router).
     from app.api.router import v1
 
-    paths = {r.path for r in v1.routes}
+    def _walk(routes, prefix=""):
+        for r in routes:
+            if getattr(r, "path", None):
+                yield prefix + r.path
+            elif getattr(r, "original_router", None) is not None:
+                yield from _walk(r.original_router.routes, prefix + (r.original_router.prefix or ""))
+
+    paths = set(_walk(v1.routes))
     assert not any(p.startswith("/universities") and "passport" not in p for p in paths)
 
 

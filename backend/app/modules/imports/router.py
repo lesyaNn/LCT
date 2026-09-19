@@ -2,15 +2,22 @@
 
 ``POST /import/preview`` stages the workbook and returns headers + first
 rows; ``POST /import/execute`` runs the import synchronously in the MVP
-and returns a ``job_id`` via the ``task_queue`` stub (shape-compatible
-with the P4-06-01 background worker); ``GET /import/jobs/{id}`` reports
-status + summary.
+(job lifecycle is still recorded: queued -> running -> done | failed, so
+``GET /import/jobs/{id}`` never hangs on "queued"); ``GET /import/jobs/{id}``
+reports status + summary. Repeated POSTs with the same file + mapping +
+options return the existing job (idempotency_key) instead of a duplicate
+insert. The payload shape is worker-compatible: ``workers`` can dequeue
+and run the same ``execute_import`` out-of-band (see run_imports_once).
 """
+
+import hashlib
+import json
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from app.core.security import CurrentUser, get_current_user
+from app.core.permissions import require_permission
+from app.core.security import CurrentUser
 from app.db.session import get_db
 from app.infrastructure import task_queue
 from app.modules.imports import service
@@ -23,6 +30,15 @@ from app.modules.imports.schemas import (
 from app.schemas.common import ErrorResponse
 
 router = APIRouter(prefix="/import", tags=["Import"])
+
+
+def _idempotency_key(file_id: str, mapping: dict, update_existing: bool, dry_run: bool) -> str:
+    raw = json.dumps(
+        {"f": file_id, "m": mapping, "u": update_existing, "d": dry_run},
+        sort_keys=True, ensure_ascii=False,
+    )
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
 
 ERROR_RESPONSES = {
     400: {"model": ErrorResponse, "description": "Ошибка валидации файла/маппинга"},
@@ -44,7 +60,7 @@ ERROR_RESPONSES = {
 )
 def import_preview(
     file: UploadFile = File(..., description="XLSX/XLS файл каталогов (до 10 МБ)"),
-    _u: CurrentUser = Depends(get_current_user),
+    _u: CurrentUser = Depends(require_permission("import.write")),
 ):
     try:
         content = file.file.read()
@@ -76,10 +92,23 @@ def import_preview(
 def import_execute(
     req: ImportExecuteRequest,
     db: Session = Depends(get_db),
-    _u: CurrentUser = Depends(get_current_user),
+    _u: CurrentUser = Depends(require_permission("import.write")),
 ):
+    key = _idempotency_key(
+        req.file_id, req.mapping,
+        req.options.update_existing, req.options.dry_run,
+    )
+    job_id = task_queue.enqueue("xlsx_import", {
+        "file_id": req.file_id,
+        "mapping": req.mapping,
+        "update_existing": req.options.update_existing,
+        "dry_run": req.options.dry_run,
+        "idempotency_key": key,
+    })
+    if (task_queue.job_status(job_id) or {}).get("status") == "done":
+        return ImportExecuteResponse(job_id=job_id)
+    task_queue.job_running(job_id)
     try:
-        job_id = task_queue.enqueue("xlsx_import", {"file_id": req.file_id})
         summary = service.execute_import(
             db,
             req.file_id,
@@ -88,7 +117,11 @@ def import_execute(
             dry_run=req.options.dry_run,
         )
     except service.ImportValidationError as exc:
+        task_queue.job_failed(job_id, str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        task_queue.job_failed(job_id, f"{type(exc).__name__}: {exc}")
+        raise
     task_queue.job_done(job_id, summary)
     return ImportExecuteResponse(job_id=job_id)
 
@@ -106,7 +139,7 @@ def import_execute(
 )
 def import_job_status(
     job_id: str,
-    _u: CurrentUser = Depends(get_current_user),
+    _u: CurrentUser = Depends(require_permission("import.read")),
 ):
     job = task_queue.job_status(job_id)
     if not job:

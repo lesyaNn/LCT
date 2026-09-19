@@ -148,8 +148,19 @@ def _get_or_create(session: Session, model, defaults: dict, **key):
     return obj, True
 
 
-def seed_demo(session: Session) -> dict:
-    """Run the full idempotent demo seed. Returns entity counts."""
+def seed_demo(session: Session, skip_universities: bool | None = None) -> dict:
+    """Run the full idempotent demo seed. Returns entity counts.
+
+    ``skip_universities=True`` (or ``SEED_SKIP_UNIVERSITIES=1``) seeds only
+    the standalone catalogs (directions/programs/vendors/products) and skips
+    everything bound to universities (universities themselves, responsibles,
+    teachers, students, licenses/contracts, meetings, documents, notes) —
+    e.g. to fill universities later via XLSX import.
+    """
+    if skip_universities is None:
+        skip_universities = os.getenv("SEED_SKIP_UNIVERSITIES", "").strip().lower() in (
+            "1", "true", "yes",
+        )
     today = date.today()
     stats: dict[str, int] = {}
 
@@ -179,6 +190,10 @@ def seed_demo(session: Session) -> dict:
             products.append(pr)
 
     prog_names = list(programs.keys())
+
+    if skip_universities:
+        session.commit()
+        return _collect_stats(session)
 
     # --- per-university data ---
     first_names = ["Александр", "Мария", "Дмитрий", "Елена", "Игорь",
@@ -477,6 +492,11 @@ def seed_demo(session: Session) -> dict:
 
     session.commit()
 
+    return _collect_stats(session)
+
+
+def _collect_stats(session: Session) -> dict:
+    stats: dict[str, int] = {}
     for model, label in [
         (University, "universities"), (ITDirection, "directions"),
         (ITProgram, "programs"), (Vendor, "vendors"),

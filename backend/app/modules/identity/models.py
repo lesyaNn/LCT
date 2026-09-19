@@ -1,9 +1,14 @@
+"""DEFERRED module — forward stub, see ``docs/AUDIT.md`` (§0).
+
+Forward user-stub superseded by Keycloak (sub -> responsibles);
+isolated on ``DeferredBase`` metadata. Canon: ``app.core.security``.
+"""
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base
+from app.db.deferred import DeferredBase as Base
 
 
 class User(Base):

@@ -3,7 +3,8 @@
 Scope: ``.xlsx`` + ``.xls`` (legacy Excel 97-2003), basic mapping, simple
 validation. Bad rows are skipped with per-row errors — they never abort
 the whole import. Idempotency via natural keys (``contract_number`` is
-UNIQUE; licenses match on ``(university, product, license_number)``).
+UNIQUE; licenses match on ``(university, product, license_number)``;
+directions on ``code``; programs on ``(direction_id, name)``).
 
 ``execute_import`` runs synchronously in the MVP; the router wraps it into
 the ``task_queue`` stub so the API shape (``job_id`` + job status) already
@@ -23,13 +24,16 @@ from sqlalchemy.orm import Session
 
 from app.models.catalog import (
     Contract,
+    ITDirection,
     ITProduct,
+    ITProgram,
     License,
     Responsible,
     University,
     UniversityResponsible,
     Vendor,
 )
+from app.models.interactions import UniversityProgram
 
 MAX_FILE_BYTES = 10 * 1024 * 1024
 MAX_ROWS = 5000
@@ -44,6 +48,10 @@ TARGET_FIELDS = frozenset({
     "vendor.name",
     "product.name",
     "product.version",
+    "direction.code",
+    "direction.name",
+    "program.name",
+    "program.description",
     "contract.contract_number",
     "license.signed_at",
     "license.expires_at",
@@ -267,6 +275,65 @@ def link_responsible(
         session.flush()
 
 
+def _slug_code(name: str) -> str:
+    """Fallback code for a direction when only ``direction.name`` is mapped."""
+    slug = re.sub(r"\s+", "_", name.strip().lower())
+    slug = re.sub(r"[^\w\-]", "", slug, flags=re.UNICODE)[:64]
+    return slug or f"dir-{uuid.uuid4().hex[:8]}"
+
+
+def find_or_create_direction(
+    session: Session, code: str, name: str | None
+) -> ITDirection:
+    existing = session.execute(
+        select(ITDirection).filter_by(code=code)
+    ).scalar_one_or_none()
+    if existing is not None:
+        if name and existing.name != name:
+            existing.name = name
+            session.flush()
+        return existing
+    direction = ITDirection(code=code, name=name or code)
+    session.add(direction)
+    session.flush()
+    return direction
+
+
+def find_or_create_program(
+    session: Session, direction: ITDirection, name: str, description: str | None
+) -> ITProgram:
+    existing = session.execute(
+        select(ITProgram).filter_by(direction_id=direction.id, name=name)
+    ).scalar_one_or_none()
+    if existing is not None:
+        if description is not None and existing.description != description:
+            existing.description = description
+            session.flush()
+        return existing
+    program = ITProgram(
+        direction_id=direction.id, name=name, description=description or ""
+    )
+    session.add(program)
+    session.flush()
+    return program
+
+
+def link_university_program(
+    session: Session, university_id, program_id
+) -> None:
+    """Bind university <-> program (uq pair, idempotent, never deleted)."""
+    exists = session.execute(
+        select(UniversityProgram).filter_by(
+            university_id=university_id, program_id=program_id
+        )
+    ).scalar_one_or_none()
+    if exists is None:
+        session.add(UniversityProgram(
+            university_id=university_id, program_id=program_id, status="active",
+        ))
+        session.flush()
+
+
 # ------------------------------------------------------------------ row apply
 
 
@@ -310,6 +377,34 @@ def apply_row(
             session, ITProduct, {"vendor_id": vendor.id},
             vendor_id=vendor.id, name=product_name, version=version,
         )
+
+    # ИТ-направление — отдельное поле файла (опционально).
+    # Направление строки хранится прямо в лицензии (direction_id).
+    # it_programs — зона workflow: программа и связь вуз↔программа
+    # создаются только если в файле есть колонка программы.
+    direction_code = _cell_text(mapped.get("direction.code"))
+    direction_name = _cell_text(mapped.get("direction.name"))
+    program_name = _cell_text(mapped.get("program.name"))
+    program_desc_raw = mapped.get("program.description")
+    program_desc = _cell_text(program_desc_raw) or None
+    row_program = None
+    row_direction = None
+    if direction_code or direction_name or program_name:
+        if not direction_code and direction_name:
+            direction_code = _slug_code(direction_name)
+        if not direction_code:
+            raise ImportValidationError(
+                "Поле 'direction.code' обязательно, если указаны направление/программа"
+                " (или замаппьте 'direction.name' для автогенерации кода)"
+            )
+        row_direction = find_or_create_direction(
+            session, direction_code, direction_name or None
+        )
+        if program_name:
+            row_program = find_or_create_program(
+                session, row_direction, program_name, program_desc
+            )
+            link_university_program(session, uni.id, row_program.id)
 
     signed_at = parse_date(mapped.get("license.signed_at"), "license.signed_at")
     expires_at = parse_date(mapped.get("license.expires_at"), "license.expires_at")
@@ -364,6 +459,8 @@ def apply_row(
             )
         session.add(License(
             university_id=uni.id, product_id=product.id, contract_id=contract.id,
+            program_id=row_program.id if row_program else None,
+            direction_id=row_direction.id if row_direction else None,
             license_number=license_number, signed_at=signed_at or date.today(),
             expires_at=expires_at, transfer_status_raw=transfer, comment=comment,
         ))
@@ -374,6 +471,10 @@ def apply_row(
         lic.signed_at = signed_at or lic.signed_at
         lic.transfer_status_raw = transfer
         lic.contract_id = contract.id
+        if row_program is not None:
+            lic.program_id = row_program.id
+        if row_direction is not None:
+            lic.direction_id = row_direction.id
         lic.comment = comment
         session.flush()
         lic_created = False
@@ -458,6 +559,8 @@ __all__ = [
     "TARGET_FIELDS",
     "apply_row",
     "execute_import",
+    "find_or_create_direction",
+    "find_or_create_program",
     "find_university",
     "parse_date",
     "parse_preview",

@@ -1,11 +1,8 @@
-"""API v1 router.
+"""API v1 production router.
 
-Mounted: auth, import, university passport, teacher passport (P1-05),
-catalog CRUD (P1-03: universities/directions/programs/products/vendors/
-responsibles).
-Legacy ``universities``/``programs``/``teachers`` routers stay unmounted:
-they target the pre-P1 integer schema and are incompatible with the
-canonical UUID models (see gap pins in ``tests/test_p1_crud.py`` history).
+Mounted: auth, import, university passport, teacher passport, and catalog
+CRUD/overview. Deferred forward-stub routers stay unmounted; see
+``docs/AUDIT.md`` for their reactivation requirements.
 """
 
 from fastapi import APIRouter

@@ -12,17 +12,23 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
     "admin": {"*"},
     "manager": {
         "university.read",
+        "catalog.read",
         "workflow.read",
         "reports.read",
+        "import.read",
+        "import.write",
     },
     "curator": {
         "university.read",
         "university.edit",
+        "catalog.read",
         "workflow.read",
         "workflow.change_status",
+        "import.read",
     },
     "user": {
         "university.read",
+        "catalog.read",
     },
 }
 

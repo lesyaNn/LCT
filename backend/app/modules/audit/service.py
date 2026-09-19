@@ -11,9 +11,9 @@ class AuditService:
 
     def log(
         self,
-        user_id: int,
+        user_id: str | int,
         entity_type: str,
-        entity_id: int,
+        entity_id: str | int,
         action: str,
         before=None,
         after=None,
@@ -21,9 +21,9 @@ class AuditService:
         university_id=None,
     ) -> AuditEvent:
         ev = AuditEvent(
-            user_id=user_id,
+            user_id=str(user_id),
             entity_type=entity_type,
-            entity_id=entity_id,
+            entity_id=str(entity_id),
             action=action,
             before_data=_dump(before),
             after_data=_dump(after),

@@ -1,9 +1,15 @@
+"""DEFERRED module — forward stub, see ``docs/AUDIT.md`` (§0).
+
+``health_score_history`` stub with a pre-UUID int FK; intentionally absent
+from SQL migrations; isolated on ``DeferredBase`` metadata. Pure formula
+``compute_score()`` in service.py stays usable.
+"""
 from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Integer, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base
+from app.db.deferred import DeferredBase as Base
 
 
 class HealthScoreHistory(Base):
