@@ -31,7 +31,7 @@ passport pipeline (``get_passport`` / HTTP), never through private loaders:
 * EXACT query counts 8/8/9/9 + scaling + audit-row independence (§45-46);
 * PostgreSQL latency <500 ms on the reused demo dataset (§47-48);
 * pagination content + budgets via HTTP (§49-53);
-* Teacher Passport discovery pin: production endpoint absent -> PARTIAL (§54);
+* Teacher Passport production pin: endpoint mounted via P1-05 (§54);
 * OpenAPI passport paths (§64);
 * central 409 handler coexistence with 404/403/422 (§65).
 
@@ -1500,34 +1500,44 @@ def test_pagination_validation_404_and_budgets(engine, api_client, db, select_co
 # ============================================== teacher passport discovery ==
 
 
-def test_teacher_passport_production_absent():
-    """Discovery pin (§54): no Teacher Passport endpoint/schema in production.
+def test_teacher_passport_production_present():
+    """Production pin (§54, P1-05 shipped): Teacher Passport endpoint exists.
 
-    The legacy teachers router exposes CRUD only; no
-    ``GET /teachers/{id}/passport``, no ``TeacherPassport`` DTO, no
-    ``readiness_reasons`` / ``allowed_programs`` contract anywhere.
-    Per P1-11-02 rule the endpoint is NOT created to satisfy tests —
-    University Passport is fully covered, overall status stays PARTIAL.
+    ``GET /api/v1/teachers/{id}/passport`` is mounted via the UUID-native
+    ``app.modules.teachers.passport_router``; the legacy int-PK teachers
+    CRUD router stays unmounted; the ``TeacherPassport`` DTO lives in the
+    new ``passport_schemas`` module; readiness reuses the canonical
+    ``compute_teacher_readiness`` helper (no second formula); no invented
+    ``allowed_programs`` contract.
     """
+    import app.modules.teachers.passport_router as teacher_passport_router
+    import app.modules.teachers.passport_schemas as teacher_passport_schemas
+    import app.modules.teachers.passport_service as teacher_passport_service
     import app.modules.teachers.router as teachers_router
     import app.modules.teachers.schemas as teachers_schemas
     import app.modules.universities.passport_schemas as uni_schemas
+    from app.services.teacher_readiness import compute_teacher_readiness
 
     legacy_paths = sorted(getattr(route, "path", "") for route in teachers_router.router.routes)
     assert not any("passport" in p for p in legacy_paths), legacy_paths
 
     mounted = sorted(getattr(route, "path", "") for route in app.routes if hasattr(route, "path"))
     teacher_passport = [p for p in mounted if p.startswith("/api/v1/teachers") and "passport" in p]
-    assert teacher_passport == [], teacher_passport
+    assert teacher_passport == ["/api/v1/teachers/{teacher_id}/passport"], teacher_passport
 
+    assert hasattr(teacher_passport_schemas, "TeacherPassport")
     assert not hasattr(teachers_schemas, "TeacherPassport")
     assert not hasattr(uni_schemas, "TeacherPassport")
+
+    assert teacher_passport_service.compute_teacher_readiness is compute_teacher_readiness
+    assert "passport" in teacher_passport_router.router.prefix or any(
+        "passport" in getattr(route, "path", "") for route in teacher_passport_router.router.routes
+    )
 
     import app.modules.teachers.models as teachers_models
 
     for mod in (teachers_router, teachers_schemas, teachers_models, ps, uni_schemas):
-        for symbol in ("readiness_reasons", "allowed_programs", "TeacherPassport"):
-            assert symbol not in dir(mod), (mod.__name__, symbol)
+        assert "allowed_programs" not in dir(mod), mod.__name__
 
 
 # ================================================================ openapi ===
@@ -1540,7 +1550,7 @@ def test_openapi_passport_paths(api_client):
     assert "/api/v1/universities/{university_id}/passport" in paths
     assert "/api/v1/universities/{university_id}/passport/programs" in paths
     assert "/api/v1/universities/{university_id}/passport/teachers" in paths
-    assert [p for p in paths if p.startswith("/api/v1/teachers") and "passport" in p] == []
+    assert "/api/v1/teachers/{teacher_id}/passport" in paths  # P1-05 shipped (§54)
 
 
 # ==================================================== error handler coexist ==

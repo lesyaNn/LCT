@@ -1,16 +1,15 @@
 """P4-10-01: XLSX import — staging, preview, execute, idempotency."""
 
 import io
+import os
 
 import pytest
 from fastapi.testclient import TestClient
 from openpyxl import Workbook
-from sqlalchemy import create_engine, event, func, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-import app.models  # noqa: F401  (register metadata)
 from app.core.security import CurrentUser, get_current_user
-from app.db.base import Base
 from app.db.session import get_db
 from app.modules.imports import service
 from app.modules.imports.service import ImportValidationError
@@ -61,14 +60,9 @@ def staging(tmp_path, monkeypatch):
 
 @pytest.fixture()
 def db(tmp_path):
-    eng = create_engine(f"sqlite:///{tmp_path}/imp.db")
+    from tests.db_helpers import require_pg_engine
 
-    @event.listens_for(eng, "connect")
-    def _fk_on(dbapi_conn, _rec):  # pragma: no cover
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    Base.metadata.drop_all(eng)
-    Base.metadata.create_all(eng)
+    eng = require_pg_engine(os.getenv("TEST_DATABASE_URL", "sqlite://"))
     with Session(eng) as session:
         yield session
     eng.dispose()
@@ -185,9 +179,9 @@ def test_unknown_mapping_rejected(staging, db):
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(service, "STAGING_DIR", str(tmp_path / "staging"))
-    eng = create_engine(f"sqlite:///{tmp_path}/api.db")
-    Base.metadata.drop_all(eng)
-    Base.metadata.create_all(eng)
+    from tests.db_helpers import require_pg_engine
+
+    eng = require_pg_engine(os.getenv("TEST_DATABASE_URL", "sqlite://"))
 
     from app.main import app
 

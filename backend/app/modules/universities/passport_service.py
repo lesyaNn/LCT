@@ -384,7 +384,7 @@ def _load_teacher_rows(db, university_id: uuid.UUID) -> list[tuple]:
         .outerjoin(ITProgram, ITProgram.id == TeacherProgram.program_id)
         .outerjoin(ITDirection, ITDirection.id == ITProgram.direction_id)
         .where(Teacher.university_id == university_id)
-        .order_by(Teacher.full_name, ITProgram.name)
+        .order_by(Teacher.full_name, Teacher.id, ITProgram.name, ITProgram.id)
     )
     return list(db.execute(stmt).all())
 
@@ -1330,7 +1330,7 @@ def get_teachers_page(
         db.execute(
             select(Teacher.id)
             .where(Teacher.university_id == university_id)
-            .order_by(Teacher.full_name)
+            .order_by(Teacher.full_name, Teacher.id)
             .limit(page_size)
             .offset((page - 1) * page_size)
         )
@@ -1364,7 +1364,7 @@ def get_teachers_page(
         .outerjoin(ITProgram, ITProgram.id == TeacherProgram.program_id)
         .outerjoin(ITDirection, ITDirection.id == ITProgram.direction_id)
         .where(Teacher.id.in_(page_ids))
-        .order_by(Teacher.full_name, ITProgram.name)
+        .order_by(Teacher.full_name, Teacher.id, ITProgram.name, ITProgram.id)
     )
     teacher_rows = list(db.execute(stmt).all())
     return _assemble_teachers(teacher_rows), int(total)

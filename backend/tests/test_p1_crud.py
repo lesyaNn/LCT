@@ -806,33 +806,54 @@ def test_prod_auth_rbac_mechanism_admin_only(jwt_client):
 # ============================================================ HTTP gaps ==
 
 
-def test_gap_legacy_university_crud_not_mounted():
-    """Gap pin: legacy int-PK universities router must NOT be mounted
-    (it is broken vs the P1 schema). Replace with real CRUD tests when
-    P1 HTTP CRUD ships — do not mount the legacy router to satisfy this."""
+def test_gap_legacy_university_crud_not_mounted(engine):
+    """P1-03 shipped: real UUID-schema catalog CRUD is mounted at
+    ``/api/v1/universities`` (paginated). The LEGACY int-PK router
+    (``app.modules.universities.router``, region/status fields) must STILL
+    stay unmounted — this pins the new contract instead of the old 404."""
     from app.config import settings
+    from app.db.session import get_db
     from app.main import app
 
+    def _override():
+        with Session(engine) as session:
+            yield session
+
+    app.dependency_overrides[get_db] = _override
     settings.auth_dev_bypass = True
     try:
         c = TestClient(app)
-        assert c.get("/api/v1/universities").status_code == 404
-        assert c.post("/api/v1/universities", json={"name": "X"}).status_code == 404
+        r = c.get("/api/v1/universities")
+        assert r.status_code == 200, r.text
+        assert set(r.json()) == {"items", "page", "page_size", "total"}
+        # legacy contract (plain list, int ids) is gone for good
+        assert not isinstance(r.json(), list)
     finally:
+        app.dependency_overrides.pop(get_db, None)
         settings.auth_dev_bypass = False
 
 
-def test_gap_program_teacher_crud_not_mounted():
+def test_gap_program_teacher_crud_not_mounted(engine):
+    """P1-03 shipped: real ``/api/v1/programs`` CRUD is mounted (paginated).
+    ``/api/v1/teachers`` HTTP CRUD is still out of scope -> remains 404."""
     from app.config import settings
+    from app.db.session import get_db
     from app.main import app
 
+    def _override():
+        with Session(engine) as session:
+            yield session
+
+    app.dependency_overrides[get_db] = _override
     settings.auth_dev_bypass = True
     try:
         c = TestClient(app)
-        assert c.get("/api/v1/programs").status_code == 404
-        assert c.post("/api/v1/programs", json={"name": "X"}).status_code == 404
+        r = c.get("/api/v1/programs")
+        assert r.status_code == 200, r.text
+        assert set(r.json()) == {"items", "page", "page_size", "total"}
         assert c.get("/api/v1/teachers").status_code == 404
     finally:
+        app.dependency_overrides.pop(get_db, None)
         settings.auth_dev_bypass = False
 
 

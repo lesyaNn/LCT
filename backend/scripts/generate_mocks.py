@@ -28,8 +28,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
-import app.models  # noqa: F401  (register metadata)
-from app.db.base import Base
 from app.db.seed import seed_demo
 from app.models.catalog import Contract, ITProduct, ITProgram, License, University
 from app.models.interactions import (
@@ -91,7 +89,7 @@ def _program_short(prog: ITProgram) -> ProgramShort:
 def build_university_passport(session: Session, uni_name: str) -> UniversityPassport:
     uni = session.execute(select(University).filter_by(name=uni_name)).scalar_one()
 
-    links = sorted(uni.university_responsibles, key=lambda l: (not l.is_primary))
+    links = sorted(uni.university_responsibles, key=lambda link: (not link.is_primary))
     primary = links[0].responsible if links else None
     responsible = (
         ResponsibleDetail(
@@ -325,8 +323,14 @@ def main() -> None:
     args = parser.parse_args()
     os.makedirs(args.out, exist_ok=True)
 
-    engine = create_engine("sqlite://")
-    Base.metadata.create_all(engine)
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        raise SystemExit(
+            "DATABASE_URL must point to an already migrated PostgreSQL database"
+        )
+    engine = create_engine(database_url)
+    if engine.dialect.name != "postgresql":
+        raise SystemExit("generate_mocks requires an already migrated PostgreSQL database")
     with Session(engine) as session:
         seed_demo(session)
         university_passport = build_university_passport(session, UNIVERSITY_NAME)

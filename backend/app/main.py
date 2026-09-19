@@ -23,6 +23,11 @@ app = FastAPI(
     openapi_url="/openapi.json",
     openapi_tags=[
         {"name": "Universities", "description": "Каталог ВУЗов и паспорта"},
+        {"name": "Directions", "description": "Направления подготовки (CRUD)"},
+        {"name": "Programs", "description": "Программы (CRUD, принадлежат направлению)"},
+        {"name": "Products", "description": "Продукты вендоров (CRUD)"},
+        {"name": "Vendors", "description": "Вендоры (CRUD)"},
+        {"name": "Responsibles", "description": "Ответственные и связки с вузами (CRUD)"},
         {"name": "Teachers", "description": "Преподаватели и паспорта"},
         {"name": "Workflow", "description": "Workflow engine: шаблоны, экземпляры, переходы"},
         {"name": "Health Score", "description": "Расчёт и просмотр Health Score"},
