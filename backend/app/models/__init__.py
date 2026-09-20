@@ -9,7 +9,7 @@ universities, it_directions, it_programs, vendors, it_products, contracts,
 licenses, responsibles, university_responsibles, teachers,
 teacher_qualifications, teacher_certificates, teacher_programs, students,
 university_programs, university_products, meetings, documents,
-interaction_notes, meeting_documents.
+interaction_notes, meeting_documents, health_score_snapshots (P2-09-01).
 """
 
 from app.models.catalog import (  # noqa: F401
@@ -23,6 +23,7 @@ from app.models.catalog import (  # noqa: F401
     UniversityResponsible,
     Vendor,
 )
+from app.models.health_score import HealthScoreSnapshot  # noqa: F401
 from app.models.interactions import (  # noqa: F401
     Document,
     InteractionNote,
@@ -59,5 +60,6 @@ __all__ = [
     "Meeting",
     "MeetingDocument",
     "Document",
+    "HealthScoreSnapshot",
     "InteractionNote",
 ]

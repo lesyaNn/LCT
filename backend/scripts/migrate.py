@@ -67,6 +67,7 @@ EXPECTED_TABLES = [
     "interaction_notes",
     "meeting_documents",
     "audit_events",
+    "health_score_snapshots",
 ]
 
 VERSION_RE = re.compile(r"^(?P<ver>\d{6}_[a-z0-9_]+)\.(?P<dir>up|down)\.sql$")
