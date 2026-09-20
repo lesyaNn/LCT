@@ -1,7 +1,7 @@
 """P0-1 guard: one schema universe + deferred modules stay unmounted.
 
 Pins the resolution of the "two schema universes" blocker:
-* canonical ``Base.metadata`` contains exactly the 21 SQL-managed tables;
+* canonical ``Base.metadata`` contains exactly the 29 SQL-managed tables;
 * pre-UUID / stub models live on ``DeferredBase`` metadata only;
 * deferred routers are importable but NOT mounted in the production app;
 * ``AuditEvent.user_id/entity_id`` accept Keycloak ``sub`` (TEXT, 000010).
@@ -25,6 +25,8 @@ CANON_TABLES = frozenset({
     "teacher_programs", "students", "university_programs",
     "university_products", "meetings", "meeting_documents", "documents",
     "interaction_notes", "audit_events",
+    "workflow_templates", "workflow_stages", "workflow_instances",
+    "instance_stages", "transitions", "comments", "tasks", "attachments",
 })
 
 DEFERRED_TABLES = frozenset({
@@ -68,7 +70,13 @@ def test_canon_metadata_is_exactly_the_sql_managed_set():
 
 
 def test_deferred_tables_not_on_canon_metadata():
-    assert not (DEFERRED_TABLES & frozenset(Base.metadata.tables))
+    # Canonical UUID tasks and legacy integer tasks share only the SQL name.
+    assert not ((DEFERRED_TABLES - {"tasks"}) & frozenset(Base.metadata.tables))
+    from app.models.workflow import WorkflowTask
+    from app.modules.workflow.models import Task
+
+    assert WorkflowTask.__table__ is not Task.__table__
+    assert Task.__table__.metadata is DeferredBase.metadata
 
 
 def test_deferred_models_isolated_on_deferred_base():
@@ -92,7 +100,7 @@ def test_mounted_routers_are_only_the_production_contract():
         "/api/v1/auth", "/api/v1/import", "/api/v1/catalog",
         "/api/v1/universities", "/api/v1/directions", "/api/v1/programs",
         "/api/v1/products", "/api/v1/vendors", "/api/v1/responsibles",
-        "/api/v1/teachers",
+        "/api/v1/teachers", "/api/v1/workflow",
     )
     paths = _mounted_api_paths()
     assert all(path.startswith(allowed) for path in paths), paths

@@ -161,17 +161,19 @@ TEST_DATABASE_URL=postgresql+psycopg://rtk:change-me@localhost:5433/rtk_p1_test 
 ### 🗄️ P1 — ядро схемы БД (PostgreSQL + SQL migrations + seed)
 
 SQL-файлы `backend/migrations/` — **единственный источник истины схемы**
-(8 версий: `000001_core_catalog` … `000008_readiness_perf_indexes`).
+(11 версий: `000001_core_catalog` … `000011_workflow_runtime`).
 Python ORM (`backend/app/models/` + `audit_events`) — только runtime-описание,
 схемой не управляет (`create_all`/`drop_all`/Alembic DDL удалены из активных
 путей; история Alembic лежит в `backend/alembic/` как read-only архив).
-21 таблица: universities, it_directions, it_programs, vendors, it_products,
+P1-ядро содержит 21 таблицу: universities, it_directions, it_programs, vendors, it_products,
 contracts, licenses, responsibles, university_responsibles, teachers,
 teacher_qualifications, teacher_certificates, teacher_programs, students,
 university_programs, university_products, meetings, meeting_documents,
 documents, interaction_notes, audit_events. Все PK — UUID (генерирует
 приложение, без `gen_random_uuid()`), все даты — `timestamptz`,
-статусы лицензий/договоров/готовности — вычисляемые `@property`.
+статусы лицензий/договоров/готовности — вычисляемые `@property`. Миграция
+Б2 добавляет ещё 8 таблиц: workflow_templates, workflow_stages,
+workflow_instances, instance_stages, transitions, comments, tasks, attachments.
 
 ```bash
 # 1. Поднять инфраструктуру (postgres healthy -> backend сам применит миграции)
@@ -183,7 +185,7 @@ cd backend
 DATABASE_URL=postgresql+psycopg://rtk:change-me@localhost:5433/rtk \
   python scripts/migrate.py up
 
-# 3. Проверить версию (latest: 000008_readiness_perf_indexes)
+# 3. Проверить версию (latest: 000011_workflow_runtime)
 DATABASE_URL=... python scripts/migrate.py status
 DATABASE_URL=... python scripts/migrate.py verify
 
@@ -212,7 +214,7 @@ TEST_DATABASE_URL=postgresql+psycopg://postgres@localhost:55433/rtk_p1_test \
 
 ```bash
 cd backend
-DATABASE_URL=... python scripts/migrate.py down --to base --yes  # чистит схему P1 полностью
+DATABASE_URL=... python scripts/migrate.py down --to base --yes  # чистит схему приложения полностью
 DATABASE_URL=... python scripts/migrate.py up                     # создаёт заново без ошибок
 # Частичный откат: DATABASE_URL=... python scripts/migrate.py down --to 000007_passport_perf_indexes --yes
 ```
@@ -222,20 +224,21 @@ DATABASE_URL=... python scripts/migrate.py up                     # создаё
 ```bash
 cd backend
 DATABASE_URL=... python scripts/migrate.py baseline  # строгая проверка + mark applied, данные целы
+DATABASE_URL=... python scripts/migrate.py up        # применяет новый workflow runtime
 DATABASE_URL=... python scripts/migrate.py verify
 ```
 
 Проверка seed: повторный `python -m app.db.seed` печатает те же счётчики
 (10 вузов, 34 преподавателя, 750 студентов, …) — дубликатов нет.
 
-Проверка эквивалентности старой и новой схемы (каталог + pg_dump):
+Проверка эквивалентности двух схем, приведённых к одной версии (каталог + pg_dump):
 
 ```bash
 cd backend
 python scripts/check_migrations.py \
   --source postgresql://rtk:change-me@localhost:5433/rtk_schema_source \
   --target postgresql://rtk:change-me@localhost:5433/rtk_schema_target
-# -> SCHEMA EQUIVALENCE: PASS (21 tables, 173 columns)
+# -> SCHEMA EQUIVALENCE: PASS (... tables, ... columns)
 ```
 
 ### 🗄️ PostgreSQL: две базы — `rtk` (приложение) и `keycloak` (авторизация)
@@ -284,8 +287,16 @@ GRANT ALL PRIVILEGES ON DATABASE "keycloak" TO "keycloak";
 EOSQL
 ```
 
-### ⏭️ Следующий этап
+### ⏭️ Б2: interaction pipeline
 
-STOP. Далее — проектирование и реализация PostgreSQL-схемы предметной области
-(universities/teachers/programs/workflow/…). Доменные модули лежат в
-`backend/app/modules/` и в auth-стенде не монтируются.
+В ветке `raisw` добавлен канонический UUID-runtime взаимодействия с вузом.
+Миграция `backend/migrations/000011_workflow_runtime.up.sql` создаёт шаблоны
+этапов, экземпляры, историю переходов, комментарии, задачи и привязки к
+`documents`. Legacy-пакет `app.modules.workflow` намеренно остаётся
+изолированным.
+
+Основные API-пути: `/api/v1/workflow/templates`,
+`/api/v1/workflow/instances`, `/transition`, `/comments`, `/tasks` и
+`/attachments`. Переходы идут только вперёд, проверяют `expected_revision`,
+записывают append-only историю и audit event. UI-канбан, SLA-уведомления и
+фоновая автоматизация остаются следующим слоем.

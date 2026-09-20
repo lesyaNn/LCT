@@ -1,8 +1,8 @@
-"""P1 canonical domain models (single source of truth for Alembic metadata).
+"""Canonical domain models (single source of truth for ORM metadata).
 
-Importing this package registers ALL P1 tables on ``Base.metadata``.
-Alembic ``env.py`` imports this module — that is how autogenerate and
-``upgrade head`` see every model (P1-01-04 requirement).
+Importing this package registers all P1 tables plus the canonical B2 workflow
+runtime on ``Base.metadata``.  The legacy ``app.modules.workflow`` models are
+kept on ``DeferredBase`` and must not be imported here.
 
 Table naming follows the task specs exactly:
 universities, it_directions, it_programs, vendors, it_products, contracts,
@@ -10,6 +10,10 @@ licenses, responsibles, university_responsibles, teachers,
 teacher_qualifications, teacher_certificates, teacher_programs, students,
 university_programs, university_products, meetings, documents,
 interaction_notes, meeting_documents.
+
+Workflow runtime tables: workflow_templates, workflow_stages,
+workflow_instances, instance_stages, transitions,
+comments, tasks, attachments.
 """
 
 from app.models.catalog import (  # noqa: F401
@@ -38,6 +42,17 @@ from app.models.teachers import (  # noqa: F401
     TeacherProgram,
     TeacherQualification,
 )
+from app.modules.audit.models import AuditEvent  # noqa: F401
+from app.models.workflow import (  # noqa: F401
+    WorkflowAttachment,
+    WorkflowComment,
+    WorkflowInstance,
+    WorkflowInstanceStage,
+    WorkflowTask,
+    WorkflowTemplate,
+    WorkflowTemplateStage,
+    WorkflowTransition,
+)
 
 __all__ = [
     "University",
@@ -60,4 +75,13 @@ __all__ = [
     "MeetingDocument",
     "Document",
     "InteractionNote",
+    "AuditEvent",
+    "WorkflowTemplate",
+    "WorkflowTemplateStage",
+    "WorkflowInstance",
+    "WorkflowInstanceStage",
+    "WorkflowTransition",
+    "WorkflowComment",
+    "WorkflowTask",
+    "WorkflowAttachment",
 ]
