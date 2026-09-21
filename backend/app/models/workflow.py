@@ -339,6 +339,11 @@ class WorkflowTask(UUIDPKMixin, TimestampMixin, Base):
     assignee_keycloak_sub: Mapped[str | None] = mapped_column(String(256), nullable=True)
     due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="open")
+    #: P2-07-02: приоритет задачи (normal/critical). Критическая просрочка
+    #: штрафует Health Score на -8 вместо -4. Дефолт на уровне Python и БД.
+    priority: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="normal", server_default="normal"
+    )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_by_keycloak_sub: Mapped[str | None] = mapped_column(String(256), nullable=True)
     created_by_keycloak_sub: Mapped[str] = mapped_column(String(256), nullable=False)
