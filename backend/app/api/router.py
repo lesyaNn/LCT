@@ -19,8 +19,10 @@ from app.modules.universities.passport_router import router as passport_router
 v1 = APIRouter(prefix="/api/v1")
 v1.include_router(auth_router)
 v1.include_router(imports_router)
+# NOTE: health_router ДО catalog_router: точный путь /universities/health-score
+# (batch, P2-08-02) иначе перехватывается GET /universities/{university_id}.
+v1.include_router(health_router)
 v1.include_router(passport_router)
 v1.include_router(teacher_passport_router)
 v1.include_router(catalog_router)
 v1.include_router(workflow_router)
-v1.include_router(health_router)
