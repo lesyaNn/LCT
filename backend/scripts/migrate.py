@@ -68,6 +68,7 @@ P1_TABLES = [
     "interaction_notes",
     "meeting_documents",
     "audit_events",
+    "health_score_snapshots",
 ]
 
 WORKFLOW_TABLES = [
