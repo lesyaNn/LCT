@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     max_upload_mb: int = 50
     cors_origins: str = "http://localhost:3000"
 
+    # --- Health Score (P2-07-03) ---
+    # CSV обязательных типов документов для компонента D.
+    # Дефолт ТЗ: contract,license,act,protocol.
+    health_required_doc_types: str = "contract,license,act,protocol"
+
     @property
     def cors_origin_list(self) -> list[str]:
         origins = [o.strip() for o in self.cors_origins.split(",") if o.strip()]
