@@ -36,8 +36,10 @@ DEFERRED_TABLES = frozenset({
 
 # Router prefixes (without the /api/v1 mount prefix) that must stay
 # unmounted until the reactivation checklist in docs/AUDIT.md (§0) is done.
+# NOTE (P2-08-03): "/health-score" стал production (ranking) и убран отсюда;
+# legacy health_score router при этом остаётся незамаунченным.
 DEFERRED_API_PREFIXES = (
-    "/audit", "/dashboard", "/documents", "/health-score", "/users",
+    "/audit", "/dashboard", "/documents", "/users",
     "/integrations", "/notifications", "/reports", "/workflows", "/tasks",
 )
 
@@ -100,7 +102,7 @@ def test_mounted_routers_are_only_the_production_contract():
         "/api/v1/auth", "/api/v1/import", "/api/v1/catalog",
         "/api/v1/universities", "/api/v1/directions", "/api/v1/programs",
         "/api/v1/products", "/api/v1/vendors", "/api/v1/responsibles",
-        "/api/v1/teachers", "/api/v1/workflow",
+        "/api/v1/teachers", "/api/v1/workflow", "/api/v1/health-score",
     )
     paths = _mounted_api_paths()
     assert all(path.startswith(allowed) for path in paths), paths
