@@ -1,7 +1,7 @@
 """P0-1 guard: one schema universe + deferred modules stay unmounted.
 
 Pins the resolution of the "two schema universes" blocker:
-* canonical ``Base.metadata`` contains exactly the 29 SQL-managed tables;
+* canonical ``Base.metadata`` contains exactly the 30 SQL-managed tables;
 * pre-UUID / stub models live on ``DeferredBase`` metadata only;
 * deferred routers are importable but NOT mounted in the production app;
 * ``AuditEvent.user_id/entity_id`` accept Keycloak ``sub`` (TEXT, 000010).
@@ -24,7 +24,7 @@ CANON_TABLES = frozenset({
     "teachers", "teacher_qualifications", "teacher_certificates",
     "teacher_programs", "students", "university_programs",
     "university_products", "meetings", "meeting_documents", "documents",
-    "interaction_notes", "audit_events",
+    "interaction_notes", "audit_events", "health_score_snapshots",
     "workflow_templates", "workflow_stages", "workflow_instances",
     "instance_stages", "transitions", "comments", "tasks", "attachments",
 })
