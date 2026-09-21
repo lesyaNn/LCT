@@ -36,6 +36,11 @@ class CurrentUser:
 
     When PostgreSQL arrives, this `sub` maps to users.external_id
     (users.keycloak_id) — auth code will not need a rewrite.
+
+    ``university_ids`` is an OPTIONAL additive scope claim (``university_ids``
+    list or single ``university_id`` string in the JWT). P2-05 workflow file
+    storage enforces it when present (cross-university isolation); tokens
+    without it keep the pre-existing global RBAC behaviour. ``None`` = all.
     """
 
     id: str = ""
@@ -43,6 +48,7 @@ class CurrentUser:
     email: str | None = None
     name: str | None = None
     roles: set[str] = field(default_factory=set)
+    university_ids: tuple[str, ...] | None = None
 
 
 def _fetch_jwks() -> dict:
@@ -110,12 +116,19 @@ def validate_token(token: str) -> CurrentUser:
     if settings.keycloak_audience not in auds:
         raise HTTPException(status_code=401, detail="Invalid audience")
     roles = set((claims.get("realm_access") or {}).get("roles", [])) & KNOWN_ROLES
+    scope: tuple[str, ...] | None = None
+    raw_scope = claims.get("university_ids", claims.get("university_id"))
+    if isinstance(raw_scope, str) and raw_scope:
+        scope = (raw_scope,)
+    elif isinstance(raw_scope, (list, tuple)):
+        scope = tuple(str(v) for v in raw_scope if str(v)) or None
     return CurrentUser(
         id=claims.get("sub", ""),
         username=claims.get("preferred_username"),
         email=claims.get("email"),
         name=claims.get("name"),
         roles=roles,
+        university_ids=scope,
     )
 
 

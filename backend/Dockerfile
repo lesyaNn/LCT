@@ -4,9 +4,9 @@ COPY pyproject.toml ./
 # Full runtime set from pyproject.toml dependencies (P0-5: Dockerfile must
 # stay a superset of pyproject — see tests/test_p0_docker_deps.py).
 RUN pip install --no-cache-dir "fastapi" "uvicorn[standard]" sqlalchemy alembic "psycopg[binary]" pydantic pydantic-settings "python-jose[cryptography]" python-multipart redis minio httpx openpyxl xlrd reportlab python-dateutil pytest \
- && useradd -r -u 10001 appuser \
- && mkdir -p /code/var/files /tmp/rtk-imports \
- && chown -R appuser:appuser /code /tmp/rtk-imports
+  && useradd -r -u 10001 appuser \
+  && mkdir -p /code/var/files /tmp/rtk-imports /app/storage \
+  && chown -R appuser:appuser /code /tmp/rtk-imports /app/storage
 COPY scripts ./scripts
 COPY migrations ./migrations
 COPY app ./app
