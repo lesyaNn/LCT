@@ -14,10 +14,16 @@ from sqlalchemy.orm import Session
 from app.core.permissions import require_permission
 from app.core.security import CurrentUser
 from app.db.session import get_db
+from app.infrastructure import redis as redis_infra
 from app.models.catalog import University
 from app.modules.health_score import cache as health_cache
+from app.modules.health_score.attention import get_attention_items
 from app.modules.health_score.health_service import calculate_health_score
-from app.modules.health_score.schemas import HealthScoreResponse, HealthScoreShort
+from app.modules.health_score.schemas import (
+    AttentionItemsResponse,
+    HealthScoreResponse,
+    HealthScoreShort,
+)
 
 router = APIRouter(prefix="/universities", tags=["health-score"])
 
@@ -123,3 +129,38 @@ def get_university_health_score(
     return result
 
 
+
+
+@router.get(
+    "/{university_id}/attention-items",
+    response_model=AttentionItemsResponse,
+    summary="Что требует внимания (детерминированные правила)",
+    description=(
+        "WOW для демо: просроченные этапы, истекающие лицензии, просроченные "
+        "документы, истекающие сертификаты, программы под риском запуска. "
+        "Без AI — только правила. Кэш 5 минут. Неизвестный вуз → 404."
+    ),
+    responses={
+        404: {"description": "Вуз не найден"},
+    },
+)
+def get_university_attention_items(
+    university_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _user: CurrentUser = Depends(require_permission("university.read")),
+) -> AttentionItemsResponse:
+    exists = db.execute(
+        select(University.id).where(University.id == university_id)
+    ).first()
+    if exists is None:
+        raise HTTPException(status_code=404, detail="University not found")
+    cache_key = f"attention_items:{university_id}"
+    raw = redis_infra.cache_get(cache_key)
+    if raw:
+        try:
+            return AttentionItemsResponse.model_validate_json(raw)
+        except ValueError:
+            pass
+    result = AttentionItemsResponse(items=get_attention_items(db, university_id))
+    redis_infra.cache_set(cache_key, result.model_dump_json(), 300)
+    return result
