@@ -10,6 +10,7 @@ from fastapi import APIRouter
 
 from app.modules.auth.router import router as auth_router
 from app.modules.catalog.router import router as catalog_router
+from app.modules.health_score.health_router import router as health_router
 from app.modules.imports.router import router as imports_router
 from app.modules.interaction_pipeline.router import router as workflow_router
 from app.modules.teachers.passport_router import router as teacher_passport_router
@@ -22,3 +23,4 @@ v1.include_router(passport_router)
 v1.include_router(teacher_passport_router)
 v1.include_router(catalog_router)
 v1.include_router(workflow_router)
+v1.include_router(health_router)
