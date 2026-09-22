@@ -13,6 +13,7 @@ import { PageIntro } from '@/shared/ui/page-intro';
 import { PageSkeleton } from '@/shared/ui/page-skeleton';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { KpiCard, type KpiTone } from '@/widgets/dashboard/kpi-card';
+import { DashboardAnalytics } from '@/widgets/dashboard/dashboard-charts';
 import styles from '@/widgets/dashboard/dashboard.module.css';
 
 const numberFormatter = new Intl.NumberFormat('ru-RU');
@@ -81,6 +82,7 @@ export default function DashboardPage() {
           ))}
         </div>
       </section>
+      <DashboardAnalytics />
     </div>
   );
 }
