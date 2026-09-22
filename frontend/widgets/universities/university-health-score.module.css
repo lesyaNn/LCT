@@ -64,7 +64,7 @@
 .severity-low { background: var(--rtk-color-surface-subtle); color: var(--rtk-color-text-secondary); }
 .reasonBody > p { color: var(--rtk-color-text-secondary); font-size: 13px; margin: var(--rtk-space-2) 0 0; }
 .detailsButton { margin-top: var(--rtk-space-2); padding-inline: 0; }
-.reasonDetails { background: var(--rtk-color-surface-subtle); border-radius: var(--rtk-radius-small); margin-top: var(--rtk-space-2); padding: var(--rtk-space-3); }
+.reasonDetails { border-top: 1px solid var(--rtk-color-border); margin-top: var(--rtk-space-2); padding: var(--rtk-space-3) 0 0; }
 .reasonDetails p { color: var(--rtk-color-text-secondary); font-size: 12px; margin: 0; }
 .reasonDetails dl { display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); margin: var(--rtk-space-3) 0 0; }
 .reasonDetails dl div { display: flex; flex-direction: column; gap: 2px; }

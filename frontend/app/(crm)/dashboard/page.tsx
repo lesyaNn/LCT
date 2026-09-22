@@ -40,11 +40,11 @@ interface KpiDefinition {
 const kpiDefinitions: KpiDefinition[] = [
   { title: 'Вузы', caption: 'в реестре', tone: 'brand', icon: Education, value: (overview) => formatCount(overview.universitiesTotal) },
   { title: 'Средний Health Score', caption: 'среднее по вузам', tone: 'neutral', icon: StatisticsBoard, value: (overview) => formatScore(overview.averageHealthScore) },
-  { title: 'Красные вузы', caption: 'нуждаются во внимании', tone: 'danger', icon: Attention, href: '/universities?health_status=red', ariaLabel: 'Перейти к вузам со статусом red', value: (overview) => formatCount(overview.redUniversities) },
-  { title: 'Просроченные этапы', caption: 'требуют контроля', tone: 'warning', icon: Time, href: '/workflows?overdue=true', ariaLabel: 'Перейти к просроченным этапам workflow', value: (overview) => formatCount(overview.overdueStages) },
-  { title: 'Истекающие лицензии', caption: 'до истечения 30 дней', tone: 'warning', icon: DocumentText, value: (overview) => formatCount(overview.expiringLicenses) },
+  { title: 'Красные вузы', caption: 'нуждаются во внимании', tone: 'neutral', icon: Attention, href: '/universities?health_status=red', ariaLabel: 'Перейти к вузам со статусом red', value: (overview) => formatCount(overview.redUniversities) },
+  { title: 'Просроченные этапы', caption: 'требуют контроля', tone: 'neutral', icon: Time, href: '/workflows?overdue=true', ariaLabel: 'Перейти к просроченным этапам workflow', value: (overview) => formatCount(overview.overdueStages) },
+  { title: 'Истекающие лицензии', caption: 'до истечения 30 дней', tone: 'neutral', icon: DocumentText, value: (overview) => formatCount(overview.expiringLicenses) },
   { title: 'Активные программы', caption: 'запущены', tone: 'brand', icon: Book, value: (overview) => formatCount(overview.activePrograms) },
-  { title: 'Преподаватели к повышению', caption: 'attention / expired', tone: 'danger', icon: Group, value: (overview) => formatCount(overview.teachersNeedUpgrade) },
+  { title: 'Преподаватели к повышению', caption: 'attention / expired', tone: 'neutral', icon: Group, value: (overview) => formatCount(overview.teachersNeedUpgrade) },
 ];
 
 export default function DashboardPage() {

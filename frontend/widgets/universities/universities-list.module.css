@@ -148,7 +148,7 @@
 .stage-warning { background: var(--atmr-warning-container-soft, var(--rtk-color-surface-subtle)); color: var(--rtk-color-warning); }
 .stage-success { background: var(--atmr-success-container-soft, var(--rtk-color-surface-subtle)); color: var(--rtk-color-success); }
 
-.tableScroll { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-medium); min-width: 0; overflow-x: auto; }
+.tableScroll { background: var(--rtk-color-surface); min-width: 0; overflow-x: auto; }
 .table { border-collapse: collapse; min-width: 960px; table-layout: fixed; width: 100%; }
 .table th,
 .table td { border-bottom: 1px solid var(--rtk-color-border); padding: var(--rtk-space-4); text-align: left; vertical-align: middle; }
