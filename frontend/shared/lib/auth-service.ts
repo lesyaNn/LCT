@@ -7,6 +7,7 @@ export const authService = {
     if (typeof window === 'undefined') return;
 
     window.localStorage.removeItem('mock-auth-user');
-    // TODO: replace mock logout with Keycloak logout during authentication integration
+    // Keycloak logout is handled by the existing adapter; this service only
+    // clears the local preview state used when auth mode is `mock`.
   },
 };

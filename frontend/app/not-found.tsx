@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { ButtonLink } from '@/shared/ui/rtk/button';
 
 export default function NotFound() {
   return (
@@ -6,9 +6,7 @@ export default function NotFound() {
       <p className="eyebrow">404</p>
       <h1>Страница не найдена</h1>
       <p>Проверьте адрес или вернитесь на главную страницу CRM.</p>
-      <Link className="not-found-link" href="/dashboard">
-        Перейти в Dashboard
-      </Link>
+      <ButtonLink href="/dashboard" variant="primary" size="m">На главную</ButtonLink>
     </main>
   );
 }

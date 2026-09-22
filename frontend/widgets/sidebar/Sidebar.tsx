@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { getVisibleNavigationItems } from '@/shared/config/navigation';
-import { currentUser } from '@/shared/mocks/current-user';
+import type { UserRole } from '@/shared/types/user';
 import { Icon } from '@/shared/ui/rtk/icon';
 import { IconButton } from '@/shared/ui/rtk/icon-button';
 import styles from './sidebar.module.css';
 
 interface SidebarProps {
+  role: UserRole;
   pathname: string;
   collapsed: boolean;
   mobileOpen?: boolean;
@@ -15,15 +16,15 @@ interface SidebarProps {
   onCloseMobile?: () => void;
 }
 
-export function Sidebar({ pathname, collapsed, mobileOpen = false, onToggleCollapse, onCloseMobile }: SidebarProps) {
-  const items = getVisibleNavigationItems(currentUser.role);
+export function Sidebar({ role, pathname, collapsed, mobileOpen = false, onToggleCollapse, onCloseMobile }: SidebarProps) {
+  const items = getVisibleNavigationItems(role);
 
   return (
     <aside className={`${styles.sidebar} ${collapsed ? styles.collapsed : ''} ${mobileOpen ? styles.mobileOpen : ''}`} aria-label="Основная навигация">
       <div className={styles.brand}>
         <span className={styles.brandMark} aria-hidden="true">РТ</span>
         {(!collapsed || mobileOpen) && <span className={styles.brandName}>ИТ Школа РТК</span>}
-        {mobileOpen && <IconButton icon="close" label="Закрыть меню" className={styles.mobileClose} onClick={onCloseMobile} />}
+        {mobileOpen && <IconButton icon="close" label="Закрыть меню" className={styles.mobileClose} autoFocus onClick={onCloseMobile} />}
       </div>
 
       <nav className={styles.nav}>
@@ -37,6 +38,7 @@ export function Sidebar({ pathname, collapsed, mobileOpen = false, onToggleColla
               key={item.href}
               onClick={onCloseMobile}
               title={collapsed ? item.label : undefined}
+              aria-current={active ? 'page' : undefined}
             >
               <Icon name={item.icon} size={20} />
               {(!collapsed || mobileOpen) && <span>{item.label}</span>}

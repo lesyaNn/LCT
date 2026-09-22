@@ -1,10 +1,18 @@
-import type { MockUser } from '@/shared/types/user';
+import { roleLabels, type AuthUser, type UserRole } from '@/shared/types/user';
 
-export const currentUser: MockUser = {
+const configuredRole = process.env.NEXT_PUBLIC_MOCK_ROLE;
+const role: UserRole = configuredRole === 'user' || configuredRole === 'manager' || configuredRole === 'admin'
+  ? configuredRole
+  : 'admin';
+
+export const currentUser: AuthUser = {
   id: '1',
+  username: 'admin',
   name: 'Анна Иванова',
   email: 'anna.ivanova@example.ru',
-  role: 'admin',
-  roleLabel: 'Администратор',
+  role,
+  roleLabel: roleLabels[role],
   initials: 'АИ',
+  rawRoles: [role],
+  authSource: 'mock',
 };

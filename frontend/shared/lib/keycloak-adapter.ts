@@ -3,16 +3,24 @@
 import type KeycloakInstance from 'keycloak-js';
 
 /**
- * Keycloak remains an explicit integration seam for the existing backend.
- * P3-01-01 intentionally runs in mock mode, so this module is not imported by
- * the App Shell. A later auth task can opt in with NEXT_PUBLIC_AUTH_MODE=keycloak
- * without reintroducing the old Vite router or storing tokens in localStorage.
+ * Keycloak is the auth source for the existing backend. The provider opts into
+ * it when NEXT_PUBLIC_AUTH_MODE=keycloak; mock mode remains available for the
+ * local App Shell preview without reintroducing the old Vite router.
  */
 export type KeycloakRuntimeConfig = {
   url: string;
   realm: string;
   clientId: string;
 };
+
+export interface KeycloakAuthResult {
+  authenticated: boolean;
+  id: string;
+  username: string;
+  name: string;
+  email: string;
+  roles: string[];
+}
 
 const defaultConfig: KeycloakRuntimeConfig = {
   url: 'http://localhost:8081',
@@ -47,17 +55,34 @@ export async function ensureKeycloak(): Promise<KeycloakInstance> {
   return instance;
 }
 
-export async function initializeKeycloak(): Promise<boolean> {
+export async function initializeKeycloak(): Promise<KeycloakAuthResult> {
   const keycloak = await ensureKeycloak();
   keycloak.onTokenExpired = () => {
     void keycloak.updateToken(60).catch(() => keycloak.login({ redirectUri: window.location.origin }));
   };
 
-  return keycloak.init({
+  const authenticated = await keycloak.init({
     onLoad: 'check-sso',
     pkceMethod: 'S256',
     checkLoginIframe: false,
   });
+
+  const token = keycloak.tokenParsed ?? {};
+  const rawRoles = token.realm_access?.roles;
+
+  return {
+    authenticated,
+    id: token.sub ?? '',
+    username: token.preferred_username ?? '',
+    name: token.name ?? token.preferred_username ?? '',
+    email: token.email ?? '',
+    roles: Array.isArray(rawRoles) ? rawRoles.filter((role): role is string => typeof role === 'string') : [],
+  };
+}
+
+export async function loginToKeycloak(): Promise<void> {
+  const keycloak = await ensureKeycloak();
+  await keycloak.login({ redirectUri: window.location.origin });
 }
 
 export async function logoutFromKeycloak(): Promise<void> {

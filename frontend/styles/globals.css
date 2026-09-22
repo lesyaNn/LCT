@@ -26,8 +26,8 @@
   --rtk-space-6: 24px;
   --rtk-space-8: 32px;
   --rtk-font-family: Inter, Roboto, Arial, sans-serif;
-  --sidebar-width: 264px;
-  --sidebar-collapsed-width: 76px;
+  --sidebar-width: 260px;
+  --sidebar-collapsed-width: 64px;
   --topbar-height: 72px;
 }
 

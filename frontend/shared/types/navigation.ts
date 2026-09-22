@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'manager' | 'viewer';
+import type { UserRole } from './user';
 
 export type IconName =
   | 'dashboard'
@@ -14,7 +14,7 @@ export interface NavigationItem {
   label: string;
   href: string;
   icon: IconName;
-  roles?: UserRole[];
+  allowedRoles?: UserRole[];
 }
 
 export interface BreadcrumbEntry {

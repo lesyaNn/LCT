@@ -29,7 +29,7 @@
 .collapsed .activeMarker { left: 0; }
 
 @media (max-width: 768px) {
-  .sidebar { box-shadow: var(--rtk-shadow-elevation-2); left: 0; position: fixed; top: 0; transform: translateX(-105%); width: min(88vw, 320px); }
+  .sidebar { box-shadow: var(--rtk-shadow-elevation-2); height: 100dvh; left: 0; overflow-y: auto; position: fixed; top: 0; transform: translateX(-105%); width: min(88vw, 320px); }
   .mobileOpen { transform: translateX(0); }
   .mobileOpen .mobileClose { display: inline-flex; }
   .mobileOpen.collapsed { width: min(88vw, 320px); }

@@ -1,0 +1,16 @@
+.state {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--rtk-space-3);
+  justify-content: center;
+  min-height: min(520px, calc(100vh - var(--topbar-height) - var(--rtk-space-8)));
+  padding: var(--rtk-space-8) var(--rtk-space-4);
+  text-align: center;
+}
+.state h1, .state p { margin: 0; }
+.state h1 { font-size: clamp(24px, 4vw, 32px); letter-spacing: -.03em; }
+.state p:not(.eyebrow) { color: var(--rtk-color-text-secondary); max-width: 480px; }
+.eyebrow { color: var(--rtk-color-brand); font-size: 12px; font-weight: 700; letter-spacing: .08em; margin: 0; text-transform: uppercase; }
+.spinner { animation: spin 800ms linear infinite; border: 3px solid var(--rtk-color-brand-soft); border-radius: 50%; border-top-color: var(--rtk-color-brand); height: 32px; width: 32px; }
+@keyframes spin { to { transform: rotate(360deg); } }
