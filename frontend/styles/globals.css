@@ -47,15 +47,3 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   outline: 3px solid rgb(119 0 255 / 32%);
   outline-offset: 2px;
 }
-.not-found-page {
-  display: grid;
-  min-height: 100vh;
-  place-content: center;
-  gap: var(--rtk-space-3);
-  padding: var(--rtk-space-6);
-  text-align: center;
-}
-.not-found-page h1, .not-found-page p { margin: 0; }
-.not-found-page h1 { font-size: 32px; letter-spacing: -0.02em; }
-.eyebrow { color: var(--rtk-color-brand); font-size: 14px; font-weight: 700; }
-.not-found-link { color: var(--rtk-color-brand); font-weight: 600; }

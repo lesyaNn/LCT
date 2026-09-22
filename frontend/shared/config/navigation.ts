@@ -23,6 +23,12 @@ export const routeLabels: Record<string, string> = {
   docs: 'Документация',
 };
 
+export const detailRouteLabels: Record<string, string> = {
+  universities: 'Университет',
+  teachers: 'Преподаватель',
+  workflows: 'Взаимодействие',
+};
+
 export function getVisibleNavigationItems(role: UserRole): NavigationItem[] {
   return navigationItems.filter((item) => !item.allowedRoles || item.allowedRoles.includes(role));
 }

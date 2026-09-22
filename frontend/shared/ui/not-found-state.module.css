@@ -1,0 +1,16 @@
+.page {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--rtk-space-3);
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--rtk-space-6);
+  text-align: center;
+}
+
+.page h1,
+.page p { margin: 0; }
+.page h1 { font-size: clamp(28px, 5vw, 40px); letter-spacing: -.03em; }
+.page p:not(.eyebrow) { color: var(--rtk-color-text-secondary); max-width: 480px; }
+.eyebrow { color: var(--rtk-color-brand); font-size: 12px; font-weight: 700; letter-spacing: .08em; margin: 0; text-transform: uppercase; }
