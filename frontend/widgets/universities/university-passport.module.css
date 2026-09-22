@@ -11,7 +11,7 @@
 .titleBlock h1 { font-size: clamp(26px, 3vw, 40px); letter-spacing: -.035em; line-height: 1.12; margin: 0; max-width: 900px; overflow-wrap: anywhere; }
 .city { color: var(--rtk-color-text-secondary); font-size: 16px; margin: var(--rtk-space-2) 0 0; }
 .headerSide { align-items: flex-end; display: flex; flex-wrap: wrap; gap: var(--rtk-space-4); justify-content: flex-end; }
-.healthSummary { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-medium); min-width: 220px; padding: var(--rtk-space-4); }
+.healthSummary { background: var(--rtk-color-surface); border-radius: var(--rtk-radius-medium); box-shadow: var(--rtk-shadow-elevation-2); min-width: 220px; padding: var(--rtk-space-4); }
 .healthSummaryTop { align-items: flex-start; display: flex; gap: var(--rtk-space-3); justify-content: space-between; }
 .overline { color: var(--rtk-color-text-tertiary); display: block; letter-spacing: .04em; }
 .healthScore { display: block; font-size: 30px; letter-spacing: -.04em; line-height: 1.1; margin-top: 3px; }
@@ -47,7 +47,7 @@
 .sectionHeading h2 { font-size: 20px; letter-spacing: -.02em; margin: 0; }
 .sectionHint { color: var(--rtk-color-text-tertiary); display: block; font-size: 12px; margin-top: 3px; }
 .metricsGrid { display: grid; gap: var(--rtk-space-4); grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.metricCard { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-medium); display: flex; flex-direction: column; gap: var(--rtk-space-4); min-height: 170px; padding: var(--rtk-space-5); }
+.metricCard { background: var(--rtk-color-surface); border-radius: var(--rtk-radius-medium); box-shadow: var(--rtk-shadow-elevation-2); display: flex; flex-direction: column; gap: var(--rtk-space-4); min-height: 170px; padding: var(--rtk-space-5); }
 .metricHeader { align-items: center; display: flex; gap: var(--rtk-space-3); }
 .metricHeader h3 { font-size: 13px; margin: 0; }
 .metricIcon { align-items: center; background: var(--rtk-color-surface-subtle); border-radius: var(--rtk-radius-small); color: var(--rtk-color-brand); display: inline-flex; height: 36px; justify-content: center; width: 36px; }
@@ -62,7 +62,7 @@
 .metric-warning { color: var(--rtk-color-warning) !important; }
 .metric-danger { color: var(--rtk-color-danger) !important; }
 .workflowCard,
-.timelineCard { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-medium); padding: var(--rtk-space-5); }
+.timelineCard { background: var(--rtk-color-surface); border-radius: var(--rtk-radius-medium); box-shadow: var(--rtk-shadow-elevation-2); padding: var(--rtk-space-5); }
 .workflowLayout { display: grid; gap: var(--rtk-space-5); grid-template-columns: minmax(180px, 1fr) minmax(280px, 1.4fr); margin-top: var(--rtk-space-5); }
 .workflowStage { display: flex; flex-direction: column; gap: var(--rtk-space-2); }
 .workflowStage strong { font-size: 20px; letter-spacing: -.02em; }
@@ -91,7 +91,7 @@
 .timelineBody { min-width: 0; padding: 2px 0 var(--rtk-space-4); }
 .timelineBody time { color: var(--rtk-color-text-tertiary); font-size: 11px; }
 .timelineBody p { font-size: 13px; margin: var(--rtk-space-1) 0 0; }
-.placeholderPanel { align-items: center; background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-medium); display: flex; flex-direction: column; gap: var(--rtk-space-3); min-height: 260px; justify-content: center; padding: var(--rtk-space-8); text-align: center; }
+.placeholderPanel { align-items: center; background: var(--rtk-color-surface); border-radius: var(--rtk-radius-medium); box-shadow: var(--rtk-shadow-elevation-2); display: flex; flex-direction: column; gap: var(--rtk-space-3); min-height: 260px; justify-content: center; padding: var(--rtk-space-8); text-align: center; }
 .placeholderIcon { align-items: center; background: var(--rtk-color-brand-soft); border-radius: 50%; color: var(--rtk-color-brand); display: inline-flex; height: 48px; justify-content: center; width: 48px; }
 .placeholderPanel h2 { margin: 0; }
 .placeholderPanel p { color: var(--rtk-color-text-secondary); margin: 0; max-width: 440px; }

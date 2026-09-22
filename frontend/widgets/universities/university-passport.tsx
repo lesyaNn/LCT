@@ -27,23 +27,24 @@ import { Avatar } from '@/shared/ui/rtk/avatar';
 import { Button } from '@/shared/ui/rtk/button';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { UniversityHealthScore } from './university-health-score';
+import { ProductsSection, ProgramsSection, StudentsSection, TeachersSection } from './university-passport-sections';
 import styles from './university-passport.module.css';
 
 const passportQueryKey = (id: string) => ['university-passport', id] as const;
 
 const tabDefinitions = [
-  { id: 'overview', label: 'Overview' },
+  { id: 'overview', label: 'Обзор' },
   { id: 'health-score', label: 'Health Score' },
-  { id: 'programs', label: 'Programs' },
-  { id: 'teachers', label: 'Teachers' },
-  { id: 'students', label: 'Students' },
-  { id: 'products', label: 'Products' },
-  { id: 'licenses', label: 'Licenses' },
-  { id: 'documents', label: 'Documents' },
-  { id: 'meetings', label: 'Meetings' },
-  { id: 'responsibles', label: 'Responsibles' },
+  { id: 'programs', label: 'Программы' },
+  { id: 'teachers', label: 'Преподаватели' },
+  { id: 'students', label: 'Студенты' },
+  { id: 'products', label: 'Продукты' },
+  { id: 'licenses', label: 'Лицензии' },
+  { id: 'documents', label: 'Документы' },
+  { id: 'meetings', label: 'Встречи' },
+  { id: 'responsibles', label: 'Ответственные' },
   { id: 'workflow', label: 'Workflow' },
-  { id: 'history', label: 'History' },
+  { id: 'history', label: 'История' },
 ] as const;
 
 type PassportTabId = (typeof tabDefinitions)[number]['id'];
@@ -225,6 +226,14 @@ export function UniversityPassport({ id }: { id: string }) {
     ? <OverviewContent passport={passport} canAdvance={canAdvance} onTabChange={selectTab} />
     : tab === 'health-score'
       ? <UniversityHealthScore id={id} />
+    : tab === 'programs'
+      ? <ProgramsSection id={id} />
+    : tab === 'teachers'
+      ? <TeachersSection id={id} />
+    : tab === 'students'
+      ? <StudentsSection id={id} />
+    : tab === 'products'
+      ? <ProductsSection id={id} />
     : <PlaceholderContent tab={tabDefinitions.find((definition) => definition.id === tab) ?? activeTabDefinition} />;
 
   return (

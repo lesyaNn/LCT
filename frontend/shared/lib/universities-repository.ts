@@ -1,6 +1,8 @@
 import { getHealthStatus, type HealthStatus } from './health-score';
 import { programStatusLabels, type ProgramStatus } from './dashboard-repository';
 
+export type { ProgramStatus };
+
 export interface UniversityResponsible {
   id: string;
   name: string;
@@ -379,4 +381,155 @@ export async function getUniversityHealthScore(id: string): Promise<UniversityHe
     history,
     previousSnapshot,
   };
+}
+
+export interface UniversityProgramRow {
+  id: string;
+  direction: string;
+  name: string;
+  status: ProgramStatus;
+  launchDate: string;
+  responsible: UniversityResponsible | null;
+  teachersCount: number;
+  studentsCount: number;
+}
+
+export type TeacherReadiness = 'ready' | 'attention' | 'expired';
+
+export interface UniversityTeacherRow {
+  id: string;
+  name: string;
+  position: string;
+  readiness: TeacherReadiness;
+  nextTrainingDate: string;
+  allowedPrograms: string[];
+}
+
+export interface UniversityStudentsByProgram {
+  programId: string;
+  programName: string;
+  active: number;
+  graduated: number;
+  total: number;
+}
+
+export interface UniversityStudentsSummary {
+  total: number;
+  active: number;
+  graduated: number;
+  academicLeave: number;
+  byProgram: UniversityStudentsByProgram[];
+}
+
+export type UniversityProductStatus = 'active' | 'expiring' | 'expired';
+
+export interface UniversityProductRow {
+  id: string;
+  name: string;
+  version: string;
+  vendor: string;
+  status: UniversityProductStatus;
+  licenseNumber: string;
+  expiresAt: string;
+}
+
+export const universityProgramsQueryKey = (id: string) => ['university-programs', id] as const;
+export const universityTeachersQueryKey = (id: string) => ['university-teachers', id] as const;
+export const universityStudentsQueryKey = (id: string) => ['university-students', id] as const;
+export const universityProductsQueryKey = (id: string) => ['university-products', id] as const;
+
+const programDirections = ['Аналитика и данные', 'Цифровая трансформация', 'Информационная безопасность', 'Управление проектами'];
+const programNames = ['Аналитика данных', 'Цифровая экономика', 'Кибербезопасность', 'ИТ-менеджмент'];
+const teacherNames = ['Мария Кузнецова', 'Алексей Орлов', 'Ольга Соколова', 'Илья Морозов', 'Наталья Лебедева', 'Сергей Фёдоров'];
+const teacherPositions = ['Руководитель программы', 'Старший преподаватель', 'Преподаватель-практик'];
+
+function getUniversityNumericId(id: string): number {
+  return Number(id.split('-').at(-1)) || 1;
+}
+
+function getUniversityOrThrow(id: string): UniversityListItem {
+  const university = universitiesWithRelationships.find((item) => item.id === id);
+  if (!university) throw new Error('Университет не найден');
+  return university;
+}
+
+/** Typed frontend adapter for the future university programs endpoint. */
+export async function getUniversityPrograms(id: string): Promise<UniversityProgramRow[]> {
+  const university = getUniversityOrThrow(id);
+  const numericId = getUniversityNumericId(id);
+  const statuses: ProgramStatus[] = ['active', 'launched', 'planned', 'archived', 'active', 'launched'];
+  const count = Math.min(8, Math.max(4, university.programsCount));
+
+  return Array.from({ length: count }, (_, index) => ({
+    id: `${id}-program-${index + 1}`,
+    direction: programDirections[(index + numericId) % programDirections.length],
+    name: programNames[(index + numericId) % programNames.length],
+    status: statuses[(index + numericId) % statuses.length],
+    launchDate: `2026-${String(((index + numericId) % 9) + 1).padStart(2, '0')}-${String(((index * 3 + numericId) % 20) + 1).padStart(2, '0')}`,
+    responsible: university.responsible,
+    teachersCount: 8 + ((index + numericId) % 7),
+    studentsCount: 48 + ((index * 17 + numericId * 5) % 120),
+  }));
+}
+
+/** Typed frontend adapter for the future university teachers endpoint. */
+export async function getUniversityTeachers(id: string): Promise<UniversityTeacherRow[]> {
+  getUniversityOrThrow(id);
+  const numericId = getUniversityNumericId(id);
+  const readiness: TeacherReadiness[] = ['ready', 'attention', 'expired', 'ready', 'ready', 'attention'];
+  const count = 5 + (numericId % 2);
+
+  return Array.from({ length: count }, (_, index) => ({
+    id: `teacher-${String(numericId).padStart(3, '0')}-${index + 1}`,
+    name: teacherNames[(index + numericId) % teacherNames.length],
+    position: teacherPositions[(index + numericId) % teacherPositions.length],
+    readiness: readiness[(index + numericId) % readiness.length],
+    nextTrainingDate: `2026-${String(((index + numericId) % 9) + 1).padStart(2, '0')}-${String(((index * 4 + numericId) % 22) + 3).padStart(2, '0')}`,
+    allowedPrograms: [
+      programNames[(index + numericId) % programNames.length],
+      ...(index % 2 === 0 ? [programNames[(index + numericId + 1) % programNames.length]] : []),
+    ],
+  }));
+}
+
+/** Typed frontend adapter for the future aggregate students endpoint. */
+export async function getUniversityStudentsSummary(id: string): Promise<UniversityStudentsSummary> {
+  const university = getUniversityOrThrow(id);
+  const numericId = getUniversityNumericId(id);
+  const byProgram = programNames.map((programName, index) => {
+    const total = 42 + ((numericId * 9 + index * 13) % 65);
+    const graduated = 8 + ((numericId + index * 4) % 18);
+    const active = Math.max(0, total - graduated - ((numericId + index) % 5));
+    return { programId: `${id}-program-${index + 1}`, programName, active, graduated, total };
+  });
+  const total = byProgram.reduce((sum, item) => sum + item.total, 0);
+  const graduated = byProgram.reduce((sum, item) => sum + item.graduated, 0);
+  const academicLeave = 2 + (numericId % 5);
+
+  return {
+    total,
+    active: Math.max(0, total - graduated - academicLeave),
+    graduated,
+    academicLeave,
+    byProgram: university.programsCount ? byProgram : [],
+  };
+}
+
+/** Typed frontend adapter for the future university products/licenses endpoint. */
+export async function getUniversityProducts(id: string): Promise<UniversityProductRow[]> {
+  const university = getUniversityOrThrow(id);
+  const numericId = getUniversityNumericId(id);
+  const statuses: UniversityProductStatus[] = ['active', 'expiring', 'active', 'expired', 'active'];
+  const names = ['Профессиональная переподготовка', 'Короткие курсы', 'Корпоративный трек', 'Виртуальный кампус', 'Система тестирования'];
+  const vendors = ['Ростелеком', 'Яндекс Практикум', 'Skillbox', 'Контур', 'Ростелеком'];
+
+  return names.map((name, index) => ({
+    id: `${id}-product-${index + 1}`,
+    name,
+    version: `v${index + 1}.${(numericId + index) % 5}`,
+    vendor: vendors[index],
+    status: statuses[(index + numericId) % statuses.length],
+    licenseNumber: `LIC-${String(numericId).padStart(3, '0')}-${String(index + 1).padStart(3, '0')}`,
+    expiresAt: `202${index % 2 === 0 ? '7' : '6'}-${String(((index + numericId) % 9) + 1).padStart(2, '0')}-15`,
+  })).filter((_, index) => university.productIds ? index < 3 + (numericId % 3) : index < 2);
 }
