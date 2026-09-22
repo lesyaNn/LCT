@@ -533,3 +533,150 @@ export async function getUniversityProducts(id: string): Promise<UniversityProdu
     expiresAt: `202${index % 2 === 0 ? '7' : '6'}-${String(((index + numericId) % 9) + 1).padStart(2, '0')}-15`,
   })).filter((_, index) => university.productIds ? index < 3 + (numericId % 3) : index < 2);
 }
+
+export type UniversityLicenseStatus = 'active' | 'expires_soon' | 'expired';
+
+export interface UniversityLicenseRow {
+  id: string;
+  product: string;
+  vendor: string;
+  licenseNumber: string;
+  signedAt: string;
+  expiresAt: string;
+  status: UniversityLicenseStatus;
+  transfer: string;
+  contract: string;
+}
+
+export type UniversityDocumentStatus = 'signed' | 'pending' | 'expired';
+
+export interface UniversityDocumentRow {
+  id: string;
+  type: string;
+  name: string;
+  fileName: string;
+  fileSize: string;
+  signedAt: string | null;
+  expiresAt: string | null;
+  status: UniversityDocumentStatus;
+  uploadedBy: string;
+  uploadedAt: string;
+  downloadUrl?: string;
+}
+
+export type UniversityMeetingType = 'online' | 'offline' | 'phone' | 'email';
+
+export interface UniversityMeetingParticipant {
+  id: string;
+  name: string;
+  initials: string;
+}
+
+export interface UniversityMeetingRow {
+  id: string;
+  occurredAt: string;
+  type: UniversityMeetingType;
+  subject: string;
+  participants: UniversityMeetingParticipant[];
+  outcome: string;
+  nextAction: string;
+  dueDate: string | null;
+  author: string;
+}
+
+export interface UniversityResponsibleContact {
+  id: string;
+  name: string;
+  role: string;
+  email: string;
+  phone: string;
+  isPrimary: boolean;
+  initials: string;
+}
+
+export const universityLicensesQueryKey = (id: string) => ['university-licenses', id] as const;
+export const universityDocumentsQueryKey = (id: string) => ['university-documents', id] as const;
+export const universityMeetingsQueryKey = (id: string) => ['university-meetings', id] as const;
+export const universityResponsiblesQueryKey = (id: string) => ['university-responsibles', id] as const;
+
+/** Typed frontend adapter for the future university licenses endpoint. */
+export async function getUniversityLicenses(id: string): Promise<UniversityLicenseRow[]> {
+  const university = getUniversityOrThrow(id);
+  const numericId = getUniversityNumericId(id);
+  const statuses: UniversityLicenseStatus[] = ['expires_soon', 'active', 'expired', 'active', 'expires_soon'];
+  const products = ['Профессиональная переподготовка', 'Короткие курсы', 'Корпоративный трек', 'Виртуальный кампус', 'Система тестирования'];
+  const vendors = ['Ростелеком', 'Яндекс Практикум', 'Skillbox', 'Контур', 'Ростелеком'];
+  return products.map((product, index) => ({
+    id: `${id}-license-${index + 1}`,
+    product,
+    vendor: vendors[index],
+    licenseNumber: `LIC-${String(numericId).padStart(3, '0')}-${String(index + 1).padStart(3, '0')}`,
+    signedAt: `2026-0${((index + numericId) % 8) + 1}-05`,
+    expiresAt: index === 2 ? '2026-08-15' : `2026-${String(((index + numericId) % 6) + 9).padStart(2, '0')}-15`,
+    status: statuses[(index + numericId) % statuses.length],
+    transfer: index % 2 === 0 ? 'Допустима' : 'Не требуется',
+    contract: `Договор № ${numericId}-${String(index + 12).padStart(3, '0')}`,
+  })).filter((_, index) => university.productIds ? index < 3 + (numericId % 3) : index < 2);
+}
+
+/** Typed frontend adapter for the future university documents endpoint. */
+export async function getUniversityDocuments(id: string): Promise<UniversityDocumentRow[]> {
+  const university = getUniversityOrThrow(id);
+  const numericId = getUniversityNumericId(id);
+  const documents = [
+    ['Договор', 'Договор на обучение', 'contract-2026.pdf', '2,4 МБ', 'signed'],
+    ['Приложение', 'Приложение к договору', 'appendix-programs.docx', '184 КБ', 'pending'],
+    ['Акт', 'Акт оказанных услуг', 'service-act-08.pdf', '1,1 МБ', 'signed'],
+    ['Лицензия', 'Лицензия на образовательную деятельность', 'education-license.pdf', '856 КБ', 'expired'],
+    ['Отчёт', 'Отчёт о запуске программы', 'launch-report.xlsx', '326 КБ', 'signed'],
+  ] as const;
+  return documents.map(([type, name, fileName, fileSize, status], index) => ({
+    id: `${id}-document-${index + 1}`,
+    type,
+    name,
+    fileName,
+    fileSize,
+    signedAt: status === 'signed' ? `2026-0${((index + numericId) % 8) + 1}-12` : null,
+    expiresAt: index === 3 ? '2026-08-15' : index === 1 ? '2026-11-30' : null,
+    status,
+    uploadedBy: index % 2 === 0 ? university.responsible?.name ?? 'Анна Иванова' : 'Борис Петров',
+    uploadedAt: `2026-0${((index + numericId) % 8) + 1}-${String(index + 10).padStart(2, '0')}`,
+    downloadUrl: undefined,
+  }));
+}
+
+/** Typed frontend adapter for the future university meetings endpoint. */
+export async function getUniversityMeetings(id: string): Promise<UniversityMeetingRow[]> {
+  const university = getUniversityOrThrow(id);
+  const numericId = getUniversityNumericId(id);
+  const types: UniversityMeetingType[] = ['online', 'offline', 'phone', 'email', 'online'];
+  const subjects = ['Согласование плана запуска', 'Рабочая встреча с координатором', 'Уточнение пакета документов', 'Подтверждение сроков обучения', 'Итоги месяца'];
+  const participants: UniversityMeetingParticipant[] = [
+    { id: 'participant-anna', name: 'Анна Иванова', initials: 'АИ' },
+    { id: 'participant-boris', name: 'Борис Петров', initials: 'БП' },
+    { id: 'participant-elena', name: 'Елена Смирнова', initials: 'ЕС' },
+  ];
+  return subjects.map((subject, index) => ({
+    id: `${id}-meeting-${index + 1}`,
+    occurredAt: `2026-09-${String(20 - index * 3).padStart(2, '0')}T${String(10 + index).padStart(2, '0')}:30:00+03:00`,
+    type: types[(index + numericId) % types.length],
+    subject,
+    participants: participants.slice(0, 2 + (index % 2)),
+    outcome: index === 1 ? 'Согласовали обновлённый план.' : 'Зафиксировали договорённости и следующие шаги.',
+    nextAction: index === 2 ? 'Проверить комплект документов' : 'Подтвердить дату следующей встречи',
+    dueDate: index === 0 ? '2026-09-28' : index === 2 ? '2026-09-25' : null,
+    author: university.responsible?.name ?? 'Анна Иванова',
+  }));
+}
+
+/** Typed frontend adapter for the future university responsibles endpoint. */
+export async function getUniversityResponsibles(id: string): Promise<UniversityResponsibleContact[]> {
+  const university = getUniversityOrThrow(id);
+  const contacts: UniversityResponsibleContact[] = [
+    { id: 'contact-anna', name: 'Анна Иванова', role: 'Координатор проекта', email: 'anna.ivanova@example.ru', phone: '+7 (900) 123-45-67', isPrimary: true, initials: 'АИ' },
+    { id: 'contact-boris', name: 'Борис Петров', role: 'Руководитель направления', email: 'boris.petrov@example.ru', phone: '+7 (900) 234-56-78', isPrimary: false, initials: 'БП' },
+    { id: 'contact-elena', name: 'Елена Смирнова', role: 'Методист', email: 'elena.smirnova@example.ru', phone: '+7 (900) 345-67-89', isPrimary: false, initials: 'ЕС' },
+  ];
+  if (university.responsible) contacts[0] = { ...contacts[0], name: university.responsible.name, initials: university.responsible.name.split(' ').map((part) => part[0]).join('').slice(0, 2).toLocaleUpperCase('ru-RU') };
+  return contacts;
+}

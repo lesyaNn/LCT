@@ -16,6 +16,7 @@ import Education from '@atomaro/icons/24/culture/Education';
 import Edit from '@atomaro/icons/24/editor/Edit';
 import ArrowRight from '@atomaro/icons/24/navigation/ArrowRight';
 import { useAuth } from '@/shared/auth/AuthProvider';
+import { formatDateRu, formatDateTimeRu } from '@/shared/lib/formatters';
 import { getHealthStatus, healthStatusMeta, type HealthStatus } from '@/shared/lib/health-score';
 import {
   getUniversityPassport,
@@ -27,7 +28,7 @@ import { Avatar } from '@/shared/ui/rtk/avatar';
 import { Button } from '@/shared/ui/rtk/button';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { UniversityHealthScore } from './university-health-score';
-import { ProductsSection, ProgramsSection, StudentsSection, TeachersSection } from './university-passport-sections';
+import { DocumentsSection, LicensesSection, MeetingsSection, ProductsSection, ProgramsSection, ResponsiblesSection, StudentsSection, TeachersSection } from './university-passport-sections';
 import styles from './university-passport.module.css';
 
 const passportQueryKey = (id: string) => ['university-passport', id] as const;
@@ -54,14 +55,6 @@ const tabIds = new Set<PassportTabId>(tabDefinitions.map((tab) => tab.id));
 
 function parseTab(value: string | null): PassportTabId {
   return value && tabIds.has(value as PassportTabId) ? value as PassportTabId : 'overview';
-}
-
-function formatDate(isoDate: string): string {
-  return new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium' }).format(new Date(isoDate));
-}
-
-function formatDateTime(isoDate: string): string {
-  return new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(isoDate));
 }
 
 function getInitials(name: string): string {
@@ -155,7 +148,7 @@ function WorkflowOverview({ passport, canAdvance, onTabChange }: { passport: Uni
       <div className={styles.workflowLayout}>
         <div className={styles.workflowStage}><span className={styles.overline}>Текущий этап</span><strong>{workflow.currentStage.name}</strong><span className={`${styles.workflowStatus} ${styles[`workflow-${workflow.status}`]}`}>{statusLabel}</span></div>
         <div className={styles.workflowDetails}>
-          <div><span className={styles.detailLabel}>Deadline</span><strong className={overdue ? styles.overdue : undefined}><TimeStroke size={16} fill="currentColor" />{formatDate(workflow.deadline)}</strong>{overdue ? <span className={styles.detailWarning}>Срок просрочен</span> : null}</div>
+          <div><span className={styles.detailLabel}>Deadline</span><strong className={overdue ? styles.overdue : undefined}><TimeStroke size={16} fill="currentColor" />{formatDateRu(workflow.deadline)}</strong>{overdue ? <span className={styles.detailWarning}>Срок просрочен</span> : null}</div>
           <div><span className={styles.detailLabel}>Ответственный</span><strong className={styles.responsibleValue}>{workflow.responsible ? <><Avatar initials={getInitials(workflow.responsible.name)} size="s" />{workflow.responsible.name}</> : 'Не назначен'}</strong></div>
         </div>
         <div className={styles.workflowProgress}>
@@ -176,7 +169,7 @@ function EventIcon({ type }: { type: UniversityPassportEventType }) {
 }
 
 function TimelineItem({ event }: { event: UniversityPassportEvent }) {
-  return <li className={styles.timelineItem}><span className={styles.timelineIcon} aria-hidden="true"><EventIcon type={event.type} /></span><div className={styles.timelineBody}><time dateTime={event.occurredAt}>{formatDateTime(event.occurredAt)}</time><p>{event.description}</p></div></li>;
+  return <li className={styles.timelineItem}><span className={styles.timelineIcon} aria-hidden="true"><EventIcon type={event.type} /></span><div className={styles.timelineBody}><time dateTime={event.occurredAt}>{formatDateTimeRu(event.occurredAt)}</time><p>{event.description}</p></div></li>;
 }
 
 function RecentInteractions({ events, onTabChange }: { events: UniversityPassportEvent[]; onTabChange: (tab: PassportTabId) => void }) {
@@ -234,6 +227,14 @@ export function UniversityPassport({ id }: { id: string }) {
       ? <StudentsSection id={id} />
     : tab === 'products'
       ? <ProductsSection id={id} />
+    : tab === 'licenses'
+      ? <LicensesSection id={id} />
+    : tab === 'documents'
+      ? <DocumentsSection id={id} />
+    : tab === 'meetings'
+      ? <MeetingsSection id={id} canAdd={canReport} />
+    : tab === 'responsibles'
+      ? <ResponsiblesSection id={id} />
     : <PlaceholderContent tab={tabDefinitions.find((definition) => definition.id === tab) ?? activeTabDefinition} />;
 
   return (

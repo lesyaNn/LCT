@@ -54,7 +54,7 @@
 .reasonIcon { align-items: center; border-radius: var(--rtk-radius-small); display: inline-flex; flex: 0 0 36px; height: 36px; justify-content: center; }
 .reason-high { background: var(--rtk-color-surface-subtle); color: var(--rtk-color-danger); }
 .reason-medium { background: var(--rtk-color-surface-subtle); color: var(--rtk-color-warning); }
-.reason-low { background: rgb(32 138 90 / 10%); color: var(--rtk-color-success); }
+.reason-low { background: var(--atmr-success-container-soft, var(--rtk-color-surface-subtle)); color: var(--rtk-color-success); }
 .reasonBody { min-width: 0; }
 .reasonTitleLine { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); }
 .reasonTitleLine strong { font-size: 14px; }

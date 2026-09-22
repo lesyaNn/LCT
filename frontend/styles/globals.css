@@ -1,21 +1,21 @@
 :root {
-  /* Rostelecom Gen2 Light Theme semantic aliases used by local components. */
-  --rtk-color-brand: #7700ff;
-  --rtk-color-brand-hover: #5d00c9;
-  --rtk-color-brand-soft: #f1e8ff;
-  --rtk-color-text-primary: #1f1f22;
-  --rtk-color-text-secondary: #696970;
-  --rtk-color-text-tertiary: #8f8f96;
-  --rtk-color-text-inverse: #ffffff;
-  --rtk-color-surface: #ffffff;
-  --rtk-color-surface-subtle: #f6f6f8;
-  --rtk-color-surface-hover: #f0f0f3;
-  --rtk-color-border: #e2e2e7;
-  --rtk-color-border-strong: #c9c9d1;
-  --rtk-color-success: #208a5a;
-  --rtk-color-warning: #a96300;
-  --rtk-color-danger: #c62828;
-  --rtk-shadow-elevation-2: 0 12px 32px rgb(20 20 28 / 14%);
+  /* Local aliases resolve to the official Rostelecom Light Theme tokens. */
+  --rtk-color-brand: var(--atmr-accent-default, #FF4F12);
+  --rtk-color-brand-hover: var(--atmr-accent-hover, #D9430F);
+  --rtk-color-brand-soft: var(--atmr-accent-container-soft, #FFF4EF);
+  --rtk-color-text-primary: var(--atmr-fg-default, #101828);
+  --rtk-color-text-secondary: var(--atmr-fg-soft, rgba(16,24,40,.75));
+  --rtk-color-text-tertiary: var(--atmr-fg-muted, rgba(16,24,40,.55));
+  --rtk-color-text-inverse: var(--atmr-fg-on-accent, #FFFFFF);
+  --rtk-color-surface: var(--atmr-bg-surface1, #FFFFFF);
+  --rtk-color-surface-subtle: var(--atmr-bg-surface2, #F9F9FA);
+  --rtk-color-surface-hover: var(--atmr-bg-surface3, #F4F4F5);
+  --rtk-color-border: var(--atmr-border-muted, rgba(88,93,105,.15));
+  --rtk-color-border-strong: var(--atmr-border-soft, rgba(88,93,105,.25));
+  --rtk-color-success: var(--atmr-success-default, #00AC43);
+  --rtk-color-warning: var(--atmr-warning-default, #FDA610);
+  --rtk-color-danger: var(--atmr-error-default, #FF2626);
+  --rtk-shadow-elevation-2: var(--atmr-shadow-bottom, none);
   --rtk-radius-small: 8px;
   --rtk-radius-medium: 12px;
   --rtk-space-1: 4px;
@@ -44,6 +44,6 @@ body {
 button, a, input { font: inherit; }
 a { color: inherit; }
 button:focus-visible, a:focus-visible, input:focus-visible {
-  outline: 3px solid rgb(119 0 255 / 32%);
+  outline: 3px solid var(--atmr-accent-default, #FF4F12);
   outline-offset: 2px;
 }

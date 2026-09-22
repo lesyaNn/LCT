@@ -648,7 +648,7 @@ export function UniversitiesList() {
         <div className={`${styles.filterPanelWrap} ${filtersExpanded ? styles.filterPanelVisible : ''} ${filterDrawerOpen ? styles.filterDrawerVisible : ''}`}>
           {filterDrawerOpen ? <button className={styles.filterBackdrop} type="button" aria-label="Закрыть фильтры" onClick={() => setFilterDrawerOpen(false)} /> : null}
           <div className={styles.filterPanel} id="universities-filter-panel" role={filterDrawerOpen ? 'dialog' : undefined} aria-modal={filterDrawerOpen || undefined} aria-labelledby="universities-filter-title">
-            <Filters state={state} searchInput={searchInput} setSearchInput={setSearchInput} onPatch={goToState} onReset={resetFilters} hasFilters={hasFilters} onClose={() => setFilterDrawerOpen(false)} />
+            <Filters state={state} searchInput={searchInput} setSearchInput={setSearchInput} onPatch={goToState} onReset={resetFilters} hasFilters={hasFilters} onClose={() => { setFilterDrawerOpen(false); setFiltersExpanded(false); }} />
           </div>
         </div>
         <ActiveFilterChips filters={state.filters} onPatch={goToState} onReset={resetFilters} />

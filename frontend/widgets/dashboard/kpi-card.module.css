@@ -41,7 +41,7 @@
 }
 
 .interactive:focus-visible {
-  outline: 3px solid rgb(119 0 255 / 32%);
+  outline: 3px solid var(--atmr-accent-default, #FF4F12);
   outline-offset: 2px;
 }
 

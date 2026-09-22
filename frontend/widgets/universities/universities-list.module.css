@@ -37,7 +37,7 @@
 .filterPanelHeader p { color: var(--rtk-color-text-secondary); font-size: 12px; margin: var(--rtk-space-1) 0 0; }
 .filterCloseButton { align-items: center; background: transparent; border: 0; color: var(--rtk-color-text-secondary); cursor: pointer; display: inline-flex; padding: var(--rtk-space-1); }
 .filterCloseButton:hover { color: var(--rtk-color-text-primary); }
-.filterBackdrop { background: rgb(12 16 30 / 42%); border: 0; inset: 0; position: fixed; z-index: 10; }
+.filterBackdrop { background: var(--atmr-overlay-default, rgba(16,24,40,.32)); border: 0; inset: 0; position: fixed; z-index: 10; }
 .filterDrawerVisible { display: block; }
 .bodyLock { overflow: hidden; }
 
@@ -77,7 +77,7 @@
 .multiselect[open] summary,
 .pageSize select:focus-visible {
   border-color: var(--rtk-color-brand);
-  box-shadow: 0 0 0 3px rgb(119 0 255 / 16%);
+  box-shadow: 0 0 0 3px var(--atmr-accent-container-soft, rgba(255,79,18,.1));
   outline: none;
 }
 
@@ -136,17 +136,17 @@
 }
 .statusBadge { gap: 5px; padding: 4px 7px; }
 .statusBadge > span { border-radius: 50%; height: 7px; width: 7px; }
-.status-green { background: rgb(32 138 90 / 10%); color: var(--rtk-color-success); }
+.status-green { background: var(--atmr-success-container-soft, var(--rtk-color-surface-subtle)); color: var(--rtk-color-success); }
 .status-green > span { background: var(--rtk-color-success); }
-.status-yellow { background: rgb(169 99 0 / 11%); color: var(--rtk-color-warning); }
+.status-yellow { background: var(--atmr-warning-container-soft, var(--rtk-color-surface-subtle)); color: var(--rtk-color-warning); }
 .status-yellow > span { background: var(--rtk-color-warning); }
-.status-red { background: rgb(198 40 40 / 10%); color: var(--rtk-color-danger); }
+.status-red { background: var(--atmr-error-container-soft, var(--rtk-color-surface-subtle)); color: var(--rtk-color-danger); }
 .status-red > span { background: var(--rtk-color-danger); }
 .stageBadge { padding: 5px 8px; }
 .stage-neutral { background: var(--rtk-color-surface-subtle); color: var(--rtk-color-text-secondary); }
 .stage-brand { background: var(--rtk-color-brand-soft); color: var(--rtk-color-brand); }
-.stage-warning { background: rgb(169 99 0 / 11%); color: var(--rtk-color-warning); }
-.stage-success { background: rgb(32 138 90 / 10%); color: var(--rtk-color-success); }
+.stage-warning { background: var(--atmr-warning-container-soft, var(--rtk-color-surface-subtle)); color: var(--rtk-color-warning); }
+.stage-success { background: var(--atmr-success-container-soft, var(--rtk-color-surface-subtle)); color: var(--rtk-color-success); }
 
 .tableScroll { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-medium); min-width: 0; overflow-x: auto; }
 .table { border-collapse: collapse; min-width: 960px; table-layout: fixed; width: 100%; }

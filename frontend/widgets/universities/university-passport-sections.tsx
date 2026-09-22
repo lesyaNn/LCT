@@ -3,16 +3,32 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import Download from '@atomaro/icons/24/action/Download';
+import DocumentText from '@atomaro/icons/24/document/DocumentText';
+import Calendar from '@atomaro/icons/24/communication/Calendar';
+import Mail from '@atomaro/icons/24/communication/Mail';
+import Phone from '@atomaro/icons/24/technology/Phone';
 import { Button } from '@/shared/ui/rtk/button';
+import { Avatar } from '@/shared/ui/rtk/avatar';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
+import { formatDateRu, formatDateTimeRu } from '@/shared/lib/formatters';
+import { documentStatusIntent, licenseStatusIntent, productStatusIntent, programStatusIntent, readinessIntent, type SemanticIntent } from '@/shared/lib/status-semantics';
 import {
   getUniversityProducts,
   getUniversityPrograms,
+  getUniversityLicenses,
+  getUniversityDocuments,
+  getUniversityMeetings,
+  getUniversityResponsibles,
   getUniversityStudentsSummary,
   getUniversityTeachers,
   programStatusLabels,
   universityProductsQueryKey,
   universityProgramsQueryKey,
+  universityLicensesQueryKey,
+  universityDocumentsQueryKey,
+  universityMeetingsQueryKey,
+  universityResponsiblesQueryKey,
   universityStudentsQueryKey,
   universityTeachersQueryKey,
   type ProgramStatus,
@@ -22,11 +38,17 @@ import {
   type UniversityProgramRow,
   type UniversityStudentsByProgram,
   type UniversityTeacherRow,
+  type UniversityLicenseRow,
+  type UniversityLicenseStatus,
+  type UniversityDocumentRow,
+  type UniversityDocumentStatus,
+  type UniversityMeetingRow,
+  type UniversityMeetingType,
 } from '@/shared/lib/universities-repository';
 import { PassportDataTable, PassportTableSkeleton, type PassportMobileField, type PassportTableColumn } from './passport-data-table';
 import styles from './university-passport-sections.module.css';
 
-const formatDate = (isoDate: string) => new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium' }).format(new Date(isoDate));
+const formatDate = formatDateRu;
 
 const readinessLabels: Record<TeacherReadiness, string> = {
   ready: 'Готов',
@@ -44,23 +66,20 @@ function SectionHeader({ title, description, id }: { title: string; description:
   return <div className={styles.sectionHeader}><div><h2 id={id}>{title}</h2><p>{description}</p></div></div>;
 }
 
-function StatusBadge({ tone, children }: { tone: 'neutral' | 'brand' | 'success' | 'warning' | 'danger'; children: string }) {
+function StatusBadge({ tone, children }: { tone: SemanticIntent; children: string }) {
   return <span className={`${styles.statusBadge} ${styles[`status-${tone}`]}`}><span className={styles.statusDot} aria-hidden="true" />{children}</span>;
 }
 
 function ProgramStatusBadge({ status }: { status: ProgramStatus }) {
-  const tone = status === 'launched' ? 'success' : status === 'active' ? 'brand' : status === 'planned' ? 'neutral' : 'warning';
-  return <StatusBadge tone={tone}>{programStatusLabels[status]}</StatusBadge>;
+  return <StatusBadge tone={programStatusIntent[status]}>{programStatusLabels[status]}</StatusBadge>;
 }
 
 function ReadinessBadge({ readiness }: { readiness: TeacherReadiness }) {
-  const tone = readiness === 'ready' ? 'success' : readiness === 'attention' ? 'warning' : 'danger';
-  return <StatusBadge tone={tone}>{readinessLabels[readiness]}</StatusBadge>;
+  return <StatusBadge tone={readinessIntent[readiness]}>{readinessLabels[readiness]}</StatusBadge>;
 }
 
 function ProductStatusBadge({ status }: { status: UniversityProductStatus }) {
-  const tone = status === 'active' ? 'success' : status === 'expiring' ? 'warning' : 'danger';
-  return <StatusBadge tone={tone}>{productStatusLabels[status]}</StatusBadge>;
+  return <StatusBadge tone={productStatusIntent[status]}>{productStatusLabels[status]}</StatusBadge>;
 }
 
 function ProgramFilter({ value, onChange }: { value: ProgramStatus | 'all'; onChange: (value: ProgramStatus | 'all') => void }) {
@@ -192,3 +211,95 @@ function ProductsSection({ id }: { id: string }) {
 }
 
 export { ProgramsSection, ProductsSection, StudentsSection, TeachersSection };
+
+const licenseStatusLabels: Record<UniversityLicenseStatus, string> = { active: 'Действует', expires_soon: 'Скоро истекает', expired: 'Просрочена' };
+const documentStatusLabels: Record<UniversityDocumentStatus, string> = { signed: 'Подписан', pending: 'На подписи', expired: 'Просрочен' };
+const meetingTypeLabels: Record<UniversityMeetingType, string> = { online: 'Онлайн', offline: 'Очно', phone: 'Телефон', email: 'Email' };
+
+function LicenseStatusBadge({ status }: { status: UniversityLicenseStatus }) {
+  return <StatusBadge tone={licenseStatusIntent[status]}>{licenseStatusLabels[status]}</StatusBadge>;
+}
+
+function DocumentStatusBadge({ status }: { status: UniversityDocumentStatus }) {
+  return <StatusBadge tone={documentStatusIntent[status]}>{documentStatusLabels[status]}</StatusBadge>;
+}
+
+function LicensesSection({ id }: { id: string }) {
+  const [statusFilter, setStatusFilter] = useState<UniversityLicenseStatus | 'all'>('all');
+  const query = useQuery({ queryKey: universityLicensesQueryKey(id), queryFn: () => getUniversityLicenses(id), staleTime: 30_000 });
+  const rows = useMemo(() => (query.data?.filter((row) => statusFilter === 'all' || row.status === statusFilter) ?? []).sort((left, right) => left.expiresAt.localeCompare(right.expiresAt)), [query.data, statusFilter]);
+  const columns: PassportTableColumn<UniversityLicenseRow>[] = [
+    { id: 'product', label: 'Продукт', sortable: true, sortValue: (row) => row.product, render: (row) => <strong className={styles.primaryCell}>{row.product}</strong> },
+    { id: 'vendor', label: 'Вендор', sortable: true, sortValue: (row) => row.vendor, render: (row) => row.vendor },
+    { id: 'licenseNumber', label: '№ лицензии', render: (row) => row.licenseNumber },
+    { id: 'signedAt', label: 'Подписана', sortable: true, sortValue: (row) => row.signedAt, render: (row) => formatDate(row.signedAt) },
+    { id: 'expiresAt', label: 'Истекает', sortable: true, sortValue: (row) => row.expiresAt, render: (row) => formatDate(row.expiresAt) },
+    { id: 'status', label: 'Статус', render: (row) => <LicenseStatusBadge status={row.status} /> },
+    { id: 'transfer', label: 'Передача', render: (row) => row.transfer },
+    { id: 'contract', label: 'Договор', render: (row) => <details className={styles.inlineDetails}><summary>Подробнее</summary><span>{row.contract}</span></details> },
+  ];
+  const mobileFields: PassportMobileField<UniversityLicenseRow>[] = [
+    { label: 'Продукт', render: (row) => <strong className={styles.primaryCell}>{row.product}</strong> },
+    { label: 'Вендор', render: (row) => row.vendor },
+    { label: 'Лицензия', render: (row) => row.licenseNumber },
+    { label: 'Истекает', render: (row) => formatDate(row.expiresAt) },
+    { label: 'Статус', render: (row) => <LicenseStatusBadge status={row.status} /> },
+    { label: 'Договор', render: (row) => <details className={styles.inlineDetails}><summary>Подробнее</summary><span>{row.contract}</span></details> },
+  ];
+  if (query.isPending) return <section className={styles.section}><SectionHeader id="licenses-section-title" title="Лицензии" description="Лицензии продуктов и условия передачи" /><PassportTableSkeleton /></section>;
+  if (query.isError || !query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
+  return <section className={styles.section} aria-labelledby="licenses-section-title"><div className={styles.sectionToolbar}><SectionHeader id="licenses-section-title" title="Лицензии" description="Лицензии продуктов и условия передачи" /><label className={styles.filter}><span>Статус</span><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as UniversityLicenseStatus | 'all')}><option value="all">Все статусы</option>{Object.entries(licenseStatusLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label></div><PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Лицензии пока не добавлены" /></section>;
+}
+
+function DocumentFile({ row }: { row: UniversityDocumentRow }) {
+  return <div className={styles.fileCell}><DocumentText size={20} fill="currentColor" /><div><strong className={styles.primaryCell}>{row.fileName}</strong><span className={styles.secondaryCell}>{row.fileSize}</span></div></div>;
+}
+
+function DocumentsSection({ id }: { id: string }) {
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState<UniversityDocumentStatus | 'all'>('all');
+  const query = useQuery({ queryKey: universityDocumentsQueryKey(id), queryFn: () => getUniversityDocuments(id), staleTime: 30_000 });
+  const types = useMemo(() => [...new Set(query.data?.map((row) => row.type) ?? [])], [query.data]);
+  const rows = useMemo(() => (query.data?.filter((row) => (typeFilter === 'all' || row.type === typeFilter) && (statusFilter === 'all' || row.status === statusFilter)) ?? []).sort((left, right) => right.uploadedAt.localeCompare(left.uploadedAt)), [query.data, statusFilter, typeFilter]);
+  const columns: PassportTableColumn<UniversityDocumentRow>[] = [
+    { id: 'type', label: 'Тип', sortable: true, sortValue: (row) => row.type, render: (row) => row.type },
+    { id: 'name', label: 'Название', sortable: true, sortValue: (row) => row.name, render: (row) => <strong className={styles.primaryCell}>{row.name}</strong> },
+    { id: 'file', label: 'Файл', render: (row) => <DocumentFile row={row} /> },
+    { id: 'signedAt', label: 'Подписан', render: (row) => row.signedAt ? formatDate(row.signedAt) : 'Не подписан' },
+    { id: 'expiresAt', label: 'Истекает', render: (row) => row.expiresAt ? formatDate(row.expiresAt) : '—' },
+    { id: 'status', label: 'Статус', render: (row) => <DocumentStatusBadge status={row.status} /> },
+    { id: 'uploadedBy', label: 'Загрузил', render: (row) => row.uploadedBy },
+    { id: 'uploadedAt', label: 'Дата', sortable: true, sortValue: (row) => row.uploadedAt, render: (row) => formatDate(row.uploadedAt) },
+    { id: 'download', label: 'Файл', render: (row) => row.downloadUrl ? <a className={styles.iconAction} href={row.downloadUrl} download aria-label={`Скачать ${row.fileName}`}><Download size={18} fill="currentColor" /></a> : <button className={styles.iconAction} type="button" disabled aria-label={`Скачивание ${row.fileName} станет доступно после подключения API`}><Download size={18} fill="currentColor" /></button> },
+  ];
+  const mobileFields: PassportMobileField<UniversityDocumentRow>[] = [
+    { label: 'Документ', render: (row) => <><strong className={styles.primaryCell}>{row.name}</strong><span className={styles.secondaryCell}>{row.type}</span></> },
+    { label: 'Файл', render: (row) => <DocumentFile row={row} /> },
+    { label: 'Статус', render: (row) => <DocumentStatusBadge status={row.status} /> },
+    { label: 'Дата', render: (row) => formatDate(row.uploadedAt) },
+    { label: 'Скачать', render: (row) => row.downloadUrl ? <a className={styles.iconAction} href={row.downloadUrl} download aria-label={`Скачать ${row.fileName}`}><Download size={18} fill="currentColor" /></a> : <button className={styles.iconAction} type="button" disabled aria-label="Скачивание станет доступно после подключения API"><Download size={18} fill="currentColor" /></button> },
+  ];
+  if (query.isPending) return <section className={styles.section}><SectionHeader id="documents-section-title" title="Документы" description="Файлы, подписи и сроки действия" /><PassportTableSkeleton /></section>;
+  if (query.isError || !query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
+  return <section className={styles.section} aria-labelledby="documents-section-title"><div className={styles.sectionToolbar}><SectionHeader id="documents-section-title" title="Документы" description="Файлы, подписи и сроки действия" /><div className={styles.filtersRow}><label className={styles.filter}><span>Тип</span><select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option value="all">Все типы</option>{types.map((type) => <option value={type} key={type}>{type}</option>)}</select></label><label className={styles.filter}><span>Статус</span><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as UniversityDocumentStatus | 'all')}><option value="all">Все статусы</option>{Object.entries(documentStatusLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label></div></div><PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Документы пока не добавлены" /></section>;
+}
+
+function MeetingParticipants({ participants }: { participants: UniversityMeetingRow['participants'] }) {
+  return <div className={styles.participants} aria-label={`Участники: ${participants.map((participant) => participant.name).join(', ')}`}>{participants.slice(0, 3).map((participant) => <Avatar initials={participant.initials} size="s" key={participant.id} />)}{participants.length > 3 ? <span className={styles.participantMore}>+{participants.length - 3}</span> : null}</div>;
+}
+
+function MeetingsSection({ id, canAdd }: { id: string; canAdd: boolean }) {
+  const query = useQuery({ queryKey: universityMeetingsQueryKey(id), queryFn: () => getUniversityMeetings(id), staleTime: 30_000 });
+  if (query.isPending) return <section className={styles.section}><SectionHeader id="meetings-section-title" title="Встречи" description="История взаимодействий с вузом" /><PassportTableSkeleton /></section>;
+  if (query.isError || !query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
+  return <section className={styles.section} aria-labelledby="meetings-section-title"><div className={styles.sectionToolbar}><SectionHeader id="meetings-section-title" title="Встречи" description="История взаимодействий с вузом" />{canAdd ? <Button variant="primary" size="s" type="button" disabled title="Создание встречи подключится после появления API"><Calendar size={16} fill="currentColor" />Добавить встречу</Button> : null}</div><ol className={styles.meetingTimeline}>{query.data.slice().sort((left, right) => right.occurredAt.localeCompare(left.occurredAt)).map((meeting) => <li className={styles.meetingItem} key={meeting.id}><div className={styles.meetingMarker} aria-hidden="true" /><article className={styles.meetingContent}><div className={styles.meetingMeta}><time dateTime={meeting.occurredAt}>{formatDateTimeRu(meeting.occurredAt)}</time><span className={styles.meetingType}>{meetingTypeLabels[meeting.type]}</span></div><h3>{meeting.subject}</h3><MeetingParticipants participants={meeting.participants} /><details className={styles.meetingDetails}><summary>Итог и следующее действие</summary><p><strong>Итог:</strong> {meeting.outcome}</p><p><strong>Следующее действие:</strong> {meeting.nextAction}{meeting.dueDate ? ` до ${formatDateRu(meeting.dueDate)}` : ''}</p></details><span className={styles.meetingAuthor}>Автор: {meeting.author}</span></article></li>)}</ol></section>;
+}
+
+function ResponsiblesSection({ id }: { id: string }) {
+  const query = useQuery({ queryKey: universityResponsiblesQueryKey(id), queryFn: () => getUniversityResponsibles(id), staleTime: 30_000 });
+  if (query.isPending) return <section className={styles.section}><SectionHeader id="responsibles-section-title" title="Ответственные" description="Контактные лица со стороны вуза" /><PassportTableSkeleton /></section>;
+  if (query.isError || !query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
+  return <section className={styles.section} aria-labelledby="responsibles-section-title"><SectionHeader id="responsibles-section-title" title="Ответственные" description="Контактные лица со стороны вуза" /><div className={styles.responsiblesGrid}>{query.data.map((person) => <article className={styles.responsibleCard} key={person.id}><Avatar initials={person.initials} size="m" /><div className={styles.responsibleInfo}><h3>{person.name}</h3><p>{person.role}</p><a href={`mailto:${person.email}`}><Mail size={16} fill="currentColor" />{person.email}</a><a href={`tel:${person.phone.replace(/[^+\d]/g, '')}`}><Phone size={16} fill="currentColor" />{person.phone}</a></div>{person.isPrimary ? <StatusBadge tone="brand">Основной</StatusBadge> : null}</article>)}</div></section>;
+}
+
+export { LicensesSection, DocumentsSection, MeetingsSection, ResponsiblesSection };
