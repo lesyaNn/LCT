@@ -18,6 +18,7 @@ import ArrowRight from '@atomaro/icons/24/navigation/ArrowRight';
 import { useAuth } from '@/shared/auth/AuthProvider';
 import { formatDateRu, formatDateTimeRu } from '@/shared/lib/formatters';
 import { getHealthStatus, healthStatusMeta, type HealthStatus } from '@/shared/lib/health-score';
+import { workflowStatusIntent } from '@/shared/lib/status-semantics';
 import {
   getUniversityPassport,
   type UniversityPassport,
@@ -26,6 +27,7 @@ import {
 } from '@/shared/lib/universities-repository';
 import { Avatar } from '@/shared/ui/rtk/avatar';
 import { Button } from '@/shared/ui/rtk/button';
+import { StatusBadge as SemanticStatusBadge } from '@/shared/ui/rtk/status-badge';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { UniversityHealthScore } from './university-health-score';
 import { DocumentsSection, LicensesSection, MeetingsSection, ProductsSection, ProgramsSection, ResponsiblesSection, StudentsSection, TeachersSection } from './university-passport-sections';
@@ -63,7 +65,7 @@ function getInitials(name: string): string {
 
 function StatusBadge({ status }: { status: HealthStatus }) {
   const meta = healthStatusMeta[status];
-  return <span className={`${styles.statusBadge} ${styles[`status-${status}`]}`}><span aria-hidden="true" />{meta.label}</span>;
+  return <SemanticStatusBadge intent={meta.tone}>{meta.label}</SemanticStatusBadge>;
 }
 
 function HeaderHealth({ score, onDetails }: { score: number; onDetails: () => void }) {
@@ -146,7 +148,7 @@ function WorkflowOverview({ passport, canAdvance, onTabChange }: { passport: Uni
     <section className={styles.workflowCard} aria-labelledby="passport-workflow-title">
       <div className={styles.sectionHeading}><div><h2 id="passport-workflow-title">Текущий этап Workflow</h2><span className={styles.sectionHint}>Статус прохождения onboarding-процесса</span></div><button className={styles.textAction} type="button" onClick={() => onTabChange('workflow')}>Открыть Workflow <ArrowRight size={14} fill="currentColor" /></button></div>
       <div className={styles.workflowLayout}>
-        <div className={styles.workflowStage}><span className={styles.overline}>Текущий этап</span><strong>{workflow.currentStage.name}</strong><span className={`${styles.workflowStatus} ${styles[`workflow-${workflow.status}`]}`}>{statusLabel}</span></div>
+        <div className={styles.workflowStage}><span className={styles.overline}>Текущий этап</span><strong>{workflow.currentStage.name}</strong><SemanticStatusBadge intent={workflowStatusIntent[workflow.status]}>{statusLabel}</SemanticStatusBadge></div>
         <div className={styles.workflowDetails}>
           <div><span className={styles.detailLabel}>Deadline</span><strong className={overdue ? styles.overdue : undefined}><TimeStroke size={16} fill="currentColor" />{formatDateRu(workflow.deadline)}</strong>{overdue ? <span className={styles.detailWarning}>Срок просрочен</span> : null}</div>
           <div><span className={styles.detailLabel}>Ответственный</span><strong className={styles.responsibleValue}>{workflow.responsible ? <><Avatar initials={getInitials(workflow.responsible.name)} size="s" />{workflow.responsible.name}</> : 'Не назначен'}</strong></div>

@@ -10,9 +10,10 @@ import Mail from '@atomaro/icons/24/communication/Mail';
 import Phone from '@atomaro/icons/24/technology/Phone';
 import { Button } from '@/shared/ui/rtk/button';
 import { Avatar } from '@/shared/ui/rtk/avatar';
+import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { formatDateRu, formatDateTimeRu } from '@/shared/lib/formatters';
-import { documentStatusIntent, licenseStatusIntent, productStatusIntent, programStatusIntent, readinessIntent, type SemanticIntent } from '@/shared/lib/status-semantics';
+import { documentStatusIntent, licenseStatusIntent, productStatusIntent, programStatusIntent, readinessIntent } from '@/shared/lib/status-semantics';
 import {
   getUniversityProducts,
   getUniversityPrograms,
@@ -66,20 +67,16 @@ function SectionHeader({ title, description, id }: { title: string; description:
   return <div className={styles.sectionHeader}><div><h2 id={id}>{title}</h2><p>{description}</p></div></div>;
 }
 
-function StatusBadge({ tone, children }: { tone: SemanticIntent; children: string }) {
-  return <span className={`${styles.statusBadge} ${styles[`status-${tone}`]}`}><span className={styles.statusDot} aria-hidden="true" />{children}</span>;
-}
-
 function ProgramStatusBadge({ status }: { status: ProgramStatus }) {
-  return <StatusBadge tone={programStatusIntent[status]}>{programStatusLabels[status]}</StatusBadge>;
+  return <StatusBadge intent={programStatusIntent[status]}>{programStatusLabels[status]}</StatusBadge>;
 }
 
 function ReadinessBadge({ readiness }: { readiness: TeacherReadiness }) {
-  return <StatusBadge tone={readinessIntent[readiness]}>{readinessLabels[readiness]}</StatusBadge>;
+  return <StatusBadge intent={readinessIntent[readiness]}>{readinessLabels[readiness]}</StatusBadge>;
 }
 
 function ProductStatusBadge({ status }: { status: UniversityProductStatus }) {
-  return <StatusBadge tone={productStatusIntent[status]}>{productStatusLabels[status]}</StatusBadge>;
+  return <StatusBadge intent={productStatusIntent[status]}>{productStatusLabels[status]}</StatusBadge>;
 }
 
 function ProgramFilter({ value, onChange }: { value: ProgramStatus | 'all'; onChange: (value: ProgramStatus | 'all') => void }) {
@@ -217,11 +214,11 @@ const documentStatusLabels: Record<UniversityDocumentStatus, string> = { signed:
 const meetingTypeLabels: Record<UniversityMeetingType, string> = { online: 'Онлайн', offline: 'Очно', phone: 'Телефон', email: 'Email' };
 
 function LicenseStatusBadge({ status }: { status: UniversityLicenseStatus }) {
-  return <StatusBadge tone={licenseStatusIntent[status]}>{licenseStatusLabels[status]}</StatusBadge>;
+  return <StatusBadge intent={licenseStatusIntent[status]}>{licenseStatusLabels[status]}</StatusBadge>;
 }
 
 function DocumentStatusBadge({ status }: { status: UniversityDocumentStatus }) {
-  return <StatusBadge tone={documentStatusIntent[status]}>{documentStatusLabels[status]}</StatusBadge>;
+  return <StatusBadge intent={documentStatusIntent[status]}>{documentStatusLabels[status]}</StatusBadge>;
 }
 
 function LicensesSection({ id }: { id: string }) {
@@ -292,14 +289,14 @@ function MeetingsSection({ id, canAdd }: { id: string; canAdd: boolean }) {
   const query = useQuery({ queryKey: universityMeetingsQueryKey(id), queryFn: () => getUniversityMeetings(id), staleTime: 30_000 });
   if (query.isPending) return <section className={styles.section}><SectionHeader id="meetings-section-title" title="Встречи" description="История взаимодействий с вузом" /><PassportTableSkeleton /></section>;
   if (query.isError || !query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
-  return <section className={styles.section} aria-labelledby="meetings-section-title"><div className={styles.sectionToolbar}><SectionHeader id="meetings-section-title" title="Встречи" description="История взаимодействий с вузом" />{canAdd ? <Button variant="primary" size="s" type="button" disabled title="Создание встречи подключится после появления API"><Calendar size={16} fill="currentColor" />Добавить встречу</Button> : null}</div><ol className={styles.meetingTimeline}>{query.data.slice().sort((left, right) => right.occurredAt.localeCompare(left.occurredAt)).map((meeting) => <li className={styles.meetingItem} key={meeting.id}><div className={styles.meetingMarker} aria-hidden="true" /><article className={styles.meetingContent}><div className={styles.meetingMeta}><time dateTime={meeting.occurredAt}>{formatDateTimeRu(meeting.occurredAt)}</time><span className={styles.meetingType}>{meetingTypeLabels[meeting.type]}</span></div><h3>{meeting.subject}</h3><MeetingParticipants participants={meeting.participants} /><details className={styles.meetingDetails}><summary>Итог и следующее действие</summary><p><strong>Итог:</strong> {meeting.outcome}</p><p><strong>Следующее действие:</strong> {meeting.nextAction}{meeting.dueDate ? ` до ${formatDateRu(meeting.dueDate)}` : ''}</p></details><span className={styles.meetingAuthor}>Автор: {meeting.author}</span></article></li>)}</ol></section>;
+  return <section className={styles.section} aria-labelledby="meetings-section-title"><div className={styles.sectionToolbar}><SectionHeader id="meetings-section-title" title="Встречи" description="История взаимодействий с вузом" />{canAdd ? <Button variant="primary" size="s" type="button" disabled title="Создание встречи подключится после появления API"><Calendar size={16} fill="currentColor" />Добавить встречу</Button> : null}</div>{query.data.length ? <ol className={styles.meetingTimeline}>{query.data.slice().sort((left, right) => right.occurredAt.localeCompare(left.occurredAt)).map((meeting) => <li className={styles.meetingItem} key={meeting.id}><div className={styles.meetingMarker} aria-hidden="true" /><article className={styles.meetingContent}><div className={styles.meetingMeta}><time dateTime={meeting.occurredAt}>{formatDateTimeRu(meeting.occurredAt)}</time><span className={styles.meetingType}>{meetingTypeLabels[meeting.type]}</span></div><h3>{meeting.subject}</h3><MeetingParticipants participants={meeting.participants} /><details className={styles.meetingDetails}><summary>Итог и следующее действие</summary><p><strong>Итог:</strong> {meeting.outcome}</p><p><strong>Следующее действие:</strong> {meeting.nextAction}{meeting.dueDate ? ` до ${formatDateRu(meeting.dueDate)}` : ''}</p></details><span className={styles.meetingAuthor}>Автор: {meeting.author}</span></article></li>)}</ol> : <p className={styles.emptySection} role="status">Нет данных для отображения</p>}</section>;
 }
 
 function ResponsiblesSection({ id }: { id: string }) {
   const query = useQuery({ queryKey: universityResponsiblesQueryKey(id), queryFn: () => getUniversityResponsibles(id), staleTime: 30_000 });
   if (query.isPending) return <section className={styles.section}><SectionHeader id="responsibles-section-title" title="Ответственные" description="Контактные лица со стороны вуза" /><PassportTableSkeleton /></section>;
   if (query.isError || !query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
-  return <section className={styles.section} aria-labelledby="responsibles-section-title"><SectionHeader id="responsibles-section-title" title="Ответственные" description="Контактные лица со стороны вуза" /><div className={styles.responsiblesGrid}>{query.data.map((person) => <article className={styles.responsibleCard} key={person.id}><Avatar initials={person.initials} size="m" /><div className={styles.responsibleInfo}><h3>{person.name}</h3><p>{person.role}</p><a href={`mailto:${person.email}`}><Mail size={16} fill="currentColor" />{person.email}</a><a href={`tel:${person.phone.replace(/[^+\d]/g, '')}`}><Phone size={16} fill="currentColor" />{person.phone}</a></div>{person.isPrimary ? <StatusBadge tone="brand">Основной</StatusBadge> : null}</article>)}</div></section>;
+  return <section className={styles.section} aria-labelledby="responsibles-section-title"><SectionHeader id="responsibles-section-title" title="Ответственные" description="Контактные лица со стороны вуза" />{query.data.length ? <div className={styles.responsiblesGrid}>{query.data.map((person) => <article className={styles.responsibleCard} key={person.id}><Avatar initials={person.initials} size="m" /><div className={styles.responsibleInfo}><h3>{person.name}</h3><p>{person.role}</p><a href={`mailto:${person.email}`}><Mail size={16} fill="currentColor" />{person.email}</a><a href={`tel:${person.phone.replace(/[^+\d]/g, '')}`}><Phone size={16} fill="currentColor" />{person.phone}</a></div>{person.isPrimary ? <StatusBadge intent="brand">Основной</StatusBadge> : null}</article>)}</div> : <p className={styles.emptySection} role="status">Нет данных для отображения</p>}</section>;
 }
 
 export { LicensesSection, DocumentsSection, MeetingsSection, ResponsiblesSection };

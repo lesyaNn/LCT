@@ -213,30 +213,7 @@
   border-color: var(--rtk-color-brand);
 }
 
-.severity {
-  align-items: center;
-  display: inline-flex;
-  font-size: 11px;
-  font-weight: 600;
-  gap: 6px;
-  grid-column: 1;
-  grid-row: 1;
-  white-space: nowrap;
-}
-
-.severity > span {
-  border-radius: 50%;
-  display: inline-block;
-  height: 8px;
-  width: 8px;
-}
-
-.severity-red { color: var(--rtk-color-danger); }
-.severity-red > span { background: var(--rtk-color-danger); }
-.severity-orange { color: var(--rtk-color-warning); }
-.severity-orange > span { background: var(--rtk-color-warning); }
-.severity-yellow { color: var(--rtk-color-warning); }
-.severity-yellow > span { background: var(--rtk-color-warning); }
+.severity { grid-column: 1; grid-row: 1; }
 
 .universityName {
   color: var(--rtk-color-text-primary);

@@ -77,7 +77,7 @@
 .multiselect[open] summary,
 .pageSize select:focus-visible {
   border-color: var(--rtk-color-brand);
-  box-shadow: 0 0 0 3px var(--atmr-accent-container-soft, rgba(255,79,18,.1));
+  box-shadow: 0 0 0 3px var(--atmr-accent-container-default);
   outline: none;
 }
 
@@ -105,6 +105,9 @@
   z-index: 3;
 }
 .multiselectMenu label { align-items: center; cursor: pointer; display: flex; gap: var(--rtk-space-2); padding: var(--rtk-space-2); }
+.selectedOptions { display: flex; flex-wrap: wrap; gap: var(--rtk-space-1); padding-bottom: var(--rtk-space-2); }
+.selectedOption { align-items: center; background: var(--rtk-color-brand-soft); border: 1px solid var(--rtk-color-border); border-radius: 999px; color: var(--rtk-color-brand); cursor: pointer; display: inline-flex; font-size: 11px; gap: var(--rtk-space-1); max-width: 100%; padding: 4px 8px; }
+.selectedOption:hover { background: var(--atmr-accent-container-hover); }
 .multiselectMenu label:hover { background: var(--rtk-color-surface-hover); border-radius: var(--rtk-radius-small); }
 .multiselectMenu input { accent-color: var(--rtk-color-brand); }
 .optionSearch { align-items: center; border-bottom: 1px solid var(--rtk-color-border); display: flex; gap: var(--rtk-space-2); margin: calc(-1 * var(--rtk-space-1)) calc(-1 * var(--rtk-space-2)) var(--rtk-space-2); padding: 0 var(--rtk-space-2) var(--rtk-space-2); }
@@ -123,8 +126,6 @@
 .clearAllButton { background: transparent; border: 0; color: var(--rtk-color-text-secondary); padding: 4px 6px; text-decoration: underline; }
 .clearAllButton:hover { color: var(--rtk-color-text-primary); }
 
-.statusBadge,
-.stageBadge,
 .programStatus {
   align-items: center;
   border-radius: 999px;
@@ -134,39 +135,19 @@
   line-height: 1.2;
   white-space: nowrap;
 }
-.statusBadge { gap: 5px; padding: 4px 7px; }
-.statusBadge > span { border-radius: 50%; height: 7px; width: 7px; }
-.status-green { background: var(--atmr-success-container-soft, var(--rtk-color-surface-subtle)); color: var(--rtk-color-success); }
-.status-green > span { background: var(--rtk-color-success); }
-.status-yellow { background: var(--atmr-warning-container-soft, var(--rtk-color-surface-subtle)); color: var(--rtk-color-warning); }
-.status-yellow > span { background: var(--rtk-color-warning); }
-.status-red { background: var(--atmr-error-container-soft, var(--rtk-color-surface-subtle)); color: var(--rtk-color-danger); }
-.status-red > span { background: var(--rtk-color-danger); }
-.stageBadge { padding: 5px 8px; }
-.stage-neutral { background: var(--rtk-color-surface-subtle); color: var(--rtk-color-text-secondary); }
-.stage-brand { background: var(--rtk-color-brand-soft); color: var(--rtk-color-brand); }
-.stage-warning { background: var(--atmr-warning-container-soft, var(--rtk-color-surface-subtle)); color: var(--rtk-color-warning); }
-.stage-success { background: var(--atmr-success-container-soft, var(--rtk-color-surface-subtle)); color: var(--rtk-color-success); }
 
-.tableScroll { background: var(--rtk-color-surface); min-width: 0; overflow-x: auto; }
-.table { border-collapse: collapse; min-width: 960px; table-layout: fixed; width: 100%; }
-.table th,
-.table td { border-bottom: 1px solid var(--rtk-color-border); padding: var(--rtk-space-4); text-align: left; vertical-align: middle; }
-.table th { background: var(--rtk-color-surface-subtle); color: var(--rtk-color-text-secondary); font-size: 12px; font-weight: 700; white-space: nowrap; }
-.table th:nth-child(1) { width: 25%; }
+.tableScroll { composes: shell from '../../shared/ui/rtk/data-table.module.css'; overflow-x: auto; }
+.table { composes: table from '../../shared/ui/rtk/data-table.module.css'; min-width: 1030px; table-layout: fixed; }
+.table th { white-space: normal; }
+.table th:nth-child(1) { width: 23%; }
 .table th:nth-child(2) { width: 14%; }
-.table th:nth-child(3) { width: 14%; }
+.table th:nth-child(3) { width: 13%; }
 .table th:nth-child(4) { width: 15%; }
-.table th:nth-child(5) { width: 11%; }
+.table th:nth-child(5) { width: 10%; }
 .table th:nth-child(6) { width: 14%; }
-.table th:nth-child(7) { width: 7%; }
-.table tbody tr:last-child td { border-bottom: 0; }
+.table th:nth-child(7) { width: 11%; }
 .table tbody tr { transition: background-color 160ms ease; }
-.table tbody tr:hover { background: var(--rtk-color-surface-hover); }
-.table td { color: var(--rtk-color-text-secondary); font-size: 13px; }
-.sortButton { align-items: center; background: transparent; border: 0; color: inherit; cursor: pointer; display: inline-flex; gap: var(--rtk-space-2); padding: 0; text-align: left; }
-.sortButton:hover { color: var(--rtk-color-text-primary); }
-.sortButton svg { color: var(--rtk-color-brand); flex: 0 0 auto; }
+.sortButton { composes: sortButton from '../../shared/ui/rtk/data-table.module.css'; }
 .universityLink { color: var(--rtk-color-text-primary); display: block; font-weight: 700; line-height: 1.35; text-decoration: none; }
 .universityLink:hover { color: var(--rtk-color-brand); text-decoration: underline; }
 .programsCell { display: flex; flex-direction: column; gap: 5px; }
@@ -207,7 +188,6 @@
 .mobileDetails div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .mobileDetails dt { color: var(--rtk-color-text-tertiary); font-size: 11px; }
 .mobileDetails dd { color: var(--rtk-color-text-primary); font-size: 12px; margin: 0; overflow-wrap: anywhere; }
-.mobileDetails .stageBadge { align-self: flex-start; }
 
 .emptyState { align-items: center; background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-medium); display: flex; flex-direction: column; gap: var(--rtk-space-3); padding: var(--rtk-space-8); text-align: center; }
 .emptyIcon { align-items: center; background: var(--rtk-color-brand-soft); border-radius: 50%; color: var(--rtk-color-brand); display: inline-flex; font-size: 20px; height: 40px; justify-content: center; width: 40px; }
@@ -237,7 +217,7 @@
   .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .searchField { grid-column: 1 / -1; }
   .filters > button { justify-self: start; }
-  .filterCloseButton { display: none; }
+  .filterCloseButton { display: inline-flex; }
   .dateRange { grid-column: 1 / -1; }
   .desktopOnly { display: none; }
   .mobileOnly { display: block; }

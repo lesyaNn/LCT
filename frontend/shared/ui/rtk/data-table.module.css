@@ -1,0 +1,65 @@
+.shell {
+  background: var(--rtk-color-surface);
+  border: 1px solid var(--rtk-color-border-strong);
+  border-radius: var(--rtk-radius-medium);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.table th {
+  background: var(--atmr-bg-surface3, var(--rtk-color-surface-hover));
+  border-bottom: 1px solid var(--rtk-color-border);
+  color: var(--rtk-color-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  padding: var(--rtk-space-4);
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.table td {
+  border-bottom: 1px solid var(--rtk-color-border);
+  color: var(--rtk-color-text-primary);
+  font-size: 13px;
+  padding: var(--rtk-space-4);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td { border-bottom: 0; }
+.table tbody tr:hover td { background: var(--rtk-color-surface-hover); }
+
+.sortButton {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  gap: var(--rtk-space-2);
+  padding: 0;
+  text-align: left;
+}
+.sortButton:hover { color: var(--rtk-color-text-primary); }
+.sortButton:focus-visible { border-radius: var(--rtk-radius-small); outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
+.sortButton svg { color: var(--rtk-color-brand); flex: 0 0 auto; }
+
+.empty {
+  align-items: center;
+  background: var(--rtk-color-surface);
+  border: 1px solid var(--rtk-color-border-strong);
+  border-radius: var(--rtk-radius-medium);
+  color: var(--rtk-color-text-secondary);
+  display: flex;
+  justify-content: center;
+  min-height: 160px;
+  padding: var(--rtk-space-6);
+  text-align: center;
+}

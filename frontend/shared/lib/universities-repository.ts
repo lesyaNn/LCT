@@ -606,17 +606,20 @@ export async function getUniversityLicenses(id: string): Promise<UniversityLicen
   const statuses: UniversityLicenseStatus[] = ['expires_soon', 'active', 'expired', 'active', 'expires_soon'];
   const products = ['Профессиональная переподготовка', 'Короткие курсы', 'Корпоративный трек', 'Виртуальный кампус', 'Система тестирования'];
   const vendors = ['Ростелеком', 'Яндекс Практикум', 'Skillbox', 'Контур', 'Ростелеком'];
-  return products.map((product, index) => ({
-    id: `${id}-license-${index + 1}`,
-    product,
-    vendor: vendors[index],
-    licenseNumber: `LIC-${String(numericId).padStart(3, '0')}-${String(index + 1).padStart(3, '0')}`,
-    signedAt: `2026-0${((index + numericId) % 8) + 1}-05`,
-    expiresAt: index === 2 ? '2026-08-15' : `2026-${String(((index + numericId) % 6) + 9).padStart(2, '0')}-15`,
-    status: statuses[(index + numericId) % statuses.length],
-    transfer: index % 2 === 0 ? 'Допустима' : 'Не требуется',
-    contract: `Договор № ${numericId}-${String(index + 12).padStart(3, '0')}`,
-  })).filter((_, index) => university.productIds ? index < 3 + (numericId % 3) : index < 2);
+  return products.map((product, index) => {
+    const status = statuses[(index + numericId) % statuses.length];
+    return {
+      id: `${id}-license-${index + 1}`,
+      product,
+      vendor: vendors[index],
+      licenseNumber: `LIC-${String(numericId).padStart(3, '0')}-${String(index + 1).padStart(3, '0')}`,
+      signedAt: `2026-0${((index + numericId) % 8) + 1}-05`,
+      expiresAt: status === 'expired' ? '2026-08-15' : status === 'expires_soon' ? '2026-10-15' : `2027-0${(index % 6) + 1}-15`,
+      status,
+      transfer: index % 2 === 0 ? 'Допустима' : 'Не требуется',
+      contract: `Договор № ${numericId}-${String(index + 12).padStart(3, '0')}`,
+    };
+  }).filter((_, index) => university.productIds ? index < 3 + (numericId % 3) : index < 2);
 }
 
 /** Typed frontend adapter for the future university documents endpoint. */

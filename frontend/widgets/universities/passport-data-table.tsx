@@ -76,7 +76,7 @@ export function PassportDataTable<T extends { id: string }>({ rows, columns, mob
   return (
     <div className={styles.tableShell}>
       <div className={styles.desktopTableWrap}>
-        <table className={styles.table}>
+        <table className={`${styles.table} ${columns.length >= 7 ? styles.wideTable : ''}`}>
           <thead>
             <tr>
               {columns.map((column) => {

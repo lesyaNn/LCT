@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ru" className="Theme_root_rtk_default_light">
+    <html lang="ru" className="Theme_root_rtk_purple_light">
       <body><QueryProvider><AuthProvider>{children}</AuthProvider></QueryProvider></body>
     </html>
   );

@@ -1,0 +1,11 @@
+.surface {
+  background: var(--rtk-color-surface);
+  border: 1px solid var(--rtk-color-border);
+  border-radius: var(--rtk-radius-medium);
+  min-width: 0;
+  padding: var(--rtk-space-5);
+}
+
+@media (max-width: 480px) {
+  .surface { padding: var(--rtk-space-4); }
+}

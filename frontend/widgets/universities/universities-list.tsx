@@ -22,6 +22,7 @@ import ChevronSort from '@atomaro/icons/24/navigation/ChevronSort';
 import SortDown from '@atomaro/icons/24/editor/SortDown';
 import SortUp from '@atomaro/icons/24/editor/SortUp';
 import { Button } from '@/shared/ui/rtk/button';
+import { StatusBadge as SemanticStatusBadge } from '@/shared/ui/rtk/status-badge';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import {
   getHealthStatus,
@@ -216,11 +217,11 @@ function formatFullDate(isoDate: string): string {
 
 function StatusBadge({ status }: { status: HealthStatus }) {
   const meta = healthStatusMeta[status];
-  return <span className={`${styles.statusBadge} ${styles[`status-${status}`]}`}><span aria-hidden="true" />{meta.label}</span>;
+  return <SemanticStatusBadge intent={meta.tone}>{meta.label}</SemanticStatusBadge>;
 }
 
 function StageBadge({ item }: { item: UniversityListItem }) {
-  return <span className={`${styles.stageBadge} ${styles[`stage-${item.currentStage.tone}`]}`}>{item.currentStage.name}</span>;
+  return <SemanticStatusBadge intent={item.currentStage.tone}>{item.currentStage.name}</SemanticStatusBadge>;
 }
 
 function ProgramsCell({ item }: { item: UniversityListItem }) {
@@ -277,6 +278,7 @@ function MultiSelectField({
   const visibleOptions = searchable
     ? options.filter((option) => option.name.toLocaleLowerCase('ru-RU').includes(optionSearch.trim().toLocaleLowerCase('ru-RU')))
     : options;
+  const selectedOptions = options.filter((option) => values.includes(option.id));
 
   return (
     <details className={styles.multiselect}>
@@ -285,6 +287,7 @@ function MultiSelectField({
         <ChevronDown size={16} fill="currentColor" />
       </summary>
       <div className={styles.multiselectMenu}>
+        {selectedOptions.length ? <div className={styles.selectedOptions}>{selectedOptions.map((option) => <button type="button" className={styles.selectedOption} key={option.id} onClick={() => onChange(values.filter((value) => value !== option.id))} aria-label={`Удалить ${option.name} из фильтра «${label}»`}>{option.name}<CloseSmall size={14} fill="currentColor" aria-hidden="true" /></button>)}</div> : null}
         {searchable ? <div className={styles.optionSearch}><Search size={16} fill="currentColor" /><input type="search" value={optionSearch} onChange={(event) => setOptionSearch(event.target.value)} placeholder="Найти в списке" aria-label={`Поиск в поле «${label}»`} /></div> : null}
         {visibleOptions.map((option) => (
           <label key={option.id}>
@@ -393,7 +396,7 @@ function ActiveFilterChips({ filters, onPatch, onReset }: { filters: UniversityF
     <div className={styles.activeFilters} aria-label="Активные фильтры">
       <span className={styles.activeFiltersLabel}>Активные фильтры</span>
       <div className={styles.chipList}>
-        {chips.map((chip) => <button className={styles.filterChip} type="button" key={chip.key} onClick={() => onPatch(chip.patch)}>{chip.label}<CloseSmall size={14} fill="currentColor" aria-hidden="true" /></button>)}
+        {chips.map((chip) => <button className={styles.filterChip} type="button" key={chip.key} onClick={() => onPatch(chip.patch)} aria-label={`Удалить фильтр «${chip.label}»`}>{chip.label}<CloseSmall size={14} fill="currentColor" aria-hidden="true" /></button>)}
         <button className={styles.clearAllButton} type="button" onClick={onReset}>Сбросить всё</button>
       </div>
     </div>

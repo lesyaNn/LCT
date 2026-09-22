@@ -1,12 +1,12 @@
 :root {
-  /* Local aliases resolve to the official Rostelecom Light Theme tokens. */
-  --rtk-color-brand: var(--atmr-accent-default, #FF4F12);
-  --rtk-color-brand-hover: var(--atmr-accent-hover, #D9430F);
-  --rtk-color-brand-soft: var(--atmr-accent-container-soft, #FFF4EF);
+  /* Local aliases consume the selected official Rostelecom Accent family. */
+  --rtk-color-brand: var(--atmr-accent-default);
+  --rtk-color-brand-hover: var(--atmr-accent-hover);
+  --rtk-color-brand-soft: var(--atmr-accent-container-default);
   --rtk-color-text-primary: var(--atmr-fg-default, #101828);
   --rtk-color-text-secondary: var(--atmr-fg-soft, rgba(16,24,40,.75));
   --rtk-color-text-tertiary: var(--atmr-fg-muted, rgba(16,24,40,.55));
-  --rtk-color-text-inverse: var(--atmr-fg-on-accent, #FFFFFF);
+  --rtk-color-text-inverse: var(--atmr-accent-on-accent, #FFFFFF);
   --rtk-color-surface: var(--atmr-bg-surface1, #FFFFFF);
   --rtk-color-surface-subtle: var(--atmr-bg-surface2, #F9F9FA);
   --rtk-color-surface-hover: var(--atmr-bg-surface3, #F4F4F5);
@@ -31,11 +31,85 @@
   --topbar-height: 72px;
 }
 
+/* Official Accent tokens from RTK Gen2 Purple/Default Light themes. The private
+   @atomaro/themes registry is unavailable in this workspace; keep this focused
+   token bridge until the package can replace it. */
+:root.Theme_root_rtk_purple_light {
+  --atmr-neutral-0: #fff;
+  --atmr-neutral-10: #f9f9fa;
+  --atmr-neutral-25: #f4f4f5;
+  --atmr-neutral-990: #101828;
+  --atmr-bg-page-filled: var(--atmr-neutral-25);
+  --atmr-bg-surface1: var(--atmr-neutral-0);
+  --atmr-bg-surface2: var(--atmr-neutral-10);
+  --atmr-bg-surface3: var(--atmr-neutral-25);
+  --atmr-fg-default: var(--atmr-neutral-990);
+  --atmr-base-accent: #7700ff;
+  --atmr-accent-700: #5300b3;
+  --atmr-accent-600: #6500d9;
+  --atmr-accent-500: var(--atmr-base-accent);
+  --atmr-accent-400: #9233ff;
+  --atmr-accent-200: #bb80ff;
+  --atmr-accent-50: #f1e6ff;
+  --atmr-accent-0: #fff;
+  --atmr-accent-default: var(--atmr-accent-500);
+  --atmr-accent-soft: var(--atmr-accent-400);
+  --atmr-accent-muted: var(--atmr-accent-200);
+  --atmr-accent-hover: var(--atmr-accent-600);
+  --atmr-accent-active: var(--atmr-accent-700);
+  --atmr-accent-on-accent: var(--atmr-accent-0);
+  --atmr-accent-container-default: rgba(119, 0, 255, .1);
+  --atmr-accent-container-soft: rgba(119, 0, 255, .05);
+  --atmr-accent-container-muted: rgba(119, 0, 255, .03);
+  --atmr-accent-container-hover: rgba(119, 0, 255, .2);
+  --atmr-accent-container-active: rgba(119, 0, 255, .3);
+  --atmr-accent-on-container: var(--atmr-accent-500);
+  --atmr-base-success: #00ac43;
+  --atmr-success-500: var(--atmr-base-success);
+  --atmr-success-default: var(--atmr-success-500);
+  --atmr-success-container-soft: rgba(0, 172, 67, .05);
+  --atmr-success-on-container: var(--atmr-success-500);
+  --atmr-base-warning: #fda610;
+  --atmr-warning-500: var(--atmr-base-warning);
+  --atmr-warning-600: #d78d0e;
+  --atmr-warning-default: var(--atmr-warning-500);
+  --atmr-warning-container-soft: rgba(253, 166, 16, .05);
+  --atmr-warning-on-container: var(--atmr-warning-600);
+  --atmr-base-error: #ff2626;
+  --atmr-error-500: var(--atmr-base-error);
+  --atmr-error-default: var(--atmr-error-500);
+  --atmr-error-container-soft: rgba(255, 38, 38, .05);
+  --atmr-error-on-container: var(--atmr-error-500);
+  --atmr-base-info: #1f69ff;
+}
+
+.Theme_root_rtk_default_light {
+  --atmr-base-accent: #ff4f12;
+  --atmr-accent-700: #b3370d;
+  --atmr-accent-600: #d9430f;
+  --atmr-accent-500: var(--atmr-base-accent);
+  --atmr-accent-400: #ff7241;
+  --atmr-accent-200: #ffa789;
+  --atmr-accent-0: #fff;
+  --atmr-accent-default: var(--atmr-accent-500);
+  --atmr-accent-soft: var(--atmr-accent-400);
+  --atmr-accent-muted: var(--atmr-accent-200);
+  --atmr-accent-hover: var(--atmr-accent-600);
+  --atmr-accent-active: var(--atmr-accent-700);
+  --atmr-accent-on-accent: var(--atmr-accent-0);
+  --atmr-accent-container-default: rgba(255, 79, 18, .1);
+  --atmr-accent-container-soft: rgba(255, 79, 18, .05);
+  --atmr-accent-container-muted: rgba(255, 79, 18, .03);
+  --atmr-accent-container-hover: rgba(255, 79, 18, .2);
+  --atmr-accent-container-active: rgba(255, 79, 18, .3);
+  --atmr-accent-on-container: var(--atmr-accent-500);
+}
+
 * { box-sizing: border-box; }
 html { min-width: 320px; }
 body {
   margin: 0;
-  background: var(--rtk-color-surface-subtle);
+  background: var(--atmr-bg-page-filled, var(--rtk-color-surface-subtle));
   color: var(--rtk-color-text-primary);
   font-family: var(--rtk-font-family);
   font-size: 14px;
@@ -44,6 +118,6 @@ body {
 button, a, input { font: inherit; }
 a { color: inherit; }
 button:focus-visible, a:focus-visible, input:focus-visible {
-  outline: 3px solid var(--atmr-accent-default, #FF4F12);
+  outline: 3px solid var(--atmr-accent-default);
   outline-offset: 2px;
 }

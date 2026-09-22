@@ -28,6 +28,8 @@ import {
   type ProgramStatusItem,
 } from '@/shared/lib/dashboard-repository';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
+import { StatusBadge } from '@/shared/ui/rtk/status-badge';
+import { attentionSeverityIntent } from '@/shared/lib/status-semantics';
 import styles from './dashboard-charts.module.css';
 
 const numberFormatter = new Intl.NumberFormat('ru-RU');
@@ -227,10 +229,7 @@ function AttentionList({ data }: { data: DashboardAnalytics['attentionItems'] })
       {data.slice(0, 5).map((item) => (
         <li key={item.id}>
           <Link className={styles.attentionItem} href={`/universities/${item.universityId}`}>
-            <span className={`${styles.severity} ${styles[`severity-${item.severity}`]}`} aria-label={`Приоритет: ${severityLabels[item.severity]}`}>
-              <span aria-hidden="true" />
-              {severityLabels[item.severity]}
-            </span>
+            <span className={styles.severity} aria-label={`Приоритет: ${severityLabels[item.severity]}`}><StatusBadge intent={attentionSeverityIntent[item.severity]}>{severityLabels[item.severity]}</StatusBadge></span>
             <strong className={styles.universityName}>{item.universityName}</strong>
             <span className={styles.problem}>{item.problemCode} · {item.problemLabel}</span>
             <span className={styles.overdue}>{formatCount(item.overdueDays)} дн. просрочки</span>

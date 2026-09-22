@@ -1,5 +1,5 @@
 .card {
-  background: linear-gradient(135deg, var(--kpi-start), var(--kpi-end));
+  background: var(--kpi-background);
   border: 0;
   border-radius: var(--rtk-radius-medium);
   color: var(--rtk-color-text-inverse);
@@ -24,17 +24,13 @@
   width: 138px;
 }
 
-.brand { --kpi-start: var(--atmr-accent-purple-default, var(--atmr-accent-default, #FF4F12)); --kpi-end: var(--atmr-accent-purple-hover, var(--atmr-accent-hover, #D9430F)); }
-.neutral { --kpi-start: var(--atmr-bg-surface3, #F4F4F5); --kpi-end: var(--atmr-bg-surface2, #F9F9FA); color: var(--rtk-color-text-primary); }
-.neutral .title, .neutral .caption { color: var(--rtk-color-text-secondary); }
-.neutral .value { color: var(--rtk-color-text-primary); }
-.neutral .icon { background: var(--rtk-color-brand-soft); color: var(--rtk-color-brand) !important; }
-.success, .warning, .danger { --kpi-start: var(--atmr-bg-surface3, #F4F4F5); --kpi-end: var(--atmr-bg-surface2, #F9F9FA); color: var(--rtk-color-text-primary); }
-.success .title, .success .caption, .warning .title, .warning .caption, .danger .title, .danger .caption { color: var(--rtk-color-text-secondary); }
-.success .value { color: var(--rtk-color-success); }
-.warning .value { color: var(--rtk-color-warning); }
-.danger .value { color: var(--rtk-color-danger); }
-.success .icon, .warning .icon, .danger .icon { background: var(--rtk-color-surface); color: currentColor !important; }
+.brand { --kpi-background: var(--atmr-accent-default); }
+.brandSoft { --kpi-background: var(--atmr-accent-600); }
+.orange { --kpi-background: var(--atmr-accent-600); }
+.orange .title, .orange .caption { color: var(--atmr-accent-on-accent); }
+.statusIndicator { border: 2px solid var(--rtk-color-text-inverse); border-radius: 50%; flex: 0 0 10px; height: 10px; margin-left: auto; width: 10px; }
+.statusIndicator.warning { background: var(--rtk-color-warning); }
+.statusIndicator.danger { background: var(--rtk-color-danger); }
 
 .interactive {
   cursor: pointer;
@@ -46,7 +42,7 @@
 }
 
 .interactive:focus-visible {
-  outline: 3px solid var(--atmr-accent-default, #FF4F12);
+  outline: 3px solid var(--atmr-accent-default);
   outline-offset: 2px;
 }
 

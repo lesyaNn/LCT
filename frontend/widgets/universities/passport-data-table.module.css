@@ -1,13 +1,9 @@
-.tableShell { background: var(--rtk-color-surface); min-width: 0; }
+.tableShell { composes: shell from '../../shared/ui/rtk/data-table.module.css'; }
 .desktopTableWrap { overflow-x: auto; }
-.table { border-collapse: collapse; min-width: 820px; width: 100%; }
-.table th { background: var(--rtk-color-surface-subtle); color: var(--rtk-color-text-secondary); font-size: 11px; font-weight: 700; letter-spacing: .02em; padding: var(--rtk-space-3) var(--rtk-space-4); text-align: left; white-space: nowrap; }
-.table td { border-bottom: 1px solid var(--rtk-color-border); color: var(--rtk-color-text-primary); font-size: 13px; padding: var(--rtk-space-4); vertical-align: middle; }
-.table tbody tr:last-child td { border-bottom: 0; }
-.table tbody tr:hover td { background: var(--rtk-color-surface-hover); }
-.sortButton { align-items: center; background: transparent; border: 0; color: inherit; cursor: pointer; display: inline-flex; font: inherit; gap: var(--rtk-space-1); padding: 0; text-align: left; }
-.sortButton:hover { color: var(--rtk-color-text-primary); }
-.sortButton:focus-visible, .pagination button:focus-visible { border-radius: var(--rtk-radius-small); outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
+.table { composes: table from '../../shared/ui/rtk/data-table.module.css'; min-width: 820px; }
+.wideTable { min-width: 1050px; }
+.sortButton { composes: sortButton from '../../shared/ui/rtk/data-table.module.css'; }
+.pagination button:focus-visible { border-radius: var(--rtk-radius-small); outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
 .mobileCards { display: none; }
 .mobileCard { border-bottom: 1px solid var(--rtk-color-border); display: flex; flex-direction: column; gap: var(--rtk-space-3); padding: var(--rtk-space-4) 0; }
 .mobileCard:first-child { padding-top: 0; }
@@ -15,7 +11,7 @@
 .mobileField { display: flex; gap: var(--rtk-space-3); justify-content: space-between; min-width: 0; }
 .mobileLabel { color: var(--rtk-color-text-tertiary); flex: 0 0 38%; font-size: 11px; }
 .mobileValue { font-size: 13px; min-width: 0; overflow-wrap: anywhere; text-align: right; }
-.empty { align-items: center; background: var(--rtk-color-surface-subtle); color: var(--rtk-color-text-secondary); display: flex; justify-content: center; min-height: 160px; padding: var(--rtk-space-6); text-align: center; }
+.empty { composes: empty from '../../shared/ui/rtk/data-table.module.css'; }
 .pagination { align-items: center; border-top: 1px solid var(--rtk-color-border); color: var(--rtk-color-text-secondary); display: flex; font-size: 12px; justify-content: space-between; padding-top: var(--rtk-space-4); }
 .paginationActions { display: flex; gap: var(--rtk-space-2); }
 .tableSkeleton { display: flex; flex-direction: column; gap: 1px; min-height: 250px; }
