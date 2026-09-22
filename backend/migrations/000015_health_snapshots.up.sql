@@ -1,7 +1,12 @@
--- SQL migration 000012: health_score_snapshots (P2-09-01).
+-- SQL migration 000015: health_score_snapshots (P2-09-01).
 --
 -- Source of truth for: health_score_snapshots.
 -- Replaces Alembic b2c909010901 (same DDL, same names).
+--
+-- Renumbered from 000012_health_snapshots during the origin/develop merge:
+-- develop/B1 canonically occupies 000011-000014, so the feature sequence
+-- continues here. DDL semantics are unchanged (table/columns/constraints
+-- identical to the pre-merge 000012 file).
 --
 -- Notes:
 -- * UUID PK client-generated (uuid4 in Python); NO DEFAULT gen_random_uuid().
@@ -13,8 +18,6 @@
 -- * trigger_event VARCHAR(64) NOT NULL DEFAULT 'daily_cron'.
 -- * Unique (university_id, period_day, trigger_event): cron writes
 --   ON CONFLICT DO NOTHING; event snapshots never clash with daily ones.
--- * Endpoint GET .../health-score/history и cron/event писатели — позже,
---   отдельными задачами (здесь только DDL).
 
 CREATE TABLE health_score_snapshots (
     id UUID NOT NULL,

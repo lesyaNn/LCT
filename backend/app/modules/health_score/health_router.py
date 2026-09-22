@@ -5,6 +5,7 @@ Thin routes: params -> auth/RBAC -> cache -> service -> DTO. Без SQL и
 """
 
 import uuid
+from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -16,6 +17,7 @@ from app.core.security import CurrentUser
 from app.db.session import get_db
 from app.infrastructure import redis as redis_infra
 from app.models.catalog import University
+from app.models.health_score import HealthScoreSnapshot
 from app.modules.health_score import cache as health_cache
 from app.modules.health_score.attention import get_attention_items
 from app.modules.health_score.health_service import calculate_health_score
@@ -23,6 +25,10 @@ from app.modules.health_score.schemas import (
     AttentionItemsResponse,
     HealthScoreResponse,
     HealthScoreShort,
+)
+from app.modules.health_score.snapshot_schemas import (
+    HealthScoreSnapshotOut,
+    SnapshotTrigger,
 )
 
 router = APIRouter(prefix="/universities", tags=["health-score"])
@@ -164,3 +170,47 @@ def get_university_attention_items(
     result = AttentionItemsResponse(items=get_attention_items(db, university_id))
     redis_infra.cache_set(cache_key, result.model_dump_json(), 300)
     return result
+
+
+@router.get(
+    "/{university_id}/health-score/history",
+    response_model=list[HealthScoreSnapshotOut],
+    summary="История Health Score вуза (снапшоты, новые первыми)",
+    description=(
+        "Снапшоты таблицы health_score_snapshots (миграция 000015): "
+        "ежедневный cron (daily_cron) и event-писатели (transition, "
+        "document_update). Глубина — ?days= (1–365, по умолчанию 30), "
+        "опциональный фильтр ?trigger_event=. Неизвестный вуз → 404."
+    ),
+    responses={
+        404: {"description": "Вуз не найден"},
+    },
+)
+def get_university_health_score_history(
+    university_id: uuid.UUID,
+    days: int = Query(default=30, ge=1, le=365, description="Глубина истории в днях"),
+    trigger_event: SnapshotTrigger | None = Query(
+        default=None, description="Фильтр по триггеру (по умолчанию — все)"
+    ),
+    db: Session = Depends(get_db),
+    _user: CurrentUser = Depends(require_permission("university.read")),
+) -> list[HealthScoreSnapshotOut]:
+    from datetime import datetime, timezone
+
+    exists = db.execute(
+        select(University.id).where(University.id == university_id)
+    ).first()
+    if exists is None:
+        raise HTTPException(status_code=404, detail="University not found")
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    stmt = (
+        select(HealthScoreSnapshot)
+        .where(
+            HealthScoreSnapshot.university_id == university_id,
+            HealthScoreSnapshot.calculated_at >= cutoff,
+        )
+        .order_by(HealthScoreSnapshot.calculated_at.desc())
+    )
+    if trigger_event is not None:
+        stmt = stmt.where(HealthScoreSnapshot.trigger_event == trigger_event)
+    return list(db.execute(stmt).scalars().all())

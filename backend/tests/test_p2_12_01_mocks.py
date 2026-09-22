@@ -4,6 +4,8 @@ import json
 import os
 
 from app.modules.health_score.schemas import HealthScoreResponse
+from app.modules.workflow_instances.schemas import InstanceDetail
+from app.modules.workflow_transitions.schemas import WorkflowStageTransitionRead
 
 MOCKS_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "docs", "mocks"
@@ -30,11 +32,17 @@ def test_health_score_mock_matches_schema():
 
 def test_workflow_instance_mock_structure():
     data = _load("workflow-instance.json")
-    for key in ("id", "university_id", "university_name", "template_name",
-                "current_stage_name", "status", "stages", "transitions"):
-        assert key in data, key
-    assert len(data["stages"]) == 7
-    statuses = {stage["status"] for stage in data["stages"]}
-    assert {"completed", "current", "pending"} <= statuses
-    assert data["stages"][5]["stage_name"] == "Подписание документов"
-    assert data["transitions"][0]["to_stage"] == "Подписание документов"
+    # Мок повторяет контракт GET /api/v1/workflow/instances/{id} (+ history).
+    detail = InstanceDetail.model_validate(data)
+    assert detail.status == "active"
+    assert len(detail.stages) == 7
+    assert [s.order_index for s in detail.stages] == [1, 2, 3, 4, 5, 6, 7]
+    statuses = {stage.status for stage in detail.stages}
+    assert statuses == {"completed", "pending"}
+    current = next(s for s in detail.stages if s.id == detail.current_instance_stage_id)
+    assert current.name == "Подписание документов"
+    assert current.status == "pending"
+    assert detail.current_stage_id == current.template_stage_id
+    transitions = [WorkflowStageTransitionRead.model_validate(t) for t in data["transitions"]]
+    assert transitions[0].to_stage_id == current.template_stage_id
+    assert transitions[0].comment != ""

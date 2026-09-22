@@ -1,9 +1,0 @@
-DROP TABLE attachments;
-DROP TABLE tasks;
-DROP TABLE comments;
-DROP TABLE transitions;
-DROP FUNCTION reject_transition_mutation();
-DROP TABLE instance_stages;
-DROP TABLE workflow_instances;
-DROP TABLE workflow_stages;
-DROP TABLE workflow_templates;

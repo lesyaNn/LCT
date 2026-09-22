@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     s3_access_key: str = "minioadmin"
     s3_secret_key: str = "minioadmin"
     s3_bucket: str = "rtk-files"
+    # P2-05 file storage: "local" (production default, persistent volume)
+    # or "s3" (MinIO/S3 seam, same service code path).
+    storage_backend: str = "local"
+    # Production object root. Mounted as a persistent volume in compose.
+    storage_root: str = "/app/storage"
     max_upload_mb: int = 50
     cors_origins: str = "http://localhost:3000"
 

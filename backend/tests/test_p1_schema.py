@@ -52,11 +52,25 @@ from app.models.teachers import (
 from app.services.teacher_readiness import compute_teacher_readiness
 
 EXPECTED_TABLES = {
-    "universities", "it_directions", "it_programs", "vendors", "it_products",
-    "contracts", "licenses", "responsibles", "university_responsibles",
-    "teachers", "teacher_qualifications", "teacher_certificates",
-    "teacher_programs", "students", "university_programs",
-    "university_products", "meetings", "meeting_documents", "documents",
+    "universities",
+    "it_directions",
+    "it_programs",
+    "vendors",
+    "it_products",
+    "contracts",
+    "licenses",
+    "responsibles",
+    "university_responsibles",
+    "teachers",
+    "teacher_qualifications",
+    "teacher_certificates",
+    "teacher_programs",
+    "students",
+    "university_programs",
+    "university_products",
+    "meetings",
+    "meeting_documents",
+    "documents",
     "interaction_notes",
 }
 
@@ -90,15 +104,21 @@ def _mini_catalog(db: Session, tag: str = "t"):
     db.flush()
     pr = ITProduct(vendor_id=v.id, name=f"Product {tag}", version="1.0")
     u = University(name=f"University {tag}", city="Москва")
-    r = Responsible(full_name="Иванов И.И.", email=f"r-{tag}@example.local",
-                    role="manager")
+    r = Responsible(full_name="Иванов И.И.", email=f"r-{tag}@example.local", role="manager")
     db.add_all([pr, u, r])
     db.flush()
-    return {"direction": d, "program": p, "vendor": v, "product": pr,
-            "university": u, "responsible": r}
+    return {
+        "direction": d,
+        "program": p,
+        "vendor": v,
+        "product": pr,
+        "university": u,
+        "responsible": r,
+    }
 
 
 # ------------------------------------------------------------ structure
+
 
 def test_all_tables_exist(engine):
     assert EXPECTED_TABLES <= set(inspect(engine).get_table_names())
@@ -106,8 +126,11 @@ def test_all_tables_exist(engine):
 
 def test_foreign_keys_really_created(engine):
     insp = inspect(engine)
-    fks = {(t, tuple(f["constrained_columns"]), f["referred_table"])
-           for t in EXPECTED_TABLES for f in insp.get_foreign_keys(t)}
+    fks = {
+        (t, tuple(f["constrained_columns"]), f["referred_table"])
+        for t in EXPECTED_TABLES
+        for f in insp.get_foreign_keys(t)
+    }
     assert ("licenses", ("university_id",), "universities") in fks
     assert ("licenses", ("product_id",), "it_products") in fks
     assert ("teacher_programs", ("teacher_id",), "teachers") in fks
@@ -124,6 +147,7 @@ def test_no_direct_responsible_column_on_universities(engine):
 
 def test_all_models_have_timezone_aware_timestamps():
     from sqlalchemy import DateTime
+
     for table in EXPECTED_TABLES:
         cols = inspect(Base.metadata.tables[table]).columns
         for name in ("created_at", "updated_at"):
@@ -140,12 +164,15 @@ def test_timestamptz_in_postgres():
     insp = inspect(eng)
     try:
         from sqlalchemy import text
+
             # noqa
         with eng.connect() as conn:
-            rows = conn.execute(text(
+            rows = conn.execute(
+                text(
                 "SELECT DISTINCT data_type FROM information_schema.columns "
                 "WHERE column_name='created_at' AND table_schema='public'"
-            )).fetchall()
+                )
+            ).fetchall()
         assert rows and all(r[0] == "timestamp with time zone" for r in rows)
     finally:
         eng.dispose()
@@ -153,6 +180,7 @@ def test_timestamptz_in_postgres():
 
 
 # ------------------------------------------------------------ constraints
+
 
 def test_unique_constraints(db: Session):
     db.add(University(name="Уник", city="Казань"))
@@ -163,13 +191,25 @@ def test_unique_constraints(db: Session):
     db.rollback()
 
     g = _mini_catalog(db, tag="uniq")
-    db.add(Student(external_id="EXT-1", university_id=g["university"].id,
-                   program_id=g["program"].id, full_name="С",
-                   started_at=date.today()))
+    db.add(
+        Student(
+            external_id="EXT-1",
+            university_id=g["university"].id,
+            program_id=g["program"].id,
+            full_name="С",
+            started_at=date.today(),
+        )
+    )
     db.commit()
-    db.add(Student(external_id="EXT-1", university_id=g["university"].id,
-                   program_id=g["program"].id, full_name="С2",
-                   started_at=date.today()))
+    db.add(
+        Student(
+            external_id="EXT-1",
+            university_id=g["university"].id,
+            program_id=g["program"].id,
+            full_name="С2",
+            started_at=date.today(),
+        )
+    )
     with pytest.raises(IntegrityError):
         db.commit()
     db.rollback()
@@ -177,24 +217,25 @@ def test_unique_constraints(db: Session):
 
 def test_mn_uniqueness(db: Session):
     g = _mini_catalog(db)
-    t = Teacher(university_id=g["university"].id, full_name="П",
-                email="t@example.local", position="")
+    t = Teacher(
+        university_id=g["university"].id, full_name="П", email="t@example.local", position=""
+    )
     db.add(t)
     db.flush()
-    db.add(TeacherProgram(teacher_id=t.id, program_id=g["program"].id,
-                          assigned_at=date.today()))
+    db.add(TeacherProgram(teacher_id=t.id, program_id=g["program"].id, assigned_at=date.today()))
     db.commit()
-    db.add(TeacherProgram(teacher_id=t.id, program_id=g["program"].id,
-                          assigned_at=date.today()))
+    db.add(TeacherProgram(teacher_id=t.id, program_id=g["program"].id, assigned_at=date.today()))
     with pytest.raises(IntegrityError):
         db.commit()
     db.rollback()
 
-    db.add(UniversityResponsible(university_id=g["university"].id,
-                                 responsible_id=g["responsible"].id))
+    db.add(
+        UniversityResponsible(university_id=g["university"].id, responsible_id=g["responsible"].id)
+    )
     db.commit()
-    db.add(UniversityResponsible(university_id=g["university"].id,
-                                 responsible_id=g["responsible"].id))
+    db.add(
+        UniversityResponsible(university_id=g["university"].id, responsible_id=g["responsible"].id)
+    )
     with pytest.raises(IntegrityError):
         db.commit()
     db.rollback()
@@ -215,15 +256,19 @@ def test_restrict_blocks_parent_delete(db: Session):
 
 def test_cascade_teacher_children(db: Session):
     g = _mini_catalog(db)
-    t = Teacher(university_id=g["university"].id, full_name="П",
-                email="c@example.local", position="")
+    t = Teacher(
+        university_id=g["university"].id, full_name="П", email="c@example.local", position=""
+    )
     db.add(t)
     db.flush()
-    q = TeacherQualification(teacher_id=t.id, qualification_name="К",
-                             obtained_at=date.today())
-    c = TeacherCertificate(teacher_id=t.id, certificate_name="С",
-                           issued_by="X", issued_at=date.today(),
-                           is_mandatory=True)
+    q = TeacherQualification(teacher_id=t.id, qualification_name="К", obtained_at=date.today())
+    c = TeacherCertificate(
+        teacher_id=t.id,
+        certificate_name="С",
+        issued_by="X",
+        issued_at=date.today(),
+        is_mandatory=True,
+    )
     db.add_all([q, c])
     db.commit()
     db.delete(t)
@@ -235,13 +280,17 @@ def test_cascade_teacher_children(db: Session):
 def test_set_null_on_contract_delete(db: Session):
     g = _mini_catalog(db)
     u, pr = g["university"], g["product"]
-    c = Contract(university_id=u.id, contract_number="D-1",
-                 signed_at=date.today())
+    c = Contract(university_id=u.id, contract_number="D-1", signed_at=date.today())
     db.add(c)
     db.flush()
-    lic = License(university_id=u.id, product_id=pr.id, contract_id=c.id,
-                  license_number="L-1", signed_at=date.today(),
-                  expires_at=date.today() + timedelta(days=100))
+    lic = License(
+        university_id=u.id,
+        product_id=pr.id,
+        contract_id=c.id,
+        license_number="L-1",
+        signed_at=date.today(),
+        expires_at=date.today() + timedelta(days=100),
+    )
     db.add(lic)
     db.commit()
     db.delete(c)
@@ -253,10 +302,18 @@ def test_set_null_on_contract_delete(db: Session):
 def test_documents_single_link_check(db: Session):
     g = _mini_catalog(db)
     u = g["university"]
-    bad = Document(university_id=u.id, document_type="act", title="T",
-                   file_path="p", file_name="f", file_size=1, mime_type="x",
-                   license_id=uuid.uuid4(), contract_id=uuid.uuid4(),
-                   uploaded_by_keycloak_sub="s")
+    bad = Document(
+        university_id=u.id,
+        document_type="act",
+        title="T",
+        file_path="p",
+        file_name="f",
+        file_size=1,
+        mime_type="x",
+        license_id=uuid.uuid4(),
+        contract_id=uuid.uuid4(),
+        uploaded_by_keycloak_sub="s",
+    )
     db.add(bad)
     with pytest.raises(IntegrityError):
         db.commit()
@@ -266,12 +323,23 @@ def test_documents_single_link_check(db: Session):
 def test_meeting_documents_link(db: Session):
     g = _mini_catalog(db)
     u = g["university"]
-    m = Meeting(university_id=u.id, subject="S", participants=[],
+    m = Meeting(
+        university_id=u.id,
+        subject="S",
+        participants=[],
                 meeting_at=datetime.now(timezone.utc),
-                created_by_keycloak_sub="s")
-    d = Document(university_id=u.id, document_type="other", title="T",
-                 file_path="p", file_name="f", file_size=1, mime_type="x",
-                 uploaded_by_keycloak_sub="s")
+        created_by_keycloak_sub="s",
+    )
+    d = Document(
+        university_id=u.id,
+        document_type="other",
+        title="T",
+        file_path="p",
+        file_name="f",
+        file_size=1,
+        mime_type="x",
+        uploaded_by_keycloak_sub="s",
+    )
     db.add_all([m, d])
     db.flush()
     db.add(MeetingDocument(meeting_id=m.id, document_id=d.id))
@@ -290,10 +358,13 @@ def test_meeting_documents_link(db: Session):
 def test_participants_json_roundtrip(db: Session):
     g = _mini_catalog(db)
     parts = [{"name": "Иванов И.И.", "role": "Ректор", "side": "university"}]
-    m = Meeting(university_id=g["university"].id, subject="S",
+    m = Meeting(
+        university_id=g["university"].id,
+        subject="S",
                 participants=parts,
                 meeting_at=datetime.now(timezone.utc),
-                created_by_keycloak_sub="s")
+        created_by_keycloak_sub="s",
+    )
     db.add(m)
     db.commit()
     db.refresh(m)
@@ -301,6 +372,7 @@ def test_participants_json_roundtrip(db: Session):
 
 
 # ------------------------------------------------------------ timestamps
+
 
 def test_created_updated_behaviour(db: Session, engine):
     u = University(name="Временная", city="Москва")
@@ -327,24 +399,34 @@ def test_created_updated_behaviour(db: Session, engine):
 
 # ------------------------------------------------------------ derived status
 
+
 def test_license_derived_status(db: Session):
     g = _mini_catalog(db)
     u, pr = g["university"], g["product"]
-    cases = [(-5, "expired"), (5, "expires_soon"), (30, "expires_soon"),
-             (31, "active"), (400, "active")]
+    cases = [
+        (-5, "expired"),
+        (5, "expires_soon"),
+        (30, "expires_soon"),
+        (31, "active"),
+        (400, "active"),
+    ]
     for i, (delta, expected) in enumerate(cases):
-        lic = License(university_id=u.id, product_id=pr.id,
+        lic = License(
+            university_id=u.id,
+            product_id=pr.id,
                       license_number=f"LX-{i}",
                       signed_at=date.today() - timedelta(days=300),
-                      expires_at=date.today() + timedelta(days=delta))
+            expires_at=date.today() + timedelta(days=delta),
+        )
         assert lic.derived_status == expected, (delta, lic.derived_status)
         assert lic.days_to_expiry == delta
     db.rollback()
 
 
 def test_contract_derived_status(db: Session):
-    c = Contract(university_id=uuid.uuid4(), contract_number="D-X",
-                 signed_at=date.today(), expires_at=None)
+    c = Contract(
+        university_id=uuid.uuid4(), contract_number="D-X", signed_at=date.today(), expires_at=None
+    )
     assert c.derived_status == "active"
     assert c.days_to_expiry is None
     c.status_raw = "terminated"
@@ -358,38 +440,71 @@ def test_contract_derived_status(db: Session):
 
 # ------------------------------------------------------------ readiness
 
+
 def test_teacher_readiness_matrix():
     today = date.today()
     ready = compute_teacher_readiness(
-        [{"certificate_name": "Инфобез", "is_mandatory": True,
-          "expires_at": today + timedelta(days=400)}])
+        [
+            {
+                "certificate_name": "Инфобез",
+                "is_mandatory": True,
+                "expires_at": today + timedelta(days=400),
+            }
+        ]
+    )
     assert ready.readiness.value == "ready"
 
     attention = compute_teacher_readiness(
-        [{"certificate_name": "Инфобез", "is_mandatory": True,
-          "expires_at": today + timedelta(days=10)}])
+        [
+            {
+                "certificate_name": "Инфобез",
+                "is_mandatory": True,
+                "expires_at": today + timedelta(days=10),
+            }
+        ]
+    )
     assert attention.readiness.value == "attention"
     assert len(attention.reasons) == 1
 
     expired = compute_teacher_readiness(
-        [{"certificate_name": "Инфобез", "is_mandatory": True,
-          "expires_at": today - timedelta(days=5)}])
+        [
+            {
+                "certificate_name": "Инфобез",
+                "is_mandatory": True,
+                "expires_at": today - timedelta(days=5),
+            }
+        ]
+    )
     assert expired.readiness.value == "expired"
 
     # edge: no mandatory -> ready; non-mandatory expired ignored
     assert compute_teacher_readiness([]).readiness.value == "ready"
-    assert compute_teacher_readiness(
-        [{"certificate_name": "Soft", "is_mandatory": False,
-          "expires_at": today - timedelta(days=100)}]).readiness.value == "ready"
-    assert compute_teacher_readiness(
-        [{"certificate_name": "Инфобез", "is_mandatory": True,
-          "expires_at": None}]).readiness.value == "ready"
+    assert (
+        compute_teacher_readiness(
+            [
+                {
+                    "certificate_name": "Soft",
+                    "is_mandatory": False,
+                    "expires_at": today - timedelta(days=100),
+                }
+            ]
+        ).readiness.value
+        == "ready"
+    )
+    assert (
+        compute_teacher_readiness(
+            [{"certificate_name": "Инфобез", "is_mandatory": True, "expires_at": None}]
+        ).readiness.value
+        == "ready"
+    )
 
 
 # ------------------------------------------------------------ seed
 
+
 def test_seed_idempotent(engine):
     from app.db.seed import seed_demo
+
     with Session(engine) as s:
         first = seed_demo(s)
     with Session(engine) as s:
@@ -409,42 +524,48 @@ def test_seed_idempotent(engine):
 
 # ------------------------------------------------------------ migration chain
 
+
 def test_sql_migration_single_head_chain():
-    """SQL files are the single schema source: 000001..000013, paired up/down."""
+    """SQL files are the single schema source: 000001..000017, paired up/down."""
     import re as _re
 
-    versions = os.path.join(os.path.dirname(os.path.dirname(
-        os.path.abspath(__file__))), "migrations")
+    versions = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "migrations"
+    )
     ups, downs = set(), set()
     for fname in os.listdir(versions):
         m = _re.match(r"^(\d{6}_[a-z0-9_]+)\.(up|down)\.sql$", fname)
         assert m, f"bad migration filename: {fname}"
         (ups if m.group(2) == "up" else downs).add(m.group(1))
     assert ups == downs, f"unpaired migrations: up^down={ups ^ downs}"
-    assert sorted(ups)[-1] == "000013_tasks_priority"
-    assert len(ups) == 13
+    assert sorted(ups)[-1] == "000017_tasks_priority"
+    assert len(ups) == 17
 
 
-@pytest.mark.skipif(not os.getenv("TEST_DATABASE_URL"),
-                    reason="needs TEST_DATABASE_URL=postgresql...")
+@pytest.mark.skipif(
+    not os.getenv("TEST_DATABASE_URL"), reason="needs TEST_DATABASE_URL=postgresql..."
+)
 def test_sql_migrate_upgrade_downgrade_cycle():
     import subprocess
+
     backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     # Start from a truly clean DB (schema reset, test-only dedicated DB).
     eng = create_engine(os.environ["TEST_DATABASE_URL"])
     try:
         with eng.connect() as conn:
-            conn.execute(__import__("sqlalchemy").text(
-                "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"))
+            conn.execute(
+                __import__("sqlalchemy").text("DROP SCHEMA public CASCADE; CREATE SCHEMA public;")
+            )
             conn.commit()
     finally:
         eng.dispose()
     env = dict(os.environ)
     env["DATABASE_URL"] = os.environ["TEST_DATABASE_URL"]
-    for cmd in (["python", "scripts/migrate.py", "down", "--to", "base", "--yes"],
-                ["python", "scripts/migrate.py", "up"]):
-        subprocess.run(cmd, cwd=backend_dir, env=env, check=True,
-                       capture_output=True)
+    for cmd in (
+        ["python", "scripts/migrate.py", "down", "--to", "base", "--yes"],
+        ["python", "scripts/migrate.py", "up"],
+    ):
+        subprocess.run(cmd, cwd=backend_dir, env=env, check=True, capture_output=True)
     eng = create_engine(os.environ["TEST_DATABASE_URL"])
     try:
         assert EXPECTED_TABLES <= set(inspect(eng).get_table_names())

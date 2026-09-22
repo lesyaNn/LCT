@@ -1,24 +1,36 @@
 """P2-07-08: сборка ответа — unit тесты (reasons + response)."""
 
+import os
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import create_engine
+import pytest
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401 (register metadata)
-from app.db.base import Base
 from app.models.catalog import University
 from app.modules.health_score.health_service import build_reasons, calculate_health_score
 from app.modules.health_score.schemas import HealthScoreCounters
 
 NOW = datetime(2026, 9, 20, 12, 0, tzinfo=timezone.utc)
 
+TEST_URL = os.getenv("TEST_DATABASE_URL", "sqlite://")
 
-def _mem_db():
-    eng = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(eng)
-    return eng
+
+@pytest.fixture()
+def engine():
+    """PostgreSQL integration DB (canonical SQL migrations; skips w/o PG)."""
+    from tests.db_helpers import require_pg_engine
+
+    eng = require_pg_engine(TEST_URL)
+    yield eng
+    eng.dispose()
+
+
+@pytest.fixture()
+def db(engine):
+    with Session(engine) as session:
+        yield session
 
 
 def test_build_reasons_empty_when_healthy():
@@ -42,28 +54,22 @@ def test_build_reasons_codes():
     assert reasons[1].severity == "medium"
 
 
-def test_calculate_empty_university_is_green_100():
-    eng = _mem_db()
-    with Session(eng) as db:
-        uni = University(id=uuid4(), name="Вуз H-0")
-        db.add(uni)
-        db.commit()
-        resp = calculate_health_score(db, uni.id, NOW.date(), NOW)
+def test_calculate_empty_university_is_green_100(db):
+    uni = University(id=uuid4(), name="Вуз H-0")
+    db.add(uni)
+    db.commit()
+    resp = calculate_health_score(db, uni.id, NOW.date(), NOW)
     assert resp.score == 100
     assert resp.status == "green"
     assert resp.reasons == []
     assert resp.calculated_at == NOW
     assert resp.breakdown.tasks == 100
-    eng.dispose()
 
 
-def test_calculate_deterministic_same_input():
-    eng = _mem_db()
-    with Session(eng) as db:
-        uni = University(id=uuid4(), name="Вуз H-1")
-        db.add(uni)
-        db.commit()
-        first = calculate_health_score(db, uni.id, NOW.date(), NOW).model_dump(mode="json")
-        second = calculate_health_score(db, uni.id, NOW.date(), NOW).model_dump(mode="json")
+def test_calculate_deterministic_same_input(db):
+    uni = University(id=uuid4(), name="Вуз H-1")
+    db.add(uni)
+    db.commit()
+    first = calculate_health_score(db, uni.id, NOW.date(), NOW).model_dump(mode="json")
+    second = calculate_health_score(db, uni.id, NOW.date(), NOW).model_dump(mode="json")
     assert first == second
-    eng.dispose()

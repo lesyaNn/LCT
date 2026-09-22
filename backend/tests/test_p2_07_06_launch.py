@@ -1,24 +1,36 @@
 """P2-07-06: компонент L — unit + DB тесты (только P1 university_programs)."""
 
+import os
 from datetime import date, timedelta
 from uuid import uuid4
 
-from sqlalchemy import create_engine
+import pytest
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401 (register metadata)
-from app.db.base import Base
 from app.models.catalog import ITDirection, ITProgram, University
 from app.models.interactions import UniversityProgram
 from app.modules.health_score.launch_score import calc_L, score_single_program
 
 TODAY = date(2026, 9, 20)
 
+TEST_URL = os.getenv("TEST_DATABASE_URL", "sqlite://")
 
-def _mem_session() -> Session:
-    eng = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(eng)
-    return Session(eng)
+
+@pytest.fixture()
+def engine():
+    """PostgreSQL integration DB (canonical SQL migrations; skips w/o PG)."""
+    from tests.db_helpers import require_pg_engine
+
+    eng = require_pg_engine(TEST_URL)
+    yield eng
+    eng.dispose()
+
+
+@pytest.fixture()
+def db(engine):
+    with Session(engine) as session:
+        yield session
 
 
 def test_score_single_program_matrix():
@@ -33,17 +45,14 @@ def test_score_single_program_matrix():
     assert score_single_program("archived", TODAY, TODAY) == 0
 
 
-def test_calc_L_empty_is_100():
-    db = _mem_session()
+def test_calc_L_empty_is_100(db):
     uni = University(id=uuid4(), name="Вуз L-0")
     db.add(uni)
     db.commit()
     assert calc_L(db, uni.id, TODAY) == (100, 0, 0)
-    db.close()
 
 
-def test_calc_L_average_and_archived_ignored():
-    db = _mem_session()
+def test_calc_L_average_and_archived_ignored(db):
     uni = University(id=uuid4(), name="Вуз L-1")
     direction = ITDirection(id=uuid4(), code="L09", name="Направление L")
     db.add_all([uni, direction])
@@ -83,11 +92,9 @@ def test_calc_L_average_and_archived_ignored():
     assert total == 3
     assert ready == 2  # 100 и 70
     assert avg == round((100 + 40 + 70) / 3) == 70
-    db.close()
 
 
-def test_calc_L_overdue_is_zero():
-    db = _mem_session()
+def test_calc_L_overdue_is_zero(db):
     uni = University(id=uuid4(), name="Вуз L-2")
     direction = ITDirection(id=uuid4(), code="L10", name="Направление L2")
     prog = ITProgram(id=uuid4(), direction_id=direction.id, name="Программа")
@@ -101,4 +108,3 @@ def test_calc_L_overdue_is_zero():
     )
     db.commit()
     assert calc_L(db, uni.id, TODAY) == (0, 1, 0)
-    db.close()

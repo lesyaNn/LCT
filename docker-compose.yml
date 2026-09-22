@@ -101,9 +101,13 @@ services:
       REDIS_URL: redis://redis:6379/0
       IMPORT_STAGING_DIR: /tmp/rtk-imports
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-rtk}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-rtk}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      STORAGE_ROOT: /app/storage
     volumes:
       # Staging survives backend restarts (P0-4: preview -> execute).
       - import-staging:/tmp/rtk-imports
+      # P2-05 workflow file objects persist across restarts (never ephemeral).
+      - workflow-storage:/app/storage
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)\""]
       interval: 15s
@@ -155,3 +159,4 @@ volumes:
   pgdata:
   redisdata:
   import-staging:
+  workflow-storage:

@@ -1,11 +1,11 @@
 """P2-09-01: Pydantic-схемы снапшотов Health Score (Swagger-документация).
 
-Endpoint ``GET /universities/{id}/health-score/history`` — позже (отдельная
-задача): схемы уже заморожены здесь, чтобы контракт истории был виден в
-OpenAPI и переиспользовался cron/event-писателями без расхождений.
+Endpoint ``GET /universities/{id}/health-score/history`` отдаёт эти схемы:
+контракт истории виден в OpenAPI и переиспользуется cron/event-писателями
+без расхождений.
 
 Связь с моделью: ``app.models.health_score.HealthScoreSnapshot`` (таблица
-``health_score_snapshots``, миграция ``000011`` / Alembic ``b2c909010901``).
+``health_score_snapshots``, миграция ``000015`` / Alembic ``b2c909010901``).
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ SnapshotTrigger = Literal["daily_cron", "transition", "document_update"]
 class HealthScoreSnapshotOut(BaseModel):
     """Снапшот Health Score вуза (элемент истории для графика динамики).
 
-    Возвращается будущим ``GET /universities/{id}/health-score/history``.
+    Возвращается ``GET /universities/{id}/health-score/history``.
     ``breakdown``/``reasons`` — копии ответа на момент ``calculated_at``.
     """
 
@@ -59,7 +59,7 @@ class HealthScoreSnapshotOut(BaseModel):
 
 
 class HealthScoreHistoryQuery(BaseModel):
-    """Query-параметры будущего ``GET .../health-score/history`` (Swagger)."""
+    """Query-параметры ``GET .../health-score/history`` (Swagger)."""
 
     days: int = Field(
         default=30, ge=1, le=365, description="Глубина истории в днях", examples=[30]

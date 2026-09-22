@@ -1,75 +1,95 @@
-"""Pure contract tests for the canonical B2 transition policy."""
+"""Pure contract tests for the canonical B2 transition policy.
 
-from datetime import datetime, timedelta, timezone
+Runs on the B1 canonical pipeline (``instance_stages`` snapshot rows,
+1-based ``order_index``; current row referenced by
+``instance.current_instance_stage_id``). No database.
+"""
+
+from datetime import date, timedelta
+from uuid import uuid4
 
 import pytest
 
 from app.core.exceptions import BadTransition
-from app.models.workflow import (
-    WorkflowInstance,
-    WorkflowInstanceStage,
-    WorkflowTemplateStage,
-)
-from app.modules.interaction_pipeline.service import validate_transition
+from app.models.workflow_instances import InstanceStage, WorkflowInstance
+from app.modules.workflow_instances.overdue import compute_overdue
+from app.modules.workflow_transitions.service import validate_transition
 
 
-def _instance(required_middle: bool = False) -> WorkflowInstance:
-    template_stages = [
-        WorkflowTemplateStage(
-            code="contacts", name="Contacts", order_index=0, is_required=True
+def _instance(required_middle: bool = False
+              ) -> tuple[WorkflowInstance, list[InstanceStage]]:
+    current_id, middle_id, last_id = uuid4(), uuid4(), uuid4()
+    instance = WorkflowInstance(
+        id=uuid4(),
+        university_id=uuid4(),
+        template_id=uuid4(),
+        status="active",
+        current_instance_stage_id=current_id,
+    )
+    stages = [
+        InstanceStage(
+            id=current_id,
+            instance_id=instance.id,
+            template_stage_id=uuid4(),
+            order_index=1,
+            name="Contacts",
+            is_required=True,
+            status="pending",
         ),
-        WorkflowTemplateStage(
-            code="meeting", name="Meeting", order_index=1, is_required=required_middle
+        InstanceStage(
+            id=middle_id,
+            instance_id=instance.id,
+            template_stage_id=uuid4(),
+            order_index=2,
+            name="Meeting",
+            is_required=required_middle,
+            status="pending",
         ),
-        WorkflowTemplateStage(
-            code="agreement", name="Agreement", order_index=2, is_required=True
+        InstanceStage(
+            id=last_id,
+            instance_id=instance.id,
+            template_stage_id=uuid4(),
+            order_index=3,
+            name="Agreement",
+            is_required=True,
+            status="pending",
         ),
     ]
-    return WorkflowInstance(
-        status="active",
-        stages=[
-            WorkflowInstanceStage(
-                status="current", order_index=0, template_stage=template_stages[0]
-            ),
-            WorkflowInstanceStage(
-                status="pending", order_index=1, template_stage=template_stages[1]
-            ),
-            WorkflowInstanceStage(
-                status="pending", order_index=2, template_stage=template_stages[2]
-            ),
-        ],
-    )
+    # Transient relationship wiring (no DB round-trip).
+    return instance, stages
 
 
 def test_validate_transition_skips_only_optional_stages():
-    instance = _instance(required_middle=False)
-    current, target, skipped = validate_transition(instance, "agreement", "done")
+    instance, stages = _instance(required_middle=False)
+    current, target, skipped = validate_transition(
+        instance, stages, stages[2].id, "done"
+    )
 
-    assert current.template_stage.code == "contacts"
-    assert target.template_stage.code == "agreement"
-    assert [stage.template_stage.code for stage in skipped] == ["meeting"]
+    assert current.name == "Contacts"
+    assert target.name == "Agreement"
+    assert [stage.name for stage in skipped] == ["Meeting"]
 
 
 def test_validate_transition_rejects_required_stage_skip():
+    instance, stages = _instance(required_middle=True)
     with pytest.raises(BadTransition, match="Required stages"):
-        validate_transition(_instance(required_middle=True), "agreement", "done")
+        validate_transition(instance, stages, stages[2].id, "done")
 
 
 def test_validate_transition_rejects_backward_and_empty_comment():
-    instance = _instance()
+    instance, stages = _instance()
     with pytest.raises(BadTransition, match="comment"):
-        validate_transition(instance, "agreement", "   ")
+        validate_transition(instance, stages, stages[2].id, "   ")
 
-    instance.stages[2].status = "current"
-    instance.stages[0].status = "completed"
+    instance.current_instance_stage_id = stages[2].id
+    stages[0].status = "completed"
     with pytest.raises(BadTransition, match="forward"):
-        validate_transition(instance, "contacts", "reopen")
+        validate_transition(instance, stages, stages[0].id, "reopen")
 
 
-def test_overdue_properties_are_derived_without_mutating_status():
-    instance = _instance()
-    instance.due_date = datetime.now(timezone.utc) - timedelta(days=2, hours=1)
+def test_overdue_is_derived_by_shared_helper_without_mutating_status():
+    today = date(2026, 9, 20)
+    overdue, days = compute_overdue(today - timedelta(days=2), None, today)
 
-    assert instance.is_overdue is True
-    assert instance.days_overdue >= 2
-    assert instance.status == "active"
+    assert overdue is True
+    assert days == 2

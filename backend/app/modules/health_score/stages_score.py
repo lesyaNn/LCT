@@ -1,7 +1,7 @@
 """P2-07-04: компонент S — доля этапов, выполненных вовремя.
 
-Источник — канонический P2-пайплайн: ``workflow_instances`` вуза со статусом
-``active`` и их ``instance_stages``.
+Источник — канонический B1-пайплайн: ``workflow_instances`` вуза со статусом
+``active`` и их runtime-снапшоты ``instance_stages``.
 
 Правила (детерминированные, без AI):
 * нет активного instance → ``(100, 0, 0)`` (нейтрально, не штрафуем);
@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.workflow import WorkflowInstance, WorkflowInstanceStage
+from app.models.workflow_instances import InstanceStage, WorkflowInstance
 
 #: Статус instance, считающийся активным для компонента S.
 ACTIVE_INSTANCE_STATUS = "active"
@@ -112,11 +112,11 @@ def calc_S(
     rows = list(
         db.execute(
             select(
-                WorkflowInstanceStage.status,
-                WorkflowInstanceStage.due_date,
-                WorkflowInstanceStage.completed_at,
+                InstanceStage.status,
+                InstanceStage.due_date,
+                InstanceStage.completed_at,
             ).where(
-                WorkflowInstanceStage.instance_id.in_(instance_ids),
+                InstanceStage.instance_id.in_(instance_ids),
             )
         ).all()
     )

@@ -1,10 +1,10 @@
-"""P2-09-01: snapshots — модель, уникальность, SQL-DDL паритет (без endpoint)."""
+"""P2-09-01: snapshots — модель, уникальность, SQL-DDL паритет (PostgreSQL)."""
 
+import os
 from datetime import date, datetime, timezone
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import create_engine, event
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -14,16 +14,23 @@ from app.models.catalog import University
 from app.models.health_score import HealthScoreSnapshot
 from app.modules.health_score.snapshot_schemas import HealthScoreSnapshotOut
 
+TEST_URL = os.getenv("TEST_DATABASE_URL", "sqlite://")
 
-def _mem_session() -> Session:
-    eng = create_engine("sqlite:///:memory:")
 
-    @event.listens_for(eng, "connect")
-    def _fk_on(dbapi_conn, _rec):  # pragma: no cover
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
+@pytest.fixture()
+def engine():
+    """PostgreSQL integration DB (canonical SQL migrations; skips w/o PG)."""
+    from tests.db_helpers import require_pg_engine
 
-    Base.metadata.create_all(eng)
-    return Session(eng)
+    eng = require_pg_engine(TEST_URL)
+    yield eng
+    eng.dispose()
+
+
+@pytest.fixture()
+def db(engine):
+    with Session(engine) as session:
+        yield session
 
 
 def test_table_registered_on_canonical_metadata():
@@ -35,8 +42,7 @@ def test_table_registered_on_canonical_metadata():
     assert "ix_health_snapshots_univ_calculated" in index_names
 
 
-def test_insert_and_unique_uni_day_trigger():
-    db = _mem_session()
+def test_insert_and_unique_uni_day_trigger(db):
     uni = University(id=uuid4(), name="Вуз S-1")
     db.add(uni)
     db.commit()
@@ -74,11 +80,9 @@ def test_insert_and_unique_uni_day_trigger():
     )
     db.commit()
     assert db.query(HealthScoreSnapshot).count() == 2
-    db.close()
 
 
-def test_cascade_on_university_delete():
-    db = _mem_session()
+def test_cascade_on_university_delete(db):
     uni = University(id=uuid4(), name="Вуз S-2")
     db.add(uni)
     db.commit()
@@ -95,7 +99,6 @@ def test_cascade_on_university_delete():
     db.delete(uni)
     db.commit()
     assert db.query(HealthScoreSnapshot).count() == 0
-    db.close()
 
 
 def test_swagger_schema_serializes():

@@ -1,76 +1,80 @@
 """P2-07-02: компонент T — unit + DB тесты (workflow tasks/stages)."""
 
+import os
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
-from sqlalchemy import create_engine, event
+import pytest
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401 (register metadata)
-from app.db.base import Base
 from app.models.catalog import University
-from app.models.workflow import (
+from app.models.workflow_instances import (
+    InstanceStage,
     WorkflowInstance,
-    WorkflowInstanceStage,
     WorkflowTask,
-    WorkflowTemplate,
-    WorkflowTemplateStage,
 )
+from app.models.workflow_templates import WorkflowTemplate, WorkflowStage
 from app.modules.health_score.tasks_score import calc_T, classify_overdue, score_tasks
 
 NOW = datetime(2026, 9, 20, 12, 0, tzinfo=timezone.utc)
+TODAY = NOW.date()
+
+TEST_URL = os.getenv("TEST_DATABASE_URL", "sqlite://")
 
 
-def _mem_session() -> Session:
-    eng = create_engine("sqlite:///:memory:")
+@pytest.fixture()
+def engine():
+    """PostgreSQL integration DB (canonical SQL migrations; skips w/o PG)."""
+    from tests.db_helpers import require_pg_engine
 
-    @event.listens_for(eng, "connect")
-    def _fk_on(dbapi_conn, _rec):  # pragma: no cover
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
+    eng = require_pg_engine(TEST_URL)
+    yield eng
+    eng.dispose()
 
-    Base.metadata.create_all(eng)
-    return Session(eng)
+
+@pytest.fixture()
+def db(engine):
+    with Session(engine) as session:
+        yield session
 
 
 def _workflow_graph(db: Session, uni_id):
     """Минимальный граф: template → stage → instance → instance_stage."""
-    template = WorkflowTemplate(
-        id=uuid4(), code="T-T", name="Шаблон T", created_by_keycloak_sub="t"
-    )
+    template = WorkflowTemplate(id=uuid4(), name="Шаблон T")
     db.add(template)
     db.flush()
-    tpl_stage = WorkflowTemplateStage(
-        id=uuid4(), template_id=template.id, code="s1",
-        name="Этап 1", order_index=0,
+    tpl_stage = WorkflowStage(
+        id=uuid4(), template_id=template.id,
+        name="Этап 1", order_index=1,
     )
     db.add(tpl_stage)
     db.flush()
     instance = WorkflowInstance(
         id=uuid4(), template_id=template.id, university_id=uni_id,
-        status="active", started_at=NOW - timedelta(days=30),
-        created_by_keycloak_sub="t", updated_by_keycloak_sub="t",
+        status="active",
     )
     db.add(instance)
     db.flush()
-    inst_stage = WorkflowInstanceStage(
+    inst_stage = InstanceStage(
         id=uuid4(), instance_id=instance.id, template_stage_id=tpl_stage.id,
-        order_index=0, status="current",
-        due_date=NOW - timedelta(days=5),
+        order_index=1, name="Этап 1", status="pending",
+        due_date=(NOW - timedelta(days=5)).date(),
     )
     db.add(inst_stage)
     db.flush()
-    return instance, inst_stage
+    return instance, tpl_stage
 
 
 def _add_task(db, instance, stage=None, *, days_overdue=0, priority="normal",
               status="open"):
-    due = NOW - timedelta(days=days_overdue) if days_overdue else NOW + timedelta(days=5)
+    due = TODAY - timedelta(days=days_overdue) if days_overdue else TODAY + timedelta(days=5)
     db.add(
         WorkflowTask(
             id=uuid4(), instance_id=instance.id,
-            instance_stage_id=stage.id if stage is not None else None,
-            title="Задача", due_date=due, status=status,
-            priority=priority, created_by_keycloak_sub="t",
+            stage_id=stage.id if stage is not None else None,
+            title="Задача", deadline=due, status=status,
+            priority=priority,
         )
     )
     db.flush()
@@ -89,17 +93,14 @@ def test_score_tasks_floor_zero():
     assert score_tasks(20, 20) == (0, 20, 20)
 
 
-def test_calc_T_no_instances_is_100():
-    db = _mem_session()
+def test_calc_T_no_instances_is_100(db):
     uni = University(id=uuid4(), name="Вуз T-0")
     db.add(uni)
     db.commit()
     assert calc_T(db, uni.id, NOW) == (100, 0, 0)
-    db.close()
 
 
-def test_calc_T_mixed_penalties():
-    db = _mem_session()
+def test_calc_T_mixed_penalties(db):
     uni = University(id=uuid4(), name="Вуз T-1")
     db.add(uni)
     db.flush()
@@ -110,22 +111,18 @@ def test_calc_T_mixed_penalties():
     _add_task(db, instance, stage, days_overdue=0, priority="normal")  # не просрочена
     db.commit()
     assert calc_T(db, uni.id, NOW) == (80, 2, 1)
-    db.close()
 
 
-def test_calc_T_overdue_stage_without_tasks_is_normal():
-    db = _mem_session()
+def test_calc_T_overdue_stage_without_tasks_is_normal(db):
     uni = University(id=uuid4(), name="Вуз T-2")
     db.add(uni)
     db.flush()
-    _workflow_graph(db, uni.id)  # этап current, due 5 дней назад, задач нет
+    _workflow_graph(db, uni.id)  # этап pending, due 5 дней назад, задач нет
     db.commit()
     assert calc_T(db, uni.id, NOW) == (96, 0, 1)
-    db.close()
 
 
-def test_calc_T_done_tasks_ignored():
-    db = _mem_session()
+def test_calc_T_done_tasks_ignored(db):
     uni = University(id=uuid4(), name="Вуз T-3")
     db.add(uni)
     db.flush()
@@ -134,4 +131,3 @@ def test_calc_T_done_tasks_ignored():
     db.commit()
     # done-задача не считается; у этапа есть задача → +0
     assert calc_T(db, uni.id, NOW) == (100, 0, 0)
-    db.close()

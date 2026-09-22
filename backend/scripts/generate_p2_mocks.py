@@ -7,8 +7,9 @@ Usage (from ``backend/``)::
 * ``health-score.json`` — REAL ``HealthScoreResponse`` from
   ``health_service.calculate_health_score`` on a seeded problem-zone
   university (nontrivial reasons) — guaranteed schema-conformant.
-* ``workflow-instance.json`` — P3-oriented demo shape from the task file
-  (7 stages, mixed statuses, transitions); structural key checks in tests.
+* ``workflow-instance.json`` — canonical ``InstanceDetail`` shape
+  (``GET /api/v1/workflow/instances/{id}``) plus the transition history;
+  validated against the real response schemas in tests.
 
 Deterministic UUIDs (uuid5) and dates — output is stable across runs.
 """
@@ -31,14 +32,13 @@ import app.models  # noqa: F401 (register metadata)
 from app.db.base import Base
 from app.models.catalog import University
 from app.models.interactions import Document
-from app.models.workflow import (
+from app.models.workflow_instances import (
+    InstanceStage,
     WorkflowInstance,
-    WorkflowInstanceStage,
+    WorkflowStageTransition,
     WorkflowTask,
-    WorkflowTemplate,
-    WorkflowTemplateStage,
-    WorkflowTransition,
 )
+from app.models.workflow_templates import WorkflowTemplate, WorkflowStage
 from app.modules.health_score.health_service import calculate_health_score
 
 MOCK_DAY = date(2026, 9, 15)
@@ -68,16 +68,15 @@ def _seed_problem_university(db: Session) -> uuid.UUID:
     db.flush()
 
     template = WorkflowTemplate(
-        id=_uid("template/std"), code="standard", name="Стандартный цикл",
-        created_by_keycloak_sub="mock",
+        id=_uid("template/std"), name="Стандартный цикл",
     )
     db.add(template)
     db.flush()
     tpl_ids = []
-    for index, name in enumerate(STAGE_NAMES):
-        stage = WorkflowTemplateStage(
+    for index, name in enumerate(STAGE_NAMES, start=1):
+        stage = WorkflowStage(
             id=_uid(f"template-stage/{index}"), template_id=template.id,
-            code=f"s{index + 1}", name=name, order_index=index,
+            name=name, order_index=index,
         )
         db.add(stage)
         tpl_ids.append(stage.id)
@@ -86,47 +85,48 @@ def _seed_problem_university(db: Session) -> uuid.UUID:
     instance_id = _uid("instance/mgu")
     instance = WorkflowInstance(
         id=instance_id, template_id=template.id, university_id=uni_id,
-        status="active", started_at=datetime(2026, 1, 15, 10, 0, tzinfo=timezone.utc),
-        created_by_keycloak_sub="mock", updated_by_keycloak_sub="mock",
+        status="active",
     )
     db.add(instance)
     db.flush()
 
-    # 5 completed вовремя/поздно + current + pending
+    # 5 completed вовремя/поздно + текущий pending + будущий pending
     completions = [
         ("completed", date(2026, 1, 22), datetime(2026, 1, 20, 14, 0, tzinfo=timezone.utc)),
         ("completed", date(2026, 2, 5), datetime(2026, 2, 3, 11, 0, tzinfo=timezone.utc)),
         ("completed", date(2026, 3, 1), datetime(2026, 3, 5, 11, 0, tzinfo=timezone.utc)),
         ("completed", date(2026, 4, 1), datetime(2026, 3, 30, 11, 0, tzinfo=timezone.utc)),
         ("completed", date(2026, 5, 1), datetime(2026, 4, 28, 11, 0, tzinfo=timezone.utc)),
-        ("current", date(2026, 9, 20), None),
+        ("pending", date(2026, 9, 20), None),
         ("pending", date(2026, 9, 27), None),
     ]
     stage_ids = []
-    for index, (status, due, done) in enumerate(completions):
-        due_dt = datetime(due.year, due.month, due.day, tzinfo=timezone.utc)
+    for index, (status, due, done) in enumerate(completions, start=1):
         sid = _uid(f"instance-stage/{index}")
         stage_ids.append(sid)
-        db.add(WorkflowInstanceStage(
-            id=sid, instance_id=instance_id, template_stage_id=tpl_ids[index],
-            order_index=index, status=status, due_date=due_dt,
-            started_at=datetime(2026, 1, 15, 10, 0, tzinfo=timezone.utc)
-            if status != "pending" else None,
-            completed_at=done,
+        db.add(InstanceStage(
+            id=sid, instance_id=instance_id, template_stage_id=tpl_ids[index - 1],
+            order_index=index, name=STAGE_NAMES[index - 1],
+            status=status, due_date=due, completed_at=done,
         ))
-    # 3 просроченные обычные задачи на current-этапе
+    db.flush()
+    # Указатели — после снапшотов (FK требует существующих строк).
+    instance.current_stage_id = tpl_ids[5]
+    instance.current_instance_stage_id = _uid("instance-stage/6")
+    db.flush()
+    # 3 просроченные задачи у текущего этапа
     for num in range(3):
         db.add(WorkflowTask(
             id=_uid(f"task/{num}"), instance_id=instance_id,
-            instance_stage_id=stage_ids[5], title=f"Задача {num + 1}",
-            due_date=MOCK_NOW - timedelta(days=num + 1), status="open",
-            priority="normal", created_by_keycloak_sub="mock",
+            stage_id=tpl_ids[5], title=f"Задача {num + 1}",
+            deadline=(MOCK_NOW - timedelta(days=num + 1)).date(), status="open",
+            priority="normal",
         ))
-    db.add(WorkflowTransition(
+    db.add(WorkflowStageTransition(
         id=_uid("transition/1"), instance_id=instance_id,
-        from_stage_id=stage_ids[4], to_stage_id=stage_ids[5],
-        action="next", actor_keycloak_sub="mock",
-        comment="Документы согласованы", revision=5, created_at=MOCK_NOW,
+        from_stage_id=tpl_ids[4], to_stage_id=tpl_ids[5],
+        actor_keycloak_sub="mock",
+        comment="Пилот успешен, переходим к подписанию",
     ))
     # Документы: 3 valid + 1 просроченный
     for num, (doc_type, expired) in enumerate(
@@ -145,54 +145,60 @@ def _seed_problem_university(db: Session) -> uuid.UUID:
 
 
 def build_workflow_instance_mock() -> dict:
-    """P3-формат из файла задачи (имена, счётчики, переходы)."""
+    """Канонический InstanceDetail + история переходов (контракт GET)."""
     uni_id = _uid("university/mgu")
     template_id = _uid("template/std")
     instance_id = _uid("instance/mgu")
+    current_tpl = _uid("template-stage/6")
+    current_row = _uid("instance-stage/6")
     stages = []
-    due_dates = ["2026-01-22", "2026-02-05", None, None, None, "2026-09-20", "2026-09-27"]
-    statuses = ["completed"] * 5 + ["current", "pending"]
-    for index, name in enumerate(STAGE_NAMES):
+    due_dates = ["2026-01-22", "2026-02-05", "2026-03-01", "2026-04-01",
+                 "2026-05-01", "2026-09-20", "2026-09-27"]
+    done_dates = ["2026-01-20T14:00:00+03:00", "2026-02-03T11:00:00+03:00",
+                  "2026-03-05T11:00:00+03:00", "2026-03-30T11:00:00+03:00",
+                  "2026-04-28T11:00:00+03:00", None, None]
+    statuses = ["completed"] * 5 + ["pending", "pending"]
+    for index, name in enumerate(STAGE_NAMES, start=1):
         stages.append({
             "id": str(_uid(f"instance-stage/{index}")),
-            "stage_id": str(_uid(f"template-stage/{index}")),
-            "stage_name": name,
-            "order_index": index + 1,
-            "status": statuses[index],
-            "due_date": due_dates[index],
-            "completed_at": (
-                ["2026-01-20T14:00:00+03:00", "2026-02-03T11:00:00+03:00", None,
-                 None, None, None, None][index]
-            ),
-            "started_at": "2026-01-15T10:00:00+03:00" if index < 6 else None,
-            "overdue": False,
-            "days_overdue": None,
-            "assignee_name": "Иванов И.И." if index == 5 else None,
-            "comments_count": 2 if index == 0 else (1 if index == 5 else 0),
-            "attachments_count": 1 if index == 0 else 0,
-            "tasks_count": 3 if index == 5 else 0,
+            "template_stage_id": str(_uid(f"template-stage/{index}")),
+            "order_index": index,
+            "name": name,
+            "description": None,
+            "is_required": index != 5,
+            "status": statuses[index - 1],
+            "due_date": due_dates[index - 1],
+            "completed_at": done_dates[index - 1],
+            "is_overdue": False,
+            "days_overdue": 0,
+            "created_at": "2026-01-15T10:00:00+03:00",
+            "updated_at": done_dates[index - 1] or "2026-01-15T10:00:00+03:00",
         })
     return {
         "id": str(instance_id),
         "university_id": str(uni_id),
-        "university_name": "МГУ",
         "template_id": str(template_id),
-        "template_name": "Стандартный цикл",
-        "current_stage_id": str(_uid("instance-stage/5")),
-        "current_stage_name": "Подписание документов",
+        "current_stage_id": str(current_tpl),
+        "current_instance_stage_id": str(current_row),
+        "responsible_id": None,
         "status": "active",
-        "started_at": "2026-01-15T10:00:00+03:00",
+        "due_date": "2026-09-27",
         "completed_at": None,
-        "progress_percent": 45,
-        "overdue_stages_count": 1,
+        "is_overdue": False,
+        "days_overdue": 0,
+        "created_at": "2026-01-15T10:00:00+03:00",
+        "updated_at": "2026-09-10T09:00:00+03:00",
         "stages": stages,
         "transitions": [
             {
-                "from_stage": "Корректировка документов",
-                "to_stage": "Подписание документов",
-                "user_name": "Петров П.П.",
-                "comment": "Документы согласованы",
-                "transitioned_at": "2026-09-10T09:00:00+03:00",
+                "id": str(_uid("transition/1")),
+                "instance_id": str(instance_id),
+                "from_stage_id": str(_uid("template-stage/5")),
+                "to_stage_id": str(current_tpl),
+                "actor_keycloak_sub": "mock",
+                "comment": "Пилот успешен, переходим к подписанию",
+                "created_at": "2026-09-10T09:00:00+03:00",
+                "updated_at": "2026-09-10T09:00:00+03:00",
             }
         ],
     }
@@ -201,10 +207,22 @@ def build_workflow_instance_mock() -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate P2 mocks for P3")
     parser.add_argument("--out", default="docs/mocks")
+    parser.add_argument(
+        "--db-url", default=os.getenv("TEST_DATABASE_URL", ""),
+        help="PostgreSQL URL (SQL migrations are the sole schema source; "
+        "no SQLite DDL path). Falls back to TEST_DATABASE_URL.",
+    )
     args = parser.parse_args()
+    if not args.db_url.startswith("postgresql"):
+        raise SystemExit(
+            "generate_p2_mocks needs --db-url=postgresql+psycopg://... "
+            "(canonical SQL schema; SQLite cannot express DEFERRABLE)."
+        )
 
-    eng = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(eng)
+    eng = create_engine(args.db_url)
+    # Scratch database: canonical schema (no-op if migrated), seed, calc.
+    # Test databases are schema-reset by tests/db_helpers.py afterwards.
+    Base.metadata.create_all(eng, checkfirst=True)
     with Session(eng) as db:
         uni_id = _seed_problem_university(db)
         db.commit()

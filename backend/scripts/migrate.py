@@ -45,8 +45,10 @@ MIGRATIONS_DIR = Path(__file__).resolve().parent.parent / "migrations"
 LEGACY_ALEMBIC_HEAD = "7f3a1c9e2b06"
 LEGACY_SQL_HEAD = "000010_audit_identity"
 
-# Canonical application tables (alembic_version/schema_migrations excluded).
-P1_TABLES = [
+# Canonical application tables (alembic_version/schema_migrations excluded):
+# 21 P1 tables + 8 B1 workflow tables (000011-000014) + health_score_snapshots
+# (P2-09-01, 000015). Must match backend/migrations/*.up.sql exactly.
+EXPECTED_TABLES = [
     "universities",
     "it_directions",
     "it_programs",
@@ -68,26 +70,45 @@ P1_TABLES = [
     "interaction_notes",
     "meeting_documents",
     "audit_events",
-    "health_score_snapshots",
-]
-
-WORKFLOW_TABLES = [
     "workflow_templates",
     "workflow_stages",
     "workflow_instances",
+    "workflow_stage_transitions",
+    "workflow_comments",
+    "workflow_attachments",
+    "workflow_tasks",
     "instance_stages",
-    "transitions",
-    "comments",
-    "tasks",
-    "attachments",
+    "health_score_snapshots",
 ]
-
-EXPECTED_TABLES = P1_TABLES + WORKFLOW_TABLES
 
 VERSION_RE = re.compile(r"^(?P<ver>\d{6}_[a-z0-9_]+)\.(?P<dir>up|down)\.sql$")
 
-# Adoption must not mark migrations added after the archived Alembic head.
-LEGACY_TABLES = P1_TABLES
+# Adoption must not mark migrations added after the archived Alembic head:
+# the P1-only table set (000011+ workflow pipeline and 000015 health
+# snapshots stay pending for the normal `up` command).
+LEGACY_TABLES = [
+    "universities",
+    "it_directions",
+    "it_programs",
+    "vendors",
+    "it_products",
+    "responsibles",
+    "contracts",
+    "licenses",
+    "university_responsibles",
+    "teachers",
+    "teacher_qualifications",
+    "teacher_certificates",
+    "teacher_programs",
+    "students",
+    "university_programs",
+    "university_products",
+    "meetings",
+    "documents",
+    "interaction_notes",
+    "meeting_documents",
+    "audit_events",
+]
 
 
 def _database_url() -> str:
@@ -206,8 +227,7 @@ def cmd_down(target: str, confirm: bool = False) -> int:
         raise SystemExit(f"[migrate] unknown target version: {target}")
     with _connect() as conn:
         applied = _applied(conn)
-        to_revert = [v for v in reversed(applied)
-                     if target == "base" or v > target]
+        to_revert = [v for v in reversed(applied) if target == "base" or v > target]
         if not to_revert:
             print("[migrate] nothing to roll back")
             return 0
@@ -261,39 +281,44 @@ def cmd_baseline() -> int:
             )
             has_ledger = cur.fetchone()[0]
         if not has_ledger:
-            print("[migrate] baseline skipped: no alembic_version table "
-                  "(fresh SQL DB or already adopted)")
+            print(
+                "[migrate] baseline skipped: no alembic_version table "
+                "(fresh SQL DB or already adopted)"
+            )
             return 1
         with conn.cursor() as cur:
             cur.execute("SELECT version_num FROM alembic_version")
             rows = cur.fetchall()
         if len(rows) != 1 or rows[0][0] != LEGACY_ALEMBIC_HEAD:
-            print(f"[migrate] baseline refused: alembic_version={rows} "
-                  f"(expected [{LEGACY_ALEMBIC_HEAD}])")
+            print(
+                f"[migrate] baseline refused: alembic_version={rows} "
+                f"(expected [{LEGACY_ALEMBIC_HEAD}])"
+            )
             return 1
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY 1"
-            )
+            cur.execute("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY 1")
             tables = {r[0] for r in cur.fetchall()} - {"alembic_version"}
         missing = set(LEGACY_TABLES) - tables
         unexpected = tables - set(LEGACY_TABLES) - {"schema_migrations"}
         if missing or unexpected:
-            print(f"[migrate] baseline refused: missing={sorted(missing)} "
-                  f"unexpected={sorted(unexpected)}")
+            print(
+                f"[migrate] baseline refused: missing={sorted(missing)} "
+                f"unexpected={sorted(unexpected)}"
+            )
             print("[migrate] refusing to mask drift with per-table IF EXISTS logic.")
             return 1
         _ensure_bookkeeping(conn)
         with conn.cursor() as cur:
             for version, _, _ in plan:
                 cur.execute(
-                    "INSERT INTO schema_migrations (version) VALUES (%s) "
-                    "ON CONFLICT DO NOTHING",
+                    "INSERT INTO schema_migrations (version) VALUES (%s) ON CONFLICT DO NOTHING",
                     (version,),
                 )
         conn.commit()
-        print(f"[migrate] baseline OK: marked {len(plan)} versions "
-              f"(alembic {LEGACY_ALEMBIC_HEAD} adopted, data preserved)")
+        print(
+            f"[migrate] baseline OK: marked {len(plan)} versions "
+            f"(alembic {LEGACY_ALEMBIC_HEAD} adopted, data preserved)"
+        )
     return 0
 
 
@@ -302,15 +327,15 @@ def cmd_verify() -> int:
     with _connect() as conn:
         applied = _applied(conn)
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY 1"
-            )
+            cur.execute("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY 1")
             tables = {r[0] for r in cur.fetchall()}
     available = [v for v, _, _ in plan]
     ok = applied == available and set(EXPECTED_TABLES) <= tables
-    print(f"latest={available[-1] if available else '-'} "
+    print(
+        f"latest={available[-1] if available else '-'} "
           f"applied={len(applied)}/{len(available)} "
-          f"tables={len(tables)} -> {'OK' if ok else 'DRIFT'}")
+        f"tables={len(tables)} -> {'OK' if ok else 'DRIFT'}"
+    )
     return 0 if ok else 1
 
 
@@ -322,10 +347,8 @@ def main(argv: list[str] | None = None) -> int:
     p_up = sub.add_parser("up", help="apply pending migrations")
     p_up.add_argument("--to", default=None, help="stop at version (inclusive)")
     p_down = sub.add_parser("down", help="roll back to a version (or base)")
-    p_down.add_argument("--to", default="base",
-                        help="keep target applied; 'base' reverts all")
-    p_down.add_argument("--yes", action="store_true",
-                        help="actually execute (otherwise dry-run)")
+    p_down.add_argument("--to", default="base", help="keep target applied; 'base' reverts all")
+    p_down.add_argument("--yes", action="store_true", help="actually execute (otherwise dry-run)")
     sub.add_parser("baseline", help="adopt an existing Alembic-head DB")
     sub.add_parser("verify", help="check latest == applied and tables present")
     args = parser.parse_args(argv)

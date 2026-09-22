@@ -1,13 +1,13 @@
 """P2-07-03: компонент D — unit + DB тесты (только P1 documents)."""
 
+import os
 from datetime import date, timedelta
 from uuid import uuid4
 
-from sqlalchemy import create_engine
+import pytest
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401 (register metadata)
-from app.db.base import Base
 from app.models.catalog import University
 from app.models.interactions import Document
 from app.modules.health_score.documents_score import (
@@ -19,11 +19,23 @@ from app.modules.health_score.documents_score import (
 
 TODAY = date(2026, 9, 20)
 
+TEST_URL = os.getenv("TEST_DATABASE_URL", "sqlite://")
 
-def _mem_session() -> Session:
-    eng = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(eng)
-    return Session(eng)
+
+@pytest.fixture()
+def engine():
+    """PostgreSQL integration DB (canonical SQL migrations; skips w/o PG)."""
+    from tests.db_helpers import require_pg_engine
+
+    eng = require_pg_engine(TEST_URL)
+    yield eng
+    eng.dispose()
+
+
+@pytest.fixture()
+def db(engine):
+    with Session(engine) as session:
+        yield session
 
 
 def test_required_types_default_and_env():
@@ -58,17 +70,14 @@ def test_score_documents_rounding_and_other_type_ignored_by_caller():
     assert score_documents(items, TODAY) == (33, 1, 3)
 
 
-def test_calc_D_db_single_query_no_required_is_100():
-    db = _mem_session()
+def test_calc_D_db_single_query_no_required_is_100(db):
     uni = University(id=uuid4(), name="Вуз D-1")
     db.add(uni)
     db.commit()
     assert calc_D(db, uni.id, TODAY) == (100, 0, 0)
-    db.close()
 
 
-def test_calc_D_db_counts_only_required_types():
-    db = _mem_session()
+def test_calc_D_db_counts_only_required_types(db):
     uni = University(id=uuid4(), name="Вуз D-2")
     db.add(uni)
     db.flush()
@@ -96,4 +105,3 @@ def test_calc_D_db_counts_only_required_types():
     db.commit()
     # other игнорируется: total=2, valid=1 → 50
     assert calc_D(db, uni.id, TODAY) == (50, 1, 2)
-    db.close()

@@ -1,19 +1,19 @@
-"""Canonical domain models (single source of truth for ORM metadata).
+"""P1 canonical domain models (single source of truth for ORM metadata).
 
-Importing this package registers all P1 tables plus the canonical B2 workflow
-runtime on ``Base.metadata``.  The legacy ``app.modules.workflow`` models are
-kept on ``DeferredBase`` and must not be imported here.
+Importing this package registers ALL P1 tables plus the canonical P2
+workflow pipeline on ``Base.metadata``. Alembic ``env.py`` imports this
+module — that is how autogenerate and ``upgrade head`` see every model
+(P1-01-04 requirement).
 
 Table naming follows the task specs exactly:
 universities, it_directions, it_programs, vendors, it_products, contracts,
 licenses, responsibles, university_responsibles, teachers,
 teacher_qualifications, teacher_certificates, teacher_programs, students,
 university_programs, university_products, meetings, documents,
-interaction_notes, meeting_documents, health_score_snapshots (P2-09-01).
-
-Workflow runtime tables: workflow_templates, workflow_stages,
-workflow_instances, instance_stages, transitions,
-comments, tasks, attachments.
+interaction_notes, meeting_documents, workflow_templates, workflow_stages,
+workflow_instances, workflow_stage_transitions, workflow_comments,
+workflow_attachments, workflow_tasks, instance_stages,
+health_score_snapshots (P2-09-01, migration 000015).
 """
 
 from app.models.catalog import (  # noqa: F401
@@ -43,16 +43,17 @@ from app.models.teachers import (  # noqa: F401
     TeacherProgram,
     TeacherQualification,
 )
-from app.modules.audit.models import AuditEvent  # noqa: F401
-from app.models.workflow import (  # noqa: F401
+from app.models.workflow_templates import (  # noqa: F401
+    WorkflowStage,
+    WorkflowTemplate,
+)
+from app.models.workflow_instances import (  # noqa: F401
+    InstanceStage,
     WorkflowAttachment,
     WorkflowComment,
     WorkflowInstance,
-    WorkflowInstanceStage,
+    WorkflowStageTransition,
     WorkflowTask,
-    WorkflowTemplate,
-    WorkflowTemplateStage,
-    WorkflowTransition,
 )
 
 __all__ = [
@@ -75,15 +76,14 @@ __all__ = [
     "Meeting",
     "MeetingDocument",
     "Document",
-    "HealthScoreSnapshot",
     "InteractionNote",
-    "AuditEvent",
     "WorkflowTemplate",
-    "WorkflowTemplateStage",
+    "WorkflowStage",
     "WorkflowInstance",
-    "WorkflowInstanceStage",
-    "WorkflowTransition",
+    "WorkflowStageTransition",
     "WorkflowComment",
-    "WorkflowTask",
     "WorkflowAttachment",
+    "WorkflowTask",
+    "InstanceStage",
+    "HealthScoreSnapshot",
 ]

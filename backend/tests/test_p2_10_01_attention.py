@@ -1,13 +1,13 @@
-"""P2-10-01: attention rules — тесты всех 5 правил (SQLite)."""
+"""P2-10-01: attention rules — тесты всех 5 правил (PostgreSQL)."""
 
+import os
 from datetime import date, datetime, timedelta, timezone
 from uuid import uuid4
 
-from sqlalchemy import create_engine, event
+import pytest
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401 (register metadata)
-from app.db.base import Base
 from app.models.catalog import (
     ITDirection,
     ITProduct,
@@ -18,27 +18,30 @@ from app.models.catalog import (
 )
 from app.models.interactions import Document, UniversityProgram
 from app.models.teachers import Teacher, TeacherCertificate
-from app.models.workflow import (
-    WorkflowInstance,
-    WorkflowInstanceStage,
-    WorkflowTemplate,
-    WorkflowTemplateStage,
-)
+from app.models.workflow_instances import InstanceStage, WorkflowInstance
+from app.models.workflow_templates import WorkflowTemplate, WorkflowStage
 from app.modules.health_score.attention import get_attention_items
 
 TODAY = date(2026, 9, 20)
 NOW = datetime(2026, 9, 20, 12, 0, tzinfo=timezone.utc)
 
+TEST_URL = os.getenv("TEST_DATABASE_URL", "sqlite://")
 
-def _mem_session() -> Session:
-    eng = create_engine("sqlite:///:memory:")
 
-    @event.listens_for(eng, "connect")
-    def _fk_on(dbapi_conn, _rec):  # pragma: no cover
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
+@pytest.fixture()
+def engine():
+    """PostgreSQL integration DB (canonical SQL migrations; skips w/o PG)."""
+    from tests.db_helpers import require_pg_engine
 
-    Base.metadata.create_all(eng)
-    return Session(eng)
+    eng = require_pg_engine(TEST_URL)
+    yield eng
+    eng.dispose()
+
+
+@pytest.fixture()
+def db(engine):
+    with Session(engine) as session:
+        yield session
 
 
 def _uni(db: Session, name="Вуз A-1") -> University:
@@ -48,33 +51,30 @@ def _uni(db: Session, name="Вуз A-1") -> University:
     return uni
 
 
-def test_empty_university_no_items():
-    db = _mem_session()
+def test_empty_university_no_items(db):
     uni = _uni(db)
     db.commit()
     assert get_attention_items(db, uni.id, TODAY) == []
-    db.close()
 
 
-def test_overdue_stage_and_expired_document():
-    db = _mem_session()
+def test_overdue_stage_and_expired_document(db):
     uni = _uni(db)
-    template = WorkflowTemplate(id=uuid4(), code="A-1", name="Ш", created_by_keycloak_sub="t")
+    template = WorkflowTemplate(id=uuid4(), name="Ш")
     db.add(template)
     db.flush()
-    tpl_stage = WorkflowTemplateStage(
-        id=uuid4(), template_id=template.id, code="s1", name="Подписание", order_index=0)
+    tpl_stage = WorkflowStage(
+        id=uuid4(), template_id=template.id, name="Подписание", order_index=1)
     db.add(tpl_stage)
     db.flush()
     instance = WorkflowInstance(
         id=uuid4(), template_id=template.id, university_id=uni.id,
-        status="active", started_at=NOW - timedelta(days=30),
-        created_by_keycloak_sub="t", updated_by_keycloak_sub="t")
+        status="active")
     db.add(instance)
     db.flush()
-    db.add(WorkflowInstanceStage(
+    db.add(InstanceStage(
         id=uuid4(), instance_id=instance.id, template_stage_id=tpl_stage.id,
-        order_index=0, status="current", due_date=NOW - timedelta(days=5)))
+        order_index=1, name="Подписание", status="pending",
+        due_date=TODAY - timedelta(days=5)))
     db.add(Document(
         id=uuid4(), university_id=uni.id, document_type="contract",
         title="Договор", file_path="/f", file_name="d.pdf",
@@ -85,11 +85,9 @@ def test_overdue_stage_and_expired_document():
     codes = [i.code for i in items]
     assert codes == ["OVERDUE_STAGE", "EXPIRED_DOCUMENT"]  # high first
     assert "просрочен на 5 дн" in items[0].description
-    db.close()
 
 
-def test_expiring_license_and_certificate_and_launch():
-    db = _mem_session()
+def test_expiring_license_and_certificate_and_launch(db):
     uni = _uni(db)
     direction = ITDirection(id=uuid4(), code="A-1", name="Направление")
     vendor = Vendor(id=uuid4(), name="Вендор")
@@ -117,11 +115,9 @@ def test_expiring_license_and_certificate_and_launch():
     codes = sorted(i.code for i in items)
     assert codes == ["EXPIRING_CERTIFICATE", "EXPIRING_LICENSE", "LAUNCH_AT_RISK"]
     assert all(i.severity == "medium" for i in items)
-    db.close()
 
 
-def test_far_future_license_ignored_and_limit():
-    db = _mem_session()
+def test_far_future_license_ignored_and_limit(db):
     uni = _uni(db)
     vendor = Vendor(id=uuid4(), name="Вендор-2")
     product = ITProduct(id=uuid4(), vendor_id=vendor.id, name="Продукт-2")
@@ -133,4 +129,3 @@ def test_far_future_license_ignored_and_limit():
         expires_at=TODAY + timedelta(days=200)))
     db.commit()
     assert get_attention_items(db, uni.id, TODAY) == []
-    db.close()

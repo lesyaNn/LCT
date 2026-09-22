@@ -1,30 +1,27 @@
 """P2-08-01: endpoint health-score — HTTP тесты (404/200/кэш)."""
 
+import os
 from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401 (register metadata)
 from app.core.security import CurrentUser, get_current_user
-from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 from app.models.catalog import University
 from app.modules.health_score import cache as health_cache
 
+TEST_URL = os.getenv("TEST_DATABASE_URL", "sqlite://")
+
 
 @pytest.fixture()
-def client(tmp_path):
-    eng = create_engine(f"sqlite:///{tmp_path}/hs.db")
+def client():
+    from tests.db_helpers import require_pg_engine
 
-    @event.listens_for(eng, "connect")
-    def _fk_on(dbapi_conn, _rec):  # pragma: no cover
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    Base.metadata.create_all(eng)
+    eng = require_pg_engine(TEST_URL)
 
     def _override():
         with Session(eng) as session:

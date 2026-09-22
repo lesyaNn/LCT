@@ -1,24 +1,22 @@
-"""P2-11-03: Health Score edge cases, границы 0/100, детерминизм (SQLite)."""
+"""P2-11-03: Health Score edge cases, границы 0/100, детерминизм (PostgreSQL)."""
 
+import os
 from datetime import date, datetime, timedelta, timezone
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401 (register metadata)
-from app.db.base import Base
 from app.models.catalog import ITDirection, ITProgram, University
 from app.models.interactions import Document, UniversityProgram
 from app.models.teachers import Teacher, TeacherCertificate, TeacherProgram
-from app.models.workflow import (
+from app.models.workflow_instances import (
+    InstanceStage,
     WorkflowInstance,
-    WorkflowInstanceStage,
     WorkflowTask,
-    WorkflowTemplate,
-    WorkflowTemplateStage,
 )
+from app.models.workflow_templates import WorkflowTemplate, WorkflowStage
 from app.modules.health_score.aggregate import aggregate_scores
 from app.modules.health_score.health_service import build_reasons, calculate_health_score
 from app.modules.health_score.schemas import HealthScoreCounters
@@ -27,19 +25,23 @@ from app.modules.health_score.status import get_health_status
 TODAY = date(2026, 9, 20)
 NOW = datetime(2026, 9, 20, 12, 0, tzinfo=timezone.utc)
 
+TEST_URL = os.getenv("TEST_DATABASE_URL", "sqlite://")
+
 
 @pytest.fixture()
-def db():
-    eng = create_engine("sqlite:///:memory:")
+def engine():
+    """PostgreSQL integration DB (canonical SQL migrations; skips w/o PG)."""
+    from tests.db_helpers import require_pg_engine
 
-    @event.listens_for(eng, "connect")
-    def _fk_on(dbapi_conn, _rec):  # pragma: no cover
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    Base.metadata.create_all(eng)
-    with Session(eng) as session:
-        yield session
+    eng = require_pg_engine(TEST_URL)
+    yield eng
     eng.dispose()
+
+
+@pytest.fixture()
+def db(engine):
+    with Session(engine) as session:
+        yield session
 
 
 def _uni(db: Session, name="Вуз Edge") -> University:
@@ -62,18 +64,16 @@ def _program(db: Session, uni_id, *, status="active", launch=None):
 
 
 def _workflow(db: Session, uni_id):
-    template = WorkflowTemplate(id=uuid4(), code=f"W-{uuid4().hex[:8]}",
-                                name="Ш", created_by_keycloak_sub="t")
+    template = WorkflowTemplate(id=uuid4(), name="Ш")
     db.add(template)
     db.flush()
-    tpl_stage = WorkflowTemplateStage(
-        id=uuid4(), template_id=template.id, code="s1", name="Этап", order_index=0)
+    tpl_stage = WorkflowStage(
+        id=uuid4(), template_id=template.id, name="Этап", order_index=1)
     db.add(tpl_stage)
     db.flush()
     instance = WorkflowInstance(
         id=uuid4(), template_id=template.id, university_id=uni_id,
-        status="active", started_at=NOW - timedelta(days=60),
-        created_by_keycloak_sub="t", updated_by_keycloak_sub="t")
+        status="active")
     db.add(instance)
     db.flush()
     return instance, tpl_stage
@@ -119,8 +119,8 @@ def test_all_critical_tasks_T_zero(db):
     for _ in range(13):  # 13 * 8 = 104 → floor 0
         db.add(WorkflowTask(
             id=uuid4(), instance_id=instance.id, title="Задача",
-            due_date=NOW - timedelta(days=30), status="open",
-            priority="normal", created_by_keycloak_sub="t"))
+            deadline=(NOW - timedelta(days=30)).date(), status="open",
+            priority="normal"))
     db.commit()
     resp = calculate_health_score(db, uni.id, TODAY, NOW)
     assert resp.breakdown.tasks == 0
@@ -145,10 +145,11 @@ def test_all_documents_expired_D_zero(db):
 def test_all_stages_late_S_zero(db):
     uni = _uni(db)
     instance, tpl_stage = _workflow(db, uni.id)
-    db.add(WorkflowInstanceStage(
+    db.add(InstanceStage(
         id=uuid4(), instance_id=instance.id, template_stage_id=tpl_stage.id,
-        order_index=0, status="completed",
-        due_date=NOW - timedelta(days=10), completed_at=NOW - timedelta(days=1)))
+        order_index=1, name="Этап", status="completed",
+        due_date=(NOW - timedelta(days=10)).date(),
+        completed_at=NOW - timedelta(days=1)))
     db.commit()
     resp = calculate_health_score(db, uni.id, TODAY, NOW)
     assert resp.breakdown.stages == 0

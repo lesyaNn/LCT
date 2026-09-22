@@ -1,13 +1,13 @@
 """P2-07-05: компонент E — unit + DB тесты (только P1 teachers/programs)."""
 
+import os
 from datetime import date, timedelta
 from uuid import uuid4
 
-from sqlalchemy import create_engine
+import pytest
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401 (register metadata)
-from app.db.base import Base
 from app.models.catalog import ITDirection, ITProgram, University
 from app.models.interactions import UniversityProgram
 from app.models.teachers import Teacher, TeacherCertificate, TeacherProgram
@@ -15,11 +15,23 @@ from app.modules.health_score.educators_score import calc_E, score_educators
 
 TODAY = date(2026, 9, 20)
 
+TEST_URL = os.getenv("TEST_DATABASE_URL", "sqlite://")
 
-def _mem_session() -> Session:
-    eng = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(eng)
-    return Session(eng)
+
+@pytest.fixture()
+def engine():
+    """PostgreSQL integration DB (canonical SQL migrations; skips w/o PG)."""
+    from tests.db_helpers import require_pg_engine
+
+    eng = require_pg_engine(TEST_URL)
+    yield eng
+    eng.dispose()
+
+
+@pytest.fixture()
+def db(engine):
+    with Session(engine) as session:
+        yield session
 
 
 def _seed_minimal(db: Session):
@@ -82,17 +94,14 @@ def test_score_educators_empty_is_100():
     assert score_educators([True, True, False]) == (67, 2, 3)
 
 
-def test_calc_E_no_active_programs_is_100():
-    db = _mem_session()
+def test_calc_E_no_active_programs_is_100(db):
     uni = University(id=uuid4(), name="Вуз E-0")
     db.add(uni)
     db.commit()
     assert calc_E(db, uni.id, TODAY) == (100, 0, 0)
-    db.close()
 
 
-def test_calc_E_counts_only_active_programs_and_mandatory():
-    db = _mem_session()
+def test_calc_E_counts_only_active_programs_and_mandatory(db):
     uni, prog_active, prog_arch = _seed_minimal(db)
     # READY на активной программе
     _add_teacher(db, uni.id, prog_active.id, mandatory_valid=True)
@@ -107,13 +116,10 @@ def test_calc_E_counts_only_active_programs_and_mandatory():
     score, ready, total = calc_E(db, uni.id, TODAY)
     assert (ready, total) == (1, 2)
     assert score == 50
-    db.close()
 
 
-def test_calc_E_expired_is_not_ready():
-    db = _mem_session()
+def test_calc_E_expired_is_not_ready(db):
     uni, prog_active, _ = _seed_minimal(db)
     _add_teacher(db, uni.id, prog_active.id, mandatory_valid=True, expired=True)
     db.commit()
     assert calc_E(db, uni.id, TODAY) == (0, 0, 1)
-    db.close()

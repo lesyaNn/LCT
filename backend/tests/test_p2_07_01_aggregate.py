@@ -1,6 +1,10 @@
 """P2-07-01: формула и оркестрация — unit тесты."""
 
+import os
 from uuid import uuid4
+
+import pytest
+from sqlalchemy.orm import Session
 
 from app.modules.health_score.aggregate import (
     WEIGHTS,
@@ -8,6 +12,24 @@ from app.modules.health_score.aggregate import (
     components_for_university,
 )
 from app.modules.health_score.schemas import HealthScoreResponse
+
+TEST_URL = os.getenv("TEST_DATABASE_URL", "sqlite://")
+
+
+@pytest.fixture()
+def engine():
+    """PostgreSQL integration DB (canonical SQL migrations; skips w/o PG)."""
+    from tests.db_helpers import require_pg_engine
+
+    eng = require_pg_engine(TEST_URL)
+    yield eng
+    eng.dispose()
+
+
+@pytest.fixture()
+def db(engine):
+    with Session(engine) as session:
+        yield session
 
 
 def test_weights_sum_to_one():
@@ -47,26 +69,18 @@ def test_response_schema_round_trip():
     assert resp.model_dump(mode="json")["breakdown"]["tasks"] == 65
 
 
-def test_components_for_university_empty_db():
-    """Пустой вуз (SQLite): все компоненты нейтральны, структура полная."""
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import Session
-
+def test_components_for_university_empty_db(db):
+    """Пустой вуз (PostgreSQL): все компоненты нейтральны, счётчики нулевые."""
     import app.models  # noqa: F401 (register metadata)
-    from app.db.base import Base
     from app.models.catalog import University
     from uuid import uuid4
 
-    eng = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(eng)
-    with Session(eng) as db:
-        uni = University(id=uuid4(), name="Вуз A-0")
-        db.add(uni)
-        db.commit()
-        breakdown, counters = components_for_university(db, uni.id)
+    uni = University(id=uuid4(), name="Вуз A-0")
+    db.add(uni)
+    db.commit()
+    breakdown, counters = components_for_university(db, uni.id)
     assert (breakdown.tasks, breakdown.documents, breakdown.stages,
             breakdown.teachers, breakdown.launch) == (100, 100, 100, 100, 100)
     assert aggregate_scores(100, 100, 100, 100, 100) == 100
     assert counters.overdue_critical_tasks == 0
     assert counters.total_required_documents == 0
-    eng.dispose()

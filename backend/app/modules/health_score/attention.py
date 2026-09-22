@@ -1,7 +1,7 @@
 """P2-10-01: «Что требует внимания» — детерминированные правила без AI.
 
 5 правил (WOW для демо, тексты — сразу для UI):
-1. ``OVERDUE_STAGE`` — этап active-instance (current/pending) с прошедшим due;
+1. ``OVERDUE_STAGE`` — открытый этап active-instance (``pending``) с прошедшим due;
 2. ``EXPIRING_LICENSE`` — лицензия истекает в 0–30 дн. (31–60 дн. → low);
 3. ``EXPIRED_DOCUMENT`` — обязательный документ просрочен;
 4. ``EXPIRING_CERTIFICATE`` — mandatory-сертификат истекает в 1–30 дн.;
@@ -27,7 +27,7 @@ from app.models.teachers import (
     TeacherCertificate,
     TeacherQualification,
 )
-from app.models.workflow import WorkflowInstance, WorkflowInstanceStage, WorkflowTemplateStage
+from app.models.workflow_instances import InstanceStage, WorkflowInstance
 from app.modules.health_score.documents_score import VALID_DOCUMENT_STATUSES, required_document_types
 from app.modules.health_score.schemas import AttentionItem
 from app.services.teacher_readiness import compute_teacher_readiness
@@ -89,21 +89,19 @@ def get_attention_items(
         ).scalars().all()
     )
     if instance_ids:
+        # Runtime-снапшот хранит денормализованное имя — join к шаблону
+        # не нужен; открыта только строка "pending" (B1/B2-семантика:
+        # current определяется указателем instance, а не статусом).
         stage_rows = list(
             db.execute(
                 select(
-                    WorkflowInstanceStage.id,
-                    WorkflowTemplateStage.name,
-                    WorkflowInstanceStage.due_date,
-                )
-                .join(
-                    WorkflowTemplateStage,
-                    WorkflowTemplateStage.id == WorkflowInstanceStage.template_stage_id,
-                )
-                .where(
-                    WorkflowInstanceStage.instance_id.in_(instance_ids),
-                    WorkflowInstanceStage.status.in_(["current", "pending"]),
-                    WorkflowInstanceStage.due_date.is_not(None),
+                    InstanceStage.id,
+                    InstanceStage.name,
+                    InstanceStage.due_date,
+                ).where(
+                    InstanceStage.instance_id.in_(instance_ids),
+                    InstanceStage.status == "pending",
+                    InstanceStage.due_date.is_not(None),
                 )
             ).all()
         )

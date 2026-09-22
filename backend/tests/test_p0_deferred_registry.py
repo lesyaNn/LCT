@@ -1,7 +1,9 @@
 """P0-1 guard: one schema universe + deferred modules stay unmounted.
 
 Pins the resolution of the "two schema universes" blocker:
-* canonical ``Base.metadata`` contains exactly the 30 SQL-managed tables;
+* canonical ``Base.metadata`` contains exactly the 30 SQL-managed tables
+  (21 P1 tables + 8 B1 workflow tables from 000011-000014 + 1 P2 health
+  snapshot table ``health_score_snapshots`` from 000015);
 * pre-UUID / stub models live on ``DeferredBase`` metadata only;
 * deferred routers are importable but NOT mounted in the production app;
 * ``AuditEvent.user_id/entity_id`` accept Keycloak ``sub`` (TEXT, 000010).
@@ -13,26 +15,56 @@ Pure-unit: no database, no Keycloak.
 """
 
 import app.models  # noqa: F401  (register canon metadata)
-from app.api.router import v1
 from app.db.base import Base
 from app.db.deferred import DeferredBase
 from app.main import app
 
-CANON_TABLES = frozenset({
-    "universities", "it_directions", "it_programs", "vendors", "it_products",
-    "contracts", "licenses", "responsibles", "university_responsibles",
-    "teachers", "teacher_qualifications", "teacher_certificates",
-    "teacher_programs", "students", "university_programs",
-    "university_products", "meetings", "meeting_documents", "documents",
-    "interaction_notes", "audit_events", "health_score_snapshots",
-    "workflow_templates", "workflow_stages", "workflow_instances",
-    "instance_stages", "transitions", "comments", "tasks", "attachments",
-})
+CANON_TABLES = frozenset(
+    {
+        "universities",
+        "it_directions",
+        "it_programs",
+        "vendors",
+        "it_products",
+        "contracts",
+        "licenses",
+        "responsibles",
+        "university_responsibles",
+        "teachers",
+        "teacher_qualifications",
+        "teacher_certificates",
+        "teacher_programs",
+        "students",
+        "university_programs",
+        "university_products",
+        "meetings",
+        "meeting_documents",
+        "documents",
+        "interaction_notes",
+        "audit_events",
+        "workflow_templates",
+        "workflow_stages",
+        "workflow_instances",
+        "workflow_stage_transitions",
+        "workflow_comments",
+        "workflow_attachments",
+        "workflow_tasks",
+        "instance_stages",
+        "health_score_snapshots",
+    }
+)
 
-DEFERRED_TABLES = frozenset({
-    "workflow_statuses", "workflow_transitions", "workflows", "tasks",
-    "files", "health_score_history", "users",
-})
+DEFERRED_TABLES = frozenset(
+    {
+        "workflow_statuses",
+        "workflow_transitions",
+        "workflows",
+        "tasks",
+        "files",
+        "health_score_history",
+        "users",
+    }
+)
 
 # Router prefixes (without the /api/v1 mount prefix) that must stay
 # unmounted until the reactivation checklist in docs/AUDIT.md (§0) is done.
@@ -72,13 +104,7 @@ def test_canon_metadata_is_exactly_the_sql_managed_set():
 
 
 def test_deferred_tables_not_on_canon_metadata():
-    # Canonical UUID tasks and legacy integer tasks share only the SQL name.
-    assert not ((DEFERRED_TABLES - {"tasks"}) & frozenset(Base.metadata.tables))
-    from app.models.workflow import WorkflowTask
-    from app.modules.workflow.models import Task
-
-    assert WorkflowTask.__table__ is not Task.__table__
-    assert Task.__table__.metadata is DeferredBase.metadata
+    assert not (DEFERRED_TABLES & frozenset(Base.metadata.tables))
 
 
 def test_deferred_models_isolated_on_deferred_base():
@@ -87,10 +113,16 @@ def test_deferred_models_isolated_on_deferred_base():
     import app.modules.identity.models as identity_models
     import app.modules.workflow.models as workflow_models
 
-    for mod in (documents_models, health_score_models,
-                identity_models, workflow_models):
-        for name in ("FileMeta", "HealthScoreHistory", "User",
-                     "Workflow", "WorkflowStatus", "WorkflowTransition", "Task"):
+    for mod in (documents_models, health_score_models, identity_models, workflow_models):
+        for name in (
+            "FileMeta",
+            "HealthScoreHistory",
+            "User",
+            "Workflow",
+            "WorkflowStatus",
+            "WorkflowTransition",
+            "Task",
+        ):
             cls = getattr(mod, name, None)
             if cls is not None:
                 assert issubclass(cls, DeferredBase), name
@@ -99,10 +131,18 @@ def test_deferred_models_isolated_on_deferred_base():
 
 def test_mounted_routers_are_only_the_production_contract():
     allowed = (
-        "/api/v1/auth", "/api/v1/import", "/api/v1/catalog",
-        "/api/v1/universities", "/api/v1/directions", "/api/v1/programs",
-        "/api/v1/products", "/api/v1/vendors", "/api/v1/responsibles",
-        "/api/v1/teachers", "/api/v1/workflow", "/api/v1/health-score",
+        "/api/v1/auth",
+        "/api/v1/import",
+        "/api/v1/catalog",
+        "/api/v1/universities",
+        "/api/v1/directions",
+        "/api/v1/programs",
+        "/api/v1/products",
+        "/api/v1/vendors",
+        "/api/v1/responsibles",
+        "/api/v1/teachers",
+        "/api/v1/workflow",
+        "/api/v1/health-score",
     )
     paths = _mounted_api_paths()
     assert all(path.startswith(allowed) for path in paths), paths
@@ -159,4 +199,3 @@ def test_audit_service_coerces_identity_to_str():
     assert isinstance(ev, AuditEvent)
     assert isinstance(seen["ev"].user_id, str)
     assert isinstance(seen["ev"].entity_id, str)
-
