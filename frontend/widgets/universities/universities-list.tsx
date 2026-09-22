@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
   flexRender,
@@ -14,7 +14,9 @@ import {
   type Updater,
 } from '@tanstack/react-table';
 import Attention from '@atomaro/icons/24/action/Attention';
+import Filter from '@atomaro/icons/24/action/Filter';
 import Search from '@atomaro/icons/24/action/Search';
+import CloseSmall from '@atomaro/icons/24/navigation/CloseSmall';
 import ChevronDown from '@atomaro/icons/24/navigation/ChevronDown';
 import ChevronSort from '@atomaro/icons/24/navigation/ChevronSort';
 import SortDown from '@atomaro/icons/24/editor/SortDown';
@@ -33,6 +35,7 @@ import {
   universitiesQueryKey,
   type UniversityListItem,
   type UniversityListQuery,
+  type UniversityFilters,
   type UniversitySortColumn,
 } from '@/shared/lib/universities-repository';
 import styles from './universities-list.module.css';
@@ -51,9 +54,22 @@ type SearchParamsLike = {
 };
 
 type UniversityUrlState = UniversityListQuery;
+type QueryPatch = Record<string, string | number | string[] | null>;
 
 const SORT_COLUMNS = new Set<UniversitySortColumn>(['name', 'responsible', 'programs', 'stage', 'health_score', 'last_interaction']);
 const HEALTH_STATUSES = new Set<HealthStatus>(['green', 'yellow', 'red']);
+
+function normalizeFilters(filters: UniversityFilters): UniversityFilters {
+  return {
+    ...filters,
+    search: filters.search.trim(),
+    universityIds: [...filters.universityIds].sort(),
+    programIds: [...filters.programIds].sort(),
+    productIds: [...filters.productIds].sort(),
+    responsibleIds: [...filters.responsibleIds].sort(),
+    healthStatuses: [...filters.healthStatuses].sort(),
+  };
+}
 
 function parsePositiveInteger(value: string | null, fallback: number): number {
   const parsed = Number(value);
@@ -62,22 +78,109 @@ function parsePositiveInteger(value: string | null, fallback: number): number {
 
 function parseUrlState(searchParams: SearchParamsLike): UniversityUrlState {
   const sortValue = searchParams.get('sort');
-  const healthStatuses = (searchParams.get('health_status') ?? '')
-    .split(',')
-    .filter((value): value is HealthStatus => HEALTH_STATUSES.has(value as HealthStatus));
+  const parseList = (key: string) => (searchParams.get(key) ?? '').split(',').map((value) => value.trim()).filter(Boolean);
+  const healthStatuses = parseList('health_status').filter((value): value is HealthStatus => HEALTH_STATUSES.has(value as HealthStatus));
   const pageSizeValue = parsePositiveInteger(searchParams.get('page_size'), DEFAULT_PAGE_SIZE);
+  const rawDateFrom = searchParams.get('date_from') ?? '';
+  const rawDateTo = searchParams.get('date_to') ?? '';
+  const dateFrom = rawDateFrom && rawDateTo && rawDateFrom > rawDateTo ? rawDateTo : rawDateFrom;
+  const dateTo = rawDateFrom && rawDateTo && rawDateFrom > rawDateTo ? rawDateFrom : rawDateTo;
 
   return {
-    search: searchParams.get('search') ?? '',
-    city: searchParams.get('city') ?? '',
-    responsible: searchParams.get('responsible') ?? '',
-    healthStatuses,
-    stage: searchParams.get('stage') ?? '',
+      filters: normalizeFilters({
+      search: searchParams.get('search') ?? '',
+      city: searchParams.get('city') ?? '',
+      universityIds: parseList('university'),
+      programIds: parseList('program'),
+      productIds: parseList('product'),
+      responsibleIds: parseList('responsible'),
+      healthStatuses,
+      workflowStageId: searchParams.get('stage') ?? '',
+      dateFrom,
+      dateTo,
+      }),
     sort: SORT_COLUMNS.has(sortValue as UniversitySortColumn) ? sortValue as UniversitySortColumn : null,
     order: searchParams.get('order') === 'desc' ? 'desc' : 'asc',
     page: parsePositiveInteger(searchParams.get('page'), 1),
     pageSize: PAGE_SIZE_OPTIONS.includes(pageSizeValue) ? pageSizeValue : DEFAULT_PAGE_SIZE,
   };
+}
+
+const EMPTY_FILTERS: UniversityFilters = {
+  search: '',
+  city: '',
+  universityIds: [],
+  programIds: [],
+  productIds: [],
+  responsibleIds: [],
+  healthStatuses: [],
+  workflowStageId: '',
+  dateFrom: '',
+  dateTo: '',
+};
+
+const FILTER_STORAGE_KEY = 'universities.filters.v1';
+
+function filtersFromState(state: UniversityUrlState): UniversityFilters {
+  return state.filters;
+}
+
+function hasActiveFilters(filters: UniversityFilters): boolean {
+  return Boolean(
+    filters.search || filters.city || filters.universityIds.length || filters.programIds.length ||
+    filters.productIds.length || filters.responsibleIds.length || filters.healthStatuses.length ||
+    filters.workflowStageId || filters.dateFrom || filters.dateTo,
+  );
+}
+
+function parseStoredFilters(value: string | null): UniversityFilters | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as Partial<UniversityFilters>;
+    if (!parsed || typeof parsed !== 'object') return null;
+    const storedFilters: UniversityFilters = {
+      ...EMPTY_FILTERS,
+      ...parsed,
+      universityIds: Array.isArray(parsed.universityIds) ? parsed.universityIds.filter((item): item is string => typeof item === 'string') : [],
+      programIds: Array.isArray(parsed.programIds) ? parsed.programIds.filter((item): item is string => typeof item === 'string') : [],
+      productIds: Array.isArray(parsed.productIds) ? parsed.productIds.filter((item): item is string => typeof item === 'string') : [],
+      responsibleIds: Array.isArray(parsed.responsibleIds) ? parsed.responsibleIds.filter((item): item is string => typeof item === 'string') : [],
+      healthStatuses: Array.isArray(parsed.healthStatuses) ? parsed.healthStatuses.filter((item): item is HealthStatus => HEALTH_STATUSES.has(item as HealthStatus)) : [],
+      search: typeof parsed.search === 'string' ? parsed.search : '',
+      city: typeof parsed.city === 'string' ? parsed.city : '',
+      workflowStageId: typeof parsed.workflowStageId === 'string' ? parsed.workflowStageId : '',
+      dateFrom: typeof parsed.dateFrom === 'string' ? parsed.dateFrom : '',
+      dateTo: typeof parsed.dateTo === 'string' ? parsed.dateTo : '',
+    };
+    if (storedFilters.dateFrom && storedFilters.dateTo && storedFilters.dateFrom > storedFilters.dateTo) {
+      [storedFilters.dateFrom, storedFilters.dateTo] = [storedFilters.dateTo, storedFilters.dateFrom];
+    }
+    return normalizeFilters(storedFilters);
+  } catch {
+    return null;
+  }
+}
+
+function filtersPatch(filters: UniversityFilters): QueryPatch {
+  return {
+    search: filters.search || null,
+    city: filters.city || null,
+    university: filters.universityIds,
+    program: filters.programIds,
+    product: filters.productIds,
+    responsible: filters.responsibleIds,
+    health_status: filters.healthStatuses,
+    stage: filters.workflowStageId || null,
+    date_from: filters.dateFrom || null,
+    date_to: filters.dateTo || null,
+    page: 1,
+  };
+}
+
+const URL_FILTER_KEYS = ['search', 'city', 'university', 'program', 'product', 'responsible', 'health_status', 'stage', 'date_from', 'date_to'];
+
+function hasUrlFilterParams(searchParams: SearchParamsLike): boolean {
+  return URL_FILTER_KEYS.some((key) => searchParams.get(key) !== null);
 }
 
 function updateSearchParams(
@@ -155,16 +258,80 @@ function SortIndicator({ sorted }: { sorted: false | 'asc' | 'desc' }) {
   return <ChevronSort size={16} fill="currentColor" />;
 }
 
-function Filters({ state, searchInput, setSearchInput, onPatch, onReset, hasFilters }: {
+function MultiSelectField({
+  label,
+  options,
+  values,
+  onChange,
+  renderOption,
+  searchable = false,
+}: {
+  label: string;
+  options: Array<{ id: string; name: string }>;
+  values: string[];
+  onChange: (values: string[]) => void;
+  renderOption?: (option: { id: string; name: string }) => ReactNode;
+  searchable?: boolean;
+}) {
+  const [optionSearch, setOptionSearch] = useState('');
+  const visibleOptions = searchable
+    ? options.filter((option) => option.name.toLocaleLowerCase('ru-RU').includes(optionSearch.trim().toLocaleLowerCase('ru-RU')))
+    : options;
+
+  return (
+    <details className={styles.multiselect}>
+      <summary>
+        <span>{label}{values.length ? ` (${values.length})` : ''}</span>
+        <ChevronDown size={16} fill="currentColor" />
+      </summary>
+      <div className={styles.multiselectMenu}>
+        {searchable ? <div className={styles.optionSearch}><Search size={16} fill="currentColor" /><input type="search" value={optionSearch} onChange={(event) => setOptionSearch(event.target.value)} placeholder="Найти в списке" aria-label={`Поиск в поле «${label}»`} /></div> : null}
+        {visibleOptions.map((option) => (
+          <label key={option.id}>
+            <input
+              type="checkbox"
+              checked={values.includes(option.id)}
+              onChange={(event) => onChange(event.target.checked ? [...values, option.id] : values.filter((value) => value !== option.id))}
+            />
+            {renderOption ? renderOption(option) : <span>{option.name}</span>}
+          </label>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function Filters({ state, searchInput, setSearchInput, onPatch, onReset, hasFilters, onClose }: {
   state: UniversityUrlState;
   searchInput: string;
   setSearchInput: (value: string) => void;
-  onPatch: (patch: Record<string, string | number | string[] | null>) => void;
+  onPatch: (patch: QueryPatch) => void;
   onReset: () => void;
   hasFilters: boolean;
+  onClose: () => void;
 }) {
+  const filters = filtersFromState(state);
+  const updateDateRange = (key: 'date_from' | 'date_to', value: string) => {
+    if (key === 'date_from' && value && filters.dateTo && value > filters.dateTo) {
+      onPatch({ date_from: value, date_to: value, page: 1 });
+      return;
+    }
+    if (key === 'date_to' && value && filters.dateFrom && value < filters.dateFrom) {
+      onPatch({ date_from: value, date_to: value, page: 1 });
+      return;
+    }
+    onPatch({ [key]: value, page: 1 });
+  };
+
   return (
     <section className={styles.filters} aria-label="Фильтры списка вузов">
+      <div className={styles.filterPanelHeader}>
+        <div>
+          <h2 id="universities-filter-title">Фильтры</h2>
+          <p>Уточните список вузов по организации, продукту и состоянию.</p>
+        </div>
+        <button className={styles.filterCloseButton} type="button" onClick={onClose} aria-label="Закрыть фильтры"><CloseSmall size={20} fill="currentColor" /></button>
+      </div>
       <div className={`${styles.field} ${styles.searchField}`}>
         <label htmlFor="universities-search">Поиск по названию вуза</label>
         <div className={styles.inputWrap}>
@@ -172,52 +339,64 @@ function Filters({ state, searchInput, setSearchInput, onPatch, onReset, hasFilt
           <input id="universities-search" type="search" value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Поиск по названию вуза" />
         </div>
       </div>
+      <MultiSelectField label="Вуз" options={universityFilterOptions.universities} values={filters.universityIds} onChange={(values) => onPatch({ university: values, page: 1 })} searchable />
+      <MultiSelectField label="Программа" options={universityFilterOptions.programs} values={filters.programIds} onChange={(values) => onPatch({ program: values, page: 1 })} />
+      <MultiSelectField label="Продукт" options={universityFilterOptions.products} values={filters.productIds} onChange={(values) => onPatch({ product: values, page: 1 })} />
       <label className={styles.field}>
         <span>Город</span>
-        <select value={state.city} onChange={(event) => onPatch({ city: event.target.value, page: 1 })}>
+        <select value={filters.city} onChange={(event) => onPatch({ city: event.target.value, page: 1 })}>
           <option value="">Все города</option>
           {universityFilterOptions.cities.map((city) => <option key={city} value={city}>{city}</option>)}
         </select>
       </label>
-      <label className={styles.field}>
-        <span>Ответственный</span>
-        <select value={state.responsible} onChange={(event) => onPatch({ responsible: event.target.value, page: 1 })}>
-          <option value="">Все ответственные</option>
-          {universityFilterOptions.responsibles.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
-        </select>
-      </label>
-      <details className={styles.multiselect}>
-        <summary>
-          <span>Health Score{state.healthStatuses.length ? ` (${state.healthStatuses.length})` : ''}</span>
-          <ChevronDown size={16} fill="currentColor" />
-        </summary>
-        <div className={styles.multiselectMenu}>
-          {HEALTH_STATUS_OPTIONS.map((option) => (
-            <label key={option.value}>
-              <input
-                type="checkbox"
-                checked={state.healthStatuses.includes(option.value)}
-                onChange={(event) => {
-                  const next = event.target.checked
-                    ? [...state.healthStatuses, option.value]
-                    : state.healthStatuses.filter((value) => value !== option.value);
-                  onPatch({ health_status: next, page: 1 });
-                }}
-              />
-              <StatusBadge status={option.value} />
-            </label>
-          ))}
-        </div>
-      </details>
+      <MultiSelectField label="Ответственный" options={universityFilterOptions.responsibles.map((person) => ({ id: person.id, name: person.name }))} values={filters.responsibleIds} onChange={(values) => onPatch({ responsible: values, page: 1 })} />
+      <MultiSelectField label="Health Score" options={HEALTH_STATUS_OPTIONS.map((option) => ({ id: option.value, name: option.label }))} values={filters.healthStatuses} onChange={(values) => onPatch({ health_status: values, page: 1 })} renderOption={(option) => <StatusBadge status={option.id as HealthStatus} />} />
       <label className={styles.field}>
         <span>Текущий этап</span>
-        <select value={state.stage} onChange={(event) => onPatch({ stage: event.target.value, page: 1 })}>
+        <select value={filters.workflowStageId} onChange={(event) => onPatch({ stage: event.target.value, page: 1 })}>
           <option value="">Все этапы</option>
           {universityFilterOptions.stages.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select>
       </label>
+      <div className={styles.dateRange}>
+        <span className={styles.dateRangeLabel}>Период последнего взаимодействия</span>
+        <div className={styles.dateInputs}>
+          <label className={styles.field}><span>От</span><input type="date" value={filters.dateFrom} max={filters.dateTo || undefined} onChange={(event) => updateDateRange('date_from', event.target.value)} /></label>
+          <label className={styles.field}><span>До</span><input type="date" value={filters.dateTo} min={filters.dateFrom || undefined} onChange={(event) => updateDateRange('date_to', event.target.value)} /></label>
+        </div>
+      </div>
       <Button variant="ghost" size="s" type="button" disabled={!hasFilters} onClick={onReset}>Сбросить фильтры</Button>
     </section>
+  );
+}
+
+function selectedNames(values: string[], options: Array<{ id: string; name: string }>): string {
+  const names = values.map((value) => options.find((option) => option.id === value)?.name ?? value);
+  if (names.length <= 2) return names.join(', ');
+  return `${names.slice(0, 2).join(', ')} +${names.length - 2}`;
+}
+
+function ActiveFilterChips({ filters, onPatch, onReset }: { filters: UniversityFilters; onPatch: (patch: QueryPatch) => void; onReset: () => void }) {
+  const chips: Array<{ key: string; label: string; patch: QueryPatch }> = [];
+  if (filters.search) chips.push({ key: 'search', label: `Поиск: ${filters.search}`, patch: { search: null, page: 1 } });
+  if (filters.universityIds.length) chips.push({ key: 'university', label: `Вуз: ${selectedNames(filters.universityIds, universityFilterOptions.universities)}`, patch: { university: null, page: 1 } });
+  if (filters.programIds.length) chips.push({ key: 'program', label: `Программа: ${selectedNames(filters.programIds, universityFilterOptions.programs)}`, patch: { program: null, page: 1 } });
+  if (filters.productIds.length) chips.push({ key: 'product', label: `Продукт: ${selectedNames(filters.productIds, universityFilterOptions.products)}`, patch: { product: null, page: 1 } });
+  if (filters.city) chips.push({ key: 'city', label: `Город: ${filters.city}`, patch: { city: null, page: 1 } });
+  if (filters.responsibleIds.length) chips.push({ key: 'responsible', label: `Ответственный: ${selectedNames(filters.responsibleIds, universityFilterOptions.responsibles)}`, patch: { responsible: null, page: 1 } });
+  if (filters.healthStatuses.length) chips.push({ key: 'health_status', label: `Health Score: ${selectedNames(filters.healthStatuses, HEALTH_STATUS_OPTIONS.map((option) => ({ id: option.value, name: option.label })))}`, patch: { health_status: null, page: 1 } });
+  if (filters.workflowStageId) chips.push({ key: 'stage', label: `Этап: ${universityFilterOptions.stages.find((item) => item.id === filters.workflowStageId)?.name ?? filters.workflowStageId}`, patch: { stage: null, page: 1 } });
+  if (filters.dateFrom || filters.dateTo) chips.push({ key: 'date', label: `Период: ${filters.dateFrom || '…'} — ${filters.dateTo || '…'}`, patch: { date_from: null, date_to: null, page: 1 } });
+  if (!chips.length) return null;
+
+  return (
+    <div className={styles.activeFilters} aria-label="Активные фильтры">
+      <span className={styles.activeFiltersLabel}>Активные фильтры</span>
+      <div className={styles.chipList}>
+        {chips.map((chip) => <button className={styles.filterChip} type="button" key={chip.key} onClick={() => onPatch(chip.patch)}>{chip.label}<CloseSmall size={14} fill="currentColor" aria-hidden="true" /></button>)}
+        <button className={styles.clearAllButton} type="button" onClick={onReset}>Сбросить всё</button>
+      </div>
+    </div>
   );
 }
 
@@ -338,18 +517,68 @@ export function UniversitiesList() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const state = useMemo(() => parseUrlState(searchParams), [searchParams]);
-  const [searchInput, setSearchInput] = useState(state.search);
+  const [searchInput, setSearchInput] = useState(state.filters.search);
+  const [filtersExpanded, setFiltersExpanded] = useState(true);
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
+  const storageRestoredRef = useRef(false);
+  const storageReadyRef = useRef(false);
+  const pendingStoredFiltersRef = useRef<UniversityFilters | null>(null);
 
-  const goToState = useCallback((patch: Record<string, string | number | string[] | null>) => {
+  const goToState = useCallback((patch: QueryPatch) => {
     router.replace(`${pathname}${updateSearchParams(searchParams, patch)}`, { scroll: false });
   }, [pathname, router, searchParams]);
 
-  useEffect(() => setSearchInput(state.search), [state.search]);
+  useEffect(() => setSearchInput(state.filters.search), [state.filters.search]);
   useEffect(() => {
-    if (searchInput === state.search) return undefined;
+    if (searchInput === state.filters.search) return undefined;
     const timeout = window.setTimeout(() => goToState({ search: searchInput, page: 1 }), 300);
     return () => window.clearTimeout(timeout);
-  }, [goToState, searchInput, state.search]);
+  }, [goToState, searchInput, state.filters.search]);
+
+  useEffect(() => {
+    if (storageRestoredRef.current) return;
+    if (hasUrlFilterParams(searchParams)) {
+      storageRestoredRef.current = true;
+      storageReadyRef.current = true;
+      return;
+    }
+    storageRestoredRef.current = true;
+    const storedFilters = parseStoredFilters(window.localStorage.getItem(FILTER_STORAGE_KEY));
+    if (storedFilters && hasActiveFilters(storedFilters)) {
+      pendingStoredFiltersRef.current = storedFilters;
+      goToState(filtersPatch(storedFilters));
+    } else {
+      storageReadyRef.current = true;
+    }
+  }, [goToState, searchParams]);
+
+  useEffect(() => {
+    if (pendingStoredFiltersRef.current) {
+      if (JSON.stringify(state.filters) !== JSON.stringify(pendingStoredFiltersRef.current)) return;
+      pendingStoredFiltersRef.current = null;
+      storageReadyRef.current = true;
+    }
+    if (!storageReadyRef.current) return;
+    window.localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(state.filters));
+  }, [state.filters]);
+
+  useEffect(() => {
+    if (!filterDrawerOpen) return undefined;
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setFilterDrawerOpen(false); };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [filterDrawerOpen]);
+
+  useEffect(() => {
+    if (!filterDrawerOpen) return undefined;
+    const frame = window.requestAnimationFrame(() => document.getElementById('universities-search')?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [filterDrawerOpen]);
+
+  useEffect(() => {
+    document.body.classList.toggle(styles.bodyLock, filterDrawerOpen);
+    return () => document.body.classList.remove(styles.bodyLock);
+  }, [filterDrawerOpen]);
 
   const query = useQuery({
     queryKey: [...universitiesQueryKey, state],
@@ -383,10 +612,21 @@ export function UniversitiesList() {
     },
   });
 
-  const hasFilters = Boolean(state.search || state.city || state.responsible || state.stage || state.healthStatuses.length);
+  const hasFilters = hasActiveFilters(state.filters);
+  const activeFilterCount = [
+    state.filters.search,
+    state.filters.city,
+    state.filters.universityIds.length,
+    state.filters.programIds.length,
+    state.filters.productIds.length,
+    state.filters.responsibleIds.length,
+    state.filters.healthStatuses.length,
+    state.filters.workflowStageId,
+    state.filters.dateFrom || state.filters.dateTo,
+  ].filter(Boolean).length;
   const resetFilters = () => {
     setSearchInput('');
-    goToState({ search: null, city: null, responsible: null, health_status: null, stage: null, page: 1 });
+    goToState(filtersPatch(EMPTY_FILTERS));
   };
 
   return (
@@ -398,7 +638,21 @@ export function UniversitiesList() {
           <p className={styles.description}>Учебные заведения, программы и задачи, требующие внимания команды.</p>
         </div>
       </header>
-      <Filters state={state} searchInput={searchInput} setSearchInput={setSearchInput} onPatch={goToState} onReset={resetFilters} hasFilters={hasFilters} />
+      <div className={styles.filterArea}>
+        <Button variant="secondary" size="s" type="button" className={styles.filterTrigger} onClick={() => {
+          if (window.matchMedia('(max-width: 768px)').matches) setFilterDrawerOpen(true);
+          else setFiltersExpanded((expanded) => !expanded);
+        }} aria-expanded={filterDrawerOpen || filtersExpanded} aria-controls="universities-filter-panel">
+          <Filter size={18} fill="currentColor" />Фильтры{activeFilterCount ? ` (${activeFilterCount})` : ''}
+        </Button>
+        <div className={`${styles.filterPanelWrap} ${filtersExpanded ? styles.filterPanelVisible : ''} ${filterDrawerOpen ? styles.filterDrawerVisible : ''}`}>
+          {filterDrawerOpen ? <button className={styles.filterBackdrop} type="button" aria-label="Закрыть фильтры" onClick={() => setFilterDrawerOpen(false)} /> : null}
+          <div className={styles.filterPanel} id="universities-filter-panel" role={filterDrawerOpen ? 'dialog' : undefined} aria-modal={filterDrawerOpen || undefined} aria-labelledby="universities-filter-title">
+            <Filters state={state} searchInput={searchInput} setSearchInput={setSearchInput} onPatch={goToState} onReset={resetFilters} hasFilters={hasFilters} onClose={() => setFilterDrawerOpen(false)} />
+          </div>
+        </div>
+        <ActiveFilterChips filters={state.filters} onPatch={goToState} onReset={resetFilters} />
+      </div>
       {query.isPending ? <UniversityListSkeleton /> : query.isError || !query.data ? <RouteErrorState onRetry={() => void query.refetch()} /> : query.data.total === 0 ? <EmptyState filtered={hasFilters} onReset={resetFilters} /> : (
         <>
           {query.isFetching ? <p className={styles.fetching} role="status">Обновляем список…</p> : null}

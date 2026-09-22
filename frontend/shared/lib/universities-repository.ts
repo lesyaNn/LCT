@@ -25,17 +25,29 @@ export interface UniversityListItem {
   healthScore: number;
   lastInteractionAt: string;
   attention: boolean;
+  /** Mock relationship ids mirror the fields expected from the future analytics API. */
+  programIds?: string[];
+  productIds?: string[];
 }
 
 export type UniversitySortColumn = 'name' | 'responsible' | 'programs' | 'stage' | 'health_score' | 'last_interaction';
 export type SortOrder = 'asc' | 'desc';
 
-export interface UniversityListQuery {
+export interface UniversityFilters {
   search: string;
   city: string;
-  responsible: string;
+  universityIds: string[];
+  programIds: string[];
+  productIds: string[];
+  responsibleIds: string[];
   healthStatuses: HealthStatus[];
-  stage: string;
+  workflowStageId: string;
+  dateFrom: string;
+  dateTo: string;
+}
+
+export interface UniversityListQuery {
+  filters: UniversityFilters;
   sort: UniversitySortColumn | null;
   order: SortOrder;
   page: number;
@@ -53,6 +65,9 @@ export interface UniversityFilterOptions {
   cities: string[];
   responsibles: UniversityResponsible[];
   stages: UniversityStage[];
+  universities: Array<{ id: string; name: string }>;
+  programs: Array<{ id: string; name: string }>;
+  products: Array<{ id: string; name: string }>;
 }
 
 export { programStatusLabels };
@@ -105,7 +120,27 @@ export const universityFilterOptions: UniversityFilterOptions = {
   cities: [...new Set(universitiesMock.map((item) => item.city))].sort((a, b) => a.localeCompare(b, 'ru')),
   responsibles: Object.values(responsible).sort((a, b) => a.name.localeCompare(b.name, 'ru')),
   stages: Object.values(stage),
+  universities: universitiesMock.map(({ id, name }) => ({ id, name })),
+  programs: [
+    { id: 'program-data-analytics', name: 'Аналитика данных' },
+    { id: 'program-digital-economy', name: 'Цифровая экономика' },
+    { id: 'program-it-management', name: 'ИТ-менеджмент' },
+    { id: 'program-cybersecurity', name: 'Кибербезопасность' },
+  ],
+  products: [
+    { id: 'product-professional-retraining', name: 'Профессиональная переподготовка' },
+    { id: 'product-short-courses', name: 'Короткие курсы' },
+    { id: 'product-corporate-track', name: 'Корпоративный трек' },
+  ],
 };
+
+const programOptionIds = universityFilterOptions.programs.map((item) => item.id);
+const productOptionIds = universityFilterOptions.products.map((item) => item.id);
+const universitiesWithRelationships = universitiesMock.map((item, index) => ({
+  ...item,
+  programIds: [programOptionIds[index % programOptionIds.length], programOptionIds[(index + 1) % programOptionIds.length]],
+  productIds: [productOptionIds[index % productOptionIds.length]],
+}));
 
 function compareValues(left: string | number, right: string | number): number {
   if (typeof left === 'number' && typeof right === 'number') return left - right;
@@ -113,13 +148,20 @@ function compareValues(left: string | number, right: string | number): number {
 }
 
 export async function getUniversities(params: UniversityListQuery): Promise<PaginatedResult<UniversityListItem>> {
-  const search = params.search.trim().toLocaleLowerCase('ru-RU');
-  let filtered = universitiesMock.filter((item) => {
+  const { filters } = params;
+  const search = filters.search.trim().toLocaleLowerCase('ru-RU');
+  let filtered = universitiesWithRelationships.filter((item) => {
     if (search && !item.name.toLocaleLowerCase('ru-RU').includes(search)) return false;
-    if (params.city && item.city !== params.city) return false;
-    if (params.responsible && item.responsible?.id !== params.responsible) return false;
-    if (params.stage && item.currentStage.id !== params.stage) return false;
-    if (params.healthStatuses.length && !params.healthStatuses.includes(getHealthStatus(item.healthScore))) return false;
+    if (filters.city && item.city !== filters.city) return false;
+    if (filters.universityIds.length && !filters.universityIds.includes(item.id)) return false;
+    if (filters.programIds.length && !filters.programIds.some((id) => item.programIds?.includes(id))) return false;
+    if (filters.productIds.length && !filters.productIds.some((id) => item.productIds?.includes(id))) return false;
+    if (filters.responsibleIds.length && (!item.responsible || !filters.responsibleIds.includes(item.responsible.id))) return false;
+    if (filters.workflowStageId && item.currentStage.id !== filters.workflowStageId) return false;
+    if (filters.healthStatuses.length && !filters.healthStatuses.includes(getHealthStatus(item.healthScore))) return false;
+    const interactionDate = item.lastInteractionAt.slice(0, 10);
+    if (filters.dateFrom && interactionDate < filters.dateFrom) return false;
+    if (filters.dateTo && interactionDate > filters.dateTo) return false;
     return true;
   });
 
