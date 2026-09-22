@@ -63,10 +63,6 @@ const productStatusLabels: Record<UniversityProductStatus, string> = {
   expired: 'Просрочена',
 };
 
-function SectionHeader({ title, description, id }: { title: string; description: string; id: string }) {
-  return <div className={styles.sectionHeader}><div><h2 id={id}>{title}</h2><p>{description}</p></div></div>;
-}
-
 function ProgramStatusBadge({ status }: { status: ProgramStatus }) {
   return <StatusBadge intent={programStatusIntent[status]}>{programStatusLabels[status]}</StatusBadge>;
 }
@@ -115,10 +111,10 @@ function ProgramsSection({ id }: { id: string }) {
     { label: 'Действия', render: () => <Button variant="ghost" size="s" type="button" disabled title="Детали программы появятся после подключения маршрута">Открыть</Button> },
   ];
 
-  if (query.isPending) return <section className={styles.section}><SectionHeader id="programs-section-title" title="Программы" description="Образовательные программы и их запуск" /><PassportTableSkeleton /></section>;
+  if (query.isPending) return <section className={styles.section} aria-label="Программы"><PassportTableSkeleton /></section>;
   if (query.isError || !query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
 
-  return <section className={styles.section} aria-labelledby="programs-section-title"><div className={styles.sectionToolbar}><SectionHeader id="programs-section-title" title="Программы" description="Образовательные программы и их запуск" /><ProgramFilter value={statusFilter} onChange={setStatusFilter} /></div><PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Нет программ с выбранным статусом" /></section>;
+  return <section className={styles.section} aria-label="Программы"><div className={styles.sectionToolbar}><ProgramFilter value={statusFilter} onChange={setStatusFilter} /></div><PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Нет программ с выбранным статусом" /></section>;
 }
 
 function ProgramChips({ programs }: { programs: string[] }) {
@@ -148,10 +144,10 @@ function TeachersSection({ id }: { id: string }) {
     { label: 'Действия', render: (row) => <Link className={styles.actionLink} href={`/teachers/${row.id}`}>Открыть профиль</Link> },
   ];
 
-  if (query.isPending) return <section className={styles.section}><SectionHeader id="teachers-section-title" title="Преподаватели" description="Состав команды и готовность к занятиям" /><PassportTableSkeleton /></section>;
+  if (query.isPending) return <section className={styles.section} aria-label="Преподаватели"><PassportTableSkeleton /></section>;
   if (query.isError || !query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
 
-  return <section className={styles.section} aria-labelledby="teachers-section-title"><div className={styles.sectionToolbar}><SectionHeader id="teachers-section-title" title="Преподаватели" description="Состав команды и готовность к занятиям" /><TeacherFilter value={readinessFilter} onChange={setReadinessFilter} /></div><PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Нет преподавателей с выбранным статусом" /></section>;
+  return <section className={styles.section} aria-label="Преподаватели"><div className={styles.sectionToolbar}><TeacherFilter value={readinessFilter} onChange={setReadinessFilter} /></div><PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Нет преподавателей с выбранным статусом" /></section>;
 }
 
 function StudentSummary({ total, active, graduated, academicLeave }: { total: number; active: number; graduated: number; academicLeave: number }) {
@@ -174,10 +170,10 @@ function StudentsSection({ id }: { id: string }) {
     { label: 'Всего', render: (row) => row.total },
   ];
 
-  if (query.isPending) return <section className={styles.section}><SectionHeader id="students-section-title" title="Студенты" description="Агрегированная статистика без персональных данных" /><PassportTableSkeleton /></section>;
+  if (query.isPending) return <section className={styles.section} aria-label="Студенты"><PassportTableSkeleton /></section>;
   if (query.isError || !query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
 
-  return <section className={styles.section} aria-labelledby="students-section-title"><SectionHeader id="students-section-title" title="Студенты" description="Агрегированная статистика без персональных данных" /><StudentSummary total={query.data.total} active={query.data.active} graduated={query.data.graduated} academicLeave={query.data.academicLeave} /><PassportDataTable rows={query.data.byProgram.map((row) => ({ ...row, id: row.programId }))} columns={columns} mobileFields={mobileFields} emptyMessage="Нет данных по студентам" /></section>;
+  return <section className={styles.section} aria-label="Студенты"><StudentSummary total={query.data.total} active={query.data.active} graduated={query.data.graduated} academicLeave={query.data.academicLeave} /><PassportDataTable rows={query.data.byProgram.map((row) => ({ ...row, id: row.programId }))} columns={columns} mobileFields={mobileFields} emptyMessage="Нет данных по студентам" /></section>;
 }
 
 function ProductLicense({ row }: { row: UniversityProductRow }) {
@@ -201,10 +197,10 @@ function ProductsSection({ id }: { id: string }) {
     { label: 'Действия', render: () => <Button variant="ghost" size="s" type="button" disabled title="Карточка продукта появится после подключения маршрута">Просмотреть</Button> },
   ];
 
-  if (query.isPending) return <section className={styles.section}><SectionHeader id="products-section-title" title="Продукты" description="Подключённые продукты и лицензии" /><PassportTableSkeleton /></section>;
+  if (query.isPending) return <section className={styles.section} aria-label="Продукты"><PassportTableSkeleton /></section>;
   if (query.isError || !query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
 
-  return <section className={styles.section} aria-labelledby="products-section-title"><SectionHeader id="products-section-title" title="Продукты" description="Подключённые продукты и лицензии" /><PassportDataTable rows={query.data} columns={columns} mobileFields={mobileFields} emptyMessage="Нет подключённых продуктов" /></section>;
+  return <section className={styles.section} aria-label="Продукты"><PassportDataTable rows={query.data} columns={columns} mobileFields={mobileFields} emptyMessage="Нет подключённых продуктов" /></section>;
 }
 
 export { ProgramsSection, ProductsSection, StudentsSection, TeachersSection };
@@ -243,9 +239,9 @@ function LicensesSection({ id }: { id: string }) {
     { label: 'Статус', render: (row) => <LicenseStatusBadge status={row.status} /> },
     { label: 'Договор', render: (row) => <details className={styles.inlineDetails}><summary>Подробнее</summary><span>{row.contract}</span></details> },
   ];
-  if (query.isPending) return <section className={styles.section}><SectionHeader id="licenses-section-title" title="Лицензии" description="Лицензии продуктов и условия передачи" /><PassportTableSkeleton /></section>;
+  if (query.isPending) return <section className={styles.section} aria-label="Лицензии"><PassportTableSkeleton /></section>;
   if (query.isError || !query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
-  return <section className={styles.section} aria-labelledby="licenses-section-title"><div className={styles.sectionToolbar}><SectionHeader id="licenses-section-title" title="Лицензии" description="Лицензии продуктов и условия передачи" /><label className={styles.filter}><span>Статус</span><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as UniversityLicenseStatus | 'all')}><option value="all">Все статусы</option>{Object.entries(licenseStatusLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label></div><PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Лицензии пока не добавлены" /></section>;
+  return <section className={styles.section} aria-label="Лицензии"><div className={styles.sectionToolbar}><label className={styles.filter}><span>Статус</span><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as UniversityLicenseStatus | 'all')}><option value="all">Все статусы</option>{Object.entries(licenseStatusLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label></div><PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Лицензии пока не добавлены" /></section>;
 }
 
 function DocumentFile({ row }: { row: UniversityDocumentRow }) {
@@ -276,9 +272,9 @@ function DocumentsSection({ id }: { id: string }) {
     { label: 'Дата', render: (row) => formatDate(row.uploadedAt) },
     { label: 'Скачать', render: (row) => row.downloadUrl ? <a className={styles.iconAction} href={row.downloadUrl} download aria-label={`Скачать ${row.fileName}`}><Download size={18} fill="currentColor" /></a> : <button className={styles.iconAction} type="button" disabled aria-label="Скачивание станет доступно после подключения API"><Download size={18} fill="currentColor" /></button> },
   ];
-  if (query.isPending) return <section className={styles.section}><SectionHeader id="documents-section-title" title="Документы" description="Файлы, подписи и сроки действия" /><PassportTableSkeleton /></section>;
+  if (query.isPending) return <section className={styles.section} aria-label="Документы"><PassportTableSkeleton /></section>;
   if (query.isError || !query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
-  return <section className={styles.section} aria-labelledby="documents-section-title"><div className={styles.sectionToolbar}><SectionHeader id="documents-section-title" title="Документы" description="Файлы, подписи и сроки действия" /><div className={styles.filtersRow}><label className={styles.filter}><span>Тип</span><select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option value="all">Все типы</option>{types.map((type) => <option value={type} key={type}>{type}</option>)}</select></label><label className={styles.filter}><span>Статус</span><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as UniversityDocumentStatus | 'all')}><option value="all">Все статусы</option>{Object.entries(documentStatusLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label></div></div><PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Документы пока не добавлены" /></section>;
+  return <section className={styles.section} aria-label="Документы"><div className={styles.sectionToolbar}><div className={styles.filtersRow}><label className={styles.filter}><span>Тип</span><select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option value="all">Все типы</option>{types.map((type) => <option value={type} key={type}>{type}</option>)}</select></label><label className={styles.filter}><span>Статус</span><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as UniversityDocumentStatus | 'all')}><option value="all">Все статусы</option>{Object.entries(documentStatusLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label></div></div><PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Документы пока не добавлены" /></section>;
 }
 
 function MeetingParticipants({ participants }: { participants: UniversityMeetingRow['participants'] }) {
@@ -287,16 +283,16 @@ function MeetingParticipants({ participants }: { participants: UniversityMeeting
 
 function MeetingsSection({ id, canAdd }: { id: string; canAdd: boolean }) {
   const query = useQuery({ queryKey: universityMeetingsQueryKey(id), queryFn: () => getUniversityMeetings(id), staleTime: 30_000 });
-  if (query.isPending) return <section className={styles.section}><SectionHeader id="meetings-section-title" title="Встречи" description="История взаимодействий с вузом" /><PassportTableSkeleton /></section>;
+  if (query.isPending) return <section className={styles.section} aria-label="Встречи"><PassportTableSkeleton /></section>;
   if (query.isError || !query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
-  return <section className={styles.section} aria-labelledby="meetings-section-title"><div className={styles.sectionToolbar}><SectionHeader id="meetings-section-title" title="Встречи" description="История взаимодействий с вузом" />{canAdd ? <Button variant="primary" size="s" type="button" disabled title="Создание встречи подключится после появления API"><Calendar size={16} fill="currentColor" />Добавить встречу</Button> : null}</div>{query.data.length ? <ol className={styles.meetingTimeline}>{query.data.slice().sort((left, right) => right.occurredAt.localeCompare(left.occurredAt)).map((meeting) => <li className={styles.meetingItem} key={meeting.id}><div className={styles.meetingMarker} aria-hidden="true" /><article className={styles.meetingContent}><div className={styles.meetingMeta}><time dateTime={meeting.occurredAt}>{formatDateTimeRu(meeting.occurredAt)}</time><span className={styles.meetingType}>{meetingTypeLabels[meeting.type]}</span></div><h3>{meeting.subject}</h3><MeetingParticipants participants={meeting.participants} /><details className={styles.meetingDetails}><summary>Итог и следующее действие</summary><p><strong>Итог:</strong> {meeting.outcome}</p><p><strong>Следующее действие:</strong> {meeting.nextAction}{meeting.dueDate ? ` до ${formatDateRu(meeting.dueDate)}` : ''}</p></details><span className={styles.meetingAuthor}>Автор: {meeting.author}</span></article></li>)}</ol> : <p className={styles.emptySection} role="status">Нет данных для отображения</p>}</section>;
+  return <section className={styles.section} aria-label="Встречи">{canAdd ? <div className={styles.sectionToolbar}><Button variant="primary" size="s" type="button" disabled title="Создание встречи подключится после появления API"><Calendar size={16} fill="currentColor" />Добавить встречу</Button></div> : null}{query.data.length ? <ol className={styles.meetingTimeline}>{query.data.slice().sort((left, right) => right.occurredAt.localeCompare(left.occurredAt)).map((meeting) => <li className={styles.meetingItem} key={meeting.id}><div className={styles.meetingMarker} aria-hidden="true" /><article className={styles.meetingContent}><div className={styles.meetingMeta}><time dateTime={meeting.occurredAt}>{formatDateTimeRu(meeting.occurredAt)}</time><span className={styles.meetingType}>{meetingTypeLabels[meeting.type]}</span></div><h3>{meeting.subject}</h3><MeetingParticipants participants={meeting.participants} /><details className={styles.meetingDetails}><summary>Итог и следующее действие</summary><p><strong>Итог:</strong> {meeting.outcome}</p><p><strong>Следующее действие:</strong> {meeting.nextAction}{meeting.dueDate ? ` до ${formatDateRu(meeting.dueDate)}` : ''}</p></details><span className={styles.meetingAuthor}>Автор: {meeting.author}</span></article></li>)}</ol> : <p className={styles.emptySection} role="status">Нет данных для отображения</p>}</section>;
 }
 
 function ResponsiblesSection({ id }: { id: string }) {
   const query = useQuery({ queryKey: universityResponsiblesQueryKey(id), queryFn: () => getUniversityResponsibles(id), staleTime: 30_000 });
-  if (query.isPending) return <section className={styles.section}><SectionHeader id="responsibles-section-title" title="Ответственные" description="Контактные лица со стороны вуза" /><PassportTableSkeleton /></section>;
+  if (query.isPending) return <section className={styles.section} aria-label="Ответственные"><PassportTableSkeleton /></section>;
   if (query.isError || !query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
-  return <section className={styles.section} aria-labelledby="responsibles-section-title"><SectionHeader id="responsibles-section-title" title="Ответственные" description="Контактные лица со стороны вуза" />{query.data.length ? <div className={styles.responsiblesGrid}>{query.data.map((person) => <article className={styles.responsibleCard} key={person.id}><Avatar initials={person.initials} size="m" /><div className={styles.responsibleInfo}><h3>{person.name}</h3><p>{person.role}</p><a href={`mailto:${person.email}`}><Mail size={16} fill="currentColor" />{person.email}</a><a href={`tel:${person.phone.replace(/[^+\d]/g, '')}`}><Phone size={16} fill="currentColor" />{person.phone}</a></div>{person.isPrimary ? <StatusBadge intent="brand">Основной</StatusBadge> : null}</article>)}</div> : <p className={styles.emptySection} role="status">Нет данных для отображения</p>}</section>;
+  return <section className={styles.section} aria-label="Ответственные">{query.data.length ? <div className={styles.responsiblesGrid}>{query.data.map((person) => <article className={styles.responsibleCard} key={person.id}><Avatar initials={person.initials} size="m" /><div className={styles.responsibleInfo}><h3>{person.name}</h3><p>{person.role}</p><a href={`mailto:${person.email}`}><Mail size={16} fill="currentColor" />{person.email}</a><a href={`tel:${person.phone.replace(/[^+\d]/g, '')}`}><Phone size={16} fill="currentColor" />{person.phone}</a></div>{person.isPrimary ? <StatusBadge intent="brand">Основной</StatusBadge> : null}</article>)}</div> : <p className={styles.emptySection} role="status">Нет данных для отображения</p>}</section>;
 }
 
 export { LicensesSection, DocumentsSection, MeetingsSection, ResponsiblesSection };

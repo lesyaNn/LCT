@@ -77,11 +77,9 @@ function HealthScoreHero({ data }: { data: UniversityHealthScore }) {
   const deltaText = delta > 0 ? `+${delta}` : String(delta);
 
   return (
-    <section className={styles.hero} aria-labelledby="health-score-hero-title">
+    <section className={styles.hero} aria-label="Текущая оценка состояния">
       <div className={styles.heroCopy}>
         <p className={styles.eyebrow}>ОЦЕНКА СОСТОЯНИЯ</p>
-        <h2 id="health-score-hero-title">Health Score</h2>
-        <p className={styles.heroDescription}>Сводная оценка текущего состояния университета по пяти операционным направлениям.</p>
         <div className={styles.heroStatus}><span className={`${styles.statusDot} ${styles[`dot-${status}`]}`} aria-hidden="true" /><strong>{statusDescriptions[status]}</strong><span className={styles.statusLabel}>{healthStatusMeta[status].label}</span></div>
         <div className={`${styles.delta} ${styles[`delta-${deltaTone}`]}`}><DeltaIcon size={16} fill="currentColor" /><span>Изменение за неделю: <strong>{deltaText}</strong></span><small>с {formatLongDate(data.previousSnapshot.date)}</small></div>
       </div>
@@ -104,7 +102,7 @@ function BreakdownRow({ item }: { item: UniversityHealthScoreBreakdown }) {
 function Breakdown({ data }: { data: UniversityHealthScoreBreakdown[] }) {
   return (
     <section className={styles.section} aria-labelledby="health-score-breakdown-title">
-      <div className={styles.sectionHeading}><div><h2 id="health-score-breakdown-title">Состав оценки</h2><p>Пять компонентов итогового Health Score</p></div></div>
+      <div className={styles.sectionHeading}><h2 id="health-score-breakdown-title">Состав оценки</h2></div>
       {data.length ? <ul className={styles.breakdownList}>{data.map((item) => <BreakdownRow item={item} key={item.id} />)}</ul> : <p className={styles.emptyState}>Нет данных для разбивки оценки</p>}
     </section>
   );
@@ -130,7 +128,7 @@ function ReasonRow({ reason }: { reason: UniversityHealthScoreReason }) {
 function Reasons({ reasons }: { reasons: UniversityHealthScoreReason[] }) {
   return (
     <section className={styles.section} aria-labelledby="health-score-reasons-title">
-      <div className={styles.sectionHeading}><div><h2 id="health-score-reasons-title">Причины</h2><p>Факторы, которые повлияли на текущую оценку</p></div></div>
+      <div className={styles.sectionHeading}><h2 id="health-score-reasons-title">Причины</h2></div>
       {reasons.length ? <ul className={styles.reasonsList}>{reasons.map((reason) => <ReasonRow reason={reason} key={reason.id} />)}</ul> : <div className={styles.emptyState}><CheckLarge size={18} fill="currentColor" /><span>Критичных факторов не обнаружено</span></div>}
     </section>
   );
@@ -146,7 +144,7 @@ function HistoryTooltip({ active, payload }: TooltipContentProps) {
 function History({ history }: { history: UniversityHealthScoreHistoryPoint[] }) {
   return (
     <section className={styles.section} aria-labelledby="health-score-history-title">
-      <div className={styles.sectionHeading}><div><h2 id="health-score-history-title">Динамика за 30 дней</h2><p>Изменение Health Score по ежедневным снимкам</p></div></div>
+      <div className={styles.sectionHeading}><h2 id="health-score-history-title">Динамика за 30 дней</h2></div>
       {history.length ? <div className={styles.historyChart} role="img" aria-label="Динамика Health Score за последние 30 дней"><ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={230}><LineChart data={history} margin={{ top: 12, right: 12, bottom: 4, left: 4 }}><CartesianGrid stroke="var(--rtk-color-border)" strokeDasharray="3 3" vertical={false} /><XAxis dataKey="date" tickFormatter={formatHistoryDate} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} interval="preserveStartEnd" /><YAxis domain={[0, 100]} ticks={[0, 50, 100]} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} width={34} /><Tooltip content={HistoryTooltip} cursor={{ stroke: 'var(--rtk-color-border-strong)' }} /><Line type="monotone" dataKey="score" name="Health Score" stroke="var(--health-score-line)" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} isAnimationActive={false} /></LineChart></ResponsiveContainer></div> : <div className={styles.emptyHistory}><StatisticsBoard size={20} fill="currentColor" /><span>Нет данных о динамике</span></div>}
       {history.length ? <div className={styles.historyLegend}><span className={styles.historyLegendLine} aria-hidden="true" />Health Score</div> : null}
     </section>

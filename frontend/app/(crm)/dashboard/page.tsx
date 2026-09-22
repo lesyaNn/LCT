@@ -12,7 +12,7 @@ import { dashboardQueryKey, getDashboardOverview, type DashboardOverview } from 
 import { PageIntro } from '@/shared/ui/page-intro';
 import { PageSkeleton } from '@/shared/ui/page-skeleton';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
-import { KpiCard, type KpiStatus, type KpiTone } from '@/widgets/dashboard/kpi-card';
+import { KpiCard, type KpiTone } from '@/widgets/dashboard/kpi-card';
 import { DashboardAnalytics } from '@/widgets/dashboard/dashboard-charts';
 import styles from '@/widgets/dashboard/dashboard.module.css';
 
@@ -31,7 +31,6 @@ interface KpiDefinition {
   title: string;
   caption: string;
   tone: KpiTone;
-  status?: KpiStatus;
   icon: typeof Education;
   href?: string;
   ariaLabel?: string;
@@ -41,11 +40,11 @@ interface KpiDefinition {
 const kpiDefinitions: KpiDefinition[] = [
   { title: 'Вузы', caption: 'в реестре', tone: 'brand', icon: Education, value: (overview) => formatCount(overview.universitiesTotal) },
   { title: 'Средний Health Score', caption: 'среднее по вузам', tone: 'brandSoft', icon: StatisticsBoard, value: (overview) => formatScore(overview.averageHealthScore) },
-  { title: 'Красные вузы', caption: 'нуждаются во внимании', tone: 'brand', status: 'danger', icon: Attention, href: '/universities?health_status=red', ariaLabel: 'Перейти к красным вузам', value: (overview) => formatCount(overview.redUniversities) },
-  { title: 'Просроченные этапы', caption: 'требуют контроля', tone: 'brandSoft', status: 'warning', icon: Time, href: '/workflows?overdue=true', ariaLabel: 'Перейти к просроченным этапам workflow', value: (overview) => formatCount(overview.overdueStages) },
-  { title: 'Истекающие лицензии', caption: 'до истечения 30 дней', tone: 'brand', status: 'warning', icon: DocumentText, value: (overview) => formatCount(overview.expiringLicenses) },
+  { title: 'Красные вузы', caption: 'нуждаются во внимании', tone: 'danger', icon: Attention, href: '/universities?health_status=red', ariaLabel: 'Перейти к красным вузам', value: (overview) => formatCount(overview.redUniversities) },
+  { title: 'Просроченные этапы', caption: 'требуют контроля', tone: 'danger', icon: Time, href: '/workflows?overdue=true', ariaLabel: 'Перейти к просроченным этапам workflow', value: (overview) => formatCount(overview.overdueStages) },
+  { title: 'Истекающие лицензии', caption: 'до истечения 30 дней', tone: 'warning', icon: DocumentText, value: (overview) => formatCount(overview.expiringLicenses) },
   { title: 'Активные программы', caption: 'запущены', tone: 'orange', icon: Book, value: (overview) => formatCount(overview.activePrograms) },
-  { title: 'Преподаватели к повышению', caption: 'требуют внимания', tone: 'brandSoft', status: 'danger', icon: Group, value: (overview) => formatCount(overview.teachersNeedUpgrade) },
+  { title: 'Преподаватели к повышению', caption: 'требуют внимания', tone: 'warning', icon: Group, value: (overview) => formatCount(overview.teachersNeedUpgrade) },
 ];
 
 export default function DashboardPage() {
@@ -78,7 +77,6 @@ export default function DashboardPage() {
               key={definition.title}
               title={definition.title}
               tone={definition.tone}
-              status={definition.status}
               value={definition.value(overviewQuery.data)}
             />
           ))}

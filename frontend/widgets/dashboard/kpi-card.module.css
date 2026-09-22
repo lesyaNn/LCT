@@ -1,8 +1,8 @@
 .card {
   background: var(--kpi-background);
-  border: 0;
+  border: 1px solid var(--kpi-border, transparent);
   border-radius: var(--rtk-radius-medium);
-  color: var(--rtk-color-text-inverse);
+  color: var(--kpi-foreground, var(--rtk-color-text-inverse));
   display: flex;
   flex-direction: column;
   gap: var(--rtk-space-3);
@@ -27,10 +27,28 @@
 .brand { --kpi-background: var(--atmr-accent-default); }
 .brandSoft { --kpi-background: var(--atmr-accent-600); }
 .orange { --kpi-background: var(--atmr-accent-600); }
-.orange .title, .orange .caption { color: var(--atmr-accent-on-accent); }
-.statusIndicator { border: 2px solid var(--rtk-color-text-inverse); border-radius: 50%; flex: 0 0 10px; height: 10px; margin-left: auto; width: 10px; }
-.statusIndicator.warning { background: var(--rtk-color-warning); }
-.statusIndicator.danger { background: var(--rtk-color-danger); }
+.danger {
+  --kpi-background: var(--atmr-error-container-soft);
+  --kpi-border: var(--rtk-color-border);
+  --kpi-foreground: var(--rtk-color-text-primary);
+  --kpi-status: var(--atmr-error-on-container);
+}
+.warning {
+  --kpi-background: var(--atmr-warning-container-soft);
+  --kpi-border: var(--rtk-color-border);
+  --kpi-foreground: var(--rtk-color-text-primary);
+  --kpi-status: var(--atmr-warning-on-container);
+}
+.danger::after, .warning::after { display: none; }
+.danger::before, .warning::before {
+  background: var(--kpi-status);
+  content: '';
+  height: 4px;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
 
 .interactive {
   cursor: pointer;
@@ -57,22 +75,23 @@
   align-items: center;
   background: color-mix(in srgb, var(--rtk-color-text-inverse) 16%, transparent);
   border-radius: var(--rtk-radius-small);
-  color: var(--rtk-color-text-inverse) !important;
+  color: var(--rtk-color-text-inverse);
   display: inline-flex;
   flex: 0 0 40px;
   height: 40px;
   justify-content: center;
 }
+.danger .icon, .warning .icon { background: var(--rtk-color-surface); color: var(--kpi-status); }
 
 .title {
-  color: color-mix(in srgb, var(--rtk-color-text-inverse) 82%, transparent);
+  color: var(--rtk-color-text-inverse);
   font-size: 13px;
   font-weight: 600;
   line-height: 1.3;
 }
 
 .value {
-  color: var(--rtk-color-text-inverse);
+  color: var(--kpi-foreground, var(--rtk-color-text-inverse));
   font-size: clamp(26px, 2.5vw, 32px);
   font-variant-numeric: tabular-nums;
   letter-spacing: -.03em;
@@ -81,11 +100,14 @@
 }
 
 .caption {
-  color: color-mix(in srgb, var(--rtk-color-text-inverse) 74%, transparent);
+  color: var(--rtk-color-text-inverse);
   font-size: 12px;
   line-height: 1.35;
   margin-top: auto;
 }
+.danger .title, .warning .title { color: var(--rtk-color-text-primary); }
+.danger .value, .warning .value { color: var(--kpi-status); }
+.danger .caption, .warning .caption { color: var(--rtk-color-text-secondary); }
 
 .header,
 .value,

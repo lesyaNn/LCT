@@ -2,11 +2,9 @@
 .theme-green { --health-score-line: var(--rtk-color-success); }
 .theme-yellow { --health-score-line: var(--rtk-color-warning); }
 .theme-red { --health-score-line: var(--rtk-color-danger); }
-.hero { composes: surface from '../../shared/ui/rtk/section-surface.module.css'; align-items: center; display: flex; gap: var(--rtk-space-8); justify-content: space-between; min-height: 270px; padding: clamp(var(--rtk-space-5), 4vw, var(--rtk-space-8)); }
+.hero { composes: surface from '../../shared/ui/rtk/section-surface.module.css'; align-items: center; display: flex; gap: var(--rtk-space-8); justify-content: space-between; min-height: 208px; padding: var(--rtk-space-6); }
 .heroCopy { min-width: 0; }
 .eyebrow { color: var(--rtk-color-brand); font-size: 11px; font-weight: 700; letter-spacing: .07em; margin: 0 0 var(--rtk-space-2); text-transform: uppercase; }
-.hero h2 { font-size: clamp(24px, 3vw, 32px); letter-spacing: -.03em; margin: 0; }
-.heroDescription { color: var(--rtk-color-text-secondary); margin: var(--rtk-space-3) 0 0; max-width: 560px; }
 .heroStatus { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); margin-top: var(--rtk-space-5); }
 .heroStatus strong { font-size: 14px; }
 .statusLabel { color: var(--rtk-color-text-tertiary); font-size: 12px; }
@@ -19,8 +17,8 @@
 .delta-positive { color: var(--rtk-color-success); }
 .delta-negative { color: var(--rtk-color-danger); }
 .delta-neutral { color: var(--rtk-color-text-secondary); }
-.scoreRingWrap { align-items: center; display: flex; flex: 0 0 190px; height: 190px; justify-content: center; position: relative; width: 190px; }
-.scoreRing { height: 190px; transform: rotate(-90deg); width: 190px; }
+.scoreRingWrap { align-items: center; display: flex; flex: 0 0 160px; height: 160px; justify-content: center; position: relative; width: 160px; }
+.scoreRing { height: 160px; transform: rotate(-90deg); width: 160px; }
 .scoreRingTrack,
 .scoreRingProgress { fill: none; stroke-width: 10; }
 .scoreRingTrack { stroke: var(--rtk-color-surface-subtle); }
@@ -29,11 +27,10 @@
 .ring-yellow { stroke: var(--rtk-color-warning); }
 .ring-red { stroke: var(--rtk-color-danger); }
 .scoreRingValue { align-items: center; display: flex; flex-direction: column; inset: 0; justify-content: center; position: absolute; }
-.scoreRingValue strong { font-size: 42px; letter-spacing: -.06em; line-height: 1; }
+.scoreRingValue strong { font-size: 36px; letter-spacing: -.06em; line-height: 1; }
 .scoreRingValue span { color: var(--rtk-color-text-tertiary); font-size: 12px; margin-top: var(--rtk-space-2); }
 .section { composes: surface from '../../shared/ui/rtk/section-surface.module.css'; display: flex; flex-direction: column; gap: var(--rtk-space-4); }
 .sectionHeading h2 { font-size: 20px; letter-spacing: -.02em; margin: 0; }
-.sectionHeading p { color: var(--rtk-color-text-secondary); font-size: 13px; margin: var(--rtk-space-1) 0 0; }
 .breakdownList,
 .reasonsList { list-style: none; margin: 0; padding: 0; }
 .breakdownRow { padding: var(--rtk-space-4) 0; }

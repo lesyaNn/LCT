@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useMemo, type ComponentType, type ReactNode } from 'react';
+import { useMemo, useSyncExternalStore, type ComponentType, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Checklist from '@atomaro/icons/24/action/Checklist';
 import TimeStroke from '@atomaro/icons/24/alert/TimeStroke';
@@ -34,6 +34,17 @@ import { DocumentsSection, LicensesSection, MeetingsSection, ProductsSection, Pr
 import styles from './university-passport.module.css';
 
 const passportQueryKey = (id: string) => ['university-passport', id] as const;
+const mobileLayoutQuery = '(max-width: 768px)';
+
+function subscribeToMobileLayout(listener: () => void) {
+  const media = window.matchMedia(mobileLayoutQuery);
+  media.addEventListener('change', listener);
+  return () => media.removeEventListener('change', listener);
+}
+
+function isMobileLayout() {
+  return window.matchMedia(mobileLayoutQuery).matches;
+}
 
 const tabDefinitions = [
   { id: 'overview', label: 'Обзор' },
@@ -127,7 +138,7 @@ function OverviewMetrics({ passport }: { passport: UniversityPassport }) {
   const { metrics } = passport;
   return (
     <section className={styles.section} aria-labelledby="passport-metrics-title">
-      <div className={styles.sectionHeading}><h2 id="passport-metrics-title">Ключевые показатели</h2><span className={styles.sectionHint}>Актуальные данные паспорта</span></div>
+      <div className={styles.sectionHeading}><h2 id="passport-metrics-title">Ключевые показатели</h2></div>
       <div className={styles.metricsGrid}>
         <OverviewMetricCard title="Активные программы" icon={Book}><div className={styles.metricPrimary}><strong>{metrics.activePrograms}</strong><span>программ</span></div></OverviewMetricCard>
         <OverviewMetricCard title="Преподаватели" icon={Group}><div className={styles.metricPrimary}><strong>{metrics.teachers.total}</strong><span>всего</span></div><div className={styles.metricSubvalues}><MetricValue value={metrics.teachers.ready} label="готовы" tone="success" /><MetricValue value={metrics.teachers.attention} label="требуют внимания" tone="warning" /></div></OverviewMetricCard>
@@ -146,7 +157,7 @@ function WorkflowOverview({ passport, canAdvance, onTabChange }: { passport: Uni
 
   return (
     <section className={styles.workflowCard} aria-labelledby="passport-workflow-title">
-      <div className={styles.sectionHeading}><div><h2 id="passport-workflow-title">Текущий этап Workflow</h2><span className={styles.sectionHint}>Статус прохождения onboarding-процесса</span></div><button className={styles.textAction} type="button" onClick={() => onTabChange('workflow')}>Открыть Workflow <ArrowRight size={14} fill="currentColor" /></button></div>
+      <div className={styles.sectionHeading}><h2 id="passport-workflow-title">Текущий этап Workflow</h2><button className={styles.textAction} type="button" onClick={() => onTabChange('workflow')}>Открыть Workflow <ArrowRight size={14} fill="currentColor" /></button></div>
       <div className={styles.workflowLayout}>
         <div className={styles.workflowStage}><span className={styles.overline}>Текущий этап</span><strong>{workflow.currentStage.name}</strong><SemanticStatusBadge intent={workflowStatusIntent[workflow.status]}>{statusLabel}</SemanticStatusBadge></div>
         <div className={styles.workflowDetails}>
@@ -177,7 +188,7 @@ function TimelineItem({ event }: { event: UniversityPassportEvent }) {
 function RecentInteractions({ events, onTabChange }: { events: UniversityPassportEvent[]; onTabChange: (tab: PassportTabId) => void }) {
   return (
     <section className={styles.timelineCard} aria-labelledby="passport-timeline-title">
-      <div className={styles.sectionHeading}><div><h2 id="passport-timeline-title">Последние взаимодействия</h2><span className={styles.sectionHint}>Последние события по вузу</span></div><Button variant="ghost" size="s" type="button" onClick={() => onTabChange('history')}>Показать всё <ArrowRight size={14} fill="currentColor" /></Button></div>
+      <div className={styles.sectionHeading}><h2 id="passport-timeline-title">Последние взаимодействия</h2><Button variant="ghost" size="s" type="button" onClick={() => onTabChange('history')}>Показать всё <ArrowRight size={14} fill="currentColor" /></Button></div>
       <ol className={styles.timeline}>{events.slice(0, 5).map((event) => <TimelineItem event={event} key={event.id} />)}</ol>
     </section>
   );
@@ -188,7 +199,7 @@ function OverviewContent({ passport, canAdvance, onTabChange }: { passport: Univ
 }
 
 function PlaceholderContent({ tab }: { tab: (typeof tabDefinitions)[number] }) {
-  return <section className={styles.placeholderPanel} aria-labelledby={`${tab.id}-placeholder-title`}><span className={styles.placeholderIcon} aria-hidden="true"><StatisticsBoard size={24} fill="currentColor" /></span><h2 id={`${tab.id}-placeholder-title`}>{tab.label}</h2><p>Раздел подготовлен в структуре паспорта. Бизнес-данные подключатся в следующем frontend-модуле.</p></section>;
+  return <section className={styles.placeholderPanel} aria-label={tab.label}><span className={styles.placeholderIcon} aria-hidden="true"><StatisticsBoard size={24} fill="currentColor" /></span><p>Данные появятся после подключения модуля.</p></section>;
 }
 
 function PassportSkeleton() {
@@ -196,6 +207,7 @@ function PassportSkeleton() {
 }
 
 export function UniversityPassport({ id }: { id: string }) {
+  const mobileLayout = useSyncExternalStore(subscribeToMobileLayout, isMobileLayout, () => false);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -242,18 +254,18 @@ export function UniversityPassport({ id }: { id: string }) {
   return (
     <div className={styles.page}>
       <PassportHeader passport={passport} canEdit={canEdit} canReport={canReport} onTabChange={selectTab} />
-      <nav className={styles.desktopTabs} aria-label="Разделы паспорта вуза">
+      {!mobileLayout ? <nav className={styles.desktopTabs} aria-label="Разделы паспорта вуза">
         <div className={styles.tabList} role="tablist">
           {tabDefinitions.map((tab) => <button className={activeTab === tab.id ? styles.tabActive : styles.tab} id={`passport-tab-${tab.id}`} type="button" role="tab" aria-selected={activeTab === tab.id} aria-controls="passport-panel" key={tab.id} onClick={() => selectTab(tab.id)}>{tab.label}</button>)}
         </div>
-      </nav>
-      <div className={styles.desktopPanel} id="passport-panel" role="tabpanel" aria-labelledby={`passport-tab-${activeTab}`}>{renderContent(activeTab)}</div>
-      <div className={styles.mobileAccordion} aria-label="Разделы паспорта вуза">
+      </nav> : null}
+      {!mobileLayout ? <div className={styles.desktopPanel} id="passport-panel" role="tabpanel" aria-labelledby={`passport-tab-${activeTab}`}>{renderContent(activeTab)}</div> : null}
+      {mobileLayout ? <div className={styles.mobileAccordion} aria-label="Разделы паспорта вуза">
         {tabDefinitions.map((tab) => {
           const isOpen = activeTab === tab.id;
           return <section className={styles.accordionItem} key={tab.id}><button className={isOpen ? styles.accordionTriggerActive : styles.accordionTrigger} type="button" aria-expanded={isOpen} onClick={() => selectTab(tab.id)}><span>{tab.label}</span><ArrowRight size={18} fill="currentColor" /></button>{isOpen ? <div className={styles.accordionPanel}>{renderContent(tab.id)}</div> : null}</section>;
         })}
-      </div>
+      </div> : null}
     </div>
   );
 }

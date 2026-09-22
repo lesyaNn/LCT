@@ -2,8 +2,7 @@ import Link from 'next/link';
 import type { ComponentType } from 'react';
 import styles from './kpi-card.module.css';
 
-export type KpiTone = 'brand' | 'brandSoft' | 'orange';
-export type KpiStatus = 'warning' | 'danger';
+export type KpiTone = 'brand' | 'brandSoft' | 'orange' | 'warning' | 'danger';
 
 interface KpiIconProps {
   fill?: string;
@@ -16,12 +15,11 @@ interface KpiCardProps {
   caption: string;
   icon: ComponentType<KpiIconProps>;
   tone: KpiTone;
-  status?: KpiStatus;
   href?: string;
   ariaLabel?: string;
 }
 
-function KpiCardContent({ title, value, caption, icon: Icon, status }: Omit<KpiCardProps, 'href' | 'ariaLabel'>) {
+function KpiCardContent({ title, value, caption, icon: Icon }: Omit<KpiCardProps, 'href' | 'ariaLabel'>) {
   return (
     <>
       <div className={styles.header}>
@@ -29,7 +27,6 @@ function KpiCardContent({ title, value, caption, icon: Icon, status }: Omit<KpiC
           <Icon size={24} fill="currentColor" />
         </span>
         <span className={styles.title}>{title}</span>
-        {status ? <span className={`${styles.statusIndicator} ${styles[status]}`} aria-hidden="true" /> : null}
       </div>
       <strong className={styles.value}>{value}</strong>
       <span className={styles.caption}>{caption}</span>
@@ -37,8 +34,8 @@ function KpiCardContent({ title, value, caption, icon: Icon, status }: Omit<KpiC
   );
 }
 
-export function KpiCard({ title, value, caption, icon, tone, status, href, ariaLabel }: KpiCardProps) {
-  const content = <KpiCardContent title={title} value={value} caption={caption} icon={icon} tone={tone} status={status} />;
+export function KpiCard({ title, value, caption, icon, tone, href, ariaLabel }: KpiCardProps) {
+  const content = <KpiCardContent title={title} value={value} caption={caption} icon={icon} tone={tone} />;
   const className = `${styles.card} ${styles[tone]} ${tone === 'orange' ? 'Theme_root_rtk_default_light' : ''}`;
 
   if (href) {
