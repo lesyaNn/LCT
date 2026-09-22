@@ -9,7 +9,9 @@ universities, it_directions, it_programs, vendors, it_products, contracts,
 licenses, responsibles, university_responsibles, teachers,
 teacher_qualifications, teacher_certificates, teacher_programs, students,
 university_programs, university_products, meetings, documents,
-interaction_notes, meeting_documents.
+interaction_notes, meeting_documents, workflow_templates, workflow_stages,
+workflow_instances, workflow_stage_transitions, workflow_comments,
+workflow_attachments, workflow_tasks, instance_stages.
 """
 
 from app.models.catalog import (  # noqa: F401
@@ -38,6 +40,18 @@ from app.models.teachers import (  # noqa: F401
     TeacherProgram,
     TeacherQualification,
 )
+from app.models.workflow_templates import (  # noqa: F401
+    WorkflowStage,
+    WorkflowTemplate,
+)
+from app.models.workflow_instances import (  # noqa: F401
+    InstanceStage,
+    WorkflowAttachment,
+    WorkflowComment,
+    WorkflowInstance,
+    WorkflowStageTransition,
+    WorkflowTask,
+)
 
 __all__ = [
     "University",
@@ -60,4 +74,12 @@ __all__ = [
     "MeetingDocument",
     "Document",
     "InteractionNote",
+    "WorkflowTemplate",
+    "WorkflowStage",
+    "WorkflowInstance",
+    "WorkflowStageTransition",
+    "WorkflowComment",
+    "WorkflowAttachment",
+    "WorkflowTask",
+    "InstanceStage",
 ]

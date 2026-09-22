@@ -12,15 +12,16 @@
 
 Workflow instances (P1-09-02 progress table) are P2-owned tables and are
 intentionally NOT seeded here — license/document/teacher signals that feed
-Health Score ARE seeded exactly per spec.
+Health Score ARE seeded exactly per spec. The P2-01-04 standard
+14-stage workflow *template* IS seeded here via ``seed_workflow_templates``
+(idempotent, runs after ``migrate``).
 """
 
 import os
 import sys
 from datetime import date, datetime, timedelta, timezone
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(
-    os.path.abspath(__file__)))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
@@ -56,6 +57,8 @@ try:  # pragma: no cover - import guard for partial checkouts
     )
 except Exception:  # pragma: no cover
     Teacher = TeacherCertificate = TeacherProgram = TeacherQualification = None
+
+from app.db.seed_workflow import seed_workflow_templates
 
 SYSTEM_SUB = "system-seed"
 
@@ -138,6 +141,7 @@ LICENSE_EXPIRY: dict[str, list[int]] = {
 
 # ---------------------------------------------------------------- helpers
 
+
 def _get_or_create(session: Session, model, defaults: dict, **key):
     obj = session.execute(select(model).filter_by(**key)).scalar_one_or_none()
     if obj is not None:
@@ -159,7 +163,9 @@ def seed_demo(session: Session, skip_universities: bool | None = None) -> dict:
     """
     if skip_universities is None:
         skip_universities = os.getenv("SEED_SKIP_UNIVERSITIES", "").strip().lower() in (
-            "1", "true", "yes",
+            "1",
+            "true",
+            "yes",
         )
     today = date.today()
     stats: dict[str, int] = {}
@@ -172,7 +178,8 @@ def seed_demo(session: Session, skip_universities: bool | None = None) -> dict:
     programs = {}
     for name, code, desc in PROGRAMS:
         p, _ = _get_or_create(
-            session, ITProgram,
+            session,
+            ITProgram,
             {"direction_id": directions[code].id, "description": desc},
             name=name,
         )
@@ -184,8 +191,12 @@ def seed_demo(session: Session, skip_universities: bool | None = None) -> dict:
         v, _ = _get_or_create(session, Vendor, {}, name=vendor_name)
         for pname, version in prods:
             pr, _ = _get_or_create(
-                session, ITProduct, {"vendor_id": v.id},
-                vendor_id=v.id, name=pname, version=version,
+                session,
+                ITProduct,
+                {"vendor_id": v.id},
+                vendor_id=v.id,
+                name=pname,
+                version=version,
             )
             products.append(pr)
 
@@ -196,10 +207,30 @@ def seed_demo(session: Session, skip_universities: bool | None = None) -> dict:
         return _collect_stats(session)
 
     # --- per-university data ---
-    first_names = ["Александр", "Мария", "Дмитрий", "Елена", "Игорь",
-                   "Ольга", "Сергей", "Анна", "Павел", "Наталья"]
-    last_names = ["Иванов", "Петрова", "Сидоров", "Кузнецова", "Смирнов",
-                  "Попова", "Соколов", "Морозова", "Волков", "Новикова"]
+    first_names = [
+        "Александр",
+        "Мария",
+        "Дмитрий",
+        "Елена",
+        "Игорь",
+        "Ольга",
+        "Сергей",
+        "Анна",
+        "Павел",
+        "Наталья",
+    ]
+    last_names = [
+        "Иванов",
+        "Петрова",
+        "Сидоров",
+        "Кузнецова",
+        "Смирнов",
+        "Попова",
+        "Соколов",
+        "Морозова",
+        "Волков",
+        "Новикова",
+    ]
 
     for u_idx, (uname, city) in enumerate(UNIVERSITIES):
         uni, _ = _get_or_create(session, University, {"city": city}, name=uname)
@@ -209,32 +240,42 @@ def seed_demo(session: Session, skip_universities: bool | None = None) -> dict:
         for r in range(2):
             email = f"contact{r + 1}.u{u_idx}@example.local"
             resp, _ = _get_or_create(
-                session, Responsible,
-                {"full_name": f"{last_names[(u_idx + r) % 10]} "
+                session,
+                Responsible,
+                {
+                    "full_name": f"{last_names[(u_idx + r) % 10]} "
                               f"{first_names[(u_idx + r * 3) % 10]} "
                               f"{'А.' if r == 0 else 'Б.'}",
                  "phone": f"+7 (495) 000-00-{u_idx:02d}{r}",
-                 "role": "university_contact"},
+                    "role": "university_contact",
+                },
                 email=email,
             )
             uni_resps.append(resp)
             _get_or_create(
-                session, UniversityResponsible,
-                {"role_in_university": "university_contact",
-                 "is_primary": r == 0},
-                university_id=uni.id, responsible_id=resp.id,
+                session,
+                UniversityResponsible,
+                {"role_in_university": "university_contact", "is_primary": r == 0},
+                university_id=uni.id,
+                responsible_id=resp.id,
             )
         mgr_email = f"manager{(u_idx % 3) + 1}@example.local"
         mgr, _ = _get_or_create(
-            session, Responsible,
-            {"full_name": f"Менеджеров Менеджер {(u_idx % 3) + 1}",
-             "phone": None, "role": "our_manager"},
+            session,
+            Responsible,
+            {
+                "full_name": f"Менеджеров Менеджер {(u_idx % 3) + 1}",
+                "phone": None,
+                "role": "our_manager",
+            },
             email=mgr_email,
         )
         _get_or_create(
-            session, UniversityResponsible,
+            session,
+            UniversityResponsible,
             {"role_in_university": "our_manager", "is_primary": False},
-            university_id=uni.id, responsible_id=mgr.id,
+            university_id=uni.id,
+            responsible_id=mgr.id,
         )
 
         # university_programs: 2-3 programs
@@ -246,12 +287,15 @@ def seed_demo(session: Session, skip_universities: bool | None = None) -> dict:
             if uname.startswith("Дальневосточный"):
                 status = "planned"
             up, _ = _get_or_create(
-                session, UniversityProgram,
-                {"status": status,
-                 "launch_date": (today - timedelta(days=200)
-                                 if status == "launched" else None),
-                 "responsible_id": uni_resps[0].id},
-                university_id=uni.id, program_id=prog.id,
+                session,
+                UniversityProgram,
+                {
+                    "status": status,
+                    "launch_date": (today - timedelta(days=200) if status == "launched" else None),
+                    "responsible_id": uni_resps[0].id,
+                },
+                university_id=uni.id,
+                program_id=prog.id,
             )
             uni_progs.append((prog, up))
 
@@ -260,78 +304,99 @@ def seed_demo(session: Session, skip_universities: bool | None = None) -> dict:
         for t_idx, readiness in enumerate(plan):
             email = f"teacher.u{u_idx}.t{t_idx}@example.local"
             teacher, created = _get_or_create(
-                session, Teacher,
-                {"university_id": uni.id,
+                session,
+                Teacher,
+                {
+                    "university_id": uni.id,
                  "full_name": f"{last_names[(u_idx * 3 + t_idx) % 10]} "
                               f"{first_names[(u_idx + t_idx * 2) % 10]} "
                               f"В.{t_idx}",
                  "phone": None,
-                 "position": "доцент" if t_idx % 2 == 0 else "старший преподаватель"},
+                    "position": "доцент" if t_idx % 2 == 0 else "старший преподаватель",
+                },
                 email=email,
             )
             if created:
                 # teacher_programs: 1-2 of the university's programs
                 for lk, (prog, _up) in enumerate(uni_progs[: 1 + (t_idx % 2)]):
-                    session.add(TeacherProgram(
-                        teacher_id=teacher.id, program_id=prog.id,
+                    session.add(
+                        TeacherProgram(
+                            teacher_id=teacher.id,
+                            program_id=prog.id,
                         can_teach=True,
                         assigned_at=today - timedelta(days=300 + t_idx),
-                    ))
+                        )
+                    )
                 # qualification
-                session.add(TeacherQualification(
+                session.add(
+                    TeacherQualification(
                     teacher_id=teacher.id,
                     qualification_name="Повышение квалификации ППС",
                     obtained_at=today - timedelta(days=400 + t_idx * 30),
-                    expires_at=(today + timedelta(days=300)
-                                if readiness != "expired" else
-                                today - timedelta(days=60)),
+                        expires_at=(
+                            today + timedelta(days=300)
+                            if readiness != "expired"
+                            else today - timedelta(days=60)
+                        ),
                     document_ref=None,
-                ))
+                    )
+                )
                 # certificates per readiness
                 if readiness == "ready-nocert":
-                    session.add(TeacherCertificate(
+                    session.add(
+                        TeacherCertificate(
                         teacher_id=teacher.id,
                         certificate_name=OPTIONAL_CERTS[t_idx % 2],
                         issued_by="Внутренний центр",
                         issued_at=today - timedelta(days=200),
                         expires_at=today + timedelta(days=500),
                         is_mandatory=False,
-                        program_id=None, document_ref=None,
-                    ))
+                            program_id=None,
+                            document_ref=None,
+                        )
+                    )
                 else:
                     if readiness == "ready":
                         deltas = [400 + t_idx * 40, 550]
                     elif readiness == "attention":
                         # СПбГУ: 15; ВШЭ: 10/25 — derive from position in plan
-                        att_seen = sum(1 for x in plan[: t_idx + 1]
-                                       if x == "attention")
+                        att_seen = sum(1 for x in plan[: t_idx + 1] if x == "attention")
                         delta_map = {1: 15, 2: 25}
-                        first = 10 if uname == "НИУ ВШЭ" and att_seen == 1 else \
-                            delta_map.get(att_seen, 20)
+                        first = (
+                            10
+                            if uname == "НИУ ВШЭ" and att_seen == 1
+                            else delta_map.get(att_seen, 20)
+                        )
                         deltas = [first, 400]
                     else:  # expired
                         deltas = [-5 - t_idx * 7, 400 if t_idx % 2 == 0 else -40]
                     for c_idx, delta in enumerate(deltas[:2]):
-                        session.add(TeacherCertificate(
+                        session.add(
+                            TeacherCertificate(
                             teacher_id=teacher.id,
                             certificate_name=MANDATORY_CERTS[
-                                (t_idx + c_idx) % len(MANDATORY_CERTS)],
+                                    (t_idx + c_idx) % len(MANDATORY_CERTS)
+                                ],
                             issued_by="АНО ДПО «РТК Школа»",
                             issued_at=today - timedelta(days=1000),
                             expires_at=today + timedelta(days=delta),
                             is_mandatory=True,
                             program_id=uni_progs[0][0].id,
                             document_ref=None,
-                        ))
-                    session.add(TeacherCertificate(
+                            )
+                        )
+                    session.add(
+                        TeacherCertificate(
                         teacher_id=teacher.id,
                         certificate_name=OPTIONAL_CERTS[t_idx % 2],
                         issued_by="Внутренний центр",
                         issued_at=today - timedelta(days=200),
                         expires_at=today + timedelta(days=600),
                         is_mandatory=False,
-                        program_id=None, document_ref=None,
-                    ))
+                            program_id=None,
+                            document_ref=None,
+                        )
+                    )
                 session.flush()
 
         # --- licenses + contracts (P1-09-02 expiry plan) ---
@@ -342,44 +407,57 @@ def seed_demo(session: Session, skip_universities: bool | None = None) -> dict:
             con_no = f"DOG-{u_idx:02d}-{l_idx:02d}"
             signed = today - timedelta(days=335)
             expires = today + timedelta(days=delta)
-            is_expired_contract = (
-                uname == "НИУ ВШЭ" and l_idx == 0
-            )
+            is_expired_contract = uname == "НИУ ВШЭ" and l_idx == 0
             contract, _ = _get_or_create(
-                session, Contract,
-                {"university_id": uni.id,
+                session,
+                Contract,
+                {
+                    "university_id": uni.id,
                  "product_id": prod.id if l_idx == 0 else None,
                  "signed_at": signed,
-                 "expires_at": (today - timedelta(days=12)
-                                if is_expired_contract else expires),
+                    "expires_at": (today - timedelta(days=12) if is_expired_contract else expires),
                  "status_raw": "signed",
                  "transfer_status_raw": "accepted",
-                 "comment": None},
+                    "comment": None,
+                },
                 contract_number=con_no,
             )
             lic, lic_created = _get_or_create(
-                session, License,
-                {"university_id": uni.id, "product_id": prod.id,
-                 "contract_id": contract.id, "signed_at": signed,
-                 "expires_at": expires, "transfer_status_raw": "accepted",
-                 "comment": None},
+                session,
+                License,
+                {
+                    "university_id": uni.id,
+                    "product_id": prod.id,
+                    "contract_id": contract.id,
+                    "signed_at": signed,
+                    "expires_at": expires,
+                    "transfer_status_raw": "accepted",
+                    "comment": None,
+                },
                 license_number=lic_no,
             )
             if lic_created:
                 _get_or_create(
-                    session, UniversityProduct,
+                    session,
+                    UniversityProduct,
                     {"license_id": lic.id, "status": "active"},
-                    university_id=uni.id, product_id=prod.id,
+                    university_id=uni.id,
+                    product_id=prod.id,
                 )
         # extra framework contract (no product) per university
         fw_no = f"DOG-{u_idx:02d}-FW"
         _get_or_create(
-            session, Contract,
-            {"university_id": uni.id, "product_id": None,
+            session,
+            Contract,
+            {
+                "university_id": uni.id,
+                "product_id": None,
              "signed_at": today - timedelta(days=100),
              "expires_at": today + timedelta(days=600),
-             "status_raw": "signed", "transfer_status_raw": "transferred",
-             "comment": "Рамочный договор"},
+                "status_raw": "signed",
+                "transfer_status_raw": "transferred",
+                "comment": "Рамочный договор",
+            },
             contract_number=fw_no,
         )
 
@@ -400,18 +478,22 @@ def seed_demo(session: Session, skip_universities: bool | None = None) -> dict:
                 exp = today + timedelta(days=200 + d_idx * 30)
                 st = "signed" if d_idx % 2 == 0 else "draft"
             doc, doc_created = _get_or_create(
-                session, Document,
-                {"university_id": uni.id,
-                 "document_type": ["contract", "license", "act",
-                                   "protocol"][d_idx % 4],
+                session,
+                Document,
+                {
+                    "university_id": uni.id,
+                    "document_type": ["contract", "license", "act", "protocol"][d_idx % 4],
                  "file_path": f"storage/u{u_idx}/doc{d_idx}.pdf",
                  "file_name": f"doc{d_idx}.pdf",
                  "file_size": 1024 * (100 + d_idx),
                  "mime_type": "application/pdf",
-                 "license_id": None, "contract_id": None,
+                    "license_id": None,
+                    "contract_id": None,
                  "signed_at": today - timedelta(days=120),
-                 "expires_at": exp, "status_raw": st,
-                 "uploaded_by_keycloak_sub": SYSTEM_SUB},
+                    "expires_at": exp,
+                    "status_raw": st,
+                    "uploaded_by_keycloak_sub": SYSTEM_SUB,
+                },
                 title=title,
             )
             void = doc_created  # noqa: F841 (readability)
@@ -422,22 +504,23 @@ def seed_demo(session: Session, skip_universities: bool | None = None) -> dict:
             subject = f"Встреча {m_idx + 1}: {uname[:12]}"
             mat = datetime.now(timezone.utc) - timedelta(days=m_idx * 40 + u_idx)
             meeting, m_created = _get_or_create(
-                session, Meeting,
-                {"university_id": uni.id,
+                session,
+                Meeting,
+                {
+                    "university_id": uni.id,
                  "meeting_type": mtypes[(u_idx + m_idx) % 4],
                  "participants": [
-                     {"name": "Иванов И.И.", "role": "Ректор",
-                      "side": "university"},
-                     {"name": "Петров П.П.", "role": "Менеджер",
-                      "side": "our"},
+                        {"name": "Иванов И.И.", "role": "Ректор", "side": "university"},
+                        {"name": "Петров П.П.", "role": "Менеджер", "side": "our"},
                  ],
                  "outcome": f"Итог встречи {m_idx + 1}",
-                 "next_action": ("Подготовить документы"
-                                 if m_idx == 0 else None),
-                 "next_action_due": (today - timedelta(days=5)
-                                     if m_idx == 0 and u_idx % 3 == 0 else None),
+                    "next_action": ("Подготовить документы" if m_idx == 0 else None),
+                    "next_action_due": (
+                        today - timedelta(days=5) if m_idx == 0 and u_idx % 3 == 0 else None
+                    ),
                  "meeting_at": mat,
-                 "created_by_keycloak_sub": SYSTEM_SUB},
+                    "created_by_keycloak_sub": SYSTEM_SUB,
+                },
                 subject=subject,
             )
             if m_created and m_idx == 0:
@@ -446,25 +529,29 @@ def seed_demo(session: Session, skip_universities: bool | None = None) -> dict:
                     select(Document).filter_by(university_id=uni.id).limit(1)
                 ).scalar_one_or_none()
                 if first_doc is not None:
-                    session.add(MeetingDocument(
-                        meeting_id=meeting.id, document_id=first_doc.id))
+                    session.add(MeetingDocument(meeting_id=meeting.id, document_id=first_doc.id))
 
         # --- interaction notes ---
         for n_idx in range(2):
             _get_or_create(
-                session, InteractionNote,
-                {"university_id": uni.id,
+                session,
+                InteractionNote,
+                {
+                    "university_id": uni.id,
                  "author_keycloak_sub": SYSTEM_SUB,
                  "content": f"Заметка {n_idx + 1} по {uname[:20]}",
-                 "is_internal": True},
+                    "is_internal": True,
+                },
                 university_id=uni.id,
                 content=f"Заметка {n_idx + 1} по {uname[:20]}",
             )
 
         # --- students (bulk, idempotent) ---
-        existing = set(session.execute(
-            select(Student.external_id).filter_by(university_id=uni.id)
-        ).scalars().all())
+        existing = set(
+            session.execute(select(Student.external_id).filter_by(university_id=uni.id))
+            .scalars()
+            .all()
+        )
         to_add = []
         for _prog, up in uni_progs:
             for s_idx in range(30):
@@ -479,37 +566,51 @@ def seed_demo(session: Session, skip_universities: bool | None = None) -> dict:
                     st, fin = "expelled", None
                 else:
                     st, fin = "academic_leave", None
-                to_add.append(Student(
-                    external_id=ext, university_id=uni.id,
+                to_add.append(
+                    Student(
+                        external_id=ext,
+                        university_id=uni.id,
                     program_id=up.program_id,
                     full_name=f"Студентов Студент {u_idx}-{s_idx}",
                     group_name=f"Группа {(s_idx % 3) + 1}",
-                    status=st, started_at=today - timedelta(days=400),
+                        status=st,
+                        started_at=today - timedelta(days=400),
                     finished_at=fin,
-                ))
+                    )
+                )
         session.add_all(to_add)
         session.flush()
 
     session.commit()
 
-    return _collect_stats(session)
+    wf_stats = seed_workflow_templates(session)
+
+    stats = _collect_stats(session)
+    stats.update(wf_stats)
+    return stats
 
 
 def _collect_stats(session: Session) -> dict:
     stats: dict[str, int] = {}
     for model, label in [
-        (University, "universities"), (ITDirection, "directions"),
-        (ITProgram, "programs"), (Vendor, "vendors"),
-        (ITProduct, "products"), (Responsible, "responsibles"),
-        (Teacher, "teachers"), (TeacherCertificate, "certificates"),
-        (Student, "students"), (License, "licenses"),
-        (Contract, "contracts"), (Meeting, "meetings"),
-        (Document, "documents"), (InteractionNote, "interaction_notes"),
+        (University, "universities"),
+        (ITDirection, "directions"),
+        (ITProgram, "programs"),
+        (Vendor, "vendors"),
+        (ITProduct, "products"),
+        (Responsible, "responsibles"),
+        (Teacher, "teachers"),
+        (TeacherCertificate, "certificates"),
+        (Student, "students"),
+        (License, "licenses"),
+        (Contract, "contracts"),
+        (Meeting, "meetings"),
+        (Document, "documents"),
+        (InteractionNote, "interaction_notes"),
         (UniversityProgram, "university_programs"),
         (UniversityProduct, "university_products"),
     ]:
-        stats[label] = session.execute(
-            select(model.id)).scalars().all().__len__()
+        stats[label] = session.execute(select(model.id)).scalars().all().__len__()
     return stats
 
 
