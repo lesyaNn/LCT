@@ -41,6 +41,7 @@
 .skeletonLine { height: 18px; width: min(100%, 420px); }
 .skeletonLineShort { width: min(62%, 260px); }
 .skeletonCards { display: grid; gap: var(--rtk-space-4); grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: var(--rtk-space-2); }
+.skeletonCardsDashboard { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .skeletonCard { height: 144px; }
 
 .error {
@@ -66,6 +67,11 @@
 
 @media (max-width: 900px) {
   .skeletonCards { grid-template-columns: 1fr; max-width: 520px; }
+  .skeletonCardsDashboard { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: none; }
+}
+
+@media (max-width: 640px) {
+  .skeletonCardsDashboard { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

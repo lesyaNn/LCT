@@ -1,0 +1,80 @@
+.card {
+  background: var(--rtk-color-surface);
+  border: 1px solid var(--rtk-color-border);
+  border-inline-start: 3px solid var(--kpi-accent);
+  border-radius: var(--rtk-radius-medium);
+  display: flex;
+  flex-direction: column;
+  gap: var(--rtk-space-3);
+  min-height: 172px;
+  padding: var(--rtk-space-5);
+  text-decoration: none;
+}
+
+.brand { --kpi-accent: var(--rtk-color-brand); }
+.neutral { --kpi-accent: var(--rtk-color-border-strong); }
+.success { --kpi-accent: var(--rtk-color-success); }
+.warning { --kpi-accent: var(--rtk-color-warning); }
+.danger { --kpi-accent: var(--rtk-color-danger); }
+
+.interactive {
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.interactive:hover {
+  background: var(--rtk-color-surface-hover);
+  border-color: var(--rtk-color-border-strong);
+  border-inline-start-color: var(--kpi-accent);
+  box-shadow: var(--rtk-shadow-elevation-2);
+}
+
+.interactive:focus-visible {
+  border-inline-start-color: var(--kpi-accent);
+}
+
+.header {
+  align-items: center;
+  display: flex;
+  gap: var(--rtk-space-3);
+  min-height: 32px;
+}
+
+.icon {
+  align-items: center;
+  background: var(--rtk-color-surface-subtle);
+  border-radius: var(--rtk-radius-small);
+  display: inline-flex;
+  flex: 0 0 40px;
+  height: 40px;
+  justify-content: center;
+}
+
+.icon.brand { color: var(--rtk-color-brand); }
+.icon.neutral { color: var(--rtk-color-text-secondary); }
+.icon.success { color: var(--rtk-color-success); }
+.icon.warning { color: var(--rtk-color-warning); }
+.icon.danger { color: var(--rtk-color-danger); }
+
+.title {
+  color: var(--rtk-color-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.value {
+  color: var(--rtk-color-text-primary);
+  font-size: clamp(26px, 2.5vw, 32px);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.03em;
+  line-height: 1.1;
+  margin-top: var(--rtk-space-2);
+}
+
+.caption {
+  color: var(--rtk-color-text-tertiary);
+  font-size: 12px;
+  line-height: 1.35;
+  margin-top: auto;
+}

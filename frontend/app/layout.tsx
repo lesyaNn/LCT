@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { AuthProvider } from '@/shared/auth/AuthProvider';
+import { QueryProvider } from '@/shared/providers/query-provider';
 import '../styles/globals.css';
 
 export const metadata: Metadata = {
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ru">
-      <body><AuthProvider>{children}</AuthProvider></body>
+      <body><QueryProvider><AuthProvider>{children}</AuthProvider></QueryProvider></body>
     </html>
   );
 }
