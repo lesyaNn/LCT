@@ -1,5 +1,6 @@
 import { getHealthStatus, type HealthStatus } from './health-score';
 import { programStatusLabels, type ProgramStatus } from './dashboard-repository';
+import { getExpirationStatus, type ExpirationStatus } from './formatters';
 
 export type { ProgramStatus };
 
@@ -610,6 +611,53 @@ export interface UniversityTeacherRow {
   allowedPrograms: string[];
 }
 
+export interface TeacherQualification {
+  id: string;
+  name: string;
+  obtainedAt: string;
+  expiresAt: string;
+  status: ExpirationStatus;
+  document: { name: string; fileType: string; fileSize: string; downloadUrl: string | null } | null;
+}
+
+export interface TeacherTraining {
+  id: string;
+  name: string;
+  provider: string;
+  completedAt: string;
+  hours: number;
+  certificate: string | null;
+}
+
+export type TeacherCertificateStatus = ExpirationStatus;
+
+export interface TeacherCertificate {
+  id: string;
+  name: string;
+  issuer: string;
+  issuedAt: string;
+  expiresAt: string;
+  mandatory: boolean;
+  program: string;
+  status: TeacherCertificateStatus;
+  document: { name: string; fileType: string; fileSize: string; downloadUrl: string | null } | null;
+}
+
+export interface TeacherPassportProfile extends UniversityTeacherRow {
+  universityId: string;
+  universityName: string;
+  universityCity: string;
+  readinessReason: string;
+}
+
+export interface TeacherPassport {
+  teacher: TeacherPassportProfile;
+  qualifications: TeacherQualification[];
+  trainings: TeacherTraining[];
+  certificates: TeacherCertificate[];
+  allowedPrograms: Array<{ id: string; name: string }>;
+}
+
 export interface UniversityStudentsByProgram {
   programId: string;
   programName: string;
@@ -640,6 +688,7 @@ export interface UniversityProductRow {
 
 export const universityProgramsQueryKey = (id: string) => ['university-programs', id] as const;
 export const universityTeachersQueryKey = (id: string) => ['university-teachers', id] as const;
+export const teacherPassportQueryKey = (id: string) => ['teacher-passport', id] as const;
 export const universityStudentsQueryKey = (id: string) => ['university-students', id] as const;
 export const universityProductsQueryKey = (id: string) => ['university-products', id] as const;
 
@@ -680,10 +729,22 @@ export async function getUniversityPrograms(id: string): Promise<UniversityProgr
 /** Typed frontend adapter for the future university teachers endpoint. */
 export async function getUniversityTeachers(id: string): Promise<UniversityTeacherRow[]> {
   getUniversityOrThrow(id);
+  return universityTeachersFixture(id);
+}
+
+function getTeacherPassportContext(id: string): { teacher: UniversityTeacherRow; university: UniversityListItem } {
+  const parts = id.split('-');
+  const universityId = `university-${String(Number(parts[1]) || 1).padStart(3, '0')}`;
+  const university = getUniversityOrThrow(universityId);
+  const teacherIndex = Math.max(0, (Number(parts[2]) || 1) - 1);
+  const teachers = universityTeachersFixture(universityId);
+  return { university, teacher: teachers[teacherIndex] ?? teachers[0] };
+}
+
+function universityTeachersFixture(id: string): UniversityTeacherRow[] {
   const numericId = getUniversityNumericId(id);
   const readiness: TeacherReadiness[] = ['ready', 'attention', 'expired', 'ready', 'ready', 'attention'];
   const count = 5 + (numericId % 2);
-
   return Array.from({ length: count }, (_, index) => ({
     id: `teacher-${String(numericId).padStart(3, '0')}-${index + 1}`,
     name: teacherNames[(index + numericId) % teacherNames.length],
@@ -695,6 +756,80 @@ export async function getUniversityTeachers(id: string): Promise<UniversityTeach
       ...(index % 2 === 0 ? [programNames[(index + numericId + 1) % programNames.length]] : []),
     ],
   }));
+}
+
+const qualificationNames = ['Педагогический дизайн', 'Информационная безопасность', 'Управление образовательными проектами'];
+const certificateNames = ['Информационная безопасность', 'Цифровая педагогика', 'Управление проектами', 'Основы аналитики данных'];
+
+function getReadinessReason(readiness: TeacherReadiness, certificates: TeacherCertificate[]): string {
+  const expiring = certificates.find((item) => item.mandatory && item.status === 'expires_soon');
+  const expired = certificates.find((item) => item.mandatory && item.status === 'expired');
+  if (readiness === 'ready') return 'Все обязательные сертификаты актуальны';
+  if (readiness === 'expired' && expired) return `Истёк обязательный сертификат: ${expired.name}`;
+  if (expiring) return `Сертификат «${expiring.name}» истекает ${new Intl.DateTimeFormat('ru-RU').format(new Date(expiring.expiresAt))}`;
+  return 'Нужно обновить данные о квалификации';
+}
+
+/** Typed frontend adapter for the future GET /teachers/{id}/passport endpoint. */
+export async function getTeacherPassport(id: string): Promise<TeacherPassport> {
+  const { teacher, university } = getTeacherPassportContext(id);
+  const numericId = getUniversityNumericId(university.id);
+  const certificateDates = teacher.readiness === 'expired'
+    ? ['2026-08-15', '2027-02-20', '2026-09-10', '2027-03-05']
+    : teacher.readiness === 'attention'
+      ? ['2026-10-15', '2027-02-20', '2027-04-10', '2027-03-05']
+      : ['2027-01-15', '2027-02-20', '2027-04-10', '2027-03-05'];
+  const certificates: TeacherCertificate[] = certificateNames.map((name, index) => {
+    const expiresAt = certificateDates[index];
+    return {
+      id: `${id}-certificate-${index + 1}`,
+      name,
+      issuer: ['Ростелеком', 'ИТ-Академия', 'НОЦ «Цифровые кадры»', 'Университетская школа'][index],
+      issuedAt: `202${index % 2 + 3}-${String(((numericId + index) % 8) + 1).padStart(2, '0')}-12`,
+      expiresAt,
+      mandatory: index < 3,
+      program: programNames[(index + numericId) % programNames.length],
+      status: getExpirationStatus(expiresAt),
+      document: {
+        name: `${name}.pdf`,
+        fileType: 'PDF',
+        fileSize: `${1 + index}.2 МБ`,
+        downloadUrl: null,
+      },
+    };
+  }).sort((left, right) => Number(right.mandatory) - Number(left.mandatory) || left.expiresAt.localeCompare(right.expiresAt));
+
+  const qualifications: TeacherQualification[] = qualificationNames.map((name, index) => {
+    const expiresAt = [`2027-04-18`, `2026-12-12`, `2026-09-10`][index];
+    return {
+      id: `${id}-qualification-${index + 1}`,
+      name,
+      obtainedAt: `202${index + 2}-0${index + 3}-18`,
+      expiresAt,
+      status: getExpirationStatus(expiresAt),
+      document: index === 2 ? null : { name: `${name}.pdf`, fileType: 'PDF', fileSize: `${2 + index}.4 МБ`, downloadUrl: null },
+    };
+  }).sort((left, right) => right.obtainedAt.localeCompare(left.obtainedAt));
+
+  const trainings: TeacherTraining[] = [
+    { id: `${id}-training-1`, name: 'Современные методы онлайн-обучения', provider: 'Ростелеком Лицей', completedAt: '2026-06-24', hours: 24, certificate: 'Сертификат RTK-2026-184' },
+    { id: `${id}-training-2`, name: 'Практики безопасной разработки', provider: 'ИТ-Академия', completedAt: '2025-11-18', hours: 16, certificate: 'Сертификат IT-2025-071' },
+    { id: `${id}-training-3`, name: 'Работа с данными в образовательных программах', provider: 'НОЦ «Цифровые кадры»', completedAt: '2025-04-09', hours: 32, certificate: null },
+  ];
+
+  return {
+    teacher: {
+      ...teacher,
+      universityId: university.id,
+      universityName: university.name,
+      universityCity: university.city,
+      readinessReason: getReadinessReason(teacher.readiness, certificates),
+    },
+    qualifications,
+    trainings,
+    certificates,
+    allowedPrograms: teacher.allowedPrograms.map((name, index) => ({ id: `${university.id}-program-${index + 1}`, name })),
+  };
 }
 
 /** Typed frontend adapter for the future aggregate students endpoint. */
