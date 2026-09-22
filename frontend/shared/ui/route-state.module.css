@@ -1,0 +1,75 @@
+.loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rtk-space-6);
+  max-width: 760px;
+}
+
+.loadingHeader {
+  align-items: center;
+  display: flex;
+  gap: var(--rtk-space-3);
+}
+
+.loader {
+  animation: spin 800ms linear infinite;
+  border: 3px solid var(--rtk-color-brand-soft);
+  border-radius: 50%;
+  border-top-color: var(--rtk-color-brand);
+  flex: 0 0 auto;
+  height: 24px;
+  width: 24px;
+}
+
+.loadingText {
+  color: var(--rtk-color-text-secondary);
+  margin: 0;
+}
+
+.skeleton {
+  display: grid;
+  gap: var(--rtk-space-4);
+}
+
+.skeletonLine,
+.skeletonCard {
+  animation: pulse 1.4s ease-in-out infinite;
+  background: var(--rtk-color-surface-hover);
+  border-radius: var(--rtk-radius-small);
+}
+
+.skeletonLine { height: 18px; width: min(100%, 420px); }
+.skeletonLineShort { width: min(62%, 260px); }
+.skeletonCards { display: grid; gap: var(--rtk-space-4); grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: var(--rtk-space-2); }
+.skeletonCard { height: 144px; }
+
+.error {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--rtk-space-3);
+  justify-content: center;
+  min-height: min(520px, calc(100vh - var(--topbar-height) - var(--rtk-space-8)));
+  padding: var(--rtk-space-8) var(--rtk-space-4);
+  text-align: center;
+}
+
+.error h1,
+.error p { margin: 0; }
+.error h1 { font-size: clamp(24px, 4vw, 32px); letter-spacing: -.03em; }
+.error p:not(.eyebrow) { color: var(--rtk-color-text-secondary); max-width: 480px; }
+.eyebrow { color: var(--rtk-color-brand); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.actions { display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); justify-content: center; margin-top: var(--rtk-space-2); }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse { 50% { opacity: .52; } }
+
+@media (max-width: 900px) {
+  .skeletonCards { grid-template-columns: 1fr; max-width: 520px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loader,
+  .skeletonLine,
+  .skeletonCard { animation: none; }
+}
