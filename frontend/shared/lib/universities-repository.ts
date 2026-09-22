@@ -195,3 +195,96 @@ export async function getUniversities(params: UniversityListQuery): Promise<Pagi
     total,
   };
 }
+
+export type UniversityPassportEventType = 'meeting' | 'document' | 'workflow' | 'note';
+
+export interface UniversityPassportMetrics {
+  activePrograms: number;
+  teachers: { total: number; ready: number; attention: number };
+  licenses: { active: number; expiring: number; overdue: number };
+  documents: { total: number; signed: number; overdue: number };
+}
+
+export interface UniversityPassportWorkflow {
+  currentStage: UniversityStage;
+  status: 'in_progress' | 'completed' | 'attention';
+  deadline: string;
+  overdue: boolean;
+  responsible: UniversityResponsible | null;
+  completedSteps: number;
+  totalSteps: number;
+  nextStage: UniversityStage | null;
+}
+
+export interface UniversityPassportEvent {
+  id: string;
+  type: UniversityPassportEventType;
+  occurredAt: string;
+  description: string;
+}
+
+export interface UniversityPassport {
+  id: string;
+  name: string;
+  city: string;
+  healthScore: number;
+  metrics: UniversityPassportMetrics;
+  workflow: UniversityPassportWorkflow;
+  timeline: UniversityPassportEvent[];
+}
+
+const workflowOrder = [stage.preparation, stage.launch, stage.support, stage.completed];
+
+function getPassportNextStage(currentStageId: string): UniversityStage | null {
+  const currentIndex = workflowOrder.findIndex((item) => item.id === currentStageId);
+  return currentIndex >= 0 && currentIndex < workflowOrder.length - 1 ? workflowOrder[currentIndex + 1] : null;
+}
+
+/**
+ * Typed frontend fixture for the future GET /universities/{id}/passport adapter.
+ * Keeping this mapper next to the existing university repository lets the UI
+ * switch to a real source without changing passport components.
+ */
+export async function getUniversityPassport(id: string): Promise<UniversityPassport> {
+  const university = universitiesWithRelationships.find((item) => item.id === id);
+  if (!university) throw new Error('Университет не найден');
+
+  const launchedPrograms = university.programStatusCounts.launched ?? 0;
+  const activePrograms = launchedPrograms + (university.programStatusCounts.active ?? 0);
+  const numericId = Number(id.split('-').at(-1)) || 1;
+  const teachersTotal = 42 + numericId;
+  const teachersAttention = university.attention ? 8 : 3;
+  const workflowStatus: UniversityPassportWorkflow['status'] = university.currentStage.id === stage.completed.id
+    ? 'completed'
+    : university.attention ? 'attention' : 'in_progress';
+
+  return {
+    id: university.id,
+    name: university.name,
+    city: university.city,
+    healthScore: university.healthScore,
+    metrics: {
+      activePrograms,
+      teachers: { total: teachersTotal, ready: teachersTotal - teachersAttention, attention: teachersAttention },
+      licenses: { active: 4 + (numericId % 3), expiring: university.attention ? 2 : 1, overdue: university.attention ? 1 : 0 },
+      documents: { total: 24 + numericId, signed: 19 + (numericId % 4), overdue: university.attention ? 2 : 0 },
+    },
+    workflow: {
+      currentStage: university.currentStage,
+      status: workflowStatus,
+      deadline: university.attention ? '2026-09-18' : '2026-10-08',
+      overdue: university.attention && university.currentStage.id !== stage.completed.id,
+      responsible: university.responsible,
+      completedSteps: university.currentStage.id === stage.completed.id ? 6 : Math.max(1, workflowOrder.findIndex((item) => item.id === university.currentStage.id) + 2),
+      totalSteps: 6,
+      nextStage: getPassportNextStage(university.currentStage.id),
+    },
+    timeline: [
+      { id: `${id}-event-1`, type: 'meeting', occurredAt: '2026-09-20T11:30:00+03:00', description: 'Провели встречу с координатором программы.' },
+      { id: `${id}-event-2`, type: 'document', occurredAt: '2026-09-18T16:10:00+03:00', description: 'Получили подписанный пакет документов.' },
+      { id: `${id}-event-3`, type: 'workflow', occurredAt: '2026-09-16T13:45:00+03:00', description: `Этап изменён: ${university.currentStage.name}.` },
+      { id: `${id}-event-4`, type: 'note', occurredAt: '2026-09-14T09:20:00+03:00', description: 'Добавили заметку по подготовке преподавателей.' },
+      { id: `${id}-event-5`, type: 'meeting', occurredAt: '2026-09-12T15:00:00+03:00', description: 'Согласовали план ближайших запусков.' },
+    ],
+  };
+}

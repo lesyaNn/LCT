@@ -1,7 +1,13 @@
-import { EntityDetailPlaceholder } from '@/shared/ui/entity-detail-placeholder';
+import { Suspense } from 'react';
+import { PageSkeleton } from '@/shared/ui/page-skeleton';
+import { UniversityPassport } from '@/widgets/universities/university-passport';
 
 export default async function UniversityDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  return <EntityDetailPlaceholder eyebrow="ВУЗы" title="Университет" description="Карточка университета будет подключена в следующем функциональном модуле." routeId={id} />;
+  return (
+    <Suspense fallback={<PageSkeleton cardCount={4} variant="dashboard" />}>
+      <UniversityPassport id={id} />
+    </Suspense>
+  );
 }
