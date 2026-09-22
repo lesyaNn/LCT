@@ -136,6 +136,7 @@
   white-space: nowrap;
 }
 
+.tableSection { composes: section from '../../shared/ui/rtk/data-table.module.css'; }
 .tableScroll { composes: shell from '../../shared/ui/rtk/data-table.module.css'; overflow-x: auto; }
 .table { composes: table from '../../shared/ui/rtk/data-table.module.css'; min-width: 1030px; table-layout: fixed; }
 .table th { white-space: normal; }

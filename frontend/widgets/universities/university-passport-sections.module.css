@@ -1,6 +1,8 @@
-.section { composes: surface from '../../shared/ui/rtk/section-surface.module.css'; display: flex; flex-direction: column; gap: var(--rtk-space-4); }
+.section { composes: section from '../../shared/ui/rtk/data-table.module.css'; }
 .emptySection { color: var(--rtk-color-text-secondary); margin: var(--rtk-space-5) 0; text-align: center; }
-.sectionToolbar { align-items: flex-end; display: flex; gap: var(--rtk-space-4); justify-content: flex-end; }
+.sectionToolbar { align-items: center; display: flex; gap: var(--rtk-space-4); justify-content: space-between; }
+.sectionToolbar h2 { font-size: 18px; letter-spacing: -.02em; margin: 0; }
+.toolbarControls { align-items: flex-end; display: flex; gap: var(--rtk-space-3); margin-left: auto; }
 .filter { align-items: flex-start; display: flex; flex-direction: column; gap: var(--rtk-space-1); min-width: 180px; }
 .filter span { color: var(--rtk-color-text-secondary); font-size: 11px; font-weight: 600; }
 .filter select { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border-strong); border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-primary); font: inherit; font-size: 13px; min-height: 36px; padding: 0 var(--rtk-space-3); width: 100%; }
@@ -13,10 +15,8 @@
 .chips { display: flex; flex-wrap: wrap; gap: var(--rtk-space-1); max-width: 270px; }
 .chip, .chipMore { background: var(--rtk-color-surface-subtle); border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-secondary); display: inline-block; font-size: 11px; max-width: 180px; overflow: hidden; padding: 3px 6px; text-overflow: ellipsis; white-space: nowrap; }
 .chipMore { color: var(--rtk-color-brand); font-weight: 700; }
+.studentPage { display: flex; flex-direction: column; gap: var(--rtk-space-5); }
 .studentSummary { display: grid; gap: var(--rtk-space-3); grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.studentMetric { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-medium); display: flex; flex-direction: column; gap: var(--rtk-space-1); min-height: 104px; min-width: 0; padding: var(--rtk-space-4); }
-.studentMetric strong { font-size: 24px; letter-spacing: -.03em; line-height: 1; }
-.studentMetric span { color: var(--rtk-color-text-secondary); font-size: 12px; }
 .license { display: flex; flex-direction: column; gap: 2px; }
 .license strong { font-size: 12px; }
 .license span { color: var(--rtk-color-text-tertiary); font-size: 11px; }
@@ -55,6 +55,7 @@
 .responsibleInfo a:hover { text-decoration: underline; }
 @media (max-width: 768px) {
   .sectionToolbar { align-items: stretch; flex-direction: column; }
+  .toolbarControls { margin-left: 0; }
   .filter { max-width: 280px; }
   .studentSummary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .filtersRow { align-items: stretch; flex-direction: column; }
@@ -62,6 +63,4 @@
 }
 @media (max-width: 420px) {
   .studentSummary { gap: var(--rtk-space-2); }
-  .studentMetric { padding: var(--rtk-space-3); }
-  .studentMetric strong { font-size: 20px; }
 }

@@ -72,12 +72,16 @@
   --atmr-base-warning: #fda610;
   --atmr-warning-500: var(--atmr-base-warning);
   --atmr-warning-600: #d78d0e;
+  --atmr-warning-990: #332103;
   --atmr-warning-default: var(--atmr-warning-500);
+  --atmr-warning-on-warning: var(--atmr-warning-990);
   --atmr-warning-container-soft: rgba(253, 166, 16, .05);
   --atmr-warning-on-container: var(--atmr-warning-600);
   --atmr-base-error: #ff2626;
   --atmr-error-500: var(--atmr-base-error);
+  --atmr-error-0: var(--atmr-neutral-0);
   --atmr-error-default: var(--atmr-error-500);
+  --atmr-error-on-error: var(--atmr-error-0);
   --atmr-error-container-soft: rgba(255, 38, 38, .05);
   --atmr-error-on-container: var(--atmr-error-500);
   --atmr-base-info: #1f69ff;

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useMemo, useSyncExternalStore, type ComponentType, type ReactNode } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Checklist from '@atomaro/icons/24/action/Checklist';
 import TimeStroke from '@atomaro/icons/24/alert/TimeStroke';
@@ -27,6 +27,7 @@ import {
 } from '@/shared/lib/universities-repository';
 import { Avatar } from '@/shared/ui/rtk/avatar';
 import { Button } from '@/shared/ui/rtk/button';
+import { MetricCard } from '@/shared/ui/rtk/metric-card';
 import { StatusBadge as SemanticStatusBadge } from '@/shared/ui/rtk/status-badge';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { UniversityHealthScore } from './university-health-score';
@@ -62,7 +63,6 @@ const tabDefinitions = [
 ] as const;
 
 type PassportTabId = (typeof tabDefinitions)[number]['id'];
-type IconProps = { fill?: string; size?: number };
 
 const tabIds = new Set<PassportTabId>(tabDefinitions.map((tab) => tab.id));
 
@@ -121,29 +121,17 @@ function PassportHeader({ passport, canEdit, canReport, onTabChange }: { passpor
   );
 }
 
-function OverviewMetricCard({ title, icon: Icon, children }: { title: string; icon: ComponentType<IconProps>; children: ReactNode }) {
-  return (
-    <article className={styles.metricCard}>
-      <div className={styles.metricHeader}><span className={styles.metricIcon} aria-hidden="true"><Icon size={20} fill="currentColor" /></span><h3>{title}</h3></div>
-      {children}
-    </article>
-  );
-}
-
-function MetricValue({ value, label, tone = 'neutral' }: { value: number; label: string; tone?: 'neutral' | 'success' | 'warning' | 'danger' }) {
-  return <div className={styles.metricValue}><strong>{value}</strong><span className={styles[`metric-${tone}`]}>{label}</span></div>;
-}
-
 function OverviewMetrics({ passport }: { passport: UniversityPassport }) {
   const { metrics } = passport;
+  const licensesTotal = metrics.licenses.active + metrics.licenses.expiring + metrics.licenses.overdue;
   return (
     <section className={styles.section} aria-labelledby="passport-metrics-title">
       <div className={styles.sectionHeading}><h2 id="passport-metrics-title">Ключевые показатели</h2></div>
       <div className={styles.metricsGrid}>
-        <OverviewMetricCard title="Активные программы" icon={Book}><div className={styles.metricPrimary}><strong>{metrics.activePrograms}</strong><span>программ</span></div></OverviewMetricCard>
-        <OverviewMetricCard title="Преподаватели" icon={Group}><div className={styles.metricPrimary}><strong>{metrics.teachers.total}</strong><span>всего</span></div><div className={styles.metricSubvalues}><MetricValue value={metrics.teachers.ready} label="готовы" tone="success" /><MetricValue value={metrics.teachers.attention} label="требуют внимания" tone="warning" /></div></OverviewMetricCard>
-        <OverviewMetricCard title="Лицензии" icon={Education}><div className={styles.metricSubvalues}><MetricValue value={metrics.licenses.active} label="действуют" tone="success" /><MetricValue value={metrics.licenses.expiring} label="истекают" tone="warning" /><MetricValue value={metrics.licenses.overdue} label="просрочены" tone="danger" /></div></OverviewMetricCard>
-        <OverviewMetricCard title="Документы" icon={DocumentText}><div className={styles.metricPrimary}><strong>{metrics.documents.total}</strong><span>всего</span></div><div className={styles.metricSubvalues}><MetricValue value={metrics.documents.signed} label="подписано" tone="success" /><MetricValue value={metrics.documents.overdue} label="просрочено" tone="danger" /></div></OverviewMetricCard>
+        <MetricCard label="Активные программы" value={metrics.activePrograms} icon={Book} />
+        <MetricCard label="Преподаватели" value={metrics.teachers.total} icon={Group} indicators={[{ value: metrics.teachers.ready, label: 'готовы', intent: 'success' }, { value: metrics.teachers.attention, label: 'требуют внимания', intent: 'warning' }]} />
+        <MetricCard label="Лицензии" value={licensesTotal} icon={Education} indicators={[{ value: metrics.licenses.active, label: 'действуют', intent: 'success' }, { value: metrics.licenses.expiring, label: 'истекают', intent: 'warning' }, { value: metrics.licenses.overdue, label: 'просрочены', intent: 'danger' }]} />
+        <MetricCard label="Документы" value={metrics.documents.total} icon={DocumentText} indicators={[{ value: metrics.documents.signed, label: 'подписано', intent: 'success' }, { value: metrics.documents.overdue, label: 'просрочено', intent: 'danger' }]} />
       </div>
     </section>
   );

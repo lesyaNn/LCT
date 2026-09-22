@@ -5,3 +5,4 @@
 .success { background: var(--atmr-success-container-soft); color: var(--atmr-success-on-container); }
 .warning { background: var(--atmr-warning-container-soft); color: var(--atmr-warning-on-container); }
 .danger { background: var(--atmr-error-container-soft); color: var(--atmr-error-on-container); }
+.inline { background: transparent; border-radius: 0; padding: 0; }

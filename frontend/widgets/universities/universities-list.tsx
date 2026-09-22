@@ -405,7 +405,7 @@ function ActiveFilterChips({ filters, onPatch, onReset }: { filters: UniversityF
 
 function UniversityListSkeleton() {
   return (
-    <div aria-live="polite" aria-busy="true">
+    <section className={styles.tableSection} aria-label="Загрузка списка вузов" aria-live="polite" aria-busy="true">
       <div className={styles.desktopOnly}>
         <div className={styles.tableScroll}>
           <table className={styles.table} aria-label="Загрузка списка вузов">
@@ -422,7 +422,7 @@ function UniversityListSkeleton() {
           {Array.from({ length: 4 }, (_, index) => <div className={styles.mobileSkeletonCard} key={index}><span className={styles.skeletonLine} /><span className={styles.skeletonLine} /><span className={styles.skeletonLine} /></div>)}
         </div>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -659,9 +659,11 @@ export function UniversitiesList() {
       {query.isPending ? <UniversityListSkeleton /> : query.isError || !query.data ? <RouteErrorState onRetry={() => void query.refetch()} /> : query.data.total === 0 ? <EmptyState filtered={hasFilters} onReset={resetFilters} /> : (
         <>
           {query.isFetching ? <p className={styles.fetching} role="status">Обновляем список…</p> : null}
-          <div className={styles.desktopOnly}><DesktopTable table={table} /></div>
-          <div className={styles.mobileOnly}><MobileUniversityCards items={query.data.items} /></div>
-          <Pagination page={query.data.page} pageSize={query.data.pageSize} total={query.data.total} onPatch={goToState} />
+          <section className={styles.tableSection} aria-label="Список вузов">
+            <div className={styles.desktopOnly}><DesktopTable table={table} /></div>
+            <div className={styles.mobileOnly}><MobileUniversityCards items={query.data.items} /></div>
+            <Pagination page={query.data.page} pageSize={query.data.pageSize} total={query.data.total} onPatch={goToState} />
+          </section>
         </>
       )}
     </div>

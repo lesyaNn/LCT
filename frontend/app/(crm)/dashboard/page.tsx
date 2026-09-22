@@ -39,7 +39,7 @@ interface KpiDefinition {
 
 const kpiDefinitions: KpiDefinition[] = [
   { title: 'Вузы', caption: 'в реестре', tone: 'brand', icon: Education, value: (overview) => formatCount(overview.universitiesTotal) },
-  { title: 'Средний Health Score', caption: 'среднее по вузам', tone: 'brandSoft', icon: StatisticsBoard, value: (overview) => formatScore(overview.averageHealthScore) },
+  { title: 'Средний Health Score', caption: 'среднее по вузам', tone: 'brand', icon: StatisticsBoard, value: (overview) => formatScore(overview.averageHealthScore) },
   { title: 'Красные вузы', caption: 'нуждаются во внимании', tone: 'danger', icon: Attention, href: '/universities?health_status=red', ariaLabel: 'Перейти к красным вузам', value: (overview) => formatCount(overview.redUniversities) },
   { title: 'Просроченные этапы', caption: 'требуют контроля', tone: 'danger', icon: Time, href: '/workflows?overdue=true', ariaLabel: 'Перейти к просроченным этапам workflow', value: (overview) => formatCount(overview.overdueStages) },
   { title: 'Истекающие лицензии', caption: 'до истечения 30 дней', tone: 'warning', icon: DocumentText, value: (overview) => formatCount(overview.expiringLicenses) },

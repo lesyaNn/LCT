@@ -1,53 +1,38 @@
 .card {
   background: var(--kpi-background);
-  border: 1px solid var(--kpi-border, transparent);
+  border: 0;
   border-radius: var(--rtk-radius-medium);
-  color: var(--kpi-foreground, var(--rtk-color-text-inverse));
+  color: var(--kpi-foreground);
   display: flex;
   flex-direction: column;
-  gap: var(--rtk-space-3);
-  min-height: 172px;
+  gap: var(--rtk-space-2);
+  min-height: 150px;
   overflow: hidden;
-  padding: var(--rtk-space-5);
+  padding: var(--rtk-space-4);
   position: relative;
   text-decoration: none;
 }
 
 .card::after {
-  border: 1px solid color-mix(in srgb, var(--rtk-color-text-inverse) 18%, transparent);
+  border: 1px solid var(--kpi-foreground);
   border-radius: 50%;
   content: '';
-  height: 138px;
+  height: 112px;
+  opacity: .18;
   position: absolute;
-  right: -52px;
-  top: -66px;
-  width: 138px;
+  right: -46px;
+  top: -54px;
+  width: 112px;
 }
 
-.brand { --kpi-background: var(--atmr-accent-default); }
-.brandSoft { --kpi-background: var(--atmr-accent-600); }
-.orange { --kpi-background: var(--atmr-accent-600); }
+.brand, .orange { --kpi-background: var(--atmr-accent-default); --kpi-foreground: var(--atmr-accent-on-accent); }
 .danger {
-  --kpi-background: var(--atmr-error-container-soft);
-  --kpi-border: var(--rtk-color-border);
-  --kpi-foreground: var(--rtk-color-text-primary);
-  --kpi-status: var(--atmr-error-on-container);
+  --kpi-background: var(--atmr-error-default);
+  --kpi-foreground: var(--atmr-error-on-error);
 }
 .warning {
-  --kpi-background: var(--atmr-warning-container-soft);
-  --kpi-border: var(--rtk-color-border);
-  --kpi-foreground: var(--rtk-color-text-primary);
-  --kpi-status: var(--atmr-warning-on-container);
-}
-.danger::after, .warning::after { display: none; }
-.danger::before, .warning::before {
-  background: var(--kpi-status);
-  content: '';
-  height: 4px;
-  left: 0;
-  position: absolute;
-  right: 0;
-  top: 0;
+  --kpi-background: var(--atmr-warning-default);
+  --kpi-foreground: var(--atmr-warning-on-warning);
 }
 
 .interactive {
@@ -73,41 +58,37 @@
 
 .icon {
   align-items: center;
-  background: color-mix(in srgb, var(--rtk-color-text-inverse) 16%, transparent);
+  background: var(--kpi-foreground);
   border-radius: var(--rtk-radius-small);
-  color: var(--rtk-color-text-inverse);
+  color: var(--kpi-background);
   display: inline-flex;
-  flex: 0 0 40px;
-  height: 40px;
+  flex: 0 0 36px;
+  height: 36px;
   justify-content: center;
 }
-.danger .icon, .warning .icon { background: var(--rtk-color-surface); color: var(--kpi-status); }
 
 .title {
-  color: var(--rtk-color-text-inverse);
+  color: var(--kpi-foreground);
   font-size: 13px;
   font-weight: 600;
   line-height: 1.3;
 }
 
 .value {
-  color: var(--kpi-foreground, var(--rtk-color-text-inverse));
+  color: var(--kpi-foreground);
   font-size: clamp(26px, 2.5vw, 32px);
   font-variant-numeric: tabular-nums;
   letter-spacing: -.03em;
   line-height: 1.1;
-  margin-top: var(--rtk-space-2);
+  margin-top: var(--rtk-space-1);
 }
 
 .caption {
-  color: var(--rtk-color-text-inverse);
+  color: var(--kpi-foreground);
   font-size: 12px;
   line-height: 1.35;
   margin-top: auto;
 }
-.danger .title, .warning .title { color: var(--rtk-color-text-primary); }
-.danger .value, .warning .value { color: var(--kpi-status); }
-.danger .caption, .warning .caption { color: var(--rtk-color-text-secondary); }
 
 .header,
 .value,

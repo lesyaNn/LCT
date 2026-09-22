@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { ComponentType } from 'react';
 import styles from './kpi-card.module.css';
 
-export type KpiTone = 'brand' | 'brandSoft' | 'orange' | 'warning' | 'danger';
+export type KpiTone = 'brand' | 'orange' | 'warning' | 'danger';
 
 interface KpiIconProps {
   fill?: string;
