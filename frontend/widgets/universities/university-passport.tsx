@@ -26,6 +26,7 @@ import {
 import { Avatar } from '@/shared/ui/rtk/avatar';
 import { Button } from '@/shared/ui/rtk/button';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
+import { UniversityHealthScore } from './university-health-score';
 import styles from './university-passport.module.css';
 
 const passportQueryKey = (id: string) => ['university-passport', id] as const;
@@ -222,6 +223,8 @@ export function UniversityPassport({ id }: { id: string }) {
   const passport = query.data;
   const renderContent = (tab: PassportTabId) => tab === 'overview'
     ? <OverviewContent passport={passport} canAdvance={canAdvance} onTabChange={selectTab} />
+    : tab === 'health-score'
+      ? <UniversityHealthScore id={id} />
     : <PlaceholderContent tab={tabDefinitions.find((definition) => definition.id === tab) ?? activeTabDefinition} />;
 
   return (

@@ -288,3 +288,95 @@ export async function getUniversityPassport(id: string): Promise<UniversityPassp
     ],
   };
 }
+
+export type HealthScoreReasonSeverity = 'high' | 'medium' | 'low';
+
+export interface UniversityHealthScoreBreakdown {
+  id: 'tasks' | 'documents' | 'stages' | 'teachers' | 'launch';
+  label: string;
+  weight: number;
+  score: number;
+  inputCounters: Array<{ label: string; value: number }>;
+}
+
+export interface UniversityHealthScoreReason {
+  id: string;
+  severity: HealthScoreReasonSeverity;
+  title: string;
+  description: string;
+  details?: string;
+  inputCounters?: Array<{ label: string; value: number }>;
+}
+
+export interface UniversityHealthScoreHistoryPoint {
+  date: string;
+  score: number;
+}
+
+export interface UniversityHealthScore {
+  universityId: string;
+  currentScore: number;
+  status: HealthStatus;
+  breakdown: UniversityHealthScoreBreakdown[];
+  reasons: UniversityHealthScoreReason[];
+  history: UniversityHealthScoreHistoryPoint[];
+  previousSnapshot: UniversityHealthScoreHistoryPoint;
+}
+
+export const universityHealthScoreQueryKey = (id: string) => ['university-health-score', id] as const;
+
+function clampScore(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function createHealthHistory(currentScore: number, numericId: number): UniversityHealthScoreHistoryPoint[] {
+  const today = new Date(Date.UTC(2026, 8, 22));
+  return Array.from({ length: 30 }, (_, index) => {
+    const date = new Date(today);
+    date.setUTCDate(today.getUTCDate() - (29 - index));
+    const trend = (index - 22) * (numericId % 3 === 0 ? 0.28 : 0.16);
+    const wave = ((index * 7 + numericId) % 5) - 2;
+    return { date: date.toISOString().slice(0, 10), score: clampScore(currentScore - 3 + trend + wave) };
+  }).map((point, index, points) => index === points.length - 1 ? { ...point, score: currentScore } : point);
+}
+
+/** Temporary typed adapter for the future GET /universities/{id}/health-score endpoints. */
+export async function getUniversityHealthScore(id: string): Promise<UniversityHealthScore> {
+  const university = universitiesWithRelationships.find((item) => item.id === id);
+  if (!university) throw new Error('Университет не найден');
+
+  const numericId = Number(id.split('-').at(-1)) || 1;
+  const currentScore = university.healthScore;
+  const taskScore = clampScore(currentScore + (university.attention ? -9 : 4));
+  const documentScore = clampScore(currentScore + (numericId % 2 === 0 ? 3 : -4));
+  const stageScore = clampScore(currentScore + (university.currentStage.id === stage.completed.id ? 8 : -3));
+  const teacherScore = clampScore(currentScore + (numericId % 3 === 0 ? -7 : 2));
+  const launchScore = clampScore(currentScore + (university.programStatusCounts.launched ? 3 : -6));
+  const history = createHealthHistory(currentScore, numericId);
+  const previousSnapshot = history[history.length - 8] ?? history[0];
+  const reasons: UniversityHealthScoreReason[] = university.attention
+    ? [
+      { id: `${id}-reason-tasks`, severity: 'high', title: 'Есть просроченные задачи', description: 'Часть контрольных задач не закрыта в установленный срок.', details: 'Проверьте задачи workflow и назначьте ответственных.', inputCounters: [{ label: 'Всего задач', value: 18 }, { label: 'Просрочено', value: 4 }] },
+      { id: `${id}-reason-documents`, severity: 'medium', title: 'Не все документы подписаны', description: 'Для запуска следующего этапа не хватает подтверждённых документов.', details: 'Нужно проверить пакет документов по двум активным программам.', inputCounters: [{ label: 'Документов', value: 24 }, { label: 'Ожидают подписи', value: 3 }] },
+      { id: `${id}-reason-teachers`, severity: 'low', title: 'Преподавателям требуется обновление данных', description: 'У нескольких преподавателей не подтверждена готовность к запуску.', inputCounters: [{ label: 'Требуют внимания', value: 8 }] },
+    ]
+    : [
+      { id: `${id}-reason-stable`, severity: 'low', title: 'Критичных факторов не обнаружено', description: 'Основные показатели вуза находятся в стабильном диапазоне.', details: 'Текущие задачи, документы и этапы обновляются без критичных отклонений.' },
+    ];
+
+  return {
+    universityId: university.id,
+    currentScore,
+    status: getHealthStatus(currentScore),
+    breakdown: [
+      { id: 'tasks', label: 'Задачи', weight: 25, score: taskScore, inputCounters: [{ label: 'Всего задач', value: 18 }, { label: 'Выполнено', value: 14 }, { label: 'Просрочено', value: university.attention ? 4 : 1 }] },
+      { id: 'documents', label: 'Документы', weight: 20, score: documentScore, inputCounters: [{ label: 'Всего документов', value: 24 }, { label: 'Подписано', value: university.attention ? 19 : 23 }, { label: 'Просрочено', value: university.attention ? 2 : 0 }] },
+      { id: 'stages', label: 'Этапы', weight: 20, score: stageScore, inputCounters: [{ label: 'Всего этапов', value: 6 }, { label: 'Завершено', value: university.currentStage.id === stage.completed.id ? 6 : 3 }, { label: 'Текущий этап', value: 1 }] },
+      { id: 'teachers', label: 'Преподаватели', weight: 20, score: teacherScore, inputCounters: [{ label: 'Всего преподавателей', value: 42 + numericId }, { label: 'Готовы', value: university.attention ? 35 + numericId : 39 + numericId }, { label: 'Требуют внимания', value: university.attention ? 8 : 3 }] },
+      { id: 'launch', label: 'Запуск', weight: 15, score: launchScore, inputCounters: [{ label: 'Активных программ', value: (university.programStatusCounts.active ?? 0) + (university.programStatusCounts.launched ?? 0) }, { label: 'Запущено', value: university.programStatusCounts.launched ?? 0 }] },
+    ],
+    reasons,
+    history,
+    previousSnapshot,
+  };
+}

@@ -22,11 +22,11 @@
 .meter-red { background: var(--rtk-color-danger); }
 .statusBadge { align-items: center; border-radius: 999px; display: inline-flex; font-size: 11px; font-weight: 700; gap: 5px; padding: 4px 8px; white-space: nowrap; }
 .statusBadge > span { border-radius: 50%; height: 7px; width: 7px; }
-.status-green { background: rgb(32 138 90 / 10%); color: var(--rtk-color-success); }
+.status-green { background: var(--rtk-color-surface-subtle); color: var(--rtk-color-success); }
 .status-green > span { background: var(--rtk-color-success); }
-.status-yellow { background: rgb(169 99 0 / 11%); color: var(--rtk-color-warning); }
+.status-yellow { background: var(--rtk-color-surface-subtle); color: var(--rtk-color-warning); }
 .status-yellow > span { background: var(--rtk-color-warning); }
-.status-red { background: rgb(198 40 40 / 10%); color: var(--rtk-color-danger); }
+.status-red { background: var(--rtk-color-surface-subtle); color: var(--rtk-color-danger); }
 .status-red > span { background: var(--rtk-color-danger); }
 .textAction { align-items: center; background: transparent; border: 0; color: var(--rtk-color-brand); cursor: pointer; display: inline-flex; font-size: 12px; font-weight: 700; gap: var(--rtk-space-1); padding: 0; }
 .textAction:hover { color: var(--rtk-color-brand-hover); text-decoration: underline; }
@@ -68,8 +68,8 @@
 .workflowStage strong { font-size: 20px; letter-spacing: -.02em; }
 .workflowStatus { align-self: flex-start; border-radius: 999px; font-size: 11px; font-weight: 700; padding: 4px 8px; }
 .workflow-in_progress { background: var(--rtk-color-brand-soft); color: var(--rtk-color-brand); }
-.workflow-attention { background: rgb(169 99 0 / 11%); color: var(--rtk-color-warning); }
-.workflow-completed { background: rgb(32 138 90 / 10%); color: var(--rtk-color-success); }
+.workflow-attention { background: var(--rtk-color-surface-subtle); color: var(--rtk-color-warning); }
+.workflow-completed { background: var(--rtk-color-surface-subtle); color: var(--rtk-color-success); }
 .workflowDetails { display: grid; gap: var(--rtk-space-4); grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .workflowDetails > div { display: flex; flex-direction: column; gap: var(--rtk-space-2); }
 .detailLabel { color: var(--rtk-color-text-tertiary); font-size: 11px; }
