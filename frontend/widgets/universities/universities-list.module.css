@@ -136,8 +136,7 @@
   white-space: nowrap;
 }
 
-.tableSection { composes: section from '../../shared/ui/rtk/data-table.module.css'; }
-.tableScroll { composes: shell from '../../shared/ui/rtk/data-table.module.css'; overflow-x: auto; }
+.tableScroll { overflow-x: auto; }
 .table { composes: table from '../../shared/ui/rtk/data-table.module.css'; min-width: 1030px; table-layout: fixed; }
 .table th { white-space: normal; }
 .table th:nth-child(1) { width: 23%; }
@@ -161,7 +160,7 @@
 .noAttention { color: var(--rtk-color-text-tertiary); }
 
 .fetching { color: var(--rtk-color-text-secondary); font-size: 12px; margin: -8px 0 0; }
-.pagination { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-4); justify-content: space-between; }
+.pagination { align-items: center; border-top: 1px solid var(--rtk-color-border); display: flex; flex-wrap: wrap; gap: var(--rtk-space-4); justify-content: space-between; padding: var(--rtk-space-4); }
 .paginationSummary { color: var(--rtk-color-text-secondary); font-size: 12px; }
 .pageButtons { align-items: center; display: flex; gap: var(--rtk-space-2); }
 .pageButton,

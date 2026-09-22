@@ -31,7 +31,9 @@ import { MetricCard } from '@/shared/ui/rtk/metric-card';
 import { StatusBadge as SemanticStatusBadge } from '@/shared/ui/rtk/status-badge';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { UniversityHealthScore } from './university-health-score';
+import { UniversityHistory } from './university-history';
 import { DocumentsSection, LicensesSection, MeetingsSection, ProductsSection, ProgramsSection, ResponsiblesSection, StudentsSection, TeachersSection } from './university-passport-sections';
+import { UniversityWorkflow } from './university-workflow';
 import styles from './university-passport.module.css';
 
 const passportQueryKey = (id: string) => ['university-passport', id] as const;
@@ -237,6 +239,10 @@ export function UniversityPassport({ id }: { id: string }) {
       ? <MeetingsSection id={id} canAdd={canReport} />
     : tab === 'responsibles'
       ? <ResponsiblesSection id={id} />
+    : tab === 'workflow'
+      ? <UniversityWorkflow id={id} canAdvance={canAdvance} />
+    : tab === 'history'
+      ? <UniversityHistory id={id} />
     : <PlaceholderContent tab={tabDefinitions.find((definition) => definition.id === tab) ?? activeTabDefinition} />;
 
   return (

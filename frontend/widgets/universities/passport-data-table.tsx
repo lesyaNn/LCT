@@ -4,6 +4,7 @@ import ChevronSort from '@atomaro/icons/24/navigation/ChevronSort';
 import SortDown from '@atomaro/icons/24/editor/SortDown';
 import SortUp from '@atomaro/icons/24/editor/SortUp';
 import { Button } from '@/shared/ui/rtk/button';
+import { TableShell } from '@/shared/ui/rtk/table-shell';
 import { useMemo, useState, type ReactNode } from 'react';
 import styles from './passport-data-table.module.css';
 
@@ -74,7 +75,7 @@ export function PassportDataTable<T extends { id: string }>({ rows, columns, mob
   }
 
   return (
-    <div className={styles.tableShell}>
+    <TableShell>
       <div className={styles.desktopTableWrap}>
         <table className={`${styles.table} ${columns.length >= 7 ? styles.wideTable : ''}`}>
           <thead>
@@ -114,10 +115,10 @@ export function PassportDataTable<T extends { id: string }>({ rows, columns, mob
           </div>
         </div>
       ) : null}
-    </div>
+    </TableShell>
   );
 }
 
 export function PassportTableSkeleton() {
-  return <div className={styles.tableSkeleton} aria-live="polite" aria-busy="true"><span className={styles.skeletonHeader} />{Array.from({ length: 5 }, (_, index) => <span className={styles.skeletonRow} key={index} />)}</div>;
+  return <TableShell><div className={styles.tableSkeleton} aria-live="polite" aria-busy="true"><span className={styles.skeletonHeader} />{Array.from({ length: 5 }, (_, index) => <span className={styles.skeletonRow} key={index} />)}</div></TableShell>;
 }

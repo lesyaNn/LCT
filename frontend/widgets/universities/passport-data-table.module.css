@@ -1,4 +1,3 @@
-.tableShell { composes: shell from '../../shared/ui/rtk/data-table.module.css'; }
 .desktopTableWrap { overflow-x: auto; }
 .table { composes: table from '../../shared/ui/rtk/data-table.module.css'; min-width: 820px; }
 .wideTable { min-width: 1050px; }

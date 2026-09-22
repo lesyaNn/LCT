@@ -291,6 +291,211 @@ export async function getUniversityPassport(id: string): Promise<UniversityPassp
   };
 }
 
+export type UniversityWorkflowStageStatus = 'completed' | 'current' | 'pending' | 'skipped' | 'overdue';
+
+export interface UniversityWorkflowComment {
+  id: string;
+  author: string;
+  occurredAt: string;
+  text: string;
+}
+
+export interface UniversityWorkflowAttachment {
+  id: string;
+  fileName: string;
+  fileType: string;
+  fileSize: string;
+}
+
+export interface UniversityWorkflowTask {
+  id: string;
+  label: string;
+  completed: boolean;
+}
+
+export interface UniversityWorkflowTransition {
+  id: string;
+  occurredAt: string;
+  actor: string;
+  fromStatus: UniversityWorkflowStageStatus;
+  toStatus: UniversityWorkflowStageStatus;
+  comment: string;
+}
+
+export interface UniversityWorkflowStage {
+  id: string;
+  orderIndex: number;
+  name: string;
+  status: UniversityWorkflowStageStatus;
+  deadline: string;
+  responsible: UniversityResponsible | null;
+  comments: UniversityWorkflowComment[];
+  attachments: UniversityWorkflowAttachment[];
+  tasks: UniversityWorkflowTask[];
+  transitions: UniversityWorkflowTransition[];
+}
+
+export interface UniversityWorkflow {
+  universityId: string;
+  stages: UniversityWorkflowStage[];
+}
+
+export const universityWorkflowQueryKey = (id: string) => ['university-workflow', id] as const;
+
+const workflowStageNames = [
+  'Инициация проекта',
+  'Сбор данных о вузе',
+  'Проверка договорных условий',
+  'Подготовка дорожной карты',
+  'Согласование программы',
+  'Подготовка преподавателей',
+  'Подготовка инфраструктуры',
+  'Подписание документов',
+  'Настройка LMS',
+  'Пилотный запуск',
+  'Сопровождение запуска',
+  'Анализ результатов',
+  'Итоговая отчётность',
+  'Завершение проекта',
+] as const;
+
+const workflowStageIndex: Record<UniversityStage['id'], number> = { preparation: 3, launch: 6, support: 10, completed: 13 };
+
+function getWorkflowStageStatus(index: number, currentIndex: number, attention: boolean, numericId: number): UniversityWorkflowStageStatus {
+  if (index === currentIndex && currentIndex < workflowStageNames.length - 1) return 'current';
+  if (index < currentIndex) return index === 2 && numericId % 2 === 0 ? 'skipped' : 'completed';
+  if (index === currentIndex + 1 && attention) return 'overdue';
+  return 'pending';
+}
+
+function getWorkflowDeadline(index: number, status: UniversityWorkflowStageStatus): string {
+  if (status === 'overdue') return '2026-09-18';
+  if (status === 'current') return '2026-09-30';
+  return `2026-${String(Math.min(12, 3 + Math.floor(index / 2))).padStart(2, '0')}-${String(8 + (index % 6)).padStart(2, '0')}`;
+}
+
+function getWorkflowComments(id: string, index: number, responsible: UniversityResponsible | null): UniversityWorkflowComment[] {
+  const author = responsible?.name ?? 'Анна Иванова';
+  return [
+    { id: `${id}-stage-${index + 1}-comment-1`, author, occurredAt: '2026-09-20T11:30:00+03:00', text: index === 10 ? 'Зафиксировали контрольные точки запуска и ответственных.' : 'Обновили материалы этапа и подтвердили следующий шаг.' },
+    { id: `${id}-stage-${index + 1}-comment-2`, author: 'Борис Петров', occurredAt: '2026-09-18T16:10:00+03:00', text: 'Проверили комплект данных со стороны вуза.' },
+    { id: `${id}-stage-${index + 1}-comment-3`, author: 'Елена Смирнова', occurredAt: '2026-09-16T13:45:00+03:00', text: 'Добавили комментарий методиста к этапу.' },
+    { id: `${id}-stage-${index + 1}-comment-4`, author: 'Анна Иванова', occurredAt: '2026-09-12T15:00:00+03:00', text: 'Согласовали план ближайших запусков.' },
+  ];
+}
+
+/** Typed frontend adapter for the future GET /universities/{id}/workflow endpoint. */
+export async function getUniversityWorkflow(id: string): Promise<UniversityWorkflow> {
+  const university = getUniversityOrThrow(id);
+  const numericId = getUniversityNumericId(id);
+  const currentIndex = workflowStageIndex[university.currentStage.id] ?? 3;
+  const stages = workflowStageNames.map((name, index) => {
+    const status = getWorkflowStageStatus(index, currentIndex, university.attention, numericId);
+    const previousStatus = index === 0 ? 'pending' : getWorkflowStageStatus(index - 1, currentIndex, university.attention, numericId);
+    const attachments: UniversityWorkflowAttachment[] = index % 3 === 0
+      ? [{ id: `${id}-stage-${index + 1}-attachment`, fileName: index === 6 ? 'дорожная-карта-запуска.pdf' : 'материалы-этапа.docx', fileType: index === 6 ? 'PDF' : 'DOCX', fileSize: index === 6 ? '1,8 МБ' : '420 КБ' }]
+      : [];
+    const tasks: UniversityWorkflowTask[] = [
+      { id: `${id}-stage-${index + 1}-task-1`, label: 'Проверить входные данные', completed: status === 'completed' || status === 'skipped' },
+      { id: `${id}-stage-${index + 1}-task-2`, label: 'Подтвердить результат этапа', completed: status === 'completed' },
+      { id: `${id}-stage-${index + 1}-task-3`, label: 'Назначить следующий шаг', completed: index < currentIndex },
+    ];
+    return {
+      id: `${id}-workflow-stage-${index + 1}`,
+      orderIndex: index + 1,
+      name,
+      status,
+      deadline: getWorkflowDeadline(index, status),
+      responsible: university.responsible,
+      comments: getWorkflowComments(id, index, university.responsible),
+      attachments,
+      tasks,
+      transitions: index === 0 || status === 'pending' ? [] : [{
+        id: `${id}-stage-${index + 1}-transition`,
+        occurredAt: `2026-09-${String(Math.max(4, 20 - index)).padStart(2, '0')}T13:45:00+03:00`,
+        actor: university.responsible?.name ?? 'Анна Иванова',
+        fromStatus: previousStatus,
+        toStatus: status,
+        comment: status === 'skipped' ? 'Этап пропущен по согласованному плану.' : 'Этап переведён после проверки результата.',
+      }],
+    } satisfies UniversityWorkflowStage;
+  });
+
+  return { universityId: university.id, stages };
+}
+
+export type UniversityHistoryEventType = 'workflow' | 'document' | 'meeting' | 'note' | 'audit';
+
+export interface UniversityHistoryEvent {
+  id: string;
+  occurredAt: string;
+  type: UniversityHistoryEventType;
+  user: UniversityResponsible;
+  action: string;
+  details: string;
+  entity: { id: string; label: string };
+  oldValues?: Record<string, string | number | null>;
+  newValues?: Record<string, string | number | null>;
+  ip?: string;
+  userAgent?: string;
+}
+
+export interface UniversityHistoryFilters {
+  type: UniversityHistoryEventType | 'all';
+  dateFrom: string;
+  dateTo: string;
+  userId: string;
+  entityId: string;
+}
+
+export interface UniversityHistoryFilterOptions {
+  users: UniversityResponsible[];
+  entities: Array<{ id: string; label: string }>;
+}
+
+export const universityHistoryQueryKey = (id: string, filters: UniversityHistoryFilters) => ['university-history', id, filters] as const;
+
+const historyEvents = (id: string, university: UniversityListItem): UniversityHistoryEvent[] => {
+  const anna = responsible.anna;
+  const boris = responsible.boris;
+  const currentStageName = university.currentStage.name;
+  return [
+    { id: `${id}-history-1`, occurredAt: '2026-09-20T11:30:00+03:00', type: 'meeting', user: anna, action: 'Проведена встреча', details: 'Рабочая встреча с координатором программы', entity: { id: `${id}-meeting-1`, label: 'Встреча с координатором' } },
+    { id: `${id}-history-2`, occurredAt: '2026-09-19T15:20:00+03:00', type: 'audit', user: boris, action: 'Изменён срок этапа', details: `${currentStageName} → новый срок 30 сент. 2026 г.`, entity: { id: `${id}-workflow-stage-11`, label: currentStageName }, oldValues: { deadline: '2026-09-18', status: 'attention' }, newValues: { deadline: '2026-09-30', status: 'current' }, ip: '10.24.18.42', userAgent: 'Chrome 128 · macOS' },
+    { id: `${id}-history-3`, occurredAt: '2026-09-18T16:10:00+03:00', type: 'document', user: boris, action: 'Подписан документ', details: 'Договор на обучение · contract-2026.pdf', entity: { id: `${id}-document-1`, label: 'Договор на обучение' } },
+    { id: `${id}-history-4`, occurredAt: '2026-09-17T10:05:00+03:00', type: 'workflow', user: anna, action: 'Этап завершён', details: 'Подготовка преподавателей → Подготовка инфраструктуры', entity: { id: `${id}-workflow-stage-7`, label: 'Подготовка инфраструктуры' } },
+    { id: `${id}-history-5`, occurredAt: '2026-09-16T13:45:00+03:00', type: 'note', user: { id: 'responsible-elena', name: 'Елена Смирнова' }, action: 'Добавлена заметка', details: 'Нужно подтвердить готовность аудитории к пилоту.', entity: { id: `${id}-note-1`, label: 'Подготовка к пилоту' } },
+    { id: `${id}-history-6`, occurredAt: '2026-09-15T09:30:00+03:00', type: 'audit', user: anna, action: 'Изменён ответственный', details: 'Ответственный обновлён в карточке Workflow', entity: { id: `${id}-workflow-stage-10`, label: 'Пилотный запуск' }, oldValues: { responsible: 'Борис Петров' }, newValues: { responsible: anna.name }, ip: '10.24.18.42', userAgent: 'Chrome 128 · macOS' },
+    { id: `${id}-history-7`, occurredAt: '2026-09-12T15:00:00+03:00', type: 'meeting', user: { id: 'responsible-elena', name: 'Елена Смирнова' }, action: 'Зафиксированы договорённости', details: 'Согласовали план ближайших запусков', entity: { id: `${id}-meeting-2`, label: 'План ближайших запусков' } },
+    { id: `${id}-history-8`, occurredAt: '2026-09-11T12:20:00+03:00', type: 'document', user: anna, action: 'Загружен документ', details: 'Приложение к договору · appendix-programs.docx', entity: { id: `${id}-document-2`, label: 'Приложение к договору' } },
+    { id: `${id}-history-9`, occurredAt: '2026-09-09T17:10:00+03:00', type: 'workflow', user: boris, action: 'Этап изменён', details: `Текущий этап: ${currentStageName}`, entity: { id: `${id}-workflow-stage-11`, label: currentStageName } },
+    { id: `${id}-history-10`, occurredAt: '2026-09-06T14:35:00+03:00', type: 'note', user: anna, action: 'Добавлена заметка', details: 'Обновили план подготовки преподавателей.', entity: { id: `${id}-note-2`, label: 'План подготовки преподавателей' } },
+  ];
+};
+
+export function getUniversityHistoryFilterOptions(id: string): UniversityHistoryFilterOptions {
+  const university = getUniversityOrThrow(id);
+  const events = historyEvents(id, university);
+  return {
+    users: [...new Map(events.map((event) => [event.user.id, event.user])).values()].sort((left, right) => left.name.localeCompare(right.name, 'ru')),
+    entities: [...new Map(events.map((event) => [event.entity.id, event.entity])).values()].sort((left, right) => left.label.localeCompare(right.label, 'ru')),
+  };
+}
+
+/** Typed frontend adapter for the future GET /universities/{id}/history endpoint. */
+export async function getUniversityHistory(id: string, filters: UniversityHistoryFilters): Promise<UniversityHistoryEvent[]> {
+  const university = getUniversityOrThrow(id);
+  return historyEvents(id, university).filter((event) => {
+    const date = event.occurredAt.slice(0, 10);
+    if (filters.type !== 'all' && event.type !== filters.type) return false;
+    if (filters.dateFrom && date < filters.dateFrom) return false;
+    if (filters.dateTo && date > filters.dateTo) return false;
+    if (filters.userId && event.user.id !== filters.userId) return false;
+    if (filters.entityId && event.entity.id !== filters.entityId) return false;
+    return true;
+  });
+}
+
 export type HealthScoreReasonSeverity = 'high' | 'medium' | 'low';
 
 export interface UniversityHealthScoreBreakdown {

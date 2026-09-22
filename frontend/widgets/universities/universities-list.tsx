@@ -23,6 +23,7 @@ import SortDown from '@atomaro/icons/24/editor/SortDown';
 import SortUp from '@atomaro/icons/24/editor/SortUp';
 import { Button } from '@/shared/ui/rtk/button';
 import { StatusBadge as SemanticStatusBadge } from '@/shared/ui/rtk/status-badge';
+import { TableShell } from '@/shared/ui/rtk/table-shell';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import {
   getHealthStatus,
@@ -405,7 +406,7 @@ function ActiveFilterChips({ filters, onPatch, onReset }: { filters: UniversityF
 
 function UniversityListSkeleton() {
   return (
-    <section className={styles.tableSection} aria-label="Загрузка списка вузов" aria-live="polite" aria-busy="true">
+    <TableShell ariaLabel="Загрузка списка вузов" ariaBusy>
       <div className={styles.desktopOnly}>
         <div className={styles.tableScroll}>
           <table className={styles.table} aria-label="Загрузка списка вузов">
@@ -422,7 +423,7 @@ function UniversityListSkeleton() {
           {Array.from({ length: 4 }, (_, index) => <div className={styles.mobileSkeletonCard} key={index}><span className={styles.skeletonLine} /><span className={styles.skeletonLine} /><span className={styles.skeletonLine} /></div>)}
         </div>
       </div>
-    </section>
+    </TableShell>
   );
 }
 
@@ -659,11 +660,11 @@ export function UniversitiesList() {
       {query.isPending ? <UniversityListSkeleton /> : query.isError || !query.data ? <RouteErrorState onRetry={() => void query.refetch()} /> : query.data.total === 0 ? <EmptyState filtered={hasFilters} onReset={resetFilters} /> : (
         <>
           {query.isFetching ? <p className={styles.fetching} role="status">Обновляем список…</p> : null}
-          <section className={styles.tableSection} aria-label="Список вузов">
+          <TableShell>
             <div className={styles.desktopOnly}><DesktopTable table={table} /></div>
             <div className={styles.mobileOnly}><MobileUniversityCards items={query.data.items} /></div>
             <Pagination page={query.data.page} pageSize={query.data.pageSize} total={query.data.total} onPatch={goToState} />
-          </section>
+          </TableShell>
         </>
       )}
     </div>

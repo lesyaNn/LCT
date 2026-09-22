@@ -1,4 +1,4 @@
-.section { composes: section from '../../shared/ui/rtk/data-table.module.css'; }
+.section { display: flex; flex-direction: column; gap: var(--rtk-space-4); min-width: 0; }
 .emptySection { color: var(--rtk-color-text-secondary); margin: var(--rtk-space-5) 0; text-align: center; }
 .sectionToolbar { align-items: center; display: flex; gap: var(--rtk-space-4); justify-content: space-between; }
 .sectionToolbar h2 { font-size: 18px; letter-spacing: -.02em; margin: 0; }
