@@ -1,0 +1,13 @@
+.avatar {
+  align-items: center;
+  background: var(--rtk-color-brand-soft);
+  border-radius: 50%;
+  color: var(--rtk-color-brand);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-weight: 700;
+  justify-content: center;
+}
+.s { font-size: 11px; height: 32px; width: 32px; }
+.m { font-size: 13px; height: 40px; width: 40px; }
+.l { font-size: 16px; height: 56px; width: 56px; }

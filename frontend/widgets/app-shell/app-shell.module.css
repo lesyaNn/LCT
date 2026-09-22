@@ -1,0 +1,5 @@
+.shell { display: flex; min-height: 100vh; }
+.workspace { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.content { flex: 1; min-width: 0; padding: clamp(var(--rtk-space-5), 4vw, var(--rtk-space-8)); }
+.backdrop { background: rgb(20 20 28 / 44%); border: 0; inset: 0; position: fixed; z-index: 25; }
+@media (max-width: 768px) { .content { padding: var(--rtk-space-5) var(--rtk-space-4); } }

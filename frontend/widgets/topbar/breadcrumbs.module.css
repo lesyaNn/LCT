@@ -1,0 +1,6 @@
+.breadcrumbs { align-items: center; color: var(--rtk-color-text-secondary); display: flex; min-width: 0; overflow: hidden; }
+.entry { align-items: center; display: inline-flex; flex: 0 0 auto; gap: var(--rtk-space-2); max-width: 220px; }
+.entry:not(:last-child) { color: var(--rtk-color-text-tertiary); }
+.entry:last-child { color: var(--rtk-color-text-primary); font-weight: 600; }
+.entry a, .entry > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.entry a:hover { color: var(--rtk-color-brand); }

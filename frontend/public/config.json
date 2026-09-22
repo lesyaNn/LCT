@@ -1,6 +1,0 @@
-{
-  "keycloakUrl": "http://localhost:8081",
-  "keycloakRealm": "rtk",
-  "keycloakClientId": "rtk-frontend",
-  "apiUrl": ""
-}

@@ -1,3 +1,5 @@
+name: team26
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -119,30 +121,18 @@ services:
       options: { max-size: "10m", max-file: "3" }
 
   frontend:
-    build:
-      context: ./frontend
-      args:
-        # Build-time fallbacks only; runtime /config.json (see env below) wins.
-        VITE_KEYCLOAK_URL: ${KEYCLOAK_EXTERNAL_URL:-http://localhost:8081}
-        VITE_KEYCLOAK_REALM: ${KEYCLOAK_REALM:-rtk}
-        VITE_KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-rtk-frontend}
-        VITE_API_URL: ""
+    build: ./frontend
     restart: unless-stopped
     networks: [rtk-net]
     ports:
-      - "3000:80"
+      - "3000:3000"
     depends_on:
       backend:
         condition: service_healthy
     environment:
-      # Runtime SPA config (P0-2): same image works on any host, no rebuild.
-      # Empty API_URL = same-origin nginx /api/ proxy (default, no CORS).
-      KEYCLOAK_URL: ${KEYCLOAK_EXTERNAL_URL:-http://localhost:8081}
-      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-rtk}
-      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-rtk-frontend}
-      API_URL: ${FRONTEND_API_URL:-}
+      NODE_ENV: production
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:80/health | grep -q ok"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/dashboard >/dev/null"]
       interval: 15s
       timeout: 5s
       retries: 5

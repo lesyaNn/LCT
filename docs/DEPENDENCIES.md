@@ -34,16 +34,16 @@
 (`app/infrastructure/*`), работает с guarded-импортами и fallback
 на in-memory/local — приложение стартует без них.
 
-## Frontend (`frontend/`, React + TypeScript + Vite)
+## Frontend (`frontend/`, Next.js App Router + React + TypeScript)
 
 | Пакет | Версия | Лицензия | Назначение |
 |---|---|---|---|
-| react / react-dom | ^18.3.1 | MIT | UI |
+| next | ^16.3.5 | MIT | App Router, SSR/static build |
+| react / react-dom | ^19.1.1 | MIT | UI |
 | keycloak-js | ^26.0.0 | Apache-2.0 | Keycloak login |
-| vite | ^5.4.0 | MIT | Сборка/dev |
-| typescript | ^5.5.0 | Apache-2.0 | Типизация |
-| @vitejs/plugin-react | ^4.3.1 | MIT | React-плагин Vite |
-| @types/react, @types/react-dom | ^18.3.x | MIT | Типы |
+| typescript | ^5.9.2 | Apache-2.0 | Типизация |
+| eslint / eslint-config-next | ^9.36.0 / ^16.3.5 | MIT | Lint |
+| @types/react, @types/react-dom | ^19.1.x | MIT | Типы |
 
 ## Инфраструктура (Docker Compose)
 
@@ -52,8 +52,7 @@
 | postgres | 16-alpine | PostgreSQL Licence | БД `rtk` + `keycloak` (порт хоста 5433) |
 | quay.io/keycloak/keycloak | 26.7.4 | Apache-2.0 | Keycloak, realm `rtk` (порт 8081) |
 | python (база backend) | 3.12-slim | PSF | Образ backend (`:8000`) |
-| node (сборка frontend) | 22-alpine | OpenJS Foundation | Сборка SPA |
-| nginx (рантайм frontend) | alpine | BSD-2-Clause | Раздача SPA (`:3000`) |
+| node (сборка и рантайм frontend) | 22-alpine | OpenJS Foundation | Next standalone (`:3000`) |
 
 ## Порты и точки входа
 

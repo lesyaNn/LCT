@@ -1,0 +1,7 @@
+.topbar { align-items: center; background: var(--rtk-color-surface); border-bottom: 1px solid var(--rtk-color-border); display: flex; height: var(--topbar-height); justify-content: space-between; padding: 0 var(--rtk-space-6); position: sticky; top: 0; z-index: 20; }
+.left, .actions { align-items: center; display: flex; min-width: 0; }
+.left { gap: var(--rtk-space-3); }
+.actions { gap: var(--rtk-space-3); }
+.menuButton { display: none; }
+.separator { background: var(--rtk-color-border); height: 28px; width: 1px; }
+@media (max-width: 768px) { .topbar { padding: 0 var(--rtk-space-4); } .menuButton { display: inline-flex; } }

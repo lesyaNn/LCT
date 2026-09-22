@@ -284,6 +284,26 @@ GRANT ALL PRIVILEGES ON DATABASE "keycloak" TO "keycloak";
 EOSQL
 ```
 
+### 🖥️ Frontend P3-01-01
+
+Ветка `feature/p3-01-01` содержит единый frontend на **Next.js App Router + React + TypeScript**.
+App Shell (Sidebar, Topbar, Breadcrumbs, User Menu и адаптивная навигация) находится в
+`frontend/widgets/` и использует локальные CSS Modules с семантическими токенами Rostelecom
+Design System Gen2. В этой задаче авторизация остаётся mock-реализацией; существующий backend,
+Keycloak и инфраструктура репозитория сохранены без переписывания.
+
+Локальный запуск frontend:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Проверки frontend: `npm run lint`, `npm run typecheck`, `npm run build`.
+Официальные UI-источники: [Design System Gen2](https://design.rt.ru/gen2/designsystem/gettingStarted/intro)
+и [React Storybook](https://design.rt.ru/gen2/react-storybook/?path=/docs/welcome-introduction--docs&globals=cssVariables:Rostelecom+Light+Theme).
+
 ### ⏭️ Следующий этап
 
 STOP. Далее — проектирование и реализация PostgreSQL-схемы предметной области

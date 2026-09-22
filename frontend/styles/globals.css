@@ -1,0 +1,61 @@
+:root {
+  /* Rostelecom Gen2 Light Theme semantic aliases used by local components. */
+  --rtk-color-brand: #7700ff;
+  --rtk-color-brand-hover: #5d00c9;
+  --rtk-color-brand-soft: #f1e8ff;
+  --rtk-color-text-primary: #1f1f22;
+  --rtk-color-text-secondary: #696970;
+  --rtk-color-text-tertiary: #8f8f96;
+  --rtk-color-text-inverse: #ffffff;
+  --rtk-color-surface: #ffffff;
+  --rtk-color-surface-subtle: #f6f6f8;
+  --rtk-color-surface-hover: #f0f0f3;
+  --rtk-color-border: #e2e2e7;
+  --rtk-color-border-strong: #c9c9d1;
+  --rtk-color-success: #208a5a;
+  --rtk-color-warning: #a96300;
+  --rtk-color-danger: #c62828;
+  --rtk-shadow-elevation-2: 0 12px 32px rgb(20 20 28 / 14%);
+  --rtk-radius-small: 8px;
+  --rtk-radius-medium: 12px;
+  --rtk-space-1: 4px;
+  --rtk-space-2: 8px;
+  --rtk-space-3: 12px;
+  --rtk-space-4: 16px;
+  --rtk-space-5: 20px;
+  --rtk-space-6: 24px;
+  --rtk-space-8: 32px;
+  --rtk-font-family: Inter, Roboto, Arial, sans-serif;
+  --sidebar-width: 264px;
+  --sidebar-collapsed-width: 76px;
+  --topbar-height: 72px;
+}
+
+* { box-sizing: border-box; }
+html { min-width: 320px; }
+body {
+  margin: 0;
+  background: var(--rtk-color-surface-subtle);
+  color: var(--rtk-color-text-primary);
+  font-family: var(--rtk-font-family);
+  font-size: 14px;
+  line-height: 1.45;
+}
+button, a, input { font: inherit; }
+a { color: inherit; }
+button:focus-visible, a:focus-visible, input:focus-visible {
+  outline: 3px solid rgb(119 0 255 / 32%);
+  outline-offset: 2px;
+}
+.not-found-page {
+  display: grid;
+  min-height: 100vh;
+  place-content: center;
+  gap: var(--rtk-space-3);
+  padding: var(--rtk-space-6);
+  text-align: center;
+}
+.not-found-page h1, .not-found-page p { margin: 0; }
+.not-found-page h1 { font-size: 32px; letter-spacing: -0.02em; }
+.eyebrow { color: var(--rtk-color-brand); font-size: 14px; font-weight: 700; }
+.not-found-link { color: var(--rtk-color-brand); font-weight: 600; }
