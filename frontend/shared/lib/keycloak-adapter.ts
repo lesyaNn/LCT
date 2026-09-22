@@ -3,9 +3,9 @@
 import type KeycloakInstance from 'keycloak-js';
 
 /**
- * Keycloak is the auth source for the existing backend. The provider opts into
- * it when NEXT_PUBLIC_AUTH_MODE=keycloak; mock mode remains available for the
- * local App Shell preview without reintroducing the old Vite router.
+ * Keycloak is the auth source for the existing backend. It is enabled by
+ * default; mock mode is an explicit local preview override without
+ * reintroducing the old Vite router.
  */
 export type KeycloakRuntimeConfig = {
   url: string;
@@ -29,9 +29,12 @@ const defaultConfig: KeycloakRuntimeConfig = {
 };
 
 let instance: KeycloakInstance | null = null;
+let refreshPromise: Promise<string | null> | null = null;
+let sessionExpiredHandler: (() => void) | null = null;
+let sessionExpiredRedirectArmed = false;
 
 export function isKeycloakMode(): boolean {
-  return process.env.NEXT_PUBLIC_AUTH_MODE === 'keycloak';
+  return process.env.NEXT_PUBLIC_AUTH_MODE !== 'mock';
 }
 
 export function getKeycloakConfig(): KeycloakRuntimeConfig {
@@ -39,6 +42,28 @@ export function getKeycloakConfig(): KeycloakRuntimeConfig {
     url: process.env.NEXT_PUBLIC_KEYCLOAK_URL || defaultConfig.url,
     realm: process.env.NEXT_PUBLIC_KEYCLOAK_REALM || defaultConfig.realm,
     clientId: process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID || defaultConfig.clientId,
+  };
+}
+
+export function getSafeReturnPath(candidate?: string | null): string {
+  const fallback = '/dashboard';
+  if (typeof window === 'undefined' || !candidate || !candidate.startsWith('/') || candidate.startsWith('//')) {
+    return fallback;
+  }
+
+  try {
+    const url = new URL(candidate, window.location.origin);
+    if (url.origin !== window.location.origin || url.pathname === '/login') return fallback;
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return fallback;
+  }
+}
+
+export function registerSessionExpiredHandler(handler: (() => void) | null): () => void {
+  sessionExpiredHandler = handler;
+  return () => {
+    if (sessionExpiredHandler === handler) sessionExpiredHandler = null;
   };
 }
 
@@ -58,7 +83,9 @@ export async function ensureKeycloak(): Promise<KeycloakInstance> {
 export async function initializeKeycloak(): Promise<KeycloakAuthResult> {
   const keycloak = await ensureKeycloak();
   keycloak.onTokenExpired = () => {
-    void keycloak.updateToken(60).catch(() => keycloak.login({ redirectUri: window.location.origin }));
+    void refreshKeycloakToken(60)
+      .then((token) => { if (!token) return expireKeycloakSession(); })
+      .catch(() => expireKeycloakSession());
   };
 
   const authenticated = await keycloak.init({
@@ -80,16 +107,54 @@ export async function initializeKeycloak(): Promise<KeycloakAuthResult> {
   };
 }
 
-export async function loginToKeycloak(): Promise<void> {
+export async function refreshKeycloakToken(minValidity = 30): Promise<string | null> {
   const keycloak = await ensureKeycloak();
-  await keycloak.login({ redirectUri: window.location.origin });
+  if (!keycloak.authenticated || !keycloak.token) return null;
+  if (!refreshPromise) {
+    refreshPromise = keycloak.updateToken(minValidity)
+      .then(() => keycloak.token ?? null)
+      .finally(() => { refreshPromise = null; });
+  }
+  return refreshPromise;
+}
+
+export async function expireKeycloakSession(): Promise<void> {
+  if (sessionExpiredRedirectArmed) return;
+  sessionExpiredRedirectArmed = true;
+
+  try {
+    const keycloak = await ensureKeycloak();
+    keycloak.clearToken();
+  } catch {
+    // The browser may already be navigating away or Keycloak may be unavailable.
+  }
+
+  sessionExpiredHandler?.();
+  if (typeof window !== 'undefined') window.location.replace('/login?reason=session-expired');
+}
+
+export async function loginToKeycloak(returnTo = '/dashboard'): Promise<void> {
+  const keycloak = await ensureKeycloak();
+  sessionExpiredRedirectArmed = false;
+  const redirectUrl = new URL('/login', window.location.origin);
+  const safeReturnPath = getSafeReturnPath(returnTo);
+  if (safeReturnPath !== '/dashboard') redirectUrl.searchParams.set('returnTo', safeReturnPath);
+  await keycloak.login({ redirectUri: redirectUrl.toString() });
 }
 
 export async function logoutFromKeycloak(): Promise<void> {
   const keycloak = await ensureKeycloak();
-  await keycloak.logout({ redirectUri: window.location.origin });
+  sessionExpiredRedirectArmed = false;
+  try {
+    await keycloak.logout({ redirectUri: `${window.location.origin}/login` });
+  } finally {
+    keycloak.clearToken();
+  }
 }
 
 export function resetKeycloakForTests(): void {
   instance = null;
+  refreshPromise = null;
+  sessionExpiredHandler = null;
+  sessionExpiredRedirectArmed = false;
 }

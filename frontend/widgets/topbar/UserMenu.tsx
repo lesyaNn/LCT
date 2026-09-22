@@ -44,7 +44,7 @@ export function UserMenu() {
           <button className={styles.menuItem} role="menuitem" type="button"><Icon name="user" size={18} />Профиль</button>
           <button className={styles.menuItem} role="menuitem" type="button"><Icon name="settings" size={18} />Настройки</button>
           <div className={styles.divider} />
-          <button className={`${styles.menuItem} ${styles.danger}`} role="menuitem" type="button" onClick={() => { void logout().then(() => router.push('/dashboard')); }}><Icon name="logout" size={18} />Выйти</button>
+          <button className={`${styles.menuItem} ${styles.danger}`} role="menuitem" type="button" onClick={() => { void logout().then(() => router.replace('/login')); }}><Icon name="logout" size={18} />Выйти</button>
         </div>
       )}
     </div>

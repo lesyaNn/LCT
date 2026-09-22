@@ -50,7 +50,9 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
 
   if (status === 'loading') return <AuthLoading />;
   if (status === 'error') return <AuthError message={error ?? 'Неизвестная ошибка.'} onRetry={retry} />;
-  if (status === 'unauthenticated' || !user) return <AuthRequired onLogin={() => void login()} />;
+  if (status === 'unauthenticated' || !user) {
+    return <AuthRequired message={error ?? undefined} onLogin={() => void login(pathname)} />;
+  }
 
   const forbidden = !canAccessRoute(pathname, user.role);
 

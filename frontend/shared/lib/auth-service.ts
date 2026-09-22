@@ -1,6 +1,6 @@
 export const authService = {
   mode(): 'mock' | 'keycloak' {
-    return process.env.NEXT_PUBLIC_AUTH_MODE === 'keycloak' ? 'keycloak' : 'mock';
+    return process.env.NEXT_PUBLIC_AUTH_MODE === 'mock' ? 'mock' : 'keycloak';
   },
 
   logout(): void {

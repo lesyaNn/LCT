@@ -124,7 +124,7 @@ services:
     build:
       context: ./frontend
       args:
-        NEXT_PUBLIC_AUTH_MODE: ${NEXT_PUBLIC_AUTH_MODE:-mock}
+        NEXT_PUBLIC_AUTH_MODE: ${NEXT_PUBLIC_AUTH_MODE:-keycloak}
         NEXT_PUBLIC_KEYCLOAK_URL: ${KEYCLOAK_EXTERNAL_URL:-http://localhost:8081}
         NEXT_PUBLIC_KEYCLOAK_REALM: ${KEYCLOAK_REALM:-rtk}
         NEXT_PUBLIC_KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-rtk-frontend}

@@ -6,6 +6,7 @@ import {
   initializeKeycloak,
   loginToKeycloak,
   logoutFromKeycloak,
+  registerSessionExpiredHandler,
   type KeycloakAuthResult,
 } from '@/shared/lib/keycloak-adapter';
 import { currentUser } from '@/shared/mocks/current-user';
@@ -19,7 +20,7 @@ export interface AuthContextValue {
   isAuthenticated: boolean;
   user: AuthUser | null;
   error: string | null;
-  login: () => Promise<void>;
+  login: (returnTo?: string) => Promise<void>;
   logout: () => Promise<void>;
   retry: () => void;
 }
@@ -77,12 +78,18 @@ export function AuthProvider({ children }: Readonly<{ children: React.ReactNode 
     if (mode !== 'keycloak') return undefined;
 
     let cancelled = false;
+    const unregisterSessionExpiredHandler = registerSessionExpiredHandler(() => {
+      setUser(null);
+      setStatus('unauthenticated');
+      setError('Сессия истекла. Войдите снова.');
+    });
 
     void initializeKeycloak()
       .then((result) => {
         if (cancelled) return;
         setUser(result.authenticated ? userFromKeycloak(result) : null);
         setStatus(result.authenticated ? 'authenticated' : 'unauthenticated');
+        setError(null);
       })
       .catch((cause: unknown) => {
         if (cancelled) return;
@@ -93,12 +100,19 @@ export function AuthProvider({ children }: Readonly<{ children: React.ReactNode 
 
     return () => {
       cancelled = true;
+      unregisterSessionExpiredHandler();
     };
   }, [attempt, mode]);
 
-  const login = useCallback(async () => {
+  const login = useCallback(async (returnTo = '/dashboard') => {
+    setError(null);
     if (mode === 'keycloak') {
-      await loginToKeycloak();
+      try {
+        await loginToKeycloak(returnTo);
+      } catch (cause: unknown) {
+        setStatus('error');
+        setError(cause instanceof Error ? cause.message : 'Не удалось выполнить вход. Попробуйте ещё раз.');
+      }
       return;
     }
     setUser(currentUser);
@@ -106,8 +120,15 @@ export function AuthProvider({ children }: Readonly<{ children: React.ReactNode 
   }, [mode]);
 
   const logout = useCallback(async () => {
+    setUser(null);
+    setStatus('unauthenticated');
+    setError(null);
     if (mode === 'keycloak') {
-      await logoutFromKeycloak();
+      try {
+        await logoutFromKeycloak();
+      } catch (cause: unknown) {
+        setError(cause instanceof Error ? cause.message : 'Не удалось завершить сессию Keycloak.');
+      }
       return;
     }
     authService.logout();

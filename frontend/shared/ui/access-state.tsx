@@ -13,12 +13,12 @@ export function AuthLoading() {
   );
 }
 
-export function AuthRequired({ onLogin }: { onLogin: () => void }) {
+export function AuthRequired({ onLogin, message }: { onLogin: () => void; message?: string }) {
   return (
     <main className={styles.state} aria-live="polite">
       <p className={styles.eyebrow}>Требуется вход</p>
       <h1>Войдите в CRM</h1>
-      <p>Для продолжения используйте корпоративную учётную запись.</p>
+      <p>{message ?? 'Для продолжения используйте корпоративную учётную запись.'}</p>
       <Button variant="primary" size="m" onClick={onLogin}>Войти через Keycloak</Button>
     </main>
   );
