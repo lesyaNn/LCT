@@ -18,6 +18,13 @@ export interface HealthScoreDistributionItem {
 
 export type ProgramStatus = 'planned' | 'active' | 'launched' | 'archived';
 
+export const programStatusLabels: Record<ProgramStatus, string> = {
+  planned: 'Запланированы',
+  active: 'Активны',
+  launched: 'Запущены',
+  archived: 'Архивные',
+};
+
 export interface ProgramStatusItem {
   status: ProgramStatus;
   label: string;
@@ -102,10 +109,10 @@ const dashboardAnalyticsMock: DashboardAnalytics = {
     { range: '81–100', count: 12, tone: 'success' },
   ],
   programStatuses: [
-    { status: 'planned', label: 'Запланированы', count: 9, tone: 'neutral' },
-    { status: 'active', label: 'Активны', count: 24, tone: 'brand' },
-    { status: 'launched', label: 'Запущены', count: 7, tone: 'success' },
-    { status: 'archived', label: 'Архивные', count: 2, tone: 'dark' },
+    { status: 'planned', label: programStatusLabels.planned, count: 9, tone: 'neutral' },
+    { status: 'active', label: programStatusLabels.active, count: 24, tone: 'brand' },
+    { status: 'launched', label: programStatusLabels.launched, count: 7, tone: 'success' },
+    { status: 'archived', label: programStatusLabels.archived, count: 2, tone: 'dark' },
   ],
   launchDynamics: getRecentMonths(),
   attentionItems: [
