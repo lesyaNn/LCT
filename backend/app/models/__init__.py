@@ -1,8 +1,9 @@
-"""P1 canonical domain models (single source of truth for Alembic metadata).
+"""P1 canonical domain models (single source of truth for ORM metadata).
 
-Importing this package registers ALL P1 tables on ``Base.metadata``.
-Alembic ``env.py`` imports this module — that is how autogenerate and
-``upgrade head`` see every model (P1-01-04 requirement).
+Importing this package registers ALL P1 tables plus the canonical P2
+workflow pipeline on ``Base.metadata``. Alembic ``env.py`` imports this
+module — that is how autogenerate and ``upgrade head`` see every model
+(P1-01-04 requirement).
 
 Table naming follows the task specs exactly:
 universities, it_directions, it_programs, vendors, it_products, contracts,
@@ -11,7 +12,8 @@ teacher_qualifications, teacher_certificates, teacher_programs, students,
 university_programs, university_products, meetings, documents,
 interaction_notes, meeting_documents, workflow_templates, workflow_stages,
 workflow_instances, workflow_stage_transitions, workflow_comments,
-workflow_attachments, workflow_tasks, instance_stages.
+workflow_attachments, workflow_tasks, instance_stages,
+health_score_snapshots (P2-09-01, migration 000015).
 """
 
 from app.models.catalog import (  # noqa: F401
@@ -25,6 +27,7 @@ from app.models.catalog import (  # noqa: F401
     UniversityResponsible,
     Vendor,
 )
+from app.models.health_score import HealthScoreSnapshot  # noqa: F401
 from app.models.interactions import (  # noqa: F401
     Document,
     InteractionNote,
@@ -82,4 +85,5 @@ __all__ = [
     "WorkflowAttachment",
     "WorkflowTask",
     "InstanceStage",
+    "HealthScoreSnapshot",
 ]

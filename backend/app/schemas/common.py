@@ -114,6 +114,13 @@ class TeacherReadiness(str, enum.Enum):
 
 
 class HealthScoreStatus(str, enum.Enum):
+    """Статус Health Score вуза (P2-07-07) — отображается в Swagger и UI-бейджах.
+
+    * ``green`` — 85–100, вуз готов к запуску;
+    * ``yellow`` — 60–84, есть замечания, требует внимания;
+    * ``red`` — 0–59, критические проблемы.
+    """
+
     GREEN = "green"
     YELLOW = "yellow"
     RED = "red"

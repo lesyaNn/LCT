@@ -1,10 +1,9 @@
 """P0-1 guard: one schema universe + deferred modules stay unmounted.
 
 Pins the resolution of the "two schema universes" blocker:
-* canonical ``Base.metadata`` contains exactly the SQL-managed tables
-  (21 P1 tables + 2 P2 workflow-template tables from 000011 + 5 P2
-  workflow-instance pipeline tables from 000012 + 1 P2 runtime snapshot
-  table ``instance_stages`` from 000013);
+* canonical ``Base.metadata`` contains exactly the 30 SQL-managed tables
+  (21 P1 tables + 8 B1 workflow tables from 000011-000014 + 1 P2 health
+  snapshot table ``health_score_snapshots`` from 000015);
 * pre-UUID / stub models live on ``DeferredBase`` metadata only;
 * deferred routers are importable but NOT mounted in the production app;
 * ``AuditEvent.user_id/entity_id`` accept Keycloak ``sub`` (TEXT, 000010).
@@ -51,6 +50,7 @@ CANON_TABLES = frozenset(
         "workflow_attachments",
         "workflow_tasks",
         "instance_stages",
+        "health_score_snapshots",
     }
 )
 
@@ -68,17 +68,11 @@ DEFERRED_TABLES = frozenset(
 
 # Router prefixes (without the /api/v1 mount prefix) that must stay
 # unmounted until the reactivation checklist in docs/AUDIT.md (§0) is done.
+# NOTE (P2-08-03): "/health-score" стал production (ranking) и убран отсюда;
+# legacy health_score router при этом остаётся незамаунченным.
 DEFERRED_API_PREFIXES = (
-    "/audit",
-    "/dashboard",
-    "/documents",
-    "/health-score",
-    "/users",
-    "/integrations",
-    "/notifications",
-    "/reports",
-    "/workflows",
-    "/tasks",
+    "/audit", "/dashboard", "/documents", "/users",
+    "/integrations", "/notifications", "/reports", "/workflows", "/tasks",
 )
 
 
@@ -148,6 +142,7 @@ def test_mounted_routers_are_only_the_production_contract():
         "/api/v1/responsibles",
         "/api/v1/teachers",
         "/api/v1/workflow",
+        "/api/v1/health-score",
     )
     paths = _mounted_api_paths()
     assert all(path.startswith(allowed) for path in paths), paths

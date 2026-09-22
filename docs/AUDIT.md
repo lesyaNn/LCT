@@ -1,8 +1,8 @@
 # Аудит проекта CRM (ИТ Школа РТК, кейс 16)
 
-> Дата: 2026-09-18. Ветка `develop`, коммит `90afe47`. Проект в разработке — оценивается то, что есть, с прицелом на будущее.
+> Дата: 2026-09-20. Рабочая ветка `raisw`, поверх `develop`. Проект в разработке — оценивается то, что есть, с прицелом на будущее.
 > Стек: `Browser → React 18 → Keycloak 26 → FastAPI → PostgreSQL 16`. Стенд поднимается одной командой `docker compose up --build`.
-> Предыдущий срез (`docs/AUDIT.md` от 2026-09-18) частично устарел: миграций стало 9 (было 8), alembic-версий 6 (было 3), модулей 15 (было ~13), смонтировано 4 роутера (было 2).
+> Предыдущий срез (`docs/AUDIT.md` от 2026-09-18) частично устарел: добавлен канонический runtime Б2 (`interaction_pipeline`) и миграция `000011_workflow_runtime`; legacy-модуль `app.modules.workflow` по-прежнему изолирован.
 
 ## 0. Статус исправлений P0/P1 (вечер 2026-09-18)
 
@@ -10,7 +10,7 @@
 
 | Блокер | Что сделано | Проверка |
 |---|---|---|
-| Две вселенные схем | `app/modules/_deferred.py` — явный реестр 12 deferred-модулей + чек-лист реактивации; `app/db/deferred.py` — legacy int-модели (`workflow/documents/health_score/identity`) изолированы на отдельном metadata; миграция `000010_audit_identity` — `audit.user_id/entity_id` INTEGER→TEXT (Keycloak sub влезает); `AuditService.log` принимает `str\|int`; `infrastructure/keycloak.py` (мёртвый дубль) удалён; `api/router.py` ссылается на реестр | `tests/test_p0_deferred_registry.py` — 9/9; весь backend-сьют: 105 passed |
+| Две вселенные схем | `app/modules/_deferred.py` — явный реестр deferred-модулей; legacy int-модели (`workflow/documents/health_score/identity`) изолированы на отдельном metadata; миграция `000010_audit_identity` — `audit.user_id/entity_id` INTEGER→TEXT; добавлен канонический UUID runtime Б2 в `app/models/workflow.py` + `app/modules/interaction_pipeline/`; старый `app.modules.workflow` не монтируется | `tests/test_p0_deferred_registry.py` фиксирует канон из 29 таблиц и `/api/v1/workflow` |
 | Фронт только localhost | Runtime `/config.json` (entrypoint генерирует из env; build-ARG — только fallback); `apiUrl=""` = same-origin `/api/`-прокси в nginx (+ `/api/health`, gzip, security-headers, cache-policy); `KEYCLOAK_ISSUER` параметризован (`KEYCLOAK_EXTERNAL_URL`); `keycloak/render_realm.py` — точечная подмена origin в realm (3 строки, round-trip чистый) | Образ собран, smoke: `/health`→ok, `/config.json` из env; `docker compose config` валиден |
 | apiFetch только GET | Переписан: `method/body/signal`, guard `Bearer`, 204/205 и не-JSON guards, 401 с одноразовым login (анти-loop флаг), `anonymous` для публичных проб | `tsc`, `vitest` 3/3, `vite build` |
 | Импорт блокирует HTTP | Договор сохранён (sync 200 — пин теста), но: `job_failed` + `job_running` (нет вечных "queued"), `idempotency_key` (повторный POST не дублирует), Redis-персист с TTL 24ч + локальное зеркало, staging в volume (`import-staging`), payload worker-совместим + реализован `run_imports_once` | `test_p4_import` зелёный |
@@ -29,7 +29,7 @@
 | universities-CRUD | Роутер до P1-схемы (поля region/status); пин в тестах | `app.models.catalog.University` + passport |
 | teachers-CRUD | int-id; Teacher Passport намеренно отсутствует (пин) | `app.models.teachers.*` |
 | programs | int-id / таблица `programs`; в P1 — `it_programs` | `ITProgram` |
-| workflow | int PK/FK до UUID; изолирован на `DeferredBase` | Будущий `interaction_pipeline` |
+| workflow (legacy) | int PK/FK; изолирован на `DeferredBase` | Канонический `interaction_pipeline` (UUID) |
 | documents | Второй реестр `files`; изолирован на `DeferredBase` | `models.interactions.Document` |
 | health_score | int FK, таблицы нет в миграциях; изолирован | Чистый `compute_score()` |
 | identity | Заменён Keycloak (`sub` → `responsibles`); изолирован | `app.core.security` |
@@ -39,20 +39,20 @@
 | integrations | Интеграции LMS/сайт — стаб (требование кейса) | Будущий `workers/integrations` |
 | notifications | Стаб рассылок | Будущая очередь + шаблоны |
 
-Чек-лист реактивации модуля: 1) PK/FK → UUID; 2) `user_id` → `keycloak_sub: str`; 3) SQL-миграция + down; 4) монтирование + `require_permission`; 5) пагинация + `ErrorResponse`; 6) тесты (PG-путь). Guard: `tests/test_p0_deferred_registry.py` (канон ровно 21 таблица, префиксы отсутствуют в API).
+Чек-лист реактивации модуля: 1) PK/FK → UUID; 2) `user_id` → `keycloak_sub: str`; 3) SQL-миграция + down; 4) монтирование + `require_permission`; 5) пагинация + `ErrorResponse`; 6) тесты (PG-путь). Для Б2 этот чек-лист выполнен отдельным каноническим модулем; legacy-пакет не включался. Guard: `tests/test_p0_deferred_registry.py` (канон ровно 29 таблиц, legacy-префиксы отсутствуют в API).
 
 ## 1. Резюме
 
 | Блок | Состояние | Комментарий |
 |---|---|---|
 | Auth-стенд | 🟢 работает на localhost | JWT RS256 по JWKS, fail-closed, 4 demo-роли |
-| P1-ядро БД | 🟢 сильное | 9 SQL-миграций, 21 таблица, UUID + timestamptz, вычисляемые статусы |
+| P1-ядро БД | 🟢 сильное | 11 SQL-миграций, 29 канонических таблиц, UUID + timestamptz, вычисляемые статусы |
 | Импорт XLSX/XLS | 🟡 работает, но синхронно | Лимиты 10МБ/5000 строк есть, воркера нет |
 | Паспорт вуза / каталог | 🟡 частично | `passport`, `catalog` смонтированы; остальной домен — мертвый код |
 | Frontend CRM | 🔴 заглушка | Один `App.tsx`, нет роутера/store/форм/тестов, недеплоябелен вне localhost |
 | Инфра / деплой | 🟡 только localhost | `start-dev`, build-ARG, все порты наружу |
 | 152-ФЗ / ФСТЭК-117 | 🔴 отсутствует | Требование кейса, пока ноль фич |
-| Workflow 14 шагов | 🔴 не покрыт | Нет модели жизненного цикла взаимодействия |
+| Workflow 14 шагов / Б2 | 🟡 backend-скелет готов | Шаблоны, экземпляры, forward-only переходы с revision-lock, история, комментарии, задачи и привязка документов; UI и SLA-уведомления ещё не сделаны |
 
 Вывод: фундамент (auth + схема + миграции + seed) заложен грамотно. Главный риск — **две вселенные кода**: каноническое P1-ядро (UUID) vs 11 несмонтированных legacy-модулей (int PK). Если их включать «как есть» — будет каскад 500-х. Второй риск — **демо только на localhost**: на стенде жюри по IP/hostname фронт не залогинится.
 
@@ -60,7 +60,7 @@
 
 * **Auth**: `backend/app/core/security.py:82-135` — RS256, проверка `iss/exp/aud` (явная проверка `aud`, т.к. python-jose её пропускает), `503` при недоступности JWKS. `AUTH_DEV_BYPASS=false` в compose — fail-closed. `backend/app/modules/auth/router.py` — `/auth/me`, `/test/*`. Фронт: `frontend/shared/lib/keycloak-adapter.ts` — browser-only singleton, PKCE S256, refresh и logout; P3 App Shell оставляет adapter выключенным в mock mode.
 * **RBAC-заготовка**: `backend/app/core/permissions.py:11-53` — матрица `admin/manager/curator/user`, `require_permission/require_role`. Реально используется только в `passport_router.py:46` и тестовых auth-эндпоинтах — образец для остальных.
-* **P1-схема**: `backend/migrations/000001-000009` — единственный источник истины в проде (`entrypoint.sh:33-39` через `scripts/migrate.py`). 21 таблица: universities, it_directions, it_programs, vendors, it_products, contracts, licenses, responsibles, university_responsibles, teachers, teacher_qualifications, teacher_certificates, teacher_programs, students, university_programs, university_products, meetings, meeting_documents, documents, interaction_notes, audit_events. Все PK — UUID (генерит приложение), даты — `timestamptz`, статусы лицензий/готовности — вычисляемые `@property` / pure-функции (`app/services/license_status.py`, `teacher_readiness.py`).
+* **Каноническая схема**: `backend/migrations/000001-000011` — единственный источник истины в проде (`entrypoint.sh` через `scripts/migrate.py`). P1 содержит 21 таблицу; Б2 добавляет 8 workflow-таблиц (`workflow_templates`, `workflow_stages`, `workflow_instances`, `instance_stages`, `transitions`, `comments`, `tasks`, `attachments`). Все доменные PK — UUID, даты — `timestamptz`, статусы лицензий/готовности и overdue-признаки вычисляются без второй схемы.
 * **Импорт**: `backend/app/modules/imports/{router,service,schemas}.py` — `stage_upload/parse_preview/execute_import`, XLSX+XLS, лимиты 10МБ/5000 строк, cap 100 ошибок, `dry_run` через rollback, идемпотентность по natural keys.
 * **Тесты**: `tests/test_auth.py` (13 тестов, RSA keypair + мок JWKS, без Keycloak), derived-статусы, OpenAPI-доки — зелёные. PG-интеграция честно скипается без `TEST_DATABASE_URL` (`tests/db_helpers.py:63-75`).
 * **Инфра-порядок**: `depends_on service_healthy` у всех сервисов, `init-databases.sh` — least privilege (роль `keycloak` — owner только БД `keycloak`), CORS — allowlist, а не `*`.
@@ -69,8 +69,8 @@
 
 ### 3.1. Две вселенные схем: канон (UUID) vs legacy (int)
 * Канон: `app/models/*` (UUID). Legacy: `app/modules/{audit,documents,health_score,identity,workflow}/models.py` — `id/user_id/entity_id: Integer`, `health_score/models.py:12` — `FK("universities.id")` int против UUID-родителя. Схемы/роутеры тоже int: `modules/{programs,teachers,universities,workflow}/schemas.py` (`university_id: int`, `direction_id: str`).
-* `app/api/router.py:15-19` монтирует только **4 из 15** модулей: `auth, imports, passport, catalog`. Остальные 11 (`audit, dashboard, documents, health_score, identity, integrations, notifications, programs, teachers, universities-CRUD, workflow`) — мертвый код, выглядящий готовым. Включение без переписывания = 500/422 на типах FK.
-* Бонус-расщепление: два файловых реестра (`modules/documents` пишет в `files`, паспорт читает `models/interactions.py:175 documents`); двойной источник схемы `migrations/` (9 файлов, прод) vs `alembic/versions/` (6 ревизий, не гоняется в проде) без CI-gate — дрейф неизбежен.
+* `app/api/router.py` монтирует production-контракт `auth, imports, passport, catalog` и новый канонический `interaction_pipeline`. Остальные legacy-модули (`audit, dashboard, documents, health_score, identity, integrations, notifications, programs, teachers, universities-CRUD, workflow`) остаются мертвым кодом, выглядящим готовым. Включение legacy без переписывания = 500/422 на типах FK.
+* Бонус-расщепление: два файловых реестра (`modules/documents` пишет в `files`, паспорт читает `models/interactions.py:175 documents`); активный источник схемы — 11 SQL-миграций, а `alembic/versions/` остаётся read-only архивом.
 * **Фикс до включения домена**: удалить legacy `modules/*/models.py + schemas.py`, переписать `router+service+repository` на `app.models + app.schemas` (UUID, `keycloak_sub: str` вместо `user_id: int`); `alembic/` — удалить или заморозить как read-only архив; добавить тесты «все PK — Uuid» и «все роутеры смонтированы».
 
 ### 3.2. Фронт недеплоябелен вне localhost
@@ -111,19 +111,19 @@
 * Аудит несовместим с auth: `migrations/000006_audit.up.sql:19,21` — `user_id/entity_id INTEGER`, а `CurrentUser.id: str (sub)`. `fullScopeAllowed: true` в realm — избыточные права токенов.
 * `docs/DEPENDENCIES.md` — только ручная таблица, нет `syft`/CycloneDX-артефакта; `.gitignore` — только `.env` (`.venv/.pytest_cache/*.xlsx` не покрыты, `.pytest_cache/` уже был закоммичен).
 
-## 6. Разрыв с кейсом (14 шагов workflow) — взгляд в будущее
+## 6. Разрыв с кейсом (14 шагов workflow)
 
 Покрытие workflow «взаимодействие с вузом»:
 
 | Шаги | Статус |
 |---|---|
-| 1–3. Поиск контактов, коммуникация, встречи | 🟡 таблицы `responsibles`, `meetings` есть; UI и жизненного цикла нет |
-| 4–6. Документы, подписание | 🔴 два файловых реестра, статусов подписания нет |
-| 7–8. Материалы, лицензии, внедрение | 🟡 `licenses/contracts` + статусы есть; выдачи/внедрения нет |
-| 9–13. Обучение преподавателей, программы, КПК | 🟡 `teachers/students/programs` есть; связки «преподаватель→программа→поток» в UI нет |
-| 14. Контроль каждого этапа | 🔴 нет модели пайплайна/канбана, нет SLA/напоминаний |
+| 1–3. Поиск контактов, коммуникация, встречи | 🟡 канонические `responsibles`/`meetings` есть; workflow-instance и comments доступны через API, UI ещё нет |
+| 4–6. Документы, подписание | 🟡 единый `documents` уже есть; Б2 добавляет attachment-связь, статусы подписания ещё впереди |
+| 7–8. Материалы, лицензии, внедрение | 🟡 `licenses/contracts` + статусы и этапы workflow; предметные выдачи/внедрения ещё впереди |
+| 9–13. Обучение преподавателей, программы, КПК | 🟡 канонические таблицы и этапы есть; специализированные связи и UI ещё впереди |
+| 14. Контроль каждого этапа | 🟡 runtime Б2: этапы, переходы, optimistic revision, история, задачи; SLA-воркеры/напоминания и канбан ещё не сделаны |
 
-Что заложить сейчас, чтобы не переписывать позже: **единая модель жизненного цикла** (`interaction_pipeline`: вуз × программа × продукт × этап × ответственный × SLA), все доменные PK — UUID, `user_id` — всегда `keycloak_sub: str`, единый реестр `documents`, единый `ErrorResponse + PaginatedResponse`, фоновые задачи через очередь (импорт → отчеты → интеграции LMS/сайт по API — требование кейса, пока `workers/* → return 0`).
+Что заложено в Б2: **единая модель жизненного цикла** (`interaction_pipeline`: вуз × программа × продукт × этап × due date), все доменные PK — UUID, actor хранится как `keycloak_sub: str`, единый реестр `documents`, append-only история переходов и audit event в одной транзакции. Следующий слой — отдельная привязка ответственных, UI канбан/таймлайн, SLA-воркеры и уведомления.
 
 ## 7. Рекомендации по приоритету
 

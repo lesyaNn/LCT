@@ -18,9 +18,9 @@ Rules:
 * No ``IF NOT EXISTS`` hiding drift: versioned files must fail loudly on
   unexpected state; idempotency comes from the version table, not DDL.
 * ``baseline`` is the ONLY adoption path for pre-existing databases at the
-  old Alembic head (7f3a1c9e2b06). It verifies the expected table set and
-  the alembic version row, then marks every SQL migration applied WITHOUT
-  re-running DDL. Data is never dropped.
+  old Alembic head (7f3a1c9e2b06). It verifies the legacy table set and
+  the alembic version row, then marks SQL migrations through 000010 as
+  applied WITHOUT re-running DDL. The new workflow migration remains pending.
 * Keycloak database is never touched: this runner connects only to
   ``DATABASE_URL`` (the ``rtk`` application database).
 """
@@ -43,8 +43,11 @@ MIGRATIONS_DIR = Path(__file__).resolve().parent.parent / "migrations"
 # Old Alembic head adopted by `baseline`. Kept as a constant so the
 # adoption path is explicit and auditable (never "table exists -> done").
 LEGACY_ALEMBIC_HEAD = "7f3a1c9e2b06"
+LEGACY_SQL_HEAD = "000010_audit_identity"
 
-# Canonical application tables (alembic_version/schema_migrations excluded).
+# Canonical application tables (alembic_version/schema_migrations excluded):
+# 21 P1 tables + 8 B1 workflow tables (000011-000014) + health_score_snapshots
+# (P2-09-01, 000015). Must match backend/migrations/*.up.sql exactly.
 EXPECTED_TABLES = [
     "universities",
     "it_directions",
@@ -75,9 +78,37 @@ EXPECTED_TABLES = [
     "workflow_attachments",
     "workflow_tasks",
     "instance_stages",
+    "health_score_snapshots",
 ]
 
 VERSION_RE = re.compile(r"^(?P<ver>\d{6}_[a-z0-9_]+)\.(?P<dir>up|down)\.sql$")
+
+# Adoption must not mark migrations added after the archived Alembic head:
+# the P1-only table set (000011+ workflow pipeline and 000015 health
+# snapshots stay pending for the normal `up` command).
+LEGACY_TABLES = [
+    "universities",
+    "it_directions",
+    "it_programs",
+    "vendors",
+    "it_products",
+    "responsibles",
+    "contracts",
+    "licenses",
+    "university_responsibles",
+    "teachers",
+    "teacher_qualifications",
+    "teacher_certificates",
+    "teacher_programs",
+    "students",
+    "university_programs",
+    "university_products",
+    "meetings",
+    "documents",
+    "interaction_notes",
+    "meeting_documents",
+    "audit_events",
+]
 
 
 def _database_url() -> str:
@@ -236,11 +267,12 @@ def cmd_baseline() -> int:
 
     Preconditions (checked, never assumed):
     * ``alembic_version`` has exactly one row = LEGACY_ALEMBIC_HEAD
-    * public tables == EXPECTED_TABLES (+ alembic_version allowed)
-    On success: insert every SQL version into schema_migrations in ONE
-    transaction (no DDL re-run), preserving all data.
+    * public tables == LEGACY_TABLES (+ alembic_version allowed)
+    On success: insert legacy SQL versions into schema_migrations in ONE
+    transaction (no DDL re-run), preserving all data. Newer migrations stay
+    pending and are applied by the normal ``up`` command.
     """
-    plan = _discover()
+    plan = [item for item in _discover() if item[0] <= LEGACY_SQL_HEAD]
     with _connect() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -266,8 +298,8 @@ def cmd_baseline() -> int:
         with conn.cursor() as cur:
             cur.execute("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY 1")
             tables = {r[0] for r in cur.fetchall()} - {"alembic_version"}
-        missing = set(EXPECTED_TABLES) - tables
-        unexpected = tables - set(EXPECTED_TABLES) - {"schema_migrations"}
+        missing = set(LEGACY_TABLES) - tables
+        unexpected = tables - set(LEGACY_TABLES) - {"schema_migrations"}
         if missing or unexpected:
             print(
                 f"[migrate] baseline refused: missing={sorted(missing)} "

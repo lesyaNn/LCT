@@ -119,11 +119,24 @@ def test_migration_000012_pair_discoverable_and_latest():
     assert "000012_workflow_instances" in versions
     assert "000013_instance_stages" in versions
     assert "000014_transition_history_restrict" in versions
-    assert versions[-1] == "000014_transition_history_restrict"
+    # Merge continuation (B2/B3): snapshots + transition comment + task priority.
+    assert "000015_health_snapshots" in versions
+    assert "000016_transition_comment" in versions
+    assert "000017_tasks_priority" in versions
+    assert versions[-1] == "000017_tasks_priority"
     assert versions.index("000011_workflow_templates") < versions.index("000012_workflow_instances")
     assert versions.index("000012_workflow_instances") < versions.index("000013_instance_stages")
     assert versions.index("000013_instance_stages") < versions.index(
         "000014_transition_history_restrict"
+    )
+    assert versions.index("000014_transition_history_restrict") < versions.index(
+        "000015_health_snapshots"
+    )
+    assert versions.index("000015_health_snapshots") < versions.index(
+        "000016_transition_comment"
+    )
+    assert versions.index("000016_transition_comment") < versions.index(
+        "000017_tasks_priority"
     )
     assert set(module.EXPECTED_TABLES) >= set(PIPELINE_TABLES)
 
@@ -196,6 +209,7 @@ def test_orm_children_columns():
         "from_stage_id",
         "to_stage_id",
         "actor_keycloak_sub",
+        "comment",
         "created_at",
         "updated_at",
     }
@@ -233,6 +247,7 @@ def test_orm_children_columns():
         "responsible_id",
         "deadline",
         "status",
+        "priority",
         "completed_at",
         "created_at",
         "updated_at",
