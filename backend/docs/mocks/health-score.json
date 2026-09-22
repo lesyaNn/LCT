@@ -1,0 +1,43 @@
+{
+  "university_id": "ec8f0fcf-448c-5080-b576-30c8b75a1bbb",
+  "score": 88,
+  "status": "green",
+  "breakdown": {
+    "tasks": 88,
+    "documents": 75,
+    "stages": 80,
+    "teachers": 100,
+    "launch": 100
+  },
+  "reasons": [
+    {
+      "code": "OVERDUE_TASKS",
+      "severity": "medium",
+      "text": "3 просроченных задач"
+    },
+    {
+      "code": "INVALID_DOCUMENTS",
+      "severity": "high",
+      "text": "1 из 4 обязательных документов недействительны"
+    },
+    {
+      "code": "OVERDUE_STAGES",
+      "severity": "high",
+      "text": "1 из 5 этапов выполнены с просрочкой"
+    }
+  ],
+  "calculated_at": "2026-09-15T12:00:00Z",
+  "input_counters": {
+    "overdue_critical_tasks": 0,
+    "overdue_normal_tasks": 3,
+    "total_required_documents": 4,
+    "valid_documents": 3,
+    "stages_due": 5,
+    "stages_on_time": 4,
+    "teachers_required": 0,
+    "teachers_ready": 0,
+    "active_programs": 0,
+    "programs_launched_on_time": 0,
+    "programs_at_risk": 0
+  }
+}

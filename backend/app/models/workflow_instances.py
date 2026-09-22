@@ -128,7 +128,11 @@ class WorkflowInstance(UUIDPKMixin, TimestampMixin, Base):
 
 
 class WorkflowStageTransition(UUIDPKMixin, TimestampMixin, Base):
-    """Stage-movement log entry: NULL from_stage_id = creation, NULL to = closure."""
+    """Stage-movement log entry: NULL from_stage_id = creation, NULL to = closure.
+
+    ``comment`` (000016, P2-03-03) keeps the required history note: prev
+    stage + new stage + actor + comment + timestamp, never NULL.
+    """
 
     __tablename__ = "workflow_stage_transitions"
     __table_args__ = (
@@ -171,6 +175,7 @@ class WorkflowStageTransition(UUIDPKMixin, TimestampMixin, Base):
         default=None,
     )
     actor_keycloak_sub: Mapped[str] = mapped_column(String(256), nullable=False)
+    comment: Mapped[str] = mapped_column(Text, nullable=False, default="")
 
     instance: Mapped["WorkflowInstance"] = relationship(back_populates="transitions")
 
@@ -245,13 +250,18 @@ class WorkflowAttachment(UUIDPKMixin, TimestampMixin, Base):
 
 
 class WorkflowTask(UUIDPKMixin, TimestampMixin, Base):
-    """Instance task with optional stage anchor, assignee, deadline and status."""
+    """Instance task with optional stage anchor, assignee, deadline and status.
+
+    ``priority`` (000017, P2-07-02) feeds Health Score component T:
+    ``critical`` overdue tasks cost -8, other overdue tasks -4.
+    """
 
     __tablename__ = "workflow_tasks"
     __table_args__ = (
         Index("ix_workflow_tasks_instance_id", "instance_id"),
         Index("ix_workflow_tasks_status", "status"),
         Index("ix_workflow_tasks_deadline", "deadline"),
+        Index("ix_workflow_tasks_instance_priority", "instance_id", "priority"),
     )
 
     instance_id: Mapped[uuid.UUID] = mapped_column(
@@ -284,6 +294,9 @@ class WorkflowTask(UUIDPKMixin, TimestampMixin, Base):
     )
     deadline: Mapped[date | None] = mapped_column(Date, nullable=True, default=None)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="open")
+    priority: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="normal", server_default="normal"
+    )
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
     )
