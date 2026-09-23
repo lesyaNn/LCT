@@ -9,11 +9,13 @@ unmounted; see ``docs/AUDIT.md`` for their reactivation requirements.
 
 from fastapi import APIRouter
 
+from app.modules.analytics.router import router as analytics_router
 from app.modules.auth.router import router as auth_router
 from app.modules.catalog.router import router as catalog_router
 from app.modules.health_score.health_router import router as health_router
 from app.modules.health_score.ranking_router import router as ranking_router
 from app.modules.imports.router import router as imports_router
+from app.modules.report_jobs.router import router as report_jobs_router
 from app.modules.teachers.passport_router import router as teacher_passport_router
 from app.modules.universities.passport_router import router as passport_router
 from app.modules.workflow_attachments.router import router as workflow_attachments_router
@@ -35,3 +37,5 @@ v1.include_router(workflow_templates_router)
 v1.include_router(workflow_instances_router)
 v1.include_router(workflow_transitions_router)
 v1.include_router(workflow_attachments_router)
+v1.include_router(analytics_router)
+v1.include_router(report_jobs_router)

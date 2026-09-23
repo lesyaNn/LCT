@@ -1,9 +1,10 @@
 """P0-1 guard: one schema universe + deferred modules stay unmounted.
 
 Pins the resolution of the "two schema universes" blocker:
-* canonical ``Base.metadata`` contains exactly the 30 SQL-managed tables
+* canonical ``Base.metadata`` contains exactly the 31 SQL-managed tables
   (21 P1 tables + 8 B1 workflow tables from 000011-000014 + 1 P2 health
-  snapshot table ``health_score_snapshots`` from 000015);
+  snapshot table ``health_score_snapshots`` from 000015 and report_jobs from
+  000018);
 * pre-UUID / stub models live on ``DeferredBase`` metadata only;
 * deferred routers are importable but NOT mounted in the production app;
 * ``AuditEvent.user_id/entity_id`` accept Keycloak ``sub`` (TEXT, 000010).
@@ -51,6 +52,7 @@ CANON_TABLES = frozenset(
         "workflow_tasks",
         "instance_stages",
         "health_score_snapshots",
+        "report_jobs",
     }
 )
 
@@ -72,7 +74,7 @@ DEFERRED_TABLES = frozenset(
 # legacy health_score router при этом остаётся незамаунченным.
 DEFERRED_API_PREFIXES = (
     "/audit", "/dashboard", "/documents", "/users",
-    "/integrations", "/notifications", "/reports", "/workflows", "/tasks",
+    "/integrations", "/notifications", "/workflows", "/tasks",
 )
 
 
@@ -143,6 +145,8 @@ def test_mounted_routers_are_only_the_production_contract():
         "/api/v1/teachers",
         "/api/v1/workflow",
         "/api/v1/health-score",
+        "/api/v1/analytics",
+        "/api/v1/reports",
     )
     paths = _mounted_api_paths()
     assert all(path.startswith(allowed) for path in paths), paths
