@@ -159,6 +159,11 @@ def create_job(
     actor_name: str = "",
     actor_roles: list[str] | None = None,
     effective_university_ids: list[str] | None = None,
+    # Dev-3 import extension (000019): kind + worker params + re-POST dedup.
+    # Report callers omit them (job_type='report').
+    job_type: str = "report",
+    payload: dict[str, Any] | None = None,
+    idempotency_key: str | None = None,
 ) -> ReportJob:
     """Persist a ``queued`` job snapshot and commit (no worker started).
 
@@ -169,6 +174,9 @@ def create_job(
         raise ValueError(f"unsupported report format: {format!r}")
     now = _utcnow()
     job = ReportJob(
+        job_type=job_type,
+        payload=dict(payload or {}),
+        idempotency_key=idempotency_key,
         format=format,
         filters=dict(filters),
         columns=list(columns),

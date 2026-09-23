@@ -67,7 +67,18 @@ _DATE_FORMATS = ("%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y", "%Y/%m/%d", "%d-%m-%Y")
 
 
 class ImportValidationError(ValueError):
-    """Single-row validation failure (message is user-facing)."""
+    """Single-row validation failure (message is user-facing).
+
+    P4-10-02: machine-readable ``code`` + ``field`` travel with the message
+    so the summary and the downloadable XLSX error report can expose them::
+
+        REQUIRED | INVALID_FORMAT | NOT_FOUND | DUPLICATE | FK_VIOLATION
+    """
+
+    def __init__(self, message: str, *, code: str = "ROW_ERROR", field: str = "row"):
+        super().__init__(message)
+        self.code = code
+        self.field = field
 
 
 def parse_date(value: Any, field: str) -> date | None:
@@ -88,7 +99,10 @@ def parse_date(value: Any, field: str) -> date | None:
         # already converted by the .xls reader, so here float == year.
         if float(value).is_integer() and 1900 <= int(value) <= 2100:
             return date(int(value), 12, 31)
-        raise ImportValidationError(f"Неверный формат даты в поле '{field}': {value!r}")
+        raise ImportValidationError(
+            f"Неверный формат даты в поле '{field}': {value!r}",
+            code="INVALID_FORMAT", field=field,
+        )
     if isinstance(value, str):
         text = value.strip()
         if re.fullmatch(r"(19|20)\d{2}", text):
@@ -98,7 +112,10 @@ def parse_date(value: Any, field: str) -> date | None:
                 return datetime.strptime(text, fmt).date()
             except ValueError:
                 continue
-    raise ImportValidationError(f"Неверный формат даты в поле '{field}': {value!r}")
+    raise ImportValidationError(
+        f"Неверный формат даты в поле '{field}': {value!r}",
+        code="INVALID_FORMAT", field=field,
+    )
 
 
 def _cell_text(value: Any) -> str:
@@ -352,7 +369,10 @@ def apply_row(
     """
     uni_name = _cell_text(mapped.get("university.name"))
     if not uni_name:
-        raise ImportValidationError("Поле 'university.name' обязательно")
+        raise ImportValidationError(
+            "Поле 'university.name' обязательно",
+            code="REQUIRED", field="university.name",
+        )
     uni = find_university(session, uni_name)
     if uni is None:
         uni = University(name=uni_name, city=None)
@@ -361,7 +381,10 @@ def apply_row(
 
     contract_no = _cell_text(mapped.get("contract.contract_number"))
     if not contract_no:
-        raise ImportValidationError("Поле 'contract.contract_number' обязательно")
+        raise ImportValidationError(
+            "Поле 'contract.contract_number' обязательно",
+            code="REQUIRED", field="contract.contract_number",
+        )
 
     product_name = _cell_text(mapped.get("product.name"))
     product = None
@@ -369,10 +392,13 @@ def apply_row(
         vendor_name = _cell_text(mapped.get("vendor.name"))
         if not vendor_name:
             raise ImportValidationError(
-                "Поле 'vendor.name' обязательно, если указан продукт"
+                "Поле 'vendor.name' обязательно, если указан продукт",
+                code="REQUIRED", field="vendor.name",
             )
         vendor, _ = _get_or_create(session, Vendor, {}, name=vendor_name)
-        version = _cell_text(mapped.get("product.version"))
+        # P4-10-03: если колонки "Версия ПО" нет — дефолт "1.0" (ключ продукта
+        # включает версию, поэтому "" плодил бы дубли на каждый импорт).
+        version = _cell_text(mapped.get("product.version")) or "1.0"
         product, _ = _get_or_create(
             session, ITProduct, {"vendor_id": vendor.id},
             vendor_id=vendor.id, name=product_name, version=version,
@@ -395,7 +421,8 @@ def apply_row(
         if not direction_code:
             raise ImportValidationError(
                 "Поле 'direction.code' обязательно, если указаны направление/программа"
-                " (или замаппьте 'direction.name' для автогенерации кода)"
+                " (или замаппьте 'direction.name' для автогенерации кода)",
+                code="REQUIRED", field="direction.code",
             )
         row_direction = find_or_create_direction(
             session, direction_code, direction_name or None
@@ -409,12 +436,16 @@ def apply_row(
     signed_at = parse_date(mapped.get("license.signed_at"), "license.signed_at")
     expires_at = parse_date(mapped.get("license.expires_at"), "license.expires_at")
     if expires_at is None:
-        raise ImportValidationError("Поле 'license.expires_at' обязательно")
+        raise ImportValidationError(
+            "Поле 'license.expires_at' обязательно",
+            code="REQUIRED", field="license.expires_at",
+        )
     transfer = _cell_text(mapped.get("license.transfer_status")) or "pending"
     if transfer not in TRANSFER_STATUSES:
         raise ImportValidationError(
             f"Недопустимый transfer_status {transfer!r} "
-            f"(pending/transferred/accepted/rejected)"
+            f"(pending/transferred/accepted/rejected)",
+            code="INVALID_FORMAT", field="license.transfer_status",
         )
     comment_raw = mapped.get("license.comment")
     comment = _cell_text(comment_raw) or None
@@ -455,7 +486,8 @@ def apply_row(
     if lic is None:
         if product is None:
             raise ImportValidationError(
-                "Строка без продукта: не к чему привязать лицензию"
+                "Строка без продукта: не к чему привязать лицензию",
+                code="REQUIRED", field="product.name",
             )
         session.add(License(
             university_id=uni.id, product_id=product.id, contract_id=contract.id,
@@ -507,17 +539,26 @@ def execute_import(
     update_existing: bool = True,
     dry_run: bool = False,
 ) -> dict[str, Any]:
-    """Run the import over all staged rows. Bad rows are collected, never fatal."""
+    """Run the import over all staged rows. Bad rows are collected, never fatal.
+
+    P4-10-02: каждая строка выполняется в собственном savepoint
+    (``session.begin_nested()``) — откат плохой строки не трогает хорошие.
+    """
     unknown = sorted(set(mapping.values()) - TARGET_FIELDS)
     if unknown:
         raise ImportValidationError(
-            f"Неизвестные поля маппинга: {', '.join(unknown)}"
+            f"Неизвестные поля маппинга: {', '.join(unknown)}",
+            code="INVALID_FORMAT", field="mapping",
         )
     if "university.name" not in mapping.values():
-        raise ImportValidationError("Маппинг должен содержать university.name")
+        raise ImportValidationError(
+            "Маппинг должен содержать university.name",
+            code="REQUIRED", field="mapping",
+        )
     if "contract.contract_number" not in mapping.values():
         raise ImportValidationError(
-            "Маппинг должен содержать contract.contract_number"
+            "Маппинг должен содержать contract.contract_number",
+            code="REQUIRED", field="mapping",
         )
 
     _, _, data = read_sheet(file_id)
@@ -531,15 +572,13 @@ def execute_import(
                 summary["skipped"] += 1
                 continue
             try:
-                outcome = apply_row(session, _mapped(row, mapping), update_existing)
+                with session.begin_nested():
+                    outcome = apply_row(session, _mapped(row, mapping), update_existing)
                 summary[outcome] += 1
             except ImportValidationError as exc:
-                field = "row"
-                msg = str(exc)
-                if "Поле '" in msg:
-                    field = msg.split("Поле '")[1].split("'")[0]
                 summary["errors"].append(
-                    {"row": idx, "field": field, "error": msg}
+                    {"row": idx, "field": exc.field, "code": exc.code,
+                     "message": str(exc)}
                 )
                 if len(summary["errors"]) >= 100:
                     break
@@ -551,6 +590,46 @@ def execute_import(
         session.rollback()
         raise
     return summary
+
+
+def write_error_report(summary: dict[str, Any], dest: str) -> int:
+    """P4-10-02: скачиваемый XLSX-отчёт (лист «Итог» + лист «Ошибки»).
+
+    Возвращает размер файла в байтах. Пишется всегда (даже без ошибок —
+    тогда лист «Ошибки» содержит только шапку), чтобы у job был файловый
+    артефакт для ``GET /import/jobs/{id}/report``.
+    """
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+
+    wb = Workbook()
+    ws_total = wb.active
+    ws_total.title = "Итог"
+    bold = Font(bold=True)
+    ws_total.append(["Метрика", "Значение"])
+    for cell in ws_total[1]:
+        cell.font = bold
+    for key in ("total_rows", "inserted", "updated", "skipped", "dry_run"):
+        ws_total.append([key, summary.get(key)])
+    ws_total.append(["errors", len(summary.get("errors", []))])
+    for col in ("A", "B"):
+        ws_total.column_dimensions[col].width = 18
+
+    ws_err = wb.create_sheet("Ошибки")
+    ws_err.append(["Строка", "Поле", "Код", "Сообщение"])
+    for cell in ws_err[1]:
+        cell.font = bold
+    for err in summary.get("errors", []):
+        ws_err.append([
+            err.get("row"), err.get("field"),
+            err.get("code"), err.get("message"),
+        ])
+    for col, width in (("A", 10), ("B", 28), ("C", 16), ("D", 70)):
+        ws_err.column_dimensions[col].width = width
+
+    wb.save(dest)
+    wb.close()
+    return os.path.getsize(dest)
 
 
 __all__ = [
@@ -566,4 +645,5 @@ __all__ = [
     "parse_preview",
     "read_sheet",
     "stage_upload",
+    "write_error_report",
 ]

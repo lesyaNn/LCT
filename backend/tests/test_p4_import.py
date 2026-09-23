@@ -143,7 +143,12 @@ def test_bad_rows_skipped_with_errors(staging, db):
     assert summary["inserted"] == 1, summary
     assert len(summary["errors"]) == 3, summary
     assert {e["row"] for e in summary["errors"]} == {2, 3, 4}
-    assert all(e["field"] and e["error"] for e in summary["errors"])
+    assert all(e["field"] and e["message"] and e["code"] for e in summary["errors"])
+    assert {(e["field"], e["code"]) for e in summary["errors"]} == {
+        ("license.expires_at", "INVALID_FORMAT"),
+        ("contract.contract_number", "REQUIRED"),
+        ("license.transfer_status", "INVALID_FORMAT"),
+    }
 
 
 def test_rerun_updates_instead_of_duplicating(staging, db):
@@ -218,16 +223,68 @@ def test_api_preview_execute_job_flow(client):
         "mapping": MAPPING,
         "options": {"update_existing": True, "dry_run": False},
     })
-    assert resp.status_code == 200, resp.text
+    # P4-06-02: submit отвечает 202 + {job_id}, итог — polling GET jobs/{id}.
+    assert resp.status_code == 202, resp.text
     job_id = resp.json()["job_id"]
     assert job_id
 
     resp = client.get(f"/api/v1/import/jobs/{job_id}")
     assert resp.status_code == 200, resp.text
     job = resp.json()
-    assert job["status"] == "done"
+    assert job["type"] == "xlsx_import"
+    assert job["status"] == "ready"
+    assert job["progress"] == 100
+    assert job["error"] is None
     assert job["result"]["inserted"] == 2, job["result"]
     assert job["result"]["errors"] == []
+
+    # P4-10-02: скачиваемый XLSX-отчёт (Итог + Ошибки).
+    resp = client.get(f"/api/v1/import/jobs/{job_id}/report")
+    assert resp.status_code == 200, resp.text
+    assert "spreadsheetml.sheet" in resp.headers["content-type"]
+    assert len(resp.content) > 0
+
+
+def test_api_execute_idempotent_replay(client):
+    """Повторный POST с тем же file+mapping+options — тот же job_id."""
+    content = make_xlsx(HEADERS, GOOD_ROWS)
+    resp = client.post(
+        "/api/v1/import/preview",
+        files={"file": ("import.xlsx", content,
+                        "application/vnd.openxmlformats-officedocument"
+                        ".spreadsheetml.sheet")},
+    )
+    assert resp.status_code == 200, resp.text
+    body = {
+        "file_id": resp.json()["file_id"],
+        "mapping": MAPPING,
+        "options": {"update_existing": True, "dry_run": False},
+    }
+    first = client.post("/api/v1/import/execute", json=body)
+    second = client.post("/api/v1/import/execute", json=body)
+    assert first.status_code == 202 and second.status_code == 202
+    assert first.json()["job_id"] == second.json()["job_id"]
+
+    # Чужой job: curator имеет import.read, но job создан другим user_id.
+    from app.main import app
+
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        id="stranger", roles={"curator"})
+    try:
+        resp = client.get(f"/api/v1/import/jobs/{first.json()['job_id']}")
+        assert resp.status_code == 403, resp.text
+        resp = client.get(f"/api/v1/import/jobs/{first.json()['job_id']}/report")
+        assert resp.status_code == 403, resp.text
+    finally:
+        app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+            id="test", roles={"admin"})
+
+
+def test_api_job_status_not_found(client):
+    resp = client.get("/api/v1/import/jobs/00000000-0000-0000-0000-000000000000")
+    assert resp.status_code == 404
+    resp = client.get("/api/v1/import/jobs/not-a-uuid")
+    assert resp.status_code == 404
 
 
 def test_api_preview_rejects_csv(client):
@@ -245,3 +302,4 @@ def test_openapi_contains_import_endpoints():
     assert "/api/v1/import/preview" in paths
     assert "/api/v1/import/execute" in paths
     assert "/api/v1/import/jobs/{job_id}" in paths
+    assert "/api/v1/import/jobs/{job_id}/report" in paths

@@ -125,7 +125,9 @@ def test_migration_000012_pair_discoverable_and_latest():
     assert "000017_tasks_priority" in versions
     # P4 continuation: async report jobs live after the workflow pipeline.
     assert "000018_report_jobs" in versions
-    assert versions[-1] == "000018_report_jobs"
+    # Dev-3: import jobs share the report_jobs ledger.
+    assert "000019_import_jobs" in versions
+    assert versions[-1] == "000019_import_jobs"
     assert versions.index("000011_workflow_templates") < versions.index("000012_workflow_instances")
     assert versions.index("000012_workflow_instances") < versions.index("000013_instance_stages")
     assert versions.index("000013_instance_stages") < versions.index(
@@ -142,6 +144,9 @@ def test_migration_000012_pair_discoverable_and_latest():
     )
     assert versions.index("000017_tasks_priority") < versions.index(
         "000018_report_jobs"
+    )
+    assert versions.index("000018_report_jobs") < versions.index(
+        "000019_import_jobs"
     )
     assert set(module.EXPECTED_TABLES) >= set(PIPELINE_TABLES)
 

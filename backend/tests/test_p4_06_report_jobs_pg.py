@@ -663,8 +663,8 @@ def test_migration_chain_latest_is_report_jobs():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     versions = [v for v, _, _ in module._discover()]
-    assert versions[-1] == "000018_report_jobs"
-    assert len(versions) == 18
+    assert versions[-1] == "000019_import_jobs"
+    assert len(versions) == 19
     assert "report_jobs" in module.EXPECTED_TABLES
     assert module.EXPECTED_TABLES[-1] == "report_jobs"
 

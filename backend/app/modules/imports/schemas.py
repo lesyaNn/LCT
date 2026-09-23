@@ -67,9 +67,16 @@ class ImportExecuteResponse(BaseModel):
 
 
 class RowError(BaseModel):
+    """P4-10-02: построчная ошибка с машиночитаемым кодом.
+
+    Коды: REQUIRED | INVALID_FORMAT | NOT_FOUND | DUPLICATE |
+    FK_VIOLATION | ROW_ERROR (прочее).
+    """
+
     row: int
     field: str
-    error: str
+    code: str = "ROW_ERROR"
+    message: str
 
 
 class ImportSummary(BaseModel):
@@ -82,10 +89,21 @@ class ImportSummary(BaseModel):
 
 
 class ImportJobStatus(BaseModel):
+    """Polling payload for ``GET /import/jobs/{id}`` (P4-06-02).
+
+    Statuses come from the shared ``report_jobs`` ledger (P4-06-01):
+    ``queued`` → ``building`` → ``ready`` | ``failed``. The frontend polls
+    until a terminal status; ``progress`` drives the progress-bar,
+    ``error`` carries the sanitized failure reason, ``result`` the
+    terminal summary (inserted/updated/skipped/errors with codes).
+    """
+
     id: str
     type: str
     status: str
+    progress: int = 0
     result: dict | None = None
+    error: str | None = None
 
 
 __all__ = [
