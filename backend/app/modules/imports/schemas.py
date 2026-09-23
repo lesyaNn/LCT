@@ -11,16 +11,18 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field
 
 #: Ключи — заголовки колонок файла, значения — поля БД (см. TARGET_FIELDS).
+#: Заголовки — канонические имена из ТЗ (P4-10-03), чтобы дефолтный маппинг
+#: срабатывал на файле от заказчика без ручного сопоставления.
 #: Swagger подставляет этот пример в "Try it out" целиком.
 EXAMPLE_MAPPING: dict[str, str] = {
-    "Название ВУЗа": "university.name",
+    "ВУЗ": "university.name",
     "Вендор": "vendor.name",
     "ПО": "product.name",
     "Номер договора": "contract.contract_number",
     "Подписание лицензии": "license.signed_at",
-    "Срок действия лицензии (год)": "license.expires_at",
-    "Статус по передачи": "license.transfer_status",
-    "ФИО Менеджера": "responsible.full_name",
+    "Срок лицензии": "license.expires_at",
+    "Статус передачи": "license.transfer_status",
+    "ФИО менеджера": "responsible.full_name",
     "Ответственные от ВУЗа": "university_responsibles",
     "Комментарий": "license.comment",
     "IT направление": "direction.name",
