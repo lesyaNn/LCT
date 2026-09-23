@@ -1,6 +1,6 @@
 """P4-05-01 unit tests: JSON exporter over a stubbed dataset (no database).
 
-Covers the frozen shape (``generated_at/filters/columns/total/items``),
+Covers the frozen shape (``metadata/filters/columns/rows/totals``),
 default-14 vs subset vs order, typed serialization (UUID/date/datetime/
 numbers/null/unicode), hidden-key exclusion, UTF-8 readability,
 temp-file atomicity, failure cleanup and the streaming (no ``.all()`` on
@@ -154,25 +154,74 @@ def test_serialize_json_value_enum_and_fallback():
 def test_frozen_top_level_keys_and_order(tmp_path):
     _, doc = _gen(tmp_path, SUBSET_3, _rows())
     assert list(doc.keys()) == list(JSON_FROZEN_KEYS)
-    assert JSON_FROZEN_KEYS == ("generated_at", "filters", "columns", "total", "items")
+    assert JSON_FROZEN_KEYS == ("metadata", "filters", "columns", "rows", "totals")
+
+
+def test_metadata_block(tmp_path):
+    _, doc = _gen(tmp_path, SUBSET_3, _rows())
+    assert doc["metadata"]["report_name"] == "Аналитический отчёт по взаимодействию с ВУЗами"
+    assert doc["metadata"]["version"] == "1.0"
+    assert doc["metadata"]["generator"] == "CRM ИТ-Школа Ростелеком"
+    assert datetime.fromisoformat(doc["metadata"]["generated_at"]).tzinfo is not None
+
+
+def test_columns_carry_key_and_title(tmp_path):
+    _, doc = _gen(tmp_path, SUBSET_3, _rows())
+    assert doc["columns"] == [
+        {"key": "university", "title": "Наименование ВУЗа"},
+        {"key": "health_score", "title": "Health Score"},
+        {"key": "comment", "title": "Комментарий"},
+    ]
+
+
+def test_totals_computed(tmp_path):
+    _, doc = _gen(tmp_path, SUBSET_3, _rows())
+    assert doc["totals"]["row_count"] == 2
+    # Фикстура несёт два разных имени (в проде имена уникальны).
+    assert doc["totals"]["universities"] == 2
+    assert doc["totals"]["avg_health_score"] == 85.0
+    assert doc["totals"]["by_health_status"] == {"green": 1, "yellow": 0, "red": 0}
+
+
+def test_totals_empty_when_no_scores(tmp_path):
+    _, doc = _gen(tmp_path, ["university"], [])
+    assert doc["totals"] == {
+        "row_count": 0, "universities": None,
+        "avg_health_score": None,
+        "by_health_status": {"green": 0, "yellow": 0, "red": 0},
+    }
+
+
+def test_totals_fallback_to_names_without_ids(tmp_path):
+    # Курсор несёт только публичные ключи: distinct university names.
+    rows = [
+        {"university": "ВУЗ А", "health_score": 90},
+        {"university": "ВУЗ А", "health_score": 50},
+        {"university": "ВУЗ Б", "health_score": None},
+    ]
+    _, doc = _gen(tmp_path, ["university", "health_score"], rows)
+    assert doc["totals"]["universities"] == 2
+    assert doc["totals"]["avg_health_score"] == 70.0
+    assert doc["totals"]["by_health_status"] == {"green": 1, "yellow": 0, "red": 1}
 
 
 def test_default_columns_are_14_mandatory(tmp_path):
     result, doc = _gen(tmp_path, None, [])
     assert result.columns == list(DEFAULT_COLUMNS)
-    assert doc["columns"] == list(DEFAULT_COLUMNS)
-    assert doc["total"] == 0
-    assert doc["items"] == []
+    assert [c["key"] for c in doc["columns"]] == list(DEFAULT_COLUMNS)
+    assert all(c["title"] for c in doc["columns"])
+    assert doc["totals"]["row_count"] == 0
+    assert doc["rows"] == []
 
 
 def test_subset_and_selected_column_order(tmp_path):
     cols = ["health_score", "university", "comment"]
     result, doc = _gen(tmp_path, cols, _rows())
     assert result.columns == cols
-    assert doc["columns"] == cols
-    assert doc["total"] == 2
-    assert list(doc["items"][0].keys()) == cols
-    assert doc["items"][0] == {
+    assert [c["key"] for c in doc["columns"]] == cols
+    assert doc["totals"]["row_count"] == 2
+    assert list(doc["rows"][0].keys()) == cols
+    assert doc["rows"][0] == {
         "health_score": 85,
         "university": "МГУ им. Ломоносова",
         "comment": "Комментарий №1",
@@ -181,18 +230,18 @@ def test_subset_and_selected_column_order(tmp_path):
 
 def test_hidden_keys_never_emitted(tmp_path):
     _, doc = _gen(tmp_path, None, _rows())
-    for item in doc["items"]:
+    for item in doc["rows"]:
         assert "_university_id" not in item
         assert "_license_id" not in item
 
 
 def test_null_stays_null_numeric_stays_numeric(tmp_path):
     _, doc = _gen(tmp_path, SUBSET_3, _rows())
-    second = doc["items"][1]
+    second = doc["rows"][1]
     assert second["health_score"] is None
     assert second["comment"] is None
-    assert doc["items"][0]["health_score"] == 85
-    assert isinstance(doc["items"][0]["health_score"], int)
+    assert doc["rows"][0]["health_score"] == 85
+    assert isinstance(doc["rows"][0]["health_score"], int)
 
 
 def test_unicode_readable_utf8_not_escaped_dump(tmp_path):
@@ -219,15 +268,15 @@ def test_dates_iso_and_datetimes_with_timezone(tmp_path):
         }
     ]
     _, doc = _gen(tmp_path, ["university", "license_signed", "license_expires"], rows)
-    assert doc["items"][0]["license_signed"] == "2026-02-01"
-    assert doc["items"][0]["license_expires"] is None
+    assert doc["rows"][0]["license_signed"] == "2026-02-01"
+    assert doc["rows"][0]["license_expires"] is None
 
 
 def test_generated_at_iso_with_timezone(tmp_path):
     naive = datetime(2026, 9, 20, 10, 30, 0)
     result, doc = _gen(tmp_path, ["university"], _rows()[:1], generated_at=naive)
     assert result.generated_at.tzinfo is not None
-    parsed = datetime.fromisoformat(doc["generated_at"])
+    parsed = datetime.fromisoformat(doc["metadata"]["generated_at"])
     assert parsed.tzinfo is not None
 
 
@@ -296,10 +345,10 @@ def test_large_export_bounded_single_pass(tmp_path):
     ]
     result, doc = _gen(tmp_path, SUBSET_3, rows)
     assert result.row_count == 3000
-    assert doc["total"] == 3000
-    assert len(doc["items"]) == 3000
-    assert doc["items"][0]["university"] == "ВУЗ 00000"
-    assert doc["items"][2999]["university"] == "ВУЗ 02999"
+    assert doc["totals"]["row_count"] == 3000
+    assert len(doc["rows"]) == 3000
+    assert doc["rows"][0]["university"] == "ВУЗ 00000"
+    assert doc["rows"][2999]["university"] == "ВУЗ 02999"
 
 
 def test_failure_removes_temp_and_raises(tmp_path):
