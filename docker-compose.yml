@@ -104,6 +104,9 @@ services:
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
       STORAGE_ROOT: /app/storage
       REPORTS_ROOT: /app/reports
+      # Dev-2 analytics boundary: Dev-1 filter adapter (non-empty filters
+      # in /analytics/* stop returning 503 FILTER_PROVIDER_NOT_CONFIGURED).
+      P4_FILTER_PROVIDER: ${P4_FILTER_PROVIDER:-app.modules.analytics.dev1_provider:provider}
     volumes:
       # Staging survives backend restarts (P0-4: preview -> execute).
       - import-staging:/tmp/rtk-imports
@@ -139,6 +142,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       IMPORT_STAGING_DIR: /tmp/rtk-imports
       REPORTS_ROOT: /app/reports
+      P4_FILTER_PROVIDER: ${P4_FILTER_PROVIDER:-app.modules.analytics.dev1_provider:provider}
     volumes:
       - import-staging:/tmp/rtk-imports
       - reports-storage:/app/reports
