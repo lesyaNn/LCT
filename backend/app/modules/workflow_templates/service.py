@@ -34,7 +34,7 @@ import uuid
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.exceptions import NotFound
+from app.core.exceptions import Conflict, NotFound
 from app.models.workflow_templates import WorkflowStage, WorkflowTemplate
 
 from .schemas import StageRead, TemplateDetail, TemplateRead
@@ -197,6 +197,25 @@ def create_stage(
     return StageRead.model_validate(obj)
 
 
+def _ensure_no_active_current(db: Session, stage: WorkflowStage) -> None:
+    """P2-02-04: a template stage that is current in any active instance
+    cannot be retired — the pointer would dangle for running workflows."""
+    from app.models.workflow_instances import WorkflowInstance
+
+    hit = db.execute(
+        select(WorkflowInstance.id)
+        .where(
+            WorkflowInstance.status == "active",
+            WorkflowInstance.current_stage_id == stage.id,
+        )
+        .limit(1)
+    ).first()
+    if hit is not None:
+        raise Conflict(
+            "Stage is current in an active workflow instance and cannot be disabled"
+        )
+
+
 def patch_stage(
     db: Session,
     template_id: uuid.UUID,
@@ -219,6 +238,8 @@ def patch_stage(
     if "is_required" in fields and is_required is not None:
         obj.is_required = is_required
     if "is_active" in fields and is_active is not None:
+        if not is_active:
+            _ensure_no_active_current(db, obj)
         obj.is_active = is_active
     if "sla_days" in fields:
         obj.sla_days = sla_days

@@ -149,7 +149,14 @@ class UniversityDetail(BaseModel):
 
 
 class UniversityPassport(BaseModel):
-    """Aggregated schema for GET /universities/{id}/passport."""
+    """Aggregated schema for GET /universities/{id}/passport.
+
+    Mock-contract DTO (validates ``docs/mocks/university-passport.json``
+    for P3). The mounted router serves the evolved
+    ``app.modules.universities.passport_schemas.UniversityPassport``
+    (adds ?include= blocks) — keep the shared sections in sync
+    when either changes.
+    """
 
     university: UniversityDetail
     programs: list[ProgramShort] = Field(default_factory=list)

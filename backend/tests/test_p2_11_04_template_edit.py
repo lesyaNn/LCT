@@ -775,7 +775,7 @@ def test_referenced_stage_not_deletable_disable_is_retire_path(client, db):
     t = _template(client)
     _stage(client, t["id"], name="A")
     u = _university(db)
-    _post_instance(client, u.id, t["id"])  # creation transition references stage A
+    first = _post_instance(client, u.id, t["id"])  # creation transition references stage A
     sid = _stage_ids_by_name(client.get(f"/api/v1/workflow/templates/{t['id']}").json(), "A")[0]
     with pytest.raises(IntegrityError) as exc:
         db.delete(db.get(WorkflowStage, uuid.UUID(sid)))
@@ -786,5 +786,26 @@ def test_referenced_stage_not_deletable_disable_is_retire_path(client, db):
     r = client.patch(
         f"/api/v1/workflow/templates/{t['id']}/stages/{sid}", json={"is_active": False}
     )
+    # P2-02-04: stage A is current in an active instance -> 409, not retire.
+    assert r.status_code == 409, r.text
+    # Retire path on a fresh template: move the instance off A2, then A2 retires.
+    t2 = _template(client)
+    _stage(client, t2["id"], name="A2")
+    _stage(client, t2["id"], name="B2", is_required=False)
+    moving = _post_instance(client, u.id, t2["id"])
+    ids2 = {
+        s["name"]: s["id"]
+        for s in client.get(f"/api/v1/workflow/templates/{t2['id']}").json()["stages"]
+    }
+    target = next(s["id"] for s in moving["stages"] if s["template_stage_id"] == ids2["B2"])
+    tr = client.post(
+        f"/api/v1/workflow/instances/{moving['id']}/transition",
+        json={"target_instance_stage_id": target, "comment": "go"},
+    )
+    assert tr.status_code == 200, tr.text
+    r = client.patch(
+        f"/api/v1/workflow/templates/{t2['id']}/stages/{ids2['A2']}",
+        json={"is_active": False},
+    )
     assert r.status_code == 200, r.text  # disable is the normal retire path
-    assert [s["name"] for s in _post_instance(client, u.id, t["id"])["stages"]] == []
+    assert [s["name"] for s in _post_instance(client, u.id, t2["id"])["stages"]] == ["B2"]

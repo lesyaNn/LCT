@@ -165,7 +165,7 @@ class ReportFormat(str, enum.Enum):
 
 class PaginationParams(BaseModel):
     page: int = Field(default=1, ge=1, examples=[1])
-    page_size: int = Field(default=20, ge=1, le=200, examples=[20])
+    page_size: int = Field(default=20, ge=1, le=100, examples=[20])
 
 
 T = TypeVar("T")

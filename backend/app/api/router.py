@@ -1,7 +1,7 @@
 """API v1 production router.
 
-Mounted: auth, import, university passport, teacher passport, catalog
-CRUD/overview, workflow templates/stages, workflow instances (+ canonical
+Mounted: auth, import, university passport, teacher passport, meetings,
+students, catalog CRUD/overview, workflow templates/stages, workflow instances (+ canonical
 B2 transitions/comments), workflow instance attachments, health-score
 (batch/ranking/history/attention), and async analytics reports (P4-06-01:
 POST queued job + status + download). Deferred forward-stub routers stay
@@ -17,6 +17,8 @@ from app.modules.catalog.router import router as catalog_router
 from app.modules.health_score.health_router import router as health_router
 from app.modules.health_score.ranking_router import router as ranking_router
 from app.modules.imports.router import router as imports_router
+from app.modules.meetings.router import router as meetings_router
+from app.modules.students.router import router as students_router
 from app.modules.teachers.passport_router import router as teacher_passport_router
 from app.modules.universities.passport_router import router as passport_router
 from app.modules.workflow_attachments.router import router as workflow_attachments_router
@@ -33,6 +35,8 @@ v1.include_router(health_router)
 v1.include_router(ranking_router)
 v1.include_router(passport_router)
 v1.include_router(teacher_passport_router)
+v1.include_router(meetings_router)
+v1.include_router(students_router)
 v1.include_router(catalog_router)
 v1.include_router(workflow_templates_router)
 v1.include_router(workflow_instances_router)

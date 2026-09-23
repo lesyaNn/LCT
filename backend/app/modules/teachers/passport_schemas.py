@@ -105,7 +105,12 @@ class TeacherProgramRead(BaseModel):
 
 
 class TeacherPassport(BaseModel):
-    """Full teacher passport (P1-05-01/02/03)."""
+    """Full teacher passport (P1-05-01/02/03).
+
+    Decision (P1-05-02, MVP): no separate ``teacher_trainings`` table —
+    professional development is covered by qualifications/certificates,
+    so there is intentionally no ``trainings`` block here.
+    """
 
     teacher: TeacherBlock
     university: UniversityBrief

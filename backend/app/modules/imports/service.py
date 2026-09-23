@@ -249,13 +249,18 @@ def _get_or_create(session: Session, model, defaults: dict, **key):
     return obj, True
 
 
+def _escape_like(value: str) -> str:
+    """Escape LIKE wildcards in user-supplied fuzzy-search text."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 def find_university(session: Session, name: str) -> University | None:
     """Exact match first, then case-insensitive fuzzy (spec: exact/fuzzy)."""
     uni = session.execute(select(University).filter_by(name=name)).scalar_one_or_none()
     if uni is not None:
         return uni
     return session.execute(
-        select(University).filter(University.name.ilike(f"%{name}%"))
+        select(University).filter(University.name.ilike(f"%{_escape_like(name)}%", escape="\\"))
     ).scalar_one_or_none()
 
 

@@ -39,7 +39,6 @@ from app.models.workflow_instances import WorkflowAttachment, WorkflowInstance
 from app.models.workflow_templates import WorkflowTemplate
 from app.modules.workflow_attachments import service as attach_service
 from app.modules.workflow_attachments.policy import (
-    FILE_TYPE_CONTRACT_STATUS,
     MAX_FILE_SIZE_BYTES,
     UPLOAD_CHUNK_SIZE_BYTES,
     content_disposition,
@@ -231,15 +230,20 @@ def test_limits_and_chunk_constants():
     assert UPLOAD_CHUNK_SIZE_BYTES == 256 * 1024
 
 
-def test_file_type_contract_blocked_not_invented():
-    assert FILE_TYPE_CONTRACT_STATUS == "PARTIAL_BLOCKED_BY_MISSING_FILE_TYPE_CONTRACT"
+def test_file_type_contract_blocked_not_invented(monkeypatch):
+    from app.config import settings
     from app.modules.workflow_attachments import policy
+    from fastapi import HTTPException
 
-    assert policy.ALLOWED_EXTENSIONS is None
-    assert policy.ALLOWED_MIME_TYPES is None
+    monkeypatch.setattr(settings, "upload_allowed_extensions", "")
+    assert policy.get_allowed_extensions() is None
     # Without a contract the declared type is recorded, never rejected.
     assert policy.check_file_type("report.pdf", "application/pdf") == "application/pdf"
     assert policy.check_file_type("weird.bin", None) == "application/octet-stream"
+    monkeypatch.setattr(settings, "upload_allowed_extensions", "pdf")
+    with pytest.raises(HTTPException) as ei:
+        policy.check_file_type("run.exe", "application/octet-stream")
+    assert ei.value.status_code == 415
 
 
 @pytest.mark.parametrize(
@@ -709,7 +713,7 @@ def test_missing_physical_object_is_controlled(client, db, backend, storage_dir)
     (storage_dir / row.storage_key).unlink()
 
     d = client.get(f"/api/v1/workflow/instances/{g['ia'].id}/attachments/{aid}/download")
-    assert d.status_code == 500
+    assert d.status_code == 404  # P2-05-02: missing object is 404, not 500
     body = d.text
     assert "Traceback" not in body
     assert "/app/storage" not in body and str(storage_dir) not in body

@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     # Production object root. Mounted as a persistent volume in compose.
     storage_root: str = "/app/storage"
     max_upload_mb: int = 50
+    # P2-05-01: optional upload allowlist (comma-separated extensions,
+    # e.g. "pdf,docx,xlsx"). Empty = open (no contract from the customer
+    # yet); non-empty = 415 on other extensions. MIME types are recorded
+    # as declared, never allowlisted (no MIME contract).
+    upload_allowed_extensions: str = ""
     cors_origins: str = "http://localhost:3000"
 
     # --- Analytics reports (P4-06-01) ---

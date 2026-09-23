@@ -601,7 +601,16 @@ def test_filter_discovery_table():
                 )
 
     paths = set(_walk(v1.routes, "/api/v1"))
-    assert not any(p.startswith("/universities") and "passport" not in p for p in paths)
+    # Canonical university sub-resources (passport, meetings, students CRUD).
+    # Anything else directly under /universities would be an undeclared route.
+    allowed_prefixes = ("/universities",)
+    canonical_sub = ("passport", "meetings", "students")
+    stray = [
+        p for p in paths
+        if p.startswith(allowed_prefixes)
+        and not any(s in p for s in canonical_sub)
+    ]
+    assert not stray, f"unexpected /universities routes: {sorted(stray)}"
 
 
 # ======================================================= university search ==
@@ -714,9 +723,21 @@ def test_responsible_filter_via_join_distinct(db: Session):
     assert len(nodup) == 2
 
 
-def test_health_status_filter_not_implemented():
-    assert "health_status" not in inspect.signature(UniversityRepository.list).parameters
-    assert not hasattr(University, "health_status")
+def test_health_status_filter_implemented():
+    """P1-03-01 shipped: health_status filter + health_score sort exist.
+
+    Service computes scores in Python (cached 5 min); total is AFTER the
+    filter; UniversityRead carries the computed score/status.
+    """
+    import inspect as _inspect
+
+    from app.modules.catalog import service as catalog_service
+    from app.modules.catalog.schemas import UniversityRead
+
+    params = _inspect.signature(catalog_service.list_university_page).parameters
+    assert "health_status" in params
+    assert "health_score" in UniversityRead.model_fields
+    assert "health_status" in UniversityRead.model_fields
 
 
 # ================================================= pagination / sorting ==

@@ -46,8 +46,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
 )
 app.include_router(v1)
 
@@ -99,11 +99,6 @@ def health():
 
 
 @app.get("/ready", tags=["Service"], summary="Readiness-проверка",
-         description="Возвращает auth-конфигурацию (issuer, audience, dev bypass).")
+         description="Возвращает готовность API. Детали auth-конфигурации намеренно не раскрываются.")
 def ready():
-    return {
-        "status": "ready",
-        "issuer": settings.keycloak_issuer,
-        "audience": settings.keycloak_audience,
-        "dev_bypass": settings.auth_dev_bypass,
-    }
+    return {"status": "ready"}

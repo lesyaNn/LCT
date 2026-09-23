@@ -141,6 +141,8 @@ def test_mounted_routers_are_only_the_production_contract():
         "/api/v1/import",
         "/api/v1/catalog",
         "/api/v1/universities",
+        "/api/v1/meetings",
+        "/api/v1/students",
         "/api/v1/directions",
         "/api/v1/programs",
         "/api/v1/products",

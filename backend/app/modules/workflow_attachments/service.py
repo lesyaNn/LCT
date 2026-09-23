@@ -24,6 +24,7 @@ import uuid
 from typing import BinaryIO
 
 from fastapi import HTTPException
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFound
@@ -75,6 +76,29 @@ def get_bound_attachment(
     if attachment is None or attachment.instance_id != instance_id:
         raise NotFound("Attachment not found")
     return attachment
+
+
+def list_attachments(
+    db: Session, instance_id: uuid.UUID, *, page: int, page_size: int
+) -> tuple[list[WorkflowAttachment], int]:
+    """Attachment metadata for one instance, oldest first (P2-05-02)."""
+    get_instance_or_404(db, instance_id)
+    base = select(WorkflowAttachment).where(
+        WorkflowAttachment.instance_id == instance_id
+    )
+    total = db.execute(select(func.count()).select_from(base.subquery())).scalar_one()
+    rows = (
+        db.execute(
+            base.order_by(
+                WorkflowAttachment.created_at.asc(), WorkflowAttachment.id.asc()
+            )
+            .limit(page_size)
+            .offset((page - 1) * page_size)
+        )
+        .scalars()
+        .all()
+    )
+    return list(rows), total
 
 
 def _limited_chunks(stream: BinaryIO):
@@ -134,13 +158,13 @@ def upload_attachment(
 
 
 def open_download(db: Session, storage: StorageBackend, *, attachment: WorkflowAttachment):
-    """Authorize-first download handle; missing object -> controlled 500."""
+    """Authorize-first download handle; missing object -> 404 (P2-05-02)."""
     _ = db  # metadata already resolved by the caller via get_bound_attachment
     try:
         opener = storage.open_stream(attachment.storage_key)
         handle = opener.__enter__()
     except StorageObjectNotFound:
-        raise HTTPException(status_code=500, detail="File content unavailable") from None
+        raise NotFound("Attachment file not found") from None
     except StorageError as exc:
         raise HTTPException(status_code=500, detail="File storage unavailable") from exc
     return attachment, opener, handle

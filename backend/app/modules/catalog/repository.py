@@ -134,6 +134,42 @@ def list_universities(
     return list(rows), int(total)
 
 
+def list_university_candidates(
+    db: Session,
+    *,
+    search: str | None,
+    city: str | None,
+    responsible_id: uuid.UUID | None,
+    unified_filter=None,
+    unified_today=None,
+    user=None,
+) -> list[University]:
+    """All universities matching the non-health filters (name asc, id asc).
+
+    Used by the health_status/health_score path (P1-03-01): scores are
+    computed in Python, so SQL pagination cannot apply — the caller
+    filters/sorts/paginates in memory. Shares ``university_conditions``
+    and the security scope with ``list_universities``.
+    """
+    conds = university_conditions(
+        search=search,
+        city=city,
+        responsible_id=responsible_id,
+        unified_filter=unified_filter,
+        today=unified_today,
+    )
+    stmt = (
+        select(University)
+        .where(*conds)
+        .order_by(University.name.asc(), University.id.asc())
+    )
+    if user is not None:
+        from app.modules.analytics.filter_service import UnifiedFilterService
+
+        stmt = UnifiedFilterService.apply_security_scope(stmt, user)
+    return list(db.execute(stmt).scalars().all())
+
+
 def get_university(db: Session, university_id: uuid.UUID) -> University | None:
     return db.get(University, university_id)
 

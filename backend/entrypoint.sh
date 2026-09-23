@@ -31,7 +31,9 @@ EOF
   echo "[entrypoint] verifying schema..."
   python scripts/migrate.py verify
 else
-  echo "[entrypoint] DATABASE_URL not set, skipping migrations (SQLite dev mode)."
+  echo "[entrypoint] ERROR: DATABASE_URL is not set; refusing to start without migrations (fail closed)." >&2
+  echo "[entrypoint] Set DATABASE_URL to PostgreSQL and restart." >&2
+  exit 1
 fi
 
 exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers

@@ -161,7 +161,7 @@ TEST_DATABASE_URL=postgresql+psycopg://rtk:change-me@localhost:5433/rtk_p1_test 
 ### 🗄️ P1 — ядро схемы БД (PostgreSQL + SQL migrations + seed)
 
 SQL-файлы `backend/migrations/` — **единственный источник истины схемы**
-(11 версий: `000001_core_catalog` … `000011_workflow_runtime`).
+(20 версий: `000001_core_catalog` … `000020_job_attempts`).
 Python ORM (`backend/app/models/` + `audit_events`) — только runtime-описание,
 схемой не управляет (`create_all`/`drop_all`/Alembic DDL удалены из активных
 путей; история Alembic лежит в `backend/alembic/` как read-only архив).
@@ -185,7 +185,7 @@ cd backend
 DATABASE_URL=postgresql+psycopg://rtk:change-me@localhost:5433/rtk \
   python scripts/migrate.py up
 
-# 3. Проверить версию (latest: 000011_workflow_runtime)
+# 3. Проверить версию (latest: 000020_job_attempts)
 DATABASE_URL=... python scripts/migrate.py status
 DATABASE_URL=... python scripts/migrate.py verify
 
@@ -290,7 +290,7 @@ EOSQL
 ### ⏭️ Б2: interaction pipeline
 
 В ветке `raisw` добавлен канонический UUID-runtime взаимодействия с вузом.
-Миграция `backend/migrations/000011_workflow_runtime.up.sql` создаёт шаблоны
+Миграции `backend/migrations/000011_workflow_templates` … `000017_tasks_priority` создают шаблоны
 этапов, экземпляры, историю переходов, комментарии, задачи и привязки к
 `documents`. Legacy-пакет `app.modules.workflow` намеренно остаётся
 изолированным.

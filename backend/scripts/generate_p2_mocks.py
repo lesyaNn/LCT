@@ -29,7 +29,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401 (register metadata)
-from app.db.base import Base
 from app.models.catalog import University
 from app.models.interactions import Document
 from app.models.workflow_instances import (
@@ -220,9 +219,16 @@ def main() -> None:
         )
 
     eng = create_engine(args.db_url)
-    # Scratch database: canonical schema (no-op if migrated), seed, calc.
-    # Test databases are schema-reset by tests/db_helpers.py afterwards.
-    Base.metadata.create_all(eng, checkfirst=True)
+    # Scratch database: schema comes ONLY from canonical SQL migrations
+    # (scripts/migrate.py); ORM create_all is banned as a schema source.
+    # The target DB must already be migrated — fail closed otherwise.
+    from sqlalchemy import inspect as _sa_inspect
+
+    if "universities" not in _sa_inspect(eng).get_table_names():
+        raise SystemExit(
+            "generate_p2_mocks: target DB has no migrated schema; "
+            "run 'python scripts/migrate.py up' first (SQL-only schema source)."
+        )
     with Session(eng) as db:
         uni_id = _seed_problem_university(db)
         db.commit()

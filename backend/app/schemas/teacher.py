@@ -110,7 +110,14 @@ class TeacherDetail(BaseModel):
 
 
 class TeacherPassport(BaseModel):
-    """Aggregated schema for GET /teachers/{id}/passport."""
+    """Aggregated schema for GET /teachers/{id}/passport.
+
+    Legacy DTO (the mounted router serves
+    ``app.modules.teachers.passport_schemas.TeacherPassport``).
+    ``trainings`` stays empty by MVP decision (P1-05-02): no
+    ``teacher_trainings`` table, development is tracked via
+    qualifications/certificates.
+    """
 
     teacher: TeacherDetail
     trainings: list[TrainingShort] = Field(default_factory=list)

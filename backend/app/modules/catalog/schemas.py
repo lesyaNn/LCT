@@ -63,6 +63,10 @@ class UniversityRead(BaseModel):
     city: str | None = None
     created_at: datetime
     updated_at: datetime
+    # Populated only when the list is filtered/sorted by health (P1-03-01);
+    # None otherwise (scores are computed, never stored).
+    health_score: int | None = None
+    health_status: str | None = None
 
     model_config = {"from_attributes": True}
 

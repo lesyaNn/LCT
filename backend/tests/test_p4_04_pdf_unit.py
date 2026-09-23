@@ -18,6 +18,8 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
+
+reportlab = pytest.importorskip("reportlab", reason="reportlab not installed")
 from reportlab.pdfbase import pdfmetrics
 
 from app.modules.analytics.columns import COLUMN_REGISTRY, DEFAULT_COLUMNS

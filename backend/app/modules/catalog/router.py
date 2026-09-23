@@ -62,7 +62,8 @@ READ = require_permission("university.read")
 WRITE = require_permission("university.edit")
 
 
-UniversitySortBy = Literal["name", "city", "created_at"]
+UniversitySortBy = Literal["name", "city", "created_at", "health_score"]
+HealthStatusFilter = Literal["green", "yellow", "red"]
 DirectionSortBy = Literal["code", "name", "created_at"]
 ProgramSortBy = Literal["name", "created_at"]
 ProductSortBy = Literal["name", "version", "created_at"]
@@ -117,6 +118,10 @@ def list_universities(
     ),
     sort_by: UniversitySortBy = Query(default="name"),
     sort_order: SortOrder = Query(default="asc"),
+    health_status: HealthStatusFilter | None = Query(
+        default=None,
+        description="Filter by computed Health Score status (scores calculated per university, cached 5 min)",
+    ),
     unified: UnifiedFilter = Depends(get_unified_filter),
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(READ),
@@ -133,6 +138,7 @@ def list_universities(
         sort_order=sort_order,
         unified_filter=unified,
         user=user,
+        health_status=health_status,
     )
     return PaginatedResponse(items=items, page=page, page_size=page_size, total=total)
 

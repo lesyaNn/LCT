@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -26,6 +26,7 @@ from app.modules.workflow_attachments.storage import (
     StorageBackend,
     build_storage_backend,
 )
+from app.schemas.common import PaginatedResponse
 
 router = APIRouter(prefix="/workflow", tags=["Workflow"])
 
@@ -63,6 +64,29 @@ def upload_attachment(
         actor_sub=user.id,
     )
     return AttachmentRead.model_validate(attachment)
+
+
+@router.get(
+    "/instances/{instance_id}/attachments",
+    response_model=PaginatedResponse[AttachmentRead],
+    summary="List attachment metadata for an instance (oldest first)",
+)
+def list_attachments(
+    instance_id: uuid.UUID,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(READ),
+) -> PaginatedResponse[AttachmentRead]:
+    instance = service.get_instance_or_404(db, instance_id)
+    service.authorize_scope(user, instance)
+    rows, total = service.list_attachments(db, instance.id, page=page, page_size=page_size)
+    return PaginatedResponse(
+        items=[AttachmentRead.model_validate(r) for r in rows],
+        page=page,
+        page_size=page_size,
+        total=total,
+    )
 
 
 @router.get(
