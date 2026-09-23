@@ -186,6 +186,7 @@
 .mobileDetails div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .mobileDetails dt { color: var(--rtk-color-text-tertiary); font-size: 11px; }
 .mobileDetails dd { color: var(--rtk-color-text-primary); font-size: 12px; margin: 0; overflow-wrap: anywhere; }
+.mobileCardAction { align-items: center; border-top: 1px solid var(--rtk-color-border); color: var(--rtk-color-brand); display: flex; font-size: 12px; font-weight: 700; min-height: 44px; padding-top: var(--rtk-space-2); }
 
 .emptyState { align-items: center; background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-medium); display: flex; flex-direction: column; gap: var(--rtk-space-3); padding: var(--rtk-space-8); text-align: center; }
 .emptyIcon { align-items: center; background: var(--rtk-color-brand-soft); border-radius: 50%; color: var(--rtk-color-brand); display: inline-flex; font-size: 20px; height: 40px; justify-content: center; width: 40px; }
@@ -212,7 +213,7 @@
   .mobileFilterContent .field select,
   .mobileFilterContent .field input[type='date'],
   .mobileFilterContent .inputWrap,
-  .mobileFilterContent .multiselect summary { min-height: 44px; }
+  .mobileFilterContent .multiselect summary { min-height: 48px; }
   .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .searchField { grid-column: 1 / -1; }
   .filters > button { justify-self: start; }
@@ -223,6 +224,9 @@
   .pagination { align-items: flex-start; flex-direction: column; }
   .pageButtons { flex-wrap: wrap; }
   .pageSize { align-self: stretch; justify-content: space-between; }
+  .pageButton, .pageButtonActive { height: 44px; min-width: 44px; }
+  .pageSize select { min-height: 44px; }
+  .filterChip, .clearAllButton { min-height: 44px; }
 }
 
 @media (max-width: 480px) {

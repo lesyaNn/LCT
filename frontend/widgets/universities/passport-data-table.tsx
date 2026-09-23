@@ -108,7 +108,7 @@ export function PassportDataTable<T extends { id: string }>({ rows, columns, mob
         </table>
       </div>
       <div className={styles.mobileCards}>
-        {visibleGroups.map((group) => <div className={styles.mobileGroup} key={group.label ?? 'all'}>{group.label ? <h3 className={styles.groupHeading}>{group.label}<span className={styles.groupCount}>{group.rows.length}</span></h3> : null}{group.rows.map((row) => <article className={styles.mobileCard} key={row.id}>{mobileFields.map((field) => <div className={styles.mobileField} key={field.label}><span className={styles.mobileLabel}>{field.label}</span><div className={styles.mobileValue}>{field.render(row)}</div></div>)}</article>)}</div>)}
+        {visibleGroups.map((group) => <div className={styles.mobileGroup} key={group.label ?? 'all'}>{group.label ? <h3 className={styles.groupHeading}>{group.label}<span className={styles.groupCount}>{group.rows.length}</span></h3> : null}{group.rows.map((row) => <article className={styles.mobileCard} key={row.id}>{mobileFields.map((field, index) => <div className={`${styles.mobileField} ${index === 0 ? styles.mobilePrimaryField : ''}`} key={field.label}><span className={styles.mobileLabel}>{field.label}</span><div className={styles.mobileValue}>{field.render(row)}</div></div>)}</article>)}</div>)}
       </div>
       {totalPages > 1 ? (
         <div className={styles.pagination} aria-label="Пагинация таблицы">

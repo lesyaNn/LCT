@@ -68,14 +68,12 @@
   .desktopFilters { display: none; }
   .mobileFilterButton { display: inline-flex; }
   .mobileFilterButton { min-height: 44px; }
-  .drawerContent .dateInputs input, .drawerContent .multiSelect summary { min-height: 44px; }
+  .drawerContent .dateInputs input, .drawerContent .multiSelect summary { min-height: 48px; }
   .filterGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .filterGrid > button { justify-self: start; }
   .desktopTable { display: none; }
-  .mobileList { display: flex; flex-direction: column; }
-  .mobileCard { border-bottom: 1px solid var(--rtk-color-border); display: flex; flex-direction: column; gap: var(--rtk-space-3); padding: var(--rtk-space-4) 0; }
-  .mobileCard:first-child { padding-top: 0; }
-  .mobileCard:last-child { border-bottom: 0; padding-bottom: 0; }
+  .mobileList { background: var(--rtk-color-surface-subtle); display: flex; flex-direction: column; gap: var(--rtk-space-3); padding: var(--rtk-space-3); }
+  .mobileCard { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); display: flex; flex-direction: column; gap: var(--rtk-space-3); padding: var(--rtk-space-4); }
   .mobileTop { align-items: center; display: flex; justify-content: space-between; }
   .mobileTop time { color: var(--rtk-color-text-secondary); font-size: 11px; }
   .mobileCard dl { display: grid; gap: var(--rtk-space-2); margin: 0; }
@@ -83,6 +81,11 @@
   .mobileCard dt { color: var(--rtk-color-text-secondary); font-size: 11px; }
   .mobileCard dd { font-size: 12px; margin: 0; overflow-wrap: anywhere; }
   .modalMeta { grid-template-columns: 100px minmax(0, 1fr); }
+  .pagination select { min-height: 44px; }
+  .skeleton { gap: var(--rtk-space-3); min-width: 0; padding: var(--rtk-space-3); }
+  .skeleton > div { border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); gap: var(--rtk-space-2); grid-template-columns: 1fr; padding: var(--rtk-space-4); }
+  .skeleton span { border-radius: 999px; height: 14px; }
+  .skeleton span:nth-child(n+5) { display: none; }
 }
 @media (max-width: 480px) { .filterGrid { grid-template-columns: 1fr; } .filterGrid > button { justify-self: stretch; } .pagination { justify-content: stretch; } .pagination > span { flex: 1 0 100%; margin: 0; } }
 @media (prefers-reduced-motion: reduce) { .skeleton span { animation: none; } }

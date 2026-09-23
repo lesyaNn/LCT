@@ -8,5 +8,5 @@
 .close:hover { background: var(--rtk-color-surface-hover); color: var(--rtk-color-text-primary); }
 .close:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
 .body { min-height: 0; overflow: auto; padding: var(--rtk-space-5); }
-@media (max-width: 480px) { .overlay { padding: var(--rtk-space-3); } .dialog { max-height: 94vh; min-width: 0; width: 100%; } .header, .body { padding: var(--rtk-space-4); } }
+@media (max-width: 480px) { .overlay { padding: var(--rtk-space-2); } .dialog { max-height: calc(100dvh - 16px); min-width: 0; width: 100%; } .header, .body { padding: var(--rtk-space-4); } }
 @media (prefers-reduced-motion: reduce) { .overlay, .dialog { scroll-behavior: auto; } }

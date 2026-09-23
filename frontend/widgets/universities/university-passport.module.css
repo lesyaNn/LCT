@@ -112,6 +112,7 @@
   .workflowLayout { grid-template-columns: 1fr; }
   .workflowProgress,
   .workflowAction { grid-column: auto; }
+  .textAction { min-height: 44px; }
 }
 
 @media (max-width: 480px) {
@@ -120,6 +121,7 @@
   .workflowDetails { grid-template-columns: 1fr; }
   .progressLabel { align-items: flex-start; flex-direction: column; }
   .headerActions button { flex: 1; justify-content: center; }
+  .workflowAction > button { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

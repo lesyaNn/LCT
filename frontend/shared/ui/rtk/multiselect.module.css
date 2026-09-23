@@ -22,3 +22,8 @@
 .search svg { color: var(--rtk-color-text-tertiary); flex: 0 0 auto; }
 .search input { background: transparent; border: 0; color: var(--rtk-color-text-primary); min-width: 0; outline: none; width: 100%; }
 .state { color: var(--rtk-color-text-secondary); font-size: 12px; margin: 4px; }
+@media (max-width: 768px) {
+  .root summary { min-height: 48px; }
+  .menu label { min-height: 44px; }
+  .search input { min-height: 44px; }
+}

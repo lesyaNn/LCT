@@ -69,9 +69,7 @@
 .jobsEmpty h3, .jobsError h3 { font-size: 15px; margin: 0; }
 .jobsEmpty p { color: var(--rtk-color-text-secondary); font-size: 12px; margin: 0; }
 .apiNote { color: var(--rtk-color-text-tertiary) !important; }
-.jobCard { border-bottom: 1px solid var(--rtk-color-border); display: flex; flex-direction: column; gap: var(--rtk-space-3); padding: var(--rtk-space-4) 0; }
-.jobCard:first-child { padding-top: 0; }
-.jobCard:last-child { border-bottom: 0; padding-bottom: 0; }
+.jobCard { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); display: flex; flex-direction: column; gap: var(--rtk-space-3); padding: var(--rtk-space-4); }
 .jobCardHeader { align-items: center; display: flex; gap: var(--rtk-space-2); justify-content: space-between; }
 .jobCardHeader strong { font-size: 13px; overflow-wrap: anywhere; }
 .jobCard dl { display: grid; gap: var(--rtk-space-2); margin: 0; }
@@ -83,6 +81,6 @@
 .visuallyHidden { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
 @keyframes reportShimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 @media (max-width: 1180px) { .reportsLayout { grid-template-columns: 1fr; } }
-@media (max-width: 768px) { .formSurface, .jobsSurface { padding: var(--rtk-space-4); } .jobsHeader { flex-direction: column; } .jobsCapability { max-width: none; } }
-@media (max-width: 560px) { .dateGrid, .filterGrid, .columnGrid { grid-template-columns: 1fr; } .filterGrid > *:first-child { grid-column: auto; } .jobsDesktop { display: none; } .jobsMobile { display: block; } .formActions { align-items: stretch; flex-direction: column; } .formActions > button { width: 100%; } .actionHint { text-align: center; } .toastViewport { bottom: var(--rtk-space-3); right: var(--rtk-space-3); } }
+@media (max-width: 768px) { .formSurface, .jobsSurface { padding: var(--rtk-space-4); } .jobsHeader { flex-direction: column; } .jobsCapability { max-width: none; } .jobsDesktop { display: none; } .jobsMobile { background: var(--rtk-color-surface-subtle); display: flex; flex-direction: column; gap: var(--rtk-space-3); padding: var(--rtk-space-3); } .jobsSkeleton { gap: var(--rtk-space-3); min-width: 0; padding: var(--rtk-space-3); } .jobsSkeleton > div { border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); gap: var(--rtk-space-2); grid-template-columns: 1fr; padding: var(--rtk-space-4); } .jobsSkeleton span { border-radius: 999px; height: 14px; } .columnGrid label, .radioGroup label { min-height: 44px; } }
+@media (max-width: 560px) { .dateGrid, .filterGrid, .columnGrid { grid-template-columns: 1fr; } .filterGrid > *:first-child { grid-column: auto; } .formActions { align-items: stretch; flex-direction: column; } .formActions > button { width: 100%; } .actionHint { text-align: center; } .toastViewport { bottom: var(--rtk-space-3); left: var(--rtk-space-3); right: var(--rtk-space-3); } }
 @media (prefers-reduced-motion: reduce) { .jobsSkeleton span { animation: none; } }

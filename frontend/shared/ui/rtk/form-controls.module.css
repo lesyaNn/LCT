@@ -30,3 +30,9 @@
 .stepper input[aria-invalid="true"] { border-bottom-color: var(--atmr-error-default); border-top-color: var(--atmr-error-default); }
 .stepper input::-webkit-inner-spin-button, .stepper input::-webkit-outer-spin-button { appearance: none; margin: 0; }
 .stepper button:disabled, .stepper input:disabled { cursor: not-allowed; opacity: .48; }
+@media (max-width: 768px) {
+  .input { min-height: 48px; }
+  .switchLabel { min-height: 44px; min-width: 44px; }
+  .stepper button, .stepper input { height: 44px; }
+  .stepper button { width: 44px; }
+}

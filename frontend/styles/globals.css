@@ -118,6 +118,7 @@ body {
   font-family: var(--rtk-font-family);
   font-size: 14px;
   line-height: 1.45;
+  overflow-x: clip;
 }
 button, a, input, textarea, select { font: inherit; }
 a { color: inherit; }

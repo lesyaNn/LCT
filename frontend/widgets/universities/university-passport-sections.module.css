@@ -60,9 +60,13 @@
   .toolbarControls { margin-left: 0; }
   .toolbarControls,
   .filter { max-width: 100%; width: 100%; }
-  .filter { max-width: 280px; }
+  .filter { max-width: none; }
+  .filter select { min-height: 48px; }
+  .actionLink, .iconAction, .inlineDetails summary { align-items: center; display: inline-flex; min-height: 44px; }
+  .iconAction { min-width: 44px; }
   .studentSummary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .filtersRow { align-items: stretch; flex-direction: column; }
+  .meetingDetails summary { align-items: center; display: flex; min-height: 44px; }
   .responsiblesGrid { grid-template-columns: 1fr; }
   .meetingSurface { padding: var(--rtk-space-4); }
 }

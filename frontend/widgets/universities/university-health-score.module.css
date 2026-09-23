@@ -93,10 +93,19 @@
   .scoreRingValue strong { font-size: 36px; }
 }
 @media (max-width: 480px) {
-  .hero { padding: var(--rtk-space-5) var(--rtk-space-4); }
-  .breakdownHeader { gap: var(--rtk-space-2); grid-template-columns: minmax(0, 1fr) auto; }
-  .breakdownHeader strong { grid-column: 2; grid-row: 1; }
-  .breakdownWeight { grid-column: 1; grid-row: 2; }
+  .page { gap: var(--rtk-space-5); }
+  .hero { min-height: 0; padding: var(--rtk-space-5) var(--rtk-space-4); }
+  .scoreRingWrap { flex-basis: 148px; height: 148px; max-width: 100%; width: 148px; }
+  .scoreRing { height: 148px; width: 148px; }
+  .scoreRingValue strong { font-size: 32px; }
+  .breakdownHeader { align-items: flex-start; display: flex; flex-direction: column; gap: var(--rtk-space-1); }
+  .breakdownHeader strong { font-size: 18px; }
+  .breakdownTrack { height: 10px; margin-top: var(--rtk-space-3); }
+  .breakdownCounters { flex-direction: column; gap: var(--rtk-space-1); }
+  .reasonRow { align-items: flex-start; flex-direction: column; }
+  .reasonIcon { flex-basis: 36px; }
+  .reasonTitleLine { align-items: flex-start; flex-direction: column; }
+  .reasonBody { width: 100%; }
   .historyChart { height: 230px; }
 }
 @media (prefers-reduced-motion: reduce) {

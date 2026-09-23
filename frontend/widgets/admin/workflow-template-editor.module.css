@@ -91,9 +91,10 @@
   .editorHeader { align-items: stretch; flex-direction: column; }
   .headerActions { justify-content: flex-start; }
   .columnHeader { display: none; }
-  .stageRow { align-items: start; column-gap: var(--rtk-space-2); grid-template-areas: "drag order name name" "blank required active days" "blank actions actions actions"; grid-template-columns: 36px 32px minmax(0, 1fr) minmax(0, 1fr); padding: var(--rtk-space-3); row-gap: var(--rtk-space-2); }
+  .stageRow { align-items: start; column-gap: var(--rtk-space-2); grid-template-areas: "drag order name name" "blank required active days" "blank actions actions actions"; grid-template-columns: 44px 32px minmax(0, 1fr) minmax(0, 1fr); padding: var(--rtk-space-3); row-gap: var(--rtk-space-2); }
   .stageRow > * { padding: 0; }
   .dragCell { grid-area: drag; }
+  .dragHandle { height: 44px; width: 44px; }
   .orderCell { align-self: center; grid-area: order; }
   .nameCell { grid-area: name; }
   .controlCell:nth-of-type(4) { grid-area: required; }
@@ -113,8 +114,10 @@
   .surfaceHeader { align-items: flex-start; gap: var(--rtk-space-3); padding: var(--rtk-space-4); }
   .surfaceHeader > button { display: none; }
   .modalGrid { grid-template-columns: 1fr; }
+  .nameDisplay { grid-template-columns: minmax(0, auto) 44px; }
+  .nameEditor { grid-template-columns: minmax(0, 1fr) 44px 44px; }
   .templateList > li { align-items: flex-start; flex-direction: column; gap: var(--rtk-space-3); padding: var(--rtk-space-4); }
-  .editLink { align-self: stretch; justify-content: space-between; }
+  .editLink { align-self: stretch; justify-content: space-between; min-height: 44px; }
 }
 
 @media (max-width: 420px) {
@@ -122,7 +125,8 @@
   .headerActions > button { width: 100%; }
   .stageRow { grid-template-areas: "order name" "required active" "days days" "actions actions"; grid-template-columns: 30px minmax(0, 1fr); }
   .daysCell { align-items: flex-start; }
-  .nameEditor { grid-template-columns: minmax(0, 1fr) 36px 36px; }
+  .nameDisplay { grid-template-columns: minmax(0, auto) 44px; }
+  .nameEditor { grid-template-columns: minmax(0, 1fr) 44px 44px; }
   .modalActions { flex-direction: column-reverse; }
   .modalActions button { width: 100%; }
   .toastViewport { bottom: var(--rtk-space-3); left: var(--rtk-space-3); right: var(--rtk-space-3); }

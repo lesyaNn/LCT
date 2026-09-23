@@ -457,6 +457,7 @@ function MobileUniversityCards({ items }: { items: UniversityListItem[] }) {
             <div><dt>Программы</dt><dd>{item.programsCount}</dd></div>
             <div><dt>Последнее взаимодействие</dt><dd title={formatFullDate(item.lastInteractionAt)}>{formatRelativeTime(item.lastInteractionAt)}</dd></div>
           </dl>
+          <span className={styles.mobileCardAction}>Открыть</span>
         </Link>
       ))}
     </div>

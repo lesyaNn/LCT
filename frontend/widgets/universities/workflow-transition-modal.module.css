@@ -22,4 +22,4 @@
 .discard { display: flex; flex-direction: column; gap: var(--rtk-space-3); padding-top: var(--rtk-space-5); }
 .discard h3 { font-size: 16px; margin: 0; }
 .discard p { color: var(--rtk-color-text-secondary); font-size: 13px; margin: 0; }
-@media (max-width: 480px) { .context { align-items: flex-start; flex-direction: column; } .context svg { transform: rotate(90deg); } .actions { flex-direction: column-reverse; } .actions > button { justify-content: center; width: 100%; } }
+@media (max-width: 480px) { .context { align-items: flex-start; flex-direction: column; } .context svg { transform: rotate(90deg); } .field select, .field input { min-height: 48px; } .actions { flex-direction: column-reverse; } .actions > button { justify-content: center; width: 100%; } }

@@ -48,6 +48,6 @@
 .visuallyHidden { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
 @keyframes historyShimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 @media (max-width: 1100px) { .filters { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 768px) { .filters { align-items: stretch; grid-template-columns: repeat(2, minmax(0, 1fr)); } .filters > button { justify-self: start; } .desktopTable { display: none; } .mobileList { display: block; } }
+@media (max-width: 768px) { .filters { align-items: stretch; grid-template-columns: repeat(2, minmax(0, 1fr)); } .filters select, .filters input { min-height: 48px; } .filters > button { justify-self: start; } .desktopTable { display: none; } .mobileList { background: var(--rtk-color-surface-subtle); display: flex; flex-direction: column; gap: var(--rtk-space-3); padding: var(--rtk-space-3); } .mobileEvent { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); padding: var(--rtk-space-4); } }
 @media (max-width: 480px) { .filters { grid-template-columns: 1fr; } .filters > button { justify-self: stretch; } }
 @media (prefers-reduced-motion: reduce) { .skeleton span { animation: none; } }

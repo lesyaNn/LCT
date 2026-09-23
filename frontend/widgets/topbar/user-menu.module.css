@@ -14,4 +14,4 @@
 .menuItem { align-items: center; background: transparent; border: 0; border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-primary); cursor: pointer; display: flex; gap: var(--rtk-space-3); min-height: 40px; padding: 0 var(--rtk-space-3); text-align: left; width: 100%; }
 .menuItem:hover { background: var(--rtk-color-surface-hover); }
 .danger { color: var(--rtk-color-danger); }
-@media (max-width: 480px) { .triggerText { display: none; } .menu { max-width: calc(100vw - var(--rtk-space-4)); min-width: 0; position: fixed; right: var(--rtk-space-2); top: 68px; width: min(280px, calc(100vw - var(--rtk-space-4))); } }
+@media (max-width: 480px) { .triggerText { display: none; } .menu { max-width: calc(100vw - var(--rtk-space-4)); min-width: 0; position: fixed; right: var(--rtk-space-2); top: 68px; width: min(280px, calc(100vw - var(--rtk-space-4))); } .menuItem { min-height: 44px; } }
