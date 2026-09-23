@@ -670,6 +670,7 @@ def test_migration_chain_latest_is_report_jobs():
 
 
 def test_report_job_model_matches_migration_columns():
+    # 000018 core + 000019 Dev-3 import extension.
     assert set(ReportJob.__table__.columns.keys()) == {        "id",
         "format",
         "filters",
@@ -680,6 +681,10 @@ def test_report_job_model_matches_migration_columns():
         "effective_university_ids",
         "status",
         "progress",
+        "job_type",
+        "payload",
+        "result",
+        "idempotency_key",
         "file_path",
         "file_size",
         "error_message",

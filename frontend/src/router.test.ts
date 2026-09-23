@@ -12,6 +12,12 @@ describe("hash router", () => {
     expect(parseHash("#/catalog")).toBe("catalog");
   });
 
+  it("resolves analytics (P4-11-01 mock charts)", () => {
+    expect(parseHash("#/analytics")).toBe("analytics");
+    expect(routeHref("analytics")).toBe("#/analytics");
+    expect(parseHash(routeHref("analytics"))).toBe("analytics");
+  });
+
   it("round-trips hrefs", () => {
     expect(routeHref("home")).toBe("#/");
     expect(routeHref("catalog")).toBe("#/catalog");

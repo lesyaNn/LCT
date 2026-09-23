@@ -87,6 +87,14 @@ body {
   outline-offset: 2px;
 }
 .btn:disabled { opacity: 0.6; cursor: default; }
+/* P4-11-01: сетка мок-графиков + шапка карточки с кнопкой PNG. */
+.charts-grid { display: grid; gap: 16px; grid-template-columns: 1fr; margin-top: 12px; }
+.chart-card { padding: 16px 18px; }
+.chart-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.chart-head h3 { margin: 0; font-size: 14px; color: var(--text); text-transform: none; letter-spacing: 0; }
+.chart-card canvas { max-width: 100%; height: auto; display: block; margin: 8px auto 0; background: #fff; border-radius: 8px; }
+.chart-note { font-size: 12px; margin: 8px 0 0; }
+@media (min-width: 900px) { .charts-grid { grid-template-columns: 1fr 1fr; } }
 
 @media (max-width: 640px) {
   .hero { padding: 28px 18px; }

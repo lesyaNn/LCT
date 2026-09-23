@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "./api/client";
 import { useAuth } from "./auth/useAuth";
-import { CatalogPage, HomePage } from "./pages/pages";
+import { AnalyticsPage, CatalogPage, HomePage } from "./pages/pages";
 import { routeHref, useRoute } from "./router";
 import type { Me } from "./types";
 
@@ -56,11 +56,13 @@ export default function App() {
           {" "}
           <a className="btn" aria-current={route === "catalog" ? "page" : undefined} href={routeHref("catalog")}>Каталог</a>
           {" "}
+          <a className="btn" aria-current={route === "analytics" ? "page" : undefined} href={routeHref("analytics")}>Аналитика</a>
+          {" "}
           <button className="btn" onClick={logout}>Выйти</button>
         </nav>
       </header>
       <main className="content">
-        {route === "catalog" ? <CatalogPage /> : <HomePage me={me} onMe={setMe} />}
+        {route === "catalog" ? <CatalogPage /> : route === "analytics" ? <AnalyticsPage /> : <HomePage me={me} onMe={setMe} />}
       </main>
     </div>
   );

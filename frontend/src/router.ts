@@ -1,13 +1,18 @@
 import { useEffect, useState } from "react";
 
-export type Route = "home" | "catalog";
+export type Route = "home" | "catalog" | "analytics";
 
 export function parseHash(hash: string): Route {
-  return hash.startsWith("#/catalog") ? "catalog" : "home";
+  if (hash.startsWith("#/catalog")) return "catalog";
+  // P4-11-01: страница графиков на мок-данных (PNG-экспорт без бэка).
+  if (hash.startsWith("#/analytics")) return "analytics";
+  return "home";
 }
 
 export function routeHref(route: Route): string {
-  return route === "catalog" ? "#/catalog" : "#/";
+  if (route === "catalog") return "#/catalog";
+  if (route === "analytics") return "#/analytics";
+  return "#/";
 }
 
 /** Minimal hash router (P1): deep links without adding react-router (yet). */

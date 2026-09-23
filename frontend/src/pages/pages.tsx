@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "../api/client";
 import { getConfig } from "../config";
+import { AnalyticsCharts } from "../components/AnalyticsCharts";
 import { CatalogViewer } from "../components/CatalogViewer";
 import { UserCard } from "../components/UserCard";
 import type { Me } from "../types";
@@ -61,4 +62,20 @@ export function HomePage({ me, onMe }: { me: Me | null; onMe: (me: Me) => void }
 
 export function CatalogPage() {
   return <CatalogViewer />;
+}
+
+// P4-11-01: аналитика на мок-данных (docs/mocks/analytics-overview.json).
+// TODO: подменить моки на GET /api/v1/analytics/overview (эндпоинт уже есть,
+// нужен P4_FILTER_PROVIDER на бэке для непустых фильтров).
+export function AnalyticsPage() {
+  return (
+    <div className="card">
+      <h2>Аналитика (мок)</h2>
+      <p className="muted">
+        Графики рисуются на canvas из мок-данных, бэкенд не нужен.
+        Каждая диаграмма скачивается кнопкой 📥 PNG (2x DPI).
+      </p>
+      <AnalyticsCharts />
+    </div>
+  );
 }
