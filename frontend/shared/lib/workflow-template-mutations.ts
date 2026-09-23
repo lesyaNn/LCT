@@ -1,13 +1,13 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { getWorkflowStageOrderMoves, moveWorkflowStage, patchWorkflowStage } from './workflow-template-cache';
+import { getWorkflowStageOrderMoves, insertWorkflowStage, moveWorkflowStage, normalizeWorkflowStageOrder, patchWorkflowStage } from './workflow-template-cache';
 import {
   addWorkflowStage,
   createWorkflowTemplate,
   updateWorkflowStage,
   workflowTemplateDetailQueryKey,
-  workflowTemplatesQueryKey,
+  workflowTemplateListsQueryKey,
   type CreateWorkflowStageInput,
   type CreateWorkflowTemplateInput,
   type UpdateWorkflowStageInput,
@@ -21,20 +21,53 @@ export function useCreateWorkflowTemplate() {
     mutationFn: (input: CreateWorkflowTemplateInput) => createWorkflowTemplate(input),
     onSuccess: async (template) => {
       queryClient.setQueryData(workflowTemplateDetailQueryKey(template.id), template);
-      await queryClient.invalidateQueries({ queryKey: workflowTemplatesQueryKey });
+      await queryClient.invalidateQueries({ queryKey: workflowTemplateListsQueryKey });
     },
   });
 }
 
 export function useAddWorkflowStage(templateId: string) {
   const queryClient = useQueryClient();
-  return useMutation({
+  const detailKey = workflowTemplateDetailQueryKey(templateId);
+  return useMutation<WorkflowTemplateStage, Error, CreateWorkflowStageInput, { previous?: WorkflowTemplate; temporaryId: string }>({
     mutationFn: (input: CreateWorkflowStageInput) => addWorkflowStage(templateId, input),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: workflowTemplateDetailQueryKey(templateId) }),
-        queryClient.invalidateQueries({ queryKey: workflowTemplatesQueryKey }),
-      ]);
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: detailKey });
+      const previous = queryClient.getQueryData<WorkflowTemplate>(detailKey);
+      const temporaryId = `temp:stage:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+      if (previous) {
+        const now = new Date().toISOString();
+        const orderIndex = input.orderIndex ?? previous.stages.length + 1;
+        const temporaryStage: WorkflowTemplateStage = {
+          id: temporaryId,
+          templateId,
+          name: input.name,
+          description: input.description,
+          orderIndex,
+          isRequired: input.isRequired,
+          isActive: true,
+          slaDays: input.slaDays,
+          createdAt: now,
+          updatedAt: now,
+        };
+        queryClient.setQueryData<WorkflowTemplate>(detailKey, {
+          ...previous,
+          stages: insertWorkflowStage(previous.stages, temporaryStage, orderIndex),
+        });
+      }
+      return { previous, temporaryId };
+    },
+    onError: (_error, _input, context) => {
+      if (context?.previous) queryClient.setQueryData(detailKey, context.previous);
+    },
+    onSuccess: (stage, _input, context) => {
+      queryClient.setQueryData<WorkflowTemplate>(detailKey, (current) => current ? {
+        ...current,
+        stages: normalizeWorkflowStageOrder(current.stages.map((item) => item.id === context.temporaryId ? stage : item)),
+      } : current);
+    },
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: detailKey, exact: true });
     },
   });
 }
@@ -69,7 +102,7 @@ export function useUpdateWorkflowStage(templateId: string) {
       queryClient.setQueryData<WorkflowTemplate>(detailKey, (current) => patchWorkflowStage(current, stage.id, stage));
     },
     onSettled: async () => {
-      await queryClient.invalidateQueries({ queryKey: workflowTemplatesQueryKey, refetchType: 'none' });
+      await queryClient.invalidateQueries({ queryKey: detailKey, exact: true, refetchType: 'none' });
     },
   });
 }
@@ -117,10 +150,7 @@ export function useSaveWorkflowStageOrder(templateId: string) {
       if (context?.rollback) queryClient.setQueryData(detailKey, context.rollback);
     },
     onSettled: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: detailKey }),
-        queryClient.invalidateQueries({ queryKey: workflowTemplatesQueryKey, refetchType: 'none' }),
-      ]);
+      await queryClient.invalidateQueries({ queryKey: detailKey, exact: true });
     },
   });
 }

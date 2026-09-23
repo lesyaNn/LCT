@@ -12,6 +12,13 @@ export function moveWorkflowStage(stages: WorkflowTemplateStage[], fromIndex: nu
   return normalizeWorkflowStageOrder(next);
 }
 
+export function insertWorkflowStage(stages: WorkflowTemplateStage[], stage: WorkflowTemplateStage, orderIndex: number): WorkflowTemplateStage[] {
+  const next = [...stages];
+  const insertionIndex = Math.max(0, Math.min(orderIndex - 1, next.length));
+  next.splice(insertionIndex, 0, stage);
+  return normalizeWorkflowStageOrder(next);
+}
+
 export function patchWorkflowStage(template: WorkflowTemplate | undefined, stageId: string, patch: Partial<WorkflowTemplateStage>): WorkflowTemplate | undefined {
   if (!template) return template;
   return { ...template, stages: template.stages.map((stage) => stage.id === stageId ? { ...stage, ...patch } : stage) };

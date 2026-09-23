@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import ArrowUp from '@atomaro/icons/24/navigation/ArrowUp';
@@ -23,16 +23,16 @@ interface WorkflowStageRowProps {
   saving: boolean;
   orderDirty: boolean;
   onMove: (fromIndex: number, toIndex: number) => void;
-  onUpdate: (stageId: string, patch: UpdateWorkflowStageInput) => Promise<void>;
-  onDisable: (stage: WorkflowTemplateStage) => void;
+  onUpdate: (stageId: string, patch: UpdateWorkflowStageInput, successTitle?: string) => Promise<void>;
   onDelete: (stage: WorkflowTemplateStage) => void;
 }
 
-export function WorkflowStageRow({ stage, index, count, saving, orderDirty, onMove, onUpdate, onDisable, onDelete }: WorkflowStageRowProps) {
+export function WorkflowStageRow({ stage, index, count, saving, orderDirty, onMove, onUpdate, onDelete }: WorkflowStageRowProps) {
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(stage.name);
   const [nameError, setNameError] = useState('');
   const [slaDraft, setSlaDraft] = useState(stage.slaDays);
+  const savingNameRef = useRef(false);
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging, isOver } = useSortable({ id: stage.id, disabled: saving });
   const style = { transform: CSS.Transform.toString(transform), transition } satisfies CSSProperties;
 
@@ -43,21 +43,25 @@ export function WorkflowStageRow({ stage, index, count, saving, orderDirty, onMo
   };
 
   const saveName = async () => {
+    if (savingNameRef.current) return;
     const name = nameDraft.trim();
     if (!name) {
       setNameError('Название не может быть пустым.');
       return;
     }
-    if (name === stage.name) {
+    if (name === stage.name.trim()) {
       cancelName();
       return;
     }
     setNameError('');
+    savingNameRef.current = true;
     try {
-      await onUpdate(stage.id, { name });
+      await onUpdate(stage.id, { name }, 'Название этапа изменено');
       setEditingName(false);
-    } catch {
-      setNameDraft(stage.name);
+    } catch (cause) {
+      setNameError(cause instanceof Error ? cause.message : 'Не удалось сохранить название.');
+    } finally {
+      savingNameRef.current = false;
     }
   };
 
@@ -88,10 +92,10 @@ export function WorkflowStageRow({ stage, index, count, saving, orderDirty, onMo
     </div>
     <span className={styles.orderCell} data-label="№">{index + 1}</span>
     <div className={styles.nameCell} data-label="Название">
-      {editingName ? <div className={styles.nameEditor}><Input autoFocus value={nameDraft} maxLength={512} disabled={saving} aria-label={`Название этапа ${index + 1}`} aria-invalid={Boolean(nameError)} onChange={(event) => { setNameDraft(event.target.value); if (nameError) setNameError(''); }} onKeyDown={handleNameKeyDown} onBlur={() => { if (!saving) void saveName(); }} /><IconButton icon={<CheckLarge size={18} fill="currentColor" />} label="Сохранить название" size={18} disabled={saving} onMouseDown={(event) => event.preventDefault()} onClick={() => void saveName()} /><IconButton icon={<CloseLarge size={18} fill="currentColor" />} label="Отменить редактирование" size={18} disabled={saving} onMouseDown={(event) => event.preventDefault()} onClick={cancelName} />{nameError ? <small className={styles.inlineError} role="alert">{nameError}</small> : null}</div> : <div className={styles.nameDisplay}><span>{stage.name}</span>{stage.description ? <small>{stage.description}</small> : null}<IconButton icon={<Edit size={18} fill="currentColor" />} label={`Изменить название этапа «${stage.name}»`} size={18} disabled={saving || orderDirty} onClick={() => { setNameDraft(stage.name); setEditingName(true); }} /></div>}
+      {editingName ? <div className={styles.nameEditor}><Input autoFocus value={nameDraft} maxLength={512} required aria-required="true" disabled={saving} aria-label={`Название этапа ${index + 1}`} aria-invalid={Boolean(nameError)} onFocus={(event) => event.currentTarget.select()} onChange={(event) => { setNameDraft(event.target.value); if (nameError) setNameError(''); }} onKeyDown={handleNameKeyDown} onBlur={() => { if (!saving) void saveName(); }} /><IconButton icon={<CheckLarge size={18} fill="currentColor" />} label="Сохранить название" size={18} disabled={saving} onMouseDown={(event) => event.preventDefault()} onClick={() => void saveName()} /><IconButton icon={<CloseLarge size={18} fill="currentColor" />} label="Отменить редактирование" size={18} disabled={saving} onMouseDown={(event) => event.preventDefault()} onClick={cancelName} />{nameError ? <small className={styles.inlineError} role="alert">{nameError}</small> : null}</div> : <div className={styles.nameDisplay}><span>{stage.name}</span>{stage.description ? <small>{stage.description}</small> : null}<IconButton icon={<Edit size={18} fill="currentColor" />} label={`Изменить название этапа «${stage.name}»`} size={18} disabled={saving || orderDirty} onClick={() => { setNameDraft(stage.name); setNameError(''); setEditingName(true); }} /></div>}
     </div>
     <div className={styles.controlCell} data-label="Обязательный"><Switch checked={stage.isRequired} label={`Этап «${stage.name}» обязательный`} disabled={saving || orderDirty} onChange={(checked) => { void onUpdate(stage.id, { isRequired: checked }).catch(() => undefined); }} /></div>
-    <div className={styles.controlCell} data-label="Активный"><Switch checked={stage.isActive} label={`Этап «${stage.name}» активен`} disabled={saving || orderDirty} onChange={(checked) => { if (checked) void onUpdate(stage.id, { isActive: true }).catch(() => undefined); else onDisable(stage); }} /></div>
+    <div className={styles.controlCell} data-label="Активный"><Switch checked={stage.isActive} label={`Этап «${stage.name}» активен`} disabled={saving || orderDirty} onChange={(checked) => { void onUpdate(stage.id, { isActive: checked }, checked ? 'Этап включён' : 'Этап отключён').catch(() => undefined); }} /></div>
     <div className={styles.daysCell} data-label="Оценка дней"><NumberStepper value={slaDraft} label={`Оценка дней для этапа «${stage.name}»`} disabled={saving || orderDirty} onChange={setSlaDraft} onCommit={(value) => void commitSla(value)} /></div>
     <div className={styles.actionsCell} data-label="Действия">
       <IconButton icon={<ArrowUp size={18} fill="currentColor" />} label={`Переместить этап «${stage.name}» вверх`} size={18} disabled={saving || index === 0} onClick={() => onMove(index, index - 1)} />

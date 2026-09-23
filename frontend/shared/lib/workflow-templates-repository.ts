@@ -76,6 +76,7 @@ export interface CreateWorkflowStageInput {
   description: string | null;
   isRequired: boolean;
   slaDays: number | null;
+  orderIndex?: number;
 }
 
 export interface UpdateWorkflowStageInput {
@@ -95,6 +96,7 @@ export class WorkflowTemplateApiError extends Error {
 }
 
 export const workflowTemplatesQueryKey = ['workflow-templates'] as const;
+export const workflowTemplateListsQueryKey = [...workflowTemplatesQueryKey, 'list'] as const;
 export const workflowTemplateListQueryKey = (page = 1, pageSize = 100) => [...workflowTemplatesQueryKey, 'list', page, pageSize] as const;
 export const workflowTemplateDetailQueryKey = (templateId: string) => [...workflowTemplatesQueryKey, 'detail', templateId] as const;
 
@@ -172,6 +174,7 @@ export async function addWorkflowStage(templateId: string, input: CreateWorkflow
       description: input.description,
       is_required: input.isRequired,
       sla_days: input.slaDays,
+      ...(input.orderIndex === undefined ? {} : { order_index: input.orderIndex }),
     },
   });
   if (!result.ok) return fail(result.status, result.error, 'Не удалось добавить этап.');
