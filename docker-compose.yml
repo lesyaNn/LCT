@@ -121,6 +121,31 @@ services:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
 
+  worker:
+    # P4-06-01: dedicated background worker (no BackgroundTasks in the API).
+    # Owns report/import execution: atomic claim (SKIP LOCKED) -> run ->
+    # ready, up to 3 attempts, then failed. Shares the backend image.
+    build: ./backend
+    restart: unless-stopped
+    networks: [rtk-net]
+    command: ["python", "-m", "app.modules.analytics.report_worker"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-rtk}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-rtk}
+      REDIS_URL: redis://redis:6379/0
+      IMPORT_STAGING_DIR: /tmp/rtk-imports
+      REPORTS_ROOT: /app/reports
+    volumes:
+      - import-staging:/tmp/rtk-imports
+      - reports-storage:/app/reports
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
   frontend:
     build:
       context: ./frontend

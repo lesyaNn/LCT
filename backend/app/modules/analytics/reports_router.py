@@ -34,7 +34,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -50,7 +50,6 @@ from app.modules.analytics.report_service import (
     ReportQueuedResponse,
     create_report_job,
 )
-from app.modules.analytics.report_worker import generate_report_task
 from app.schemas.common import ErrorResponse, ReportFormat
 
 __all__ = ["ReportJobRead", "router"]
@@ -132,15 +131,16 @@ def _read_model(job: ReportJob) -> ReportJobRead:
     summary="Создать отчёт (async, xlsx/pdf/json)",
     description=(
         "Валидирует ReportRequest (format+filters+columns), сохраняет ReportJob "
-        "со статусом queued и ставит генерацию в фон (FastAPI BackgroundTasks). "
-        "Возвращает реальный persisted job_id."
+        "со статусом queued и возвращает реальный persisted job_id. "
+        "Исполнением владеет отдельный worker-контейнер "
+        "(python -m app.modules.analytics.report_worker); API только создаёт "
+        "jobs — BackgroundTasks запрещены ТЗ P4-06-01."
     ),
     responses={401: ERROR_RESPONSES[401], 403: ERROR_RESPONSES[403],
                422: ERROR_RESPONSES[422]},
 )
 def create_report(
     request: ReportRequest,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(require_permission(REPORTS_READ_PERMISSION)),
 ) -> ReportQueuedResponse:
@@ -154,7 +154,6 @@ def create_report(
         queued = create_report_job(db, request, user)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    background_tasks.add_task(generate_report_task, queued.job_id)
     return queued
 
 

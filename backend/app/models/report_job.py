@@ -70,6 +70,9 @@ class ReportJob(UUIDPKMixin, Base):
     )
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="queued")
     progress: Mapped[int] = mapped_column(nullable=False, default=0)
+    # P4-06-01 retries (000020): incremented on every atomic claim; a failed
+    # attempt with attempts < MAX_JOB_ATTEMPTS is requeued, else failed.
+    attempts: Mapped[int] = mapped_column(nullable=False, default=0)
     # Dev-3 import extension (000019): job kind, worker params, terminal
     # summary and re-POST dedup key. Report rows keep job_type='report'.
     job_type: Mapped[str] = mapped_column(String(32), nullable=False, default=JOB_TYPE_REPORT)

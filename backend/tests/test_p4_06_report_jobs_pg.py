@@ -149,21 +149,17 @@ def test_post_persists_real_queued_job_before_worker_runs(pg):
     eng, _ = pg
     req = ReportRequest(format="xlsx", columns=["university", "product"])
     admin = _admin()
-    background_tasks_holder: list = []
-
-    class _BG:
-        def add_task(self, fn, *args, **kwargs):
-            background_tasks_holder.append((fn, args, kwargs))
 
     from app.modules.analytics.reports_router import create_report
 
     with _session(eng) as s:
-        queued = create_report(req, _BG(), db=s, user=admin)
+        queued = create_report(req, db=s, user=admin)
     assert queued.status == "queued"
     job_id = queued.job_id
     uuid4_valid = str(job_id)
     assert len(uuid4_valid) == 36
-    # Worker was scheduled but never ran: a FRESH session still sees queued.
+    # P4-06-01: API only creates (no BackgroundTasks) — a FRESH session
+    # still sees queued; the worker container owns execution.
     with _session(eng) as fresh:
         job = jobs.get_job(fresh, job_id)
         assert job is not None and job.id is not None
@@ -177,9 +173,6 @@ def test_post_persists_real_queued_job_before_worker_runs(pg):
         delta = job.expires_at - job.created_at
         assert timedelta(hours=23) < delta < timedelta(hours=25)
         assert job.expires_at.tzinfo is not None
-    assert len(background_tasks_holder) == 1
-    fn, args, _ = background_tasks_holder[0]
-    assert fn is generate_report_task and args == (job_id,)
 
 
 def test_post_xlsx_returns_202_with_persisted_id(pg):
@@ -213,6 +206,8 @@ def test_xlsx_e2e_ready_download_valid_workbook(pg):
     )
     assert resp.status_code == 202, resp.text
     job_id = resp.json()["job_id"]
+    # P4-06-01: API only creates; drive the worker explicitly.
+    assert generate_report_task(job_id) == "ready"
 
     status = _poll_ready(client, job_id)
     assert status["status"] == "ready"
@@ -248,6 +243,8 @@ def test_pdf_e2e_ready_download(pg):
     resp = client.post("/reports", json={"format": "pdf", "columns": ["university"]})
     assert resp.status_code == 202, resp.text
     job_id = resp.json()["job_id"]
+    # P4-06-01: API only creates; drive the worker explicitly.
+    assert generate_report_task(job_id) == "ready"
     status = _poll_ready(client, job_id)
     assert status["status"] == "ready"
     dl = client.get(f"/reports/{job_id}/download")
@@ -265,15 +262,17 @@ def test_json_e2e_ready_download(pg):
     )
     assert resp.status_code == 202, resp.text
     job_id = resp.json()["job_id"]
+    # P4-06-01: API only creates; drive the worker explicitly.
+    assert generate_report_task(job_id) == "ready"
     status = _poll_ready(client, job_id)
     assert status["status"] == "ready"
     dl = client.get(f"/reports/{job_id}/download")
     assert dl.status_code == 200, dl.text
     assert dl.headers["content-type"] == "application/json"
     doc = json.loads(dl.content.decode("utf-8"))
-    assert set(doc) == {"generated_at", "filters", "columns", "total", "items"}
-    assert doc["columns"] == ["university", "product"]
-    assert doc["total"] == 2 and len(doc["items"]) == 2
+    assert set(doc) == {"metadata", "filters", "columns", "rows", "totals"}
+    assert [c["key"] for c in doc["columns"]] == ["university", "product"]
+    assert doc["totals"]["row_count"] == 2 and len(doc["rows"]) == 2
 
 
 # ------------------------------------------------------- worker lifecycle details
@@ -358,6 +357,8 @@ def test_scope_survives_background_boundary(pg):
     with _session(eng) as s:
         job = jobs.get_job(s, job_id)
         assert job.effective_university_ids == [str(ids["Бета"])]
+    # P4-06-01: API only creates; drive the worker explicitly.
+    assert generate_report_task(job_id) == "ready"
     status = _poll_ready(client, job_id)
     assert status["status"] == "ready"
 
@@ -400,11 +401,14 @@ def test_empty_scope_fails_closed(pg):
 def test_own_job_access_matrix(pg):
     eng, _ = pg
     owner = CurrentUser(id="mgr-a", roles={"manager"})
-    other = CurrentUser(id="mgr-b", roles={"manager"})
+    other_manager = CurrentUser(id="mgr-b", roles={"manager"})
+    stranger = CurrentUser(id="user-c", roles={"user"})
     with _session(eng) as s:
         job_id = create_report_job(s, ReportRequest(format="xlsx"), owner).job_id
     assert _client(owner).get(f"/reports/{job_id}").status_code == 200
-    assert _client(other).get(f"/reports/{job_id}").status_code == 403
+    # P4-06-01 RBAC: manager/admin видят все jobs, остальные — только свои.
+    assert _client(other_manager).get(f"/reports/{job_id}").status_code == 200
+    assert _client(stranger).get(f"/reports/{job_id}").status_code == 403
     assert _client(_admin()).get(f"/reports/{job_id}").status_code == 200
     assert _client(owner).get(f"/reports/{uuid4()}").status_code == 404
     assert _client(owner).get("/reports/not-a-uuid").status_code == 404
@@ -528,18 +532,13 @@ def test_cleanup_never_touches_foreign_paths(pg, tmp_path):
 
 
 def test_parallel_submit_does_not_wait_for_generation(pg, monkeypatch):
+    # P4-06-01: API only creates jobs — no BackgroundTasks scheduling at
+    # all, so every submit is fast by construction (no slow-worker mock
+    # needed); the worker container owns execution.
     import httpx
     import uvicorn
 
-    import app.modules.analytics.reports_router as router_module
-
     eng, _ = pg
-
-    def _slow(job_id: str) -> str:
-        time.sleep(3)
-        return "slow-stub"
-
-    monkeypatch.setattr(router_module, "generate_report_task", _slow)
 
     app = FastAPI()
     app.include_router(reports_router)
@@ -663,14 +662,14 @@ def test_migration_chain_latest_is_report_jobs():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     versions = [v for v, _, _ in module._discover()]
-    assert versions[-1] == "000019_import_jobs"
-    assert len(versions) == 19
+    assert versions[-1] == "000020_job_attempts"
+    assert len(versions) == 20
     assert "report_jobs" in module.EXPECTED_TABLES
     assert module.EXPECTED_TABLES[-1] == "report_jobs"
 
 
 def test_report_job_model_matches_migration_columns():
-    # 000018 core + 000019 Dev-3 import extension.
+    # 000018 core + 000019 Dev-3 import extension + 000020 attempts.
     assert set(ReportJob.__table__.columns.keys()) == {        "id",
         "format",
         "filters",
@@ -681,6 +680,7 @@ def test_report_job_model_matches_migration_columns():
         "effective_university_ids",
         "status",
         "progress",
+        "attempts",
         "job_type",
         "payload",
         "result",

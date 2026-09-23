@@ -33,7 +33,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -48,13 +48,20 @@ from app.models.report_job import (
 
 logger = logging.getLogger("rtk")
 
+#: Spec retries (P4-06-01): a failed attempt with attempts < MAX is
+#: requeued, otherwise the job goes failed.
+MAX_JOB_ATTEMPTS = 3
+
 __all__ = [
+    "MAX_JOB_ATTEMPTS",
     "REPORT_EXPIRY_HOURS",
     "REPORT_JOB_STATUSES",
     "STATUS_BUILDING",
     "STATUS_FAILED",
     "STATUS_QUEUED",
     "STATUS_READY",
+    "claim_job",
+    "claim_next_job",
     "cleanup_expired_report_jobs",
     "contained_job_path",
     "create_job",
@@ -67,6 +74,7 @@ __all__ = [
     "mark_failed",
     "mark_ready",
     "reports_root",
+    "requeue_or_fail",
     "run_cleanup_once",
     "sanitize_error_message",
 ]
@@ -210,13 +218,17 @@ def get_job(db: Session, job_id: str | uuid.UUID) -> ReportJob | None:
 
 
 def job_visible_to(job: ReportJob, user: Any, *, is_admin: bool = False) -> bool:
-    """Ownership check: admins see all jobs, others only their own.
+    """Ownership check (P4-06-01 RBAC): admin and manager see all jobs.
 
     ``is_admin`` is resolved by the caller from the canonical permission
-    system (``*`` in ``user_permissions``); non-admin holders of
-    ``reports.read`` (managers) see their own jobs only — never widened.
+    system (``*`` in ``user_permissions``); realm ``manager``s see all jobs
+    too (spec: "manager/admin — все"). Plain users/curators see only their
+    own (``actor_sub`` match). Rendered data stays confined by the snapshot
+    ``effective_university_ids`` taken at submit time.
     """
     if is_admin:
+        return True
+    if "manager" in set(getattr(user, "roles", None) or set()):
         return True
     return bool(job.actor_sub) and job.actor_sub == getattr(user, "id", None)
 
@@ -226,9 +238,13 @@ def list_visible_jobs(
 ) -> list[ReportJob]:
     """Jobs visible to ``user`` (newest first, bounded page)."""
     stmt = select(ReportJob).order_by(ReportJob.created_at.desc()).limit(limit)
-    if not is_admin:
-        stmt = stmt.where(ReportJob.actor_sub == getattr(user, "id", None))
-    return list(db.execute(stmt).scalars().all())
+    if is_admin or "manager" in set(getattr(user, "roles", None) or set()):
+        return list(db.execute(stmt).scalars().all())
+    return list(
+        db.execute(
+            stmt.where(ReportJob.actor_sub == getattr(user, "id", None))
+        ).scalars().all()
+    )
 
 
 def mark_building(db: Session, job: ReportJob) -> bool:
@@ -295,6 +311,100 @@ def mark_failed(db: Session, job: ReportJob, exc: BaseException) -> ReportJob:
     db.refresh(job)
     logger.warning("report job failed id=%s error=%s", job.id, job.error_message)
     return job
+
+
+# ------------------------------------------------------- worker-grade claims
+
+
+def claim_job(db: Session, job_id: uuid.UUID | str) -> ReportJob | None:
+    """Atomically claim ``queued -> building`` for the worker (P4-06-01).
+
+    Single ``UPDATE ... WHERE status='queued' AND attempts < MAX``: the
+    rowcount tells whether this caller won — two workers can never run the
+    same job. ``attempts`` is incremented on every won claim. Returns the
+    refreshed job, or ``None`` when already claimed/finished/exhausted.
+    Commits before returning.
+    """
+    try:
+        key = job_id if isinstance(job_id, uuid.UUID) else uuid.UUID(str(job_id))
+    except (ValueError, AttributeError, TypeError):
+        return None
+    now = _utcnow()
+    res = db.execute(
+        update(ReportJob)
+        .where(
+            ReportJob.id == key,
+            ReportJob.status == STATUS_QUEUED,
+            ReportJob.attempts < MAX_JOB_ATTEMPTS,
+        )
+        .values(
+            status=STATUS_BUILDING,
+            progress=10,
+            started_at=now,
+            attempts=ReportJob.attempts + 1,
+            error_message=None,
+        )
+    )
+    db.commit()
+    if (res.rowcount or 0) != 1:
+        return None
+    job = db.get(ReportJob, key)
+    if job is not None and not job.file_path:
+        job.file_path = str(job_file_path(job.id, job.format))
+        db.add(job)
+        db.commit()
+        db.refresh(job)
+    return job
+
+
+def claim_next_job(db: Session, *, job_type: str | None = None) -> ReportJob | None:
+    """Worker dequeue: oldest claimable job -> ``building`` (P4-06-01).
+
+    On PostgreSQL the candidate row is locked with
+    ``SELECT ... FOR UPDATE SKIP LOCKED``; other dialects (sqlite tests)
+    fall back to a plain oldest-first select — the atomic ``claim_job``
+    UPDATE guard still prevents double execution. Commits.
+    """
+    stmt = (
+        select(ReportJob.id, ReportJob.format)
+        .where(
+            ReportJob.status == STATUS_QUEUED,
+            ReportJob.attempts < MAX_JOB_ATTEMPTS,
+        )
+        .order_by(ReportJob.created_at.asc())
+        .limit(1)
+    )
+    if job_type is not None:
+        stmt = stmt.where(ReportJob.job_type == job_type)
+    if db.bind is not None and db.bind.dialect.name == "postgresql":
+        stmt = stmt.with_for_update(skip_locked=True)
+    candidate = db.execute(stmt).first()
+    if candidate is None:
+        return None
+    return claim_job(db, candidate[0])
+
+
+def requeue_or_fail(db: Session, job: ReportJob, exc: BaseException) -> str:
+    """Record a failed attempt: requeue while attempts remain, else fail.
+
+    Returns ``"requeued"`` (job is ``queued`` again with attempts kept) or
+    ``"failed"`` (terminal, sanitized message). Commits.
+    """
+    if (job.attempts or 0) < MAX_JOB_ATTEMPTS:
+        job.status = STATUS_QUEUED
+        job.progress = 0
+        job.started_at = None
+        job.error_message = sanitize_error_message(exc)
+        db.add(job)
+        db.commit()
+        db.refresh(job)
+        logger.warning(
+            "report job requeued id=%s attempt=%s error=%s",
+            job.id, job.attempts, job.error_message,
+        )
+        return "requeued"
+    mark_failed(db, job, exc)
+    return "failed"
 
 
 # ------------------------------------------------------- expiry / cleanup

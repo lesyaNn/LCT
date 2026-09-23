@@ -18,6 +18,7 @@ from app.models.report_job import (
     STATUS_READY,
     ReportJob,
 )
+from app.core.security import CurrentUser
 from app.modules.analytics import report_jobs as jobs
 from app.modules.analytics.report_worker import build_worker_user
 
@@ -125,3 +126,85 @@ def test_expiry_window_is_24h_tz_aware():
 
     assert timedelta(hours=jobs.REPORT_EXPIRY_HOURS) == timedelta(hours=24)
     assert datetime.now(timezone.utc).tzinfo is not None
+
+
+def test_job_visible_to_manager_and_admin_see_all():
+    job = ReportJob(actor_sub="owner", status=STATUS_QUEUED)
+    owner = CurrentUser(id="owner", roles={"user"})
+    other_user = CurrentUser(id="stranger", roles={"user"})
+    manager = CurrentUser(id="mgr", roles={"manager"})
+    admin = CurrentUser(id="adm", roles={"admin"})
+    assert jobs.job_visible_to(job, owner) is True
+    assert jobs.job_visible_to(job, other_user) is False
+    assert jobs.job_visible_to(job, manager) is True
+    assert jobs.job_visible_to(job, admin, is_admin=True) is True
+
+
+def _sqlite_job_db():
+    """Single-table sqlite DB for the claim state machine (no PG needed)."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from app.db.base import Base  # noqa: F401  (metadata registered via models)
+    import app.models  # noqa: F401
+
+    eng = create_engine("sqlite://")
+    ReportJob.__table__.create(eng)
+    return eng, Session
+
+
+def _queued_job(db, **kw):
+    from datetime import timedelta
+
+    now = datetime.now(timezone.utc)
+    job = ReportJob(
+        format="xlsx", filters={}, columns=[],
+        actor_sub="u1", status=STATUS_QUEUED, progress=0,
+        created_at=now, expires_at=now + timedelta(hours=24),
+        **kw,
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    return job
+
+
+def test_claim_job_is_atomic_single_winner(tmp_path, monkeypatch):
+    monkeypatch.setenv("REPORTS_DIR", str(tmp_path))
+    eng, Session = _sqlite_job_db()
+    with Session(eng) as db:
+        job = _queued_job(db)
+        first = jobs.claim_job(db, job.id)
+        assert first is not None and first.status == STATUS_BUILDING
+        assert first.attempts == 1
+        assert jobs.claim_job(db, job.id) is None  # second claimant loses
+        assert jobs.claim_job(db, "not-a-uuid") is None
+
+
+def test_claim_next_job_oldest_first_empty_none(tmp_path, monkeypatch):
+    monkeypatch.setenv("REPORTS_DIR", str(tmp_path))
+    eng, Session = _sqlite_job_db()
+    with Session(eng) as db:
+        assert jobs.claim_next_job(db) is None
+        a = _queued_job(db)
+        b = _queued_job(db)
+        claimed = jobs.claim_next_job(db)
+        assert claimed is not None and claimed.id == a.id
+        assert jobs.claim_next_job(db).id == b.id
+        assert jobs.claim_next_job(db) is None
+
+
+def test_requeue_or_fail_retries_then_fails(tmp_path, monkeypatch):
+    monkeypatch.setenv("REPORTS_DIR", str(tmp_path))
+    eng, Session = _sqlite_job_db()
+    with Session(eng) as db:
+        job = _queued_job(db)
+        jobs.claim_job(db, job.id)  # attempts -> 1
+        assert jobs.requeue_or_fail(db, job, ValueError("boom")) == "requeued"
+        assert job.status == STATUS_QUEUED
+        jobs.claim_job(db, job.id)  # attempts -> 2
+        assert jobs.requeue_or_fail(db, job, ValueError("boom")) == "requeued"
+        jobs.claim_job(db, job.id)  # attempts -> 3 == MAX
+        assert jobs.requeue_or_fail(db, job, ValueError("boom")) == "failed"
+        assert job.status == STATUS_FAILED
+        assert "boom" in (job.error_message or "")
