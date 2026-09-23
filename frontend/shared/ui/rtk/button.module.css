@@ -18,6 +18,8 @@
 .secondary:hover:not(:disabled) { background: var(--rtk-color-surface-hover); }
 .ghost { background: transparent; color: var(--rtk-color-text-secondary); }
 .ghost:hover:not(:disabled) { background: var(--rtk-color-surface-hover); color: var(--rtk-color-text-primary); }
+.danger { background: var(--rtk-color-danger); color: var(--rtk-color-text-inverse); }
+.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--rtk-color-danger) 84%, #000); }
 .s { min-height: 32px; padding: 0 var(--rtk-space-3); font-size: 12px; }
 .m { min-height: 36px; padding: 0 var(--rtk-space-4); font-size: 14px; }
 .l { min-height: 48px; padding: 0 var(--rtk-space-5); font-size: 16px; }

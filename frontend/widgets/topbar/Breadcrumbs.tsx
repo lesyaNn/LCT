@@ -10,6 +10,15 @@ function getBreadcrumbs(pathname: string): BreadcrumbEntry[] {
   const segments = pathname.split('/').filter(Boolean);
   if (segments.length === 0) return [{ label: 'Dashboard' }];
 
+  if (segments[0] === 'admin' && segments[1] === 'workflow' && segments[2] === 'templates') {
+    const entries: BreadcrumbEntry[] = [
+      { label: 'Администрирование', href: '/admin' },
+      { label: 'Шаблоны Workflow', href: segments.length > 3 ? '/admin/workflow/templates' : undefined },
+    ];
+    if (segments.length > 3) entries.push({ label: 'Редактор шаблона' });
+    return entries;
+  }
+
   return segments.map((segment, index) => ({
     label: routeLabels[segment]
       ?? (index === segments.length - 1 ? detailRouteLabels[segments[index - 1]] ?? 'Детали' : 'Раздел'),

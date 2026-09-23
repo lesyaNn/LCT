@@ -119,9 +119,9 @@ body {
   font-size: 14px;
   line-height: 1.45;
 }
-button, a, input { font: inherit; }
+button, a, input, textarea, select { font: inherit; }
 a { color: inherit; }
-button:focus-visible, a:focus-visible, input:focus-visible {
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
   outline: 3px solid var(--atmr-accent-default);
   outline-offset: 2px;
 }

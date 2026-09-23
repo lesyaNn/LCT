@@ -1,8 +1,9 @@
 .page { display: flex; flex-direction: column; gap: clamp(var(--rtk-space-6), 5vw, var(--rtk-space-8)); }
 .cards { display: grid; gap: var(--rtk-space-4); grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 980px; }
-.card { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-medium); display: flex; flex-direction: column; gap: var(--rtk-space-2); min-height: 150px; padding: var(--rtk-space-5); }
+.card { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-medium); display: flex; flex-direction: column; gap: var(--rtk-space-2); min-height: 150px; padding: var(--rtk-space-5); text-decoration: none; transition: border-color 140ms ease, transform 140ms ease; }
+.card:hover { border-color: color-mix(in srgb, var(--rtk-color-brand) 35%, var(--rtk-color-border)); transform: translateY(-1px); }
 .card span { color: var(--rtk-color-text-secondary); font-size: 13px; }
 .card strong { font-size: 28px; letter-spacing: -.03em; }
-.card small { color: var(--rtk-color-text-tertiary); font-size: 12px; margin-top: auto; }
+.card small { align-items: center; color: var(--rtk-color-text-tertiary); display: flex; font-size: 12px; gap: var(--rtk-space-2); margin-top: auto; }
 .ready { color: var(--rtk-color-success); font-size: 22px !important; }
 @media (max-width: 900px) { .cards { grid-template-columns: 1fr; max-width: 520px; } }
