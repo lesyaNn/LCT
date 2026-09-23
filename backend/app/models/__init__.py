@@ -13,7 +13,8 @@ university_programs, university_products, meetings, documents,
 interaction_notes, meeting_documents, workflow_templates, workflow_stages,
 workflow_instances, workflow_stage_transitions, workflow_comments,
 workflow_attachments, workflow_tasks, instance_stages,
-health_score_snapshots (P2-09-01, migration 000015).
+health_score_snapshots (P2-09-01, migration 000015), report_jobs
+(P4-06-01, migration 000018).
 """
 
 from app.models.catalog import (  # noqa: F401
@@ -28,6 +29,14 @@ from app.models.catalog import (  # noqa: F401
     Vendor,
 )
 from app.models.health_score import HealthScoreSnapshot  # noqa: F401
+from app.models.report_job import (  # noqa: F401
+    REPORT_JOB_STATUSES,
+    STATUS_BUILDING,
+    STATUS_FAILED,
+    STATUS_QUEUED,
+    STATUS_READY,
+    ReportJob,
+)
 from app.models.interactions import (  # noqa: F401
     Document,
     InteractionNote,
@@ -86,4 +95,5 @@ __all__ = [
     "WorkflowTask",
     "InstanceStage",
     "HealthScoreSnapshot",
+    "ReportJob",
 ]

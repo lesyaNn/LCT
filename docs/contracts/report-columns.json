@@ -1,0 +1,136 @@
+{
+  "consumers": [
+    "P4-02-01 dataset",
+    "P4-02-02 column selection",
+    "P4-03-01 export endpoint (xlsx/pdf/json writers)",
+    "P3 frontend checkbox UI"
+  ],
+  "data_types": {
+    "date": "ISO date value on the wire (dataset layer keeps typed date objects; writers format)",
+    "integer": "health_score int 0..100, null when missing (missing is never 0)",
+    "string": "text or null (missing LEFT relations are null, never ''/N/A/-)"
+  },
+  "defaults": {
+    "columns_omitted": "all 14 mandatory columns in documented order",
+    "duplicates": "deduped preserving first-seen order",
+    "empty_list": "422 - at least one column required",
+    "unknown_key": "422 - never silently ignored"
+  },
+  "mandatory_columns": [
+    {
+      "key": "university",
+      "title": "Наименование ВУЗа",
+      "type": "string",
+      "source": "universities.name (University.name)"
+    },
+    {
+      "key": "direction",
+      "title": "ИТ-направление",
+      "type": "string",
+      "source": "licenses.program_id -> it_programs.direction_id -> it_directions.name (COALESCE licenses.direction_id, program direction); NULL for fallback rows"
+    },
+    {
+      "key": "program",
+      "title": "ИТ-программа",
+      "type": "string",
+      "source": "licenses.program_id -> it_programs.name (ITProgram.name); NULL for fallback rows"
+    },
+    {
+      "key": "product",
+      "title": "ИТ-продукт",
+      "type": "string",
+      "source": "licenses.product_id -> it_products.name (ITProduct.name); NULL for fallback rows"
+    },
+    {
+      "key": "workflow_status",
+      "title": "Статус работы",
+      "type": "string",
+      "source": "derived: current InstanceStage.name of the latest workflow_instances row for the university; else earliest university_programs.status (by program name); else NULL. Canonical workflow_instances + instance_stages only, never legacy workflow tables"
+    },
+    {
+      "key": "responsible",
+      "title": "Ответственный",
+      "type": "string",
+      "source": "derived aggregate: university_responsibles -> responsibles.full_name, sorted ascending, joined with '; ' (one row per report row, never fan-out); NULL when no links"
+    },
+    {
+      "key": "vendor",
+      "title": "Вендор",
+      "type": "string",
+      "source": "licenses.product_id -> it_products.vendor_id -> vendors.name (Vendor.name); NULL for fallback rows"
+    },
+    {
+      "key": "software",
+      "title": "ПО",
+      "type": "string",
+      "source": "intentional alias of product: licenses.product_id -> it_products.name (no separate software model/field exists)"
+    },
+    {
+      "key": "contract_number",
+      "title": "Номер договора",
+      "type": "string",
+      "source": "licenses.contract_id -> contracts.contract_number for license rows; latest contracts row per university (signed_at DESC, expires_at DESC NULLS LAST, id ASC) for license-less fallback rows; else NULL"
+    },
+    {
+      "key": "license_signed",
+      "title": "Подписание лицензии",
+      "type": "date",
+      "source": "licenses.signed_at (License.signed_at, Date); NULL for fallback rows"
+    },
+    {
+      "key": "license_expires",
+      "title": "Срок действия",
+      "type": "date",
+      "source": "licenses.expires_at (License.expires_at, Date); NULL for fallback rows"
+    },
+    {
+      "key": "transfer_status",
+      "title": "Статус передачи",
+      "type": "string",
+      "source": "licenses.transfer_status_raw for license rows (real raw field, no new enum/constraint); latest contract transfer_status_raw for license-less fallback rows; else NULL"
+    },
+    {
+      "key": "comment",
+      "title": "Комментарий",
+      "type": "string",
+      "source": "COALESCE(licenses.comment, licenses.contract_id -> contracts.comment) for license rows; latest contract comment for license-less fallback rows; else NULL (both canonical comment fields exist)"
+    },
+    {
+      "key": "health_score",
+      "title": "Health Score",
+      "type": "integer",
+      "source": "latest health_score_snapshots.score per university (ORDER BY calculated_at DESC); NULL when no snapshot; optional Python fallback via canonical calculate_health_score (P2-07-08), never a new formula. int 0..100, missing is NULL (never 0)"
+    }
+  ],
+  "optional_columns_supported": [
+    {
+      "key": "city",
+      "title": "Город",
+      "type": "string",
+      "source": "universities.city (University.city); NULL when unset"
+    },
+    {
+      "key": "current_stage",
+      "title": "Текущий этап",
+      "type": "string",
+      "source": "current InstanceStage.name of the latest workflow_instances row (primary branch of workflow_status WITHOUT the university_programs fallback); NULL when no workflow"
+    }
+  ],
+  "optional_columns_unsupported": {
+    "last_interaction": "ambiguous: meetings.meeting_at vs interaction_notes.created_at; no frozen 'last interaction' definition",
+    "workflow_progress": "no frozen percentage definition over instance_stages",
+    "teacher_readiness": "per-teacher grain, no frozen per-row aggregation rule",
+    "overdue_tasks": "countable from workflow_tasks, but the report-level 'overdue' semantics is not frozen"
+  },
+  "ordering": "University.name ASC, University.id ASC, License.license_number ASC NULLS LAST, License.id ASC (deterministic, never DB natural order)",
+  "presets": {
+    "FULL": "== STANDARD until more canonical sources are frozen",
+    "MINIMAL": "14 mandatory columns",
+    "STANDARD": "14 mandatory + city + current_stage"
+  },
+  "registry": "backend/app/modules/analytics/columns.py (COLUMN_REGISTRY; single source of truth, never duplicated per exporter)",
+  "request_dto": "backend/app/modules/analytics/report_request.py (ReportRequest: format + filters: UnifiedFilter + columns)",
+  "row_grain": "one row per (University x License) via universities LEFT JOIN licenses; license-less universities produce exactly one fallback row; no programs x products x responsibles cartesian product",
+  "task": "P4-02-01 / P4-02-02",
+  "version": "1.0.0"
+}

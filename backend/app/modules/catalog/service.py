@@ -59,6 +59,9 @@ def list_university_page(
     responsible_id: uuid.UUID | None,
     sort_by: str,
     sort_order: str,
+    unified_filter=None,
+    unified_today=None,
+    user=None,
 ) -> tuple[list[UniversityRead], int]:
     rows, total = repo.list_universities(
         db,
@@ -69,6 +72,9 @@ def list_university_page(
         responsible_id=responsible_id,
         sort_by=sort_by,
         sort_order=sort_order,
+        unified_filter=unified_filter,
+        unified_today=unified_today,
+        user=user,
     )
     return [UniversityRead.model_validate(r) for r in rows], total
 

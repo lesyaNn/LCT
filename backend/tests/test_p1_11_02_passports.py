@@ -1521,7 +1521,38 @@ def test_teacher_passport_production_present():
     legacy_paths = sorted(getattr(route, "path", "") for route in teachers_router.router.routes)
     assert not any("passport" in p for p in legacy_paths), legacy_paths
 
-    mounted = sorted(getattr(route, "path", "") for route in app.routes if hasattr(route, "path"))
+    # Version-robust walk restoring the pre-0.120 flat full paths
+    # (FastAPI>=0.120 nests included routers; nested routes already carry
+    # their immediate router prefix, so collapse doubled segments on "/"
+    # boundaries instead of inventing routes).
+    def _join(prefix: str, path: str) -> str:
+        if not prefix or not path.startswith("/"):
+            return f"{prefix}{path}" if prefix else path
+        pre = [s for s in prefix.split("/") if s != ""]
+        parts = [s for s in path.split("/") if s != ""]
+        overlap = 0
+        for k in range(min(len(pre), len(parts)), 0, -1):
+            if pre[-k:] == parts[:k]:
+                overlap = k
+                break
+        return "/" + "/".join(pre + parts[overlap:])
+
+    def _walk(routes, prefix=""):
+        for r in routes:
+            path = getattr(r, "path", None)
+            if path:
+                yield _join(prefix, path)
+                continue
+            original = getattr(r, "original_router", None)
+            if original is not None:
+                yield from _walk(
+                    getattr(original, "routes", []) or [],
+                    _join(prefix, getattr(original, "prefix", "") or ""),
+                )
+            elif getattr(r, "routes", None):
+                yield from _walk(r.routes, prefix)
+
+    mounted = sorted(_walk(app.routes))
     teacher_passport = [p for p in mounted if p.startswith("/api/v1/teachers") and "passport" in p]
     assert teacher_passport == ["/api/v1/teachers/{teacher_id}/passport"], teacher_passport
 

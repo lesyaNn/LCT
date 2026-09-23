@@ -39,6 +39,14 @@ class Settings(BaseSettings):
     max_upload_mb: int = 50
     cors_origins: str = "http://localhost:3000"
 
+    # --- Analytics reports (P4-06-01) ---
+    # Filesystem root for generated xlsx/pdf/json reports. Mounted as a
+    # persistent named volume in compose; never the public static root and
+    # never mixed with workflow attachment keys.
+    # ``REPORTS_DIR`` is honored as a legacy alias (existing exporters read
+    # it); ``REPORTS_ROOT`` wins when both are set.
+    reports_root: str = "/app/reports"
+
     # --- Health Score (P2-07-03) ---
     # CSV обязательных типов документов для компонента D.
     # Дефолт ТЗ: contract,license,act,protocol.

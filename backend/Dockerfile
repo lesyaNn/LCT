@@ -1,12 +1,15 @@
 FROM python:3.12-slim
 WORKDIR /code
 COPY pyproject.toml ./
-# Full runtime set from pyproject.toml dependencies (P0-5: Dockerfile must
-# stay a superset of pyproject — see tests/test_p0_docker_deps.py).
-RUN pip install --no-cache-dir "fastapi" "uvicorn[standard]" sqlalchemy alembic "psycopg[binary]" pydantic pydantic-settings "python-jose[cryptography]" python-multipart redis minio httpx openpyxl xlrd reportlab python-dateutil pytest \
+# Cyrillic PDF runtime (P4-04-02): DejaVu Sans for reportlab. The PDF
+# generator discovers these files at runtime and never ships font binaries.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends fonts-dejavu-core \
+  && rm -rf /var/lib/apt/lists/* \
+  && pip install --no-cache-dir "fastapi" "uvicorn[standard]" sqlalchemy alembic "psycopg[binary]" pydantic pydantic-settings "python-jose[cryptography]" python-multipart redis minio httpx openpyxl xlrd reportlab python-dateutil pytest \
   && useradd -r -u 10001 appuser \
-  && mkdir -p /code/var/files /tmp/rtk-imports /app/storage \
-  && chown -R appuser:appuser /code /tmp/rtk-imports /app/storage
+  && mkdir -p /code/var/files /tmp/rtk-imports /app/storage /app/reports \
+  && chown -R appuser:appuser /code /tmp/rtk-imports /app/storage /app/reports
 COPY scripts ./scripts
 COPY migrations ./migrations
 COPY app ./app

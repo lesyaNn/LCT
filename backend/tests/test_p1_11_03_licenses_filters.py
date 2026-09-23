@@ -573,14 +573,34 @@ def test_filter_discovery_table():
     # FastAPI>=0.120 nests included routers, so walk original_router).
     from app.api.router import v1
 
+    def _join(prefix: str, path: str) -> str:
+        # Version-robust join restoring the pre-0.120 flat full paths:
+        # 0.116 routes already carry every prefix (use as-is), while
+        # 0.141 nested routes carry their immediate router prefix
+        # (collapse the doubled segments on "/" boundaries instead of
+        # inventing routes).
+        if not prefix or not path.startswith("/"):
+            return f"{prefix}{path}" if prefix else path
+        pre = [s for s in prefix.split("/") if s != ""]
+        parts = [s for s in path.split("/") if s != ""]
+        overlap = 0
+        for k in range(min(len(pre), len(parts)), 0, -1):
+            if pre[-k:] == parts[:k]:
+                overlap = k
+                break
+        return "/" + "/".join(pre + parts[overlap:])
+
     def _walk(routes, prefix=""):
         for r in routes:
             if getattr(r, "path", None):
-                yield prefix + r.path
+                yield _join(prefix, getattr(r, "path"))
             elif getattr(r, "original_router", None) is not None:
-                yield from _walk(r.original_router.routes, prefix + (r.original_router.prefix or ""))
+                yield from _walk(
+                    r.original_router.routes,
+                    _join(prefix, r.original_router.prefix or ""),
+                )
 
-    paths = set(_walk(v1.routes))
+    paths = set(_walk(v1.routes, "/api/v1"))
     assert not any(p.startswith("/universities") and "passport" not in p for p in paths)
 
 

@@ -2,13 +2,15 @@
 
 Mounted: auth, import, university passport, teacher passport, catalog
 CRUD/overview, workflow templates/stages, workflow instances (+ canonical
-B2 transitions/comments), workflow instance attachments, and health-score
-(batch/ranking/history/attention). Deferred forward-stub routers stay
+B2 transitions/comments), workflow instance attachments, health-score
+(batch/ranking/history/attention), and async analytics reports (P4-06-01:
+POST queued job + status + download). Deferred forward-stub routers stay
 unmounted; see ``docs/AUDIT.md`` for their reactivation requirements.
 """
 
 from fastapi import APIRouter
 
+from app.modules.analytics.reports_router import router as reports_router
 from app.modules.auth.router import router as auth_router
 from app.modules.catalog.router import router as catalog_router
 from app.modules.health_score.health_router import router as health_router
@@ -35,3 +37,4 @@ v1.include_router(workflow_templates_router)
 v1.include_router(workflow_instances_router)
 v1.include_router(workflow_transitions_router)
 v1.include_router(workflow_attachments_router)
+v1.include_router(reports_router)

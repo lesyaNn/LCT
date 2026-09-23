@@ -51,7 +51,12 @@ UNIVERSITY_SORT = {
 
 
 def university_conditions(
-    *, search: str | None, city: str | None, responsible_id: uuid.UUID | None
+    *,
+    search: str | None,
+    city: str | None,
+    responsible_id: uuid.UUID | None,
+    unified_filter=None,
+    today=None,
 ):
     conds = []
     if search:
@@ -75,6 +80,16 @@ def university_conditions(
                 )
             )
         )
+    if unified_filter is not None:
+        # P4-01-02: additive AND with legacy filters; EXISTS strategy keeps
+        # one row per university (no JOIN fan-out). Import is local so the
+        # catalog layer never hard-depends on the analytics package at
+        # module load time.
+        from app.modules.analytics.filter_service import UnifiedFilterService
+
+        conds.extend(
+            UnifiedFilterService.build_university_conditions(unified_filter, today=today)
+        )
     return conds
 
 
@@ -88,20 +103,34 @@ def list_universities(
     responsible_id: uuid.UUID | None,
     sort_by: str,
     sort_order: str,
+    unified_filter=None,
+    unified_today=None,
+    user=None,
 ) -> tuple[list[University], int]:
-    conds = university_conditions(search=search, city=city, responsible_id=responsible_id)
-    total = db.execute(select(func.count()).select_from(University).where(*conds)).scalar() or 0
-    rows = (
-        db.execute(
-            select(University)
-            .where(*conds)
-            .order_by(*_order(University, UNIVERSITY_SORT, sort_by, sort_order))
-            .limit(page_size)
-            .offset((page - 1) * page_size)
-        )
-        .scalars()
-        .all()
+    conds = university_conditions(
+        search=search,
+        city=city,
+        responsible_id=responsible_id,
+        unified_filter=unified_filter,
+        today=unified_today,
     )
+    count_stmt = select(func.count()).select_from(University).where(*conds)
+    page_stmt = (
+        select(University)
+        .where(*conds)
+        .order_by(*_order(University, UNIVERSITY_SORT, sort_by, sort_order))
+        .limit(page_size)
+        .offset((page - 1) * page_size)
+    )
+    if user is not None:
+        # Same security intersection as the report dataset: scoped users are
+        # confined to their universities for BOTH total and page.
+        from app.modules.analytics.filter_service import UnifiedFilterService
+
+        count_stmt = UnifiedFilterService.apply_security_scope(count_stmt, user)
+        page_stmt = UnifiedFilterService.apply_security_scope(page_stmt, user)
+    total = db.execute(count_stmt).scalar() or 0
+    rows = db.execute(page_stmt).scalars().all()
     return list(rows), int(total)
 
 
