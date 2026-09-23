@@ -1,0 +1,14 @@
+{
+  "name": "CRM ИТ-Школа Ростелеком",
+  "short_name": "ИТ-Школа CRM",
+  "description": "CRM для взаимодействия с вузами и контроля подготовки ИТ-кадров.",
+  "lang": "ru",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#f4f4f5",
+  "theme_color": "#7700ff",
+  "icons": [
+    { "src": "/favicon-32.svg", "sizes": "32x32", "type": "image/svg+xml" },
+    { "src": "/apple-touch-icon.svg", "sizes": "180x180", "type": "image/svg+xml" }
+  ]
+}

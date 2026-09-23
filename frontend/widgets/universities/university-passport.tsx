@@ -153,7 +153,7 @@ function WorkflowOverview({ passport, canAdvance, onTabChange }: { passport: Uni
       <div className={styles.workflowLayout}>
         <div className={styles.workflowStage}><span className={styles.overline}>Текущий этап</span><strong>{workflow.currentStage.name}</strong><SemanticStatusBadge intent={workflowStatusIntent[workflow.status]}>{statusLabel}</SemanticStatusBadge></div>
         <div className={styles.workflowDetails}>
-          <div><span className={styles.detailLabel}>Deadline</span><strong className={overdue ? styles.overdue : undefined}><TimeStroke size={16} fill="currentColor" />{formatDateRu(workflow.deadline)}</strong>{overdue ? <span className={styles.detailWarning}>Срок просрочен</span> : null}</div>
+          <div><span className={styles.detailLabel}>Дедлайн</span><strong className={overdue ? styles.overdue : undefined}><TimeStroke size={16} fill="currentColor" />{formatDateRu(workflow.deadline)}</strong>{overdue ? <span className={styles.detailWarning}>Срок просрочен</span> : null}</div>
           <div><span className={styles.detailLabel}>Ответственный</span><strong className={styles.responsibleValue}>{workflow.responsible ? <><Avatar initials={getInitials(workflow.responsible.name)} size="s" />{workflow.responsible.name}</> : 'Не назначен'}</strong></div>
         </div>
         <div className={styles.workflowProgress}>

@@ -2,7 +2,7 @@ import type { NavigationItem } from '@/shared/types/navigation';
 import type { UserRole } from '@/shared/types/user';
 
 export const navigationItems: NavigationItem[] = [
-  { label: 'Dashboard', href: '/dashboard', icon: 'dashboard', allowedRoles: ['user', 'manager', 'admin'] },
+  { label: 'Обзор', href: '/dashboard', icon: 'dashboard', allowedRoles: ['user', 'manager', 'admin'] },
   { label: 'ВУЗы', href: '/universities', icon: 'university', allowedRoles: ['user', 'manager', 'admin'] },
   { label: 'Преподаватели', href: '/teachers', icon: 'teacher', allowedRoles: ['user', 'manager', 'admin'] },
   { label: 'Workflow', href: '/workflows', icon: 'workflow', allowedRoles: ['user', 'manager', 'admin'] },
@@ -13,7 +13,7 @@ export const navigationItems: NavigationItem[] = [
 ];
 
 export const routeLabels: Record<string, string> = {
-  dashboard: 'Dashboard',
+  dashboard: 'Обзор',
   universities: 'ВУЗы',
   teachers: 'Преподаватели',
   workflows: 'Workflow',

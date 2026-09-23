@@ -49,16 +49,16 @@
 .reasonRow { display: flex; gap: var(--rtk-space-3); padding: var(--rtk-space-4) 0; }
 .reasonRow + .reasonRow { border-top: 1px solid var(--rtk-color-border); }
 .reasonIcon { align-items: center; border-radius: var(--rtk-radius-small); display: inline-flex; flex: 0 0 36px; height: 36px; justify-content: center; }
-.reason-high { background: var(--rtk-color-surface-subtle); color: var(--rtk-color-danger); }
-.reason-medium { background: var(--rtk-color-surface-subtle); color: var(--rtk-color-warning); }
-.reason-low { background: var(--atmr-success-container-soft, var(--rtk-color-surface-subtle)); color: var(--rtk-color-success); }
+.reason-high { background: var(--atmr-error-container-soft); color: var(--atmr-error-on-container); }
+.reason-medium { background: var(--atmr-warning-container-soft); color: var(--atmr-warning-on-container); }
+.reason-low { background: var(--atmr-success-container-soft); color: var(--atmr-success-on-container); }
 .reasonBody { min-width: 0; }
 .reasonTitleLine { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); }
 .reasonTitleLine strong { font-size: 14px; }
 .severityBadge { border-radius: 999px; font-size: 11px; font-weight: 700; padding: 3px 7px; }
-.severity-high { background: var(--rtk-color-surface-subtle); color: var(--rtk-color-danger); }
-.severity-medium { background: var(--rtk-color-surface-subtle); color: var(--rtk-color-warning); }
-.severity-low { background: var(--rtk-color-surface-subtle); color: var(--rtk-color-text-secondary); }
+.severity-high { background: var(--atmr-error-container-soft); color: var(--atmr-error-on-container); }
+.severity-medium { background: var(--atmr-warning-container-soft); color: var(--atmr-warning-on-container); }
+.severity-low { background: var(--atmr-success-container-soft); color: var(--atmr-success-on-container); }
 .reasonBody > p { color: var(--rtk-color-text-secondary); font-size: 13px; margin: var(--rtk-space-2) 0 0; }
 .detailsButton { margin-top: var(--rtk-space-2); padding-inline: 0; }
 .reasonDetails { border-top: 1px solid var(--rtk-color-border); margin-top: var(--rtk-space-2); padding: var(--rtk-space-3) 0 0; }

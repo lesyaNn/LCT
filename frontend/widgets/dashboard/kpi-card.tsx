@@ -36,7 +36,7 @@ function KpiCardContent({ title, value, caption, icon: Icon }: Omit<KpiCardProps
 
 export function KpiCard({ title, value, caption, icon, tone, href, ariaLabel }: KpiCardProps) {
   const content = <KpiCardContent title={title} value={value} caption={caption} icon={icon} tone={tone} />;
-  const className = `${styles.card} ${styles[tone]} ${tone === 'orange' ? 'Theme_root_rtk_default_light' : ''}`;
+  const className = `${styles.card} ${styles[tone]}`;
 
   if (href) {
     return (

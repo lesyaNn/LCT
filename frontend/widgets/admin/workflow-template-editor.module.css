@@ -42,7 +42,7 @@
 .deleteButton { color: var(--rtk-color-danger); }
 .inactiveLabel { color: var(--rtk-color-text-tertiary); font-size: 11px; padding: 0 var(--rtk-space-2); }
 .rowSaving { color: var(--rtk-color-text-tertiary); font-size: 10px; width: 100%; }
-.dragOverlay { background: var(--rtk-color-surface); border: 1px solid color-mix(in srgb, var(--rtk-color-brand) 45%, var(--rtk-color-border)); border-radius: var(--rtk-radius-small); box-shadow: 0 8px 24px rgba(16, 24, 40, .14); color: var(--rtk-color-text-primary); font-weight: 650; max-width: min(440px, 80vw); overflow: hidden; padding: var(--rtk-space-3) var(--rtk-space-4); text-overflow: ellipsis; white-space: nowrap; }
+.dragOverlay { background: var(--rtk-color-surface); border: 1px solid color-mix(in srgb, var(--rtk-color-brand) 45%, var(--rtk-color-border)); border-radius: var(--rtk-radius-small); box-shadow: var(--rtk-shadow-elevation-2); color: var(--rtk-color-text-primary); font-weight: 650; max-width: min(440px, 80vw); overflow: hidden; padding: var(--rtk-space-3) var(--rtk-space-4); text-overflow: ellipsis; white-space: nowrap; }
 .emptyState { align-items: center; display: flex; flex-direction: column; padding: clamp(44px, 8vw, 80px) var(--rtk-space-5); text-align: center; }
 .emptyState h3 { font-size: 20px; margin: 0; }
 .emptyState p { color: var(--rtk-color-text-secondary); margin: var(--rtk-space-2) 0 var(--rtk-space-5); max-width: 460px; }

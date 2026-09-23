@@ -271,7 +271,7 @@ function AnalyticsGrid({ data }: { data: DashboardAnalytics }) {
       <ChartCard title="Динамика запусков" description="Фактические и планируемые запуски за последние 12 месяцев.">
         {data.launchDynamics.length ? <LaunchDynamicsChart data={data.launchDynamics} /> : <EmptyChart />}
       </ChartCard>
-      <ChartCard title="Top Attention Items" description="Пять элементов, требующих первоочередного внимания.">
+      <ChartCard title="Приоритетные задачи" description="Пять элементов, требующих первоочередного внимания.">
         {data.attentionItems.length ? <AttentionList data={data.attentionItems} /> : <EmptyChart />}
       </ChartCard>
     </div>

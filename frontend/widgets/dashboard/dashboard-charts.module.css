@@ -179,7 +179,7 @@
 }
 
 .seriesActual { background: var(--rtk-color-brand); }
-.seriesPlanned { background: var(--rtk-color-success); border-top: 1px dashed var(--rtk-color-success); }
+.seriesPlanned { background: var(--rtk-color-text-tertiary); border-top: 1px dashed var(--rtk-color-text-tertiary); }
 
 .attentionList {
   display: flex;

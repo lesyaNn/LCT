@@ -65,7 +65,7 @@ function SidebarContent({ role, pathname, collapsed, mobile = false, onToggleCol
       </nav>
 
       <div className={styles.bottom}>
-        {(!collapsed || mobile) && <p className={styles.version}>CRM v0.1 · mock frontend</p>}
+        {(!collapsed || mobile) && <p className={styles.version}>CRM ИТ-Школа Ростелеком</p>}
         {!mobile && onToggleCollapse && <IconButton icon="chevron-right" label={collapsed ? 'Развернуть меню' : 'Свернуть меню'} className={`${styles.collapseButton} ${collapsed ? styles.collapseButtonRotated : ''}`} onClick={onToggleCollapse} />}
       </div>
     </div>

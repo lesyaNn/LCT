@@ -8,7 +8,7 @@ import styles from './breadcrumbs.module.css';
 
 function getBreadcrumbs(pathname: string): BreadcrumbEntry[] {
   const segments = pathname.split('/').filter(Boolean);
-  if (segments.length === 0) return [{ label: 'Dashboard' }];
+  if (segments.length === 0) return [{ label: 'Обзор' }];
 
   if (segments[0] === 'admin' && segments[1] === 'workflow' && segments[2] === 'templates') {
     const entries: BreadcrumbEntry[] = [

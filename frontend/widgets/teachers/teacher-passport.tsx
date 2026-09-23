@@ -104,7 +104,7 @@ function TeacherHeader({ id, teacher }: { id: string; teacher: TeacherPassportPr
           </div>
         </div>
         <div className={styles.statusPanel} aria-label="Готовность преподавателя">
-          <div className={styles.statusPanelTop}><span className={styles.overline}>Readiness</span></div>
+          <div className={styles.statusPanelTop}><span className={styles.overline}>Готовность</span></div>
           <ReadinessBadge readiness={teacher.readiness} reason={teacher.readinessReason} size="lg" showDetails />
           <div className={styles.nextTraining}><TimeStroke size={18} fill="currentColor" aria-hidden="true" /><div><span>Следующее повышение квалификации</span>{!teacher.qualificationRequired ? <strong>Повышение не требуется</strong> : teacher.nextTrainingDate ? <><strong>{formatDateRu(teacher.nextTrainingDate)}</strong><StatusBadge intent={upcomingDateIntent[nextTrainingStatus]} variant="inline">{formatDaysUntilRu(teacher.nextTrainingDate)}</StatusBadge></> : <strong>Данные отсутствуют</strong>}</div></div>
           <div className={styles.headerActions} aria-label="Действия с преподавателем">
