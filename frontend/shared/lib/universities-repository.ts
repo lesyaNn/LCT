@@ -2,6 +2,7 @@ import { getHealthStatus, type HealthStatus } from './health-score';
 import { programStatusLabels, type ProgramStatus } from './dashboard-repository';
 import { getExpirationStatus, type ExpirationStatus } from './formatters';
 import { apiFetch } from './api-client';
+import { ApiRequestError } from './api-errors';
 
 export type { ProgramStatus };
 
@@ -375,13 +376,10 @@ export const universityWorkflowQueryKey = workflowQueryKey;
 export const workflowCommentsQueryKey = (instanceId: string) => [...workflowQueryKey(instanceId), 'comments'] as const;
 export const universityPassportQueryKey = (id: string) => ['university-passport', id] as const;
 
-export class WorkflowApiError extends Error {
-  readonly status: number;
-
-  constructor(status: number, message: string) {
-    super(message);
+export class WorkflowApiError extends ApiRequestError {
+  constructor(status: number, message: string, body?: unknown, transportMessage?: string) {
+    super(status, body, message, transportMessage);
     this.name = 'WorkflowApiError';
-    this.status = status;
   }
 }
 
@@ -404,7 +402,7 @@ export function isWorkflowApiInstanceId(instanceId: string): boolean {
 
 function unwrapApiResult<T>(result: Awaited<ReturnType<typeof apiFetch<T>>>): T {
   if (result.ok) return result.data;
-  throw new WorkflowApiError(result.status, result.error || 'Не удалось выполнить действие Workflow.');
+  throw new WorkflowApiError(result.status, 'Не удалось выполнить действие Workflow.', result.body, result.error);
 }
 
 export async function listWorkflowComments(instanceId: string): Promise<WorkflowCommentApiRecord[]> {
@@ -451,9 +449,9 @@ export async function getWorkflowInstance(instanceId: string): Promise<WorkflowI
   return unwrapApiResult(await apiFetch<WorkflowInstanceApiRecord>(`/api/v1/workflow/instances/${instanceId}`));
 }
 
-export async function transitionWorkflowInstance(instanceId: string, targetInstanceStageId: string, comment: string): Promise<WorkflowInstanceApiRecord> {
+export async function transitionWorkflowInstance(instanceId: string, targetInstanceStageId: string, comment: string, dueDate?: string): Promise<WorkflowInstanceApiRecord> {
   if (!isWorkflowApiInstanceId(instanceId)) throw new WorkflowApiError(0, 'Переход недоступен для этого Workflow-источника.');
-  return unwrapApiResult(await apiFetch<WorkflowInstanceApiRecord>(`/api/v1/workflow/instances/${instanceId}/transition`, { method: 'POST', body: { target_instance_stage_id: targetInstanceStageId, comment } }));
+  return unwrapApiResult(await apiFetch<WorkflowInstanceApiRecord>(`/api/v1/workflow/instances/${instanceId}/transition`, { method: 'POST', body: { target_instance_stage_id: targetInstanceStageId, comment, ...(dueDate ? { due_date: dueDate } : {}) } }));
 }
 
 export async function editWorkflowComment(commentId: string, content: string): Promise<WorkflowCommentApiRecord> {

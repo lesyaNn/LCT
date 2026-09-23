@@ -1,5 +1,6 @@
 import type { AuthUser } from '@/shared/types/user';
 import { apiUploadFormData } from './api-client';
+import { ApiRequestError, ERROR_MESSAGES } from './api-errors';
 import { isWorkflowApiInstanceId, workflowAttachmentDownloadUrl, type UniversityWorkflowAttachment } from './universities-repository';
 
 export type WorkflowAttachmentCategory = 'pdf' | 'image' | 'archive' | 'document' | 'spreadsheet' | 'other';
@@ -81,14 +82,14 @@ export function validateWorkflowUploadFile(file: Pick<File, 'name' | 'size' | 't
   if (!name || name === '.' || name === '..' || name.length > MAX_UPLOAD_FILENAME_LENGTH || unsafeFilename.test(file.name) || name !== file.name.replace(/^[ .]+|[ .]+$/g, '') || /^[a-zA-Z]:/.test(name)) {
     return { valid: false, code: 'name', message: 'Некорректное имя файла' };
   }
-  if (file.size === 0) return { valid: false, code: 'empty', message: 'Файл пустой' };
-  if (file.size > MAX_UPLOAD_FILE_SIZE_BYTES) return { valid: false, code: 'too-large', message: 'Максимальный размер файла — 50 MB' };
+  if (file.size === 0) return { valid: false, code: 'empty', message: 'Файл пустой.' };
+  if (file.size > MAX_UPLOAD_FILE_SIZE_BYTES) return { valid: false, code: 'too-large', message: ERROR_MESSAGES.FILE_TOO_LARGE };
 
   const extension = getFileExtension(name);
   const definition = WORKFLOW_FILE_TYPES.find((item) => item.uploadAllowed && item.extensions.includes(extension));
-  if (!definition) return { valid: false, code: 'type', message: 'Недопустимый формат файла' };
+  if (!definition) return { valid: false, code: 'type', message: ERROR_MESSAGES.FILE_TYPE_NOT_ALLOWED };
   const mime = file.type.split(';', 1)[0].trim().toLowerCase();
-  if (mime && !definition.mimeTypes.includes(mime)) return { valid: false, code: 'type', message: 'Тип файла не соответствует его расширению' };
+  if (mime && !definition.mimeTypes.includes(mime)) return { valid: false, code: 'type', message: ERROR_MESSAGES.FILE_TYPE_NOT_ALLOWED };
   return { valid: true, type: definition };
 }
 
@@ -103,28 +104,19 @@ export interface WorkflowAttachmentApiRecord {
   updated_at: string;
 }
 
-export class WorkflowAttachmentUploadError extends Error {
-  constructor(message: string, readonly status: number) {
-    super(message);
+export class WorkflowAttachmentUploadError extends ApiRequestError {
+  constructor(status: number, body: unknown, message: string, transportMessage?: string) {
+    super(status, body, message, transportMessage);
     this.name = 'WorkflowAttachmentUploadError';
   }
 }
 
-function uploadErrorMessage(status: number): string {
-  if (status === 401) return 'Сессия истекла. Войдите снова.';
-  if (status === 403) return 'Нет прав на загрузку файлов.';
-  if (status === 404) return 'Workflow не найден.';
-  if (status === 413) return 'Максимальный размер файла — 50 MB.';
-  if (status === 415 || status === 422) return 'Сервер отклонил тип или имя файла.';
-  return 'Не удалось загрузить файл. Попробуйте ещё раз.';
-}
-
 export async function uploadWorkflowAttachment(instanceId: string, file: File, options: { signal: AbortSignal; onProgress: (progress: number) => void }): Promise<WorkflowAttachmentApiRecord> {
-  if (!isWorkflowApiInstanceId(instanceId)) throw new WorkflowAttachmentUploadError('Загрузка недоступна для этого Workflow.', 0);
+  if (!isWorkflowApiInstanceId(instanceId)) throw new WorkflowAttachmentUploadError(0, undefined, 'Загрузка недоступна для этого Workflow.');
   const body = new FormData();
   body.append('file', file, file.name);
   const result = await apiUploadFormData<WorkflowAttachmentApiRecord>(`/api/v1/workflow/instances/${instanceId}/attachments`, body, options);
-  if (!result.ok) throw new WorkflowAttachmentUploadError(uploadErrorMessage(result.status), result.status);
+  if (!result.ok) throw new WorkflowAttachmentUploadError(result.status, result.body, 'Не удалось загрузить файл.', result.error);
   return result.data;
 }
 

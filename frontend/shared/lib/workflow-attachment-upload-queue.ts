@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { uploadWorkflowAttachment, validateWorkflowUploadFile, type WorkflowAttachmentApiRecord } from './workflow-attachments';
+import { normalizeApiError, type NormalizedApiError } from './api-errors';
 
 export const WORKFLOW_UPLOAD_MAX_CONCURRENCY = 3;
 
@@ -22,7 +23,7 @@ function createQueueId(): string {
   return `upload:${random}`;
 }
 
-export function useAttachmentUploadQueue({ instanceId, onSuccess, onServerError }: { instanceId: string; onSuccess: (attachment: WorkflowAttachmentApiRecord) => void; onServerError?: (message: string) => void }) {
+export function useAttachmentUploadQueue({ instanceId, onSuccess, onServerError }: { instanceId: string; onSuccess: (attachment: WorkflowAttachmentApiRecord) => void; onServerError?: (error: NormalizedApiError) => void }) {
   const [items, setItems] = useState<WorkflowUploadQueueItem[]>([]);
   const controllers = useRef(new Map<string, AbortController>());
   const removalTimers = useRef(new Map<string, number>());
@@ -73,9 +74,10 @@ export function useAttachmentUploadQueue({ instanceId, onSuccess, onServerError 
       removeAfter(item.id, 700);
     }).catch((cause: unknown) => {
       if (!mounted.current || controller.signal.aborted || (cause instanceof DOMException && cause.name === 'AbortError')) return;
-      const message = cause instanceof Error ? cause.message : 'Не удалось загрузить файл.';
-      setItems((current) => current.map((candidate) => candidate.id === item.id ? { ...candidate, status: 'error', error: message, progress: 0, validationError: false, serverAttachmentId: undefined } : candidate));
-      onServerError?.(message);
+      const normalized = normalizeApiError(cause);
+      const validationError = normalized.code === 'FILE_TYPE_NOT_ALLOWED' || normalized.code === 'FILE_TOO_LARGE' || normalized.kind === 'validation';
+      setItems((current) => current.map((candidate) => candidate.id === item.id ? { ...candidate, status: 'error', error: normalized.message, progress: 0, validationError, serverAttachmentId: undefined } : candidate));
+      if (!validationError) onServerError?.(normalized);
     }).finally(() => {
       controllers.current.delete(item.id);
     });

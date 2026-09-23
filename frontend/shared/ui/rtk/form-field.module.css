@@ -1,0 +1,8 @@
+.field { display: flex; flex-direction: column; gap: var(--rtk-space-2); min-width: 0; }
+.field > label { color: var(--rtk-color-text-secondary); font-size: 13px; font-weight: 650; }
+.field sup { color: var(--atmr-error-default); }
+.hint { color: var(--rtk-color-text-tertiary); font-size: 11px; line-height: 1.4; }
+.error { align-items: flex-start; color: var(--atmr-error-on-container); display: inline-flex; font-size: 12px; gap: var(--rtk-space-1); line-height: 1.4; overflow-wrap: anywhere; }
+.error svg { flex: 0 0 auto; margin-top: 1px; }
+.banner { align-items: center; background: var(--atmr-error-container-soft); border-radius: var(--rtk-radius-small); color: var(--atmr-error-on-container); display: flex; font-size: 12px; font-weight: 650; gap: var(--rtk-space-2); line-height: 1.4; padding: var(--rtk-space-2) var(--rtk-space-3); }
+.banner svg { flex: 0 0 auto; }

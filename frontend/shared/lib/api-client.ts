@@ -4,7 +4,7 @@ import { ensureKeycloak, expireKeycloakSession, isKeycloakMode, refreshKeycloakT
 
 export type ApiResult<T> =
   | { ok: true; status: number; data: T }
-  | { ok: false; status: number; error: string };
+  | { ok: false; status: number; error: string; body?: unknown };
 
 export type ApiOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -47,7 +47,9 @@ async function request<T>(path: string, options: ApiOptions, token?: string): Pr
 
   if (!response.ok) {
     const text = await response.text().catch(() => '');
-    return { ok: false, status: response.status, error: `${response.status} ${text}`.trim() };
+    let body: unknown;
+    try { body = text ? JSON.parse(text) : undefined; } catch { body = undefined; }
+    return { ok: false, status: response.status, error: `HTTP ${response.status}`, body };
   }
 
   const contentType = response.headers.get('content-type') ?? '';
@@ -144,7 +146,9 @@ export async function apiUploadFormData<T>(path: string, body: FormData, options
       cleanup();
       if (xhr.status === 401 && keycloak) void expireKeycloakSession();
       if (xhr.status < 200 || xhr.status >= 300) {
-        resolve({ ok: false, status: xhr.status, error: `${xhr.status} ${xhr.responseText}`.trim() });
+        let body: unknown;
+        try { body = xhr.responseText ? JSON.parse(xhr.responseText) : undefined; } catch { body = undefined; }
+        resolve({ ok: false, status: xhr.status, error: `HTTP ${xhr.status}`, body });
         return;
       }
       const contentType = xhr.getResponseHeader('content-type') ?? '';

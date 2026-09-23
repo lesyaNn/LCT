@@ -1,4 +1,5 @@
 import { apiFetch } from './api-client';
+import { ApiRequestError } from './api-errors';
 
 interface WorkflowTemplateStageApiRecord {
   id: string;
@@ -88,9 +89,9 @@ export interface UpdateWorkflowStageInput {
   slaDays?: number | null;
 }
 
-export class WorkflowTemplateApiError extends Error {
-  constructor(message: string, readonly status: number) {
-    super(message);
+export class WorkflowTemplateApiError extends ApiRequestError {
+  constructor(status: number, body: unknown, message: string, transportMessage?: string) {
+    super(status, body, message, transportMessage);
     this.name = 'WorkflowTemplateApiError';
   }
 }
@@ -133,27 +134,19 @@ function templateFromApi(item: WorkflowTemplateDetailApiRecord): WorkflowTemplat
   };
 }
 
-function messageForError(error: string, fallback: string): string {
-  if (error.includes('Workflow template not found')) return 'Шаблон Workflow не найден.';
-  if (error.includes('Workflow stage not found')) return 'Этап Workflow не найден.';
-  if (error.startsWith('403')) return 'Недостаточно прав для управления шаблонами.';
-  if (error.startsWith('409') || error.includes('uq_workflow_templates_name')) return 'Шаблон с таким названием уже существует.';
-  return fallback;
-}
-
-function fail(status: number, error: string, fallback: string): never {
-  throw new WorkflowTemplateApiError(messageForError(error, fallback), status);
+function fail(status: number, body: unknown, error: string, fallback: string): never {
+  throw new WorkflowTemplateApiError(status, body, fallback, error);
 }
 
 export async function listWorkflowTemplates(page = 1, pageSize = 100, signal?: AbortSignal): Promise<WorkflowTemplatePage> {
   const result = await apiFetch<PaginatedApiResponse<WorkflowTemplateApiRecord>>(`/api/v1/workflow/templates?page=${page}&page_size=${pageSize}`, { signal });
-  if (!result.ok) return fail(result.status, result.error, 'Не удалось загрузить шаблоны Workflow.');
+  if (!result.ok) return fail(result.status, result.body, result.error, 'Не удалось загрузить шаблоны Workflow.');
   return { items: result.data.items.map(templateSummaryFromApi), page: result.data.page, pageSize: result.data.page_size, total: result.data.total };
 }
 
 export async function getWorkflowTemplate(templateId: string, signal?: AbortSignal): Promise<WorkflowTemplate> {
   const result = await apiFetch<WorkflowTemplateDetailApiRecord>(`/api/v1/workflow/templates/${encodeURIComponent(templateId)}`, { signal });
-  if (!result.ok) return fail(result.status, result.error, 'Не удалось загрузить шаблон Workflow.');
+  if (!result.ok) return fail(result.status, result.body, result.error, 'Не удалось загрузить шаблон Workflow.');
   return templateFromApi(result.data);
 }
 
@@ -162,7 +155,7 @@ export async function createWorkflowTemplate(input: CreateWorkflowTemplateInput)
     method: 'POST',
     body: { name: input.name, description: input.description },
   });
-  if (!result.ok) return fail(result.status, result.error, 'Не удалось создать шаблон Workflow.');
+  if (!result.ok) return fail(result.status, result.body, result.error, 'Не удалось создать шаблон Workflow.');
   return templateFromApi(result.data);
 }
 
@@ -177,7 +170,7 @@ export async function addWorkflowStage(templateId: string, input: CreateWorkflow
       ...(input.orderIndex === undefined ? {} : { order_index: input.orderIndex }),
     },
   });
-  if (!result.ok) return fail(result.status, result.error, 'Не удалось добавить этап.');
+  if (!result.ok) return fail(result.status, result.body, result.error, 'Не удалось добавить этап.');
   return stageFromApi(result.data);
 }
 
@@ -190,6 +183,6 @@ export async function updateWorkflowStage(templateId: string, stageId: string, i
   if (input.isActive !== undefined) body.is_active = input.isActive;
   if (input.slaDays !== undefined) body.sla_days = input.slaDays;
   const result = await apiFetch<WorkflowTemplateStageApiRecord>(`/api/v1/workflow/templates/${encodeURIComponent(templateId)}/stages/${encodeURIComponent(stageId)}`, { method: 'PATCH', body });
-  if (!result.ok) return fail(result.status, result.error, 'Не удалось сохранить этап.');
+  if (!result.ok) return fail(result.status, result.body, result.error, 'Не удалось сохранить этап.');
   return stageFromApi(result.data);
 }

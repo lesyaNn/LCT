@@ -13,6 +13,7 @@ import CloseLarge from '@atomaro/icons/24/navigation/CloseLarge';
 import { IconButton } from '@/shared/ui/rtk/icon-button';
 import { Input, NumberStepper, Switch } from '@/shared/ui/rtk/form-controls';
 import { Tooltip } from '@/shared/ui/rtk/tooltip';
+import { normalizeApiError } from '@/shared/lib/api-errors';
 import type { UpdateWorkflowStageInput, WorkflowTemplateStage } from '@/shared/lib/workflow-templates-repository';
 import styles from './workflow-template-editor.module.css';
 
@@ -59,7 +60,8 @@ export function WorkflowStageRow({ stage, index, count, saving, orderDirty, onMo
       await onUpdate(stage.id, { name }, 'Название этапа изменено');
       setEditingName(false);
     } catch (cause) {
-      setNameError(cause instanceof Error ? cause.message : 'Не удалось сохранить название.');
+      const normalized = normalizeApiError(cause, { defaultCode: 'DUPLICATE_ENTITY' });
+      setNameError(normalized.code === 'DUPLICATE_ENTITY' ? 'Этап с таким названием уже существует.' : normalized.message);
     } finally {
       savingNameRef.current = false;
     }
@@ -92,7 +94,7 @@ export function WorkflowStageRow({ stage, index, count, saving, orderDirty, onMo
     </div>
     <span className={styles.orderCell} data-label="№">{index + 1}</span>
     <div className={styles.nameCell} data-label="Название">
-      {editingName ? <div className={styles.nameEditor}><Input autoFocus value={nameDraft} maxLength={512} required aria-required="true" disabled={saving} aria-label={`Название этапа ${index + 1}`} aria-invalid={Boolean(nameError)} onFocus={(event) => event.currentTarget.select()} onChange={(event) => { setNameDraft(event.target.value); if (nameError) setNameError(''); }} onKeyDown={handleNameKeyDown} onBlur={() => { if (!saving) void saveName(); }} /><IconButton icon={<CheckLarge size={18} fill="currentColor" />} label="Сохранить название" size={18} disabled={saving} onMouseDown={(event) => event.preventDefault()} onClick={() => void saveName()} /><IconButton icon={<CloseLarge size={18} fill="currentColor" />} label="Отменить редактирование" size={18} disabled={saving} onMouseDown={(event) => event.preventDefault()} onClick={cancelName} />{nameError ? <small className={styles.inlineError} role="alert">{nameError}</small> : null}</div> : <div className={styles.nameDisplay}><span>{stage.name}</span>{stage.description ? <small>{stage.description}</small> : null}<IconButton icon={<Edit size={18} fill="currentColor" />} label={`Изменить название этапа «${stage.name}»`} size={18} disabled={saving || orderDirty} onClick={() => { setNameDraft(stage.name); setNameError(''); setEditingName(true); }} /></div>}
+      {editingName ? <div className={styles.nameEditor}><Input autoFocus value={nameDraft} maxLength={512} required aria-required="true" disabled={saving} aria-label={`Название этапа ${index + 1}`} aria-invalid={Boolean(nameError)} aria-describedby={nameError ? `${stage.id}-name-error` : undefined} onFocus={(event) => event.currentTarget.select()} onChange={(event) => { setNameDraft(event.target.value); if (nameError) setNameError(''); }} onKeyDown={handleNameKeyDown} onBlur={() => { if (!saving) void saveName(); }} /><IconButton icon={<CheckLarge size={18} fill="currentColor" />} label="Сохранить название" size={18} disabled={saving} onMouseDown={(event) => event.preventDefault()} onClick={() => void saveName()} /><IconButton icon={<CloseLarge size={18} fill="currentColor" />} label="Отменить редактирование" size={18} disabled={saving} onMouseDown={(event) => event.preventDefault()} onClick={cancelName} />{nameError ? <small id={`${stage.id}-name-error`} className={styles.inlineError} role="alert">{nameError}</small> : null}</div> : <div className={styles.nameDisplay}><span>{stage.name}</span>{stage.description ? <small>{stage.description}</small> : null}<IconButton icon={<Edit size={18} fill="currentColor" />} label={`Изменить название этапа «${stage.name}»`} size={18} disabled={saving || orderDirty} onClick={() => { setNameDraft(stage.name); setNameError(''); setEditingName(true); }} /></div>}
     </div>
     <div className={styles.controlCell} data-label="Обязательный"><Switch checked={stage.isRequired} label={`Этап «${stage.name}» обязательный`} disabled={saving || orderDirty} onChange={(checked) => { void onUpdate(stage.id, { isRequired: checked }).catch(() => undefined); }} /></div>
     <div className={styles.controlCell} data-label="Активный"><Switch checked={stage.isActive} label={`Этап «${stage.name}» активен`} disabled={saving || orderDirty} onChange={(checked) => { void onUpdate(stage.id, { isActive: checked }, checked ? 'Этап включён' : 'Этап отключён').catch(() => undefined); }} /></div>

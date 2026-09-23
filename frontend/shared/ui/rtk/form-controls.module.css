@@ -27,5 +27,6 @@
 .stepper button:first-child { border-radius: var(--rtk-radius-small) 0 0 var(--rtk-radius-small); }
 .stepper button:last-child { border-radius: 0 var(--rtk-radius-small) var(--rtk-radius-small) 0; }
 .stepper input { border-left: 0; border-right: 0; min-width: 42px; padding: 0 4px; text-align: center; width: 52px; }
+.stepper input[aria-invalid="true"] { border-bottom-color: var(--atmr-error-default); border-top-color: var(--atmr-error-default); }
 .stepper input::-webkit-inner-spin-button, .stepper input::-webkit-outer-spin-button { appearance: none; margin: 0; }
 .stepper button:disabled, .stepper input:disabled { cursor: not-allowed; opacity: .48; }

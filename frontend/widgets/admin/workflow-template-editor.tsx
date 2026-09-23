@@ -8,6 +8,7 @@ import AddLarge from '@atomaro/icons/24/action/AddLarge';
 import CheckLarge from '@atomaro/icons/24/navigation/CheckLarge';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { moveWorkflowStage } from '@/shared/lib/workflow-template-cache';
+import { normalizeApiError } from '@/shared/lib/api-errors';
 import { useAddWorkflowStage, useSaveWorkflowStageOrder, useUpdateWorkflowStage } from '@/shared/lib/workflow-template-mutations';
 import { getWorkflowTemplate, workflowTemplateDetailQueryKey, type CreateWorkflowStageInput, type UpdateWorkflowStageInput, type WorkflowTemplate, type WorkflowTemplateStage } from '@/shared/lib/workflow-templates-repository';
 import { Button } from '@/shared/ui/rtk/button';
@@ -40,7 +41,6 @@ export function WorkflowTemplateEditor({ templateId }: { templateId: string }) {
   const [orderDirty, setOrderDirty] = useState(false);
   const [activeStageId, setActiveStageId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
-  const [addError, setAddError] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [confirmationError, setConfirmationError] = useState<string | null>(null);
   const [notification, setNotification] = useState<Notification | null>(null);
@@ -93,7 +93,7 @@ export function WorkflowTemplateEditor({ templateId }: { templateId: string }) {
       setNotification({ intent: 'success', title: 'Порядок сохранён' });
     } catch (cause) {
       setOrderDirty(false);
-      setNotification({ intent: 'error', title: 'Не удалось сохранить порядок', message: cause instanceof Error ? cause.message : undefined });
+      setNotification({ intent: 'error', title: 'Не удалось сохранить порядок', message: normalizeApiError(cause).message });
     }
   };
 
@@ -102,22 +102,15 @@ export function WorkflowTemplateEditor({ templateId }: { templateId: string }) {
       await updateStage.mutateAsync({ stageId, patch });
       if (successTitle) setNotification({ intent: 'success', title: successTitle });
     } catch (cause) {
-      setNotification({ intent: 'error', title: 'Изменение не сохранено', message: cause instanceof Error ? cause.message : undefined });
+      if (patch.name === undefined) setNotification({ intent: 'error', title: 'Изменение не сохранено', message: normalizeApiError(cause).message });
       throw cause;
     }
   };
 
   const createStage = async (input: CreateWorkflowStageInput) => {
-    setAddError(null);
-    try {
-      await addStage.mutateAsync(input);
-      setAddOpen(false);
-      setNotification({ intent: 'success', title: 'Этап добавлен' });
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : 'Не удалось добавить этап.';
-      setAddError(message);
-      setNotification({ intent: 'error', title: 'Этап не добавлен', message });
-    }
+    await addStage.mutateAsync(input);
+    setAddOpen(false);
+    setNotification({ intent: 'success', title: 'Этап добавлен' });
   };
 
   const confirmRetire = async () => {
@@ -128,11 +121,11 @@ export function WorkflowTemplateEditor({ templateId }: { templateId: string }) {
       setConfirmation(null);
       setNotification({ intent: 'success', title: 'Этап удалён из активного шаблона' });
     } catch (cause) {
-      setConfirmationError(cause instanceof Error ? cause.message : 'Не удалось отключить этап.');
+      setConfirmationError(normalizeApiError(cause).message);
     }
   };
 
   const savingStageId = updateStage.isPending ? updateStage.variables?.stageId : undefined;
 
-  return <div className={styles.page}><EditorHeader template={template} dirty={orderDirty} savingOrder={saveOrder.isPending} onAdd={() => { setAddError(null); setAddOpen(true); }} onSaveOrder={() => void persistOrder()} onCancelOrder={cancelOrder} /><span className={styles.srOnly} aria-live="polite">{announcement}</span><section className={styles.stageSurface} aria-labelledby="workflow-stages-heading"><div className={styles.surfaceHeader}><div><h2 id="workflow-stages-heading">Этапы</h2><p>{stages.length} {stages.length === 1 ? 'этап' : 'этапов'} в шаблоне</p></div>{!orderDirty ? <Button type="button" variant="secondary" size="s" onClick={() => { setAddError(null); setAddOpen(true); }}><AddLarge size={16} fill="currentColor" />Добавить этап</Button> : null}</div>{stages.length ? <><div className={styles.columnHeader} aria-hidden="true"><span /><span>№</span><span>Название</span><span>Обяз.</span><span>Активен</span><span>Оценка дней</span><span>Действия</span></div><DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragCancel={() => setActiveStageId(null)} onDragEnd={handleDragEnd}><SortableContext items={stages.map((stage) => stage.id)} strategy={verticalListSortingStrategy}><ol className={styles.stageList}>{stages.map((stage, index) => <WorkflowStageRow key={stage.id} stage={stage} index={index} count={stages.length} saving={savingStageId === stage.id || saveOrder.isPending} orderDirty={orderDirty} onMove={reorderStages} onUpdate={update} onDelete={(item) => { setConfirmationError(null); setConfirmation({ stage: item, mode: 'delete' }); }} />)}</ol></SortableContext><DragOverlay>{activeStage ? <div className={styles.dragOverlay}>{activeStage.orderIndex}. {activeStage.name}</div> : null}</DragOverlay></DndContext></> : <div className={styles.emptyState}><h3>В шаблоне пока нет этапов</h3><p>Добавьте первый этап, чтобы начать настройку маршрута.</p><Button type="button" variant="primary" size="m" onClick={() => setAddOpen(true)}><AddLarge size={18} fill="currentColor" />Добавить этап</Button></div>}</section>{addOpen ? <AddStageModal stages={stages.filter((stage) => !stage.id.startsWith('temp:stage:'))} pending={addStage.isPending} error={addError} onClose={() => { if (!addStage.isPending) setAddOpen(false); }} onSubmit={createStage} /> : null}{confirmation ? <StageConfirmationModal stage={confirmation.stage} mode={confirmation.mode} pending={updateStage.isPending} error={confirmationError} onClose={() => { if (!updateStage.isPending) setConfirmation(null); }} onConfirm={() => void confirmRetire()} /> : null}{notification ? <div className={styles.toastViewport}><Toast intent={notification.intent} title={notification.title} message={notification.message} onClose={() => setNotification(null)} /></div> : null}</div>;
+  return <div className={styles.page}><EditorHeader template={template} dirty={orderDirty} savingOrder={saveOrder.isPending} onAdd={() => setAddOpen(true)} onSaveOrder={() => void persistOrder()} onCancelOrder={cancelOrder} /><span className={styles.srOnly} aria-live="polite">{announcement}</span><section className={styles.stageSurface} aria-labelledby="workflow-stages-heading"><div className={styles.surfaceHeader}><div><h2 id="workflow-stages-heading">Этапы</h2><p>{stages.length} {stages.length === 1 ? 'этап' : 'этапов'} в шаблоне</p></div>{!orderDirty ? <Button type="button" variant="secondary" size="s" onClick={() => setAddOpen(true)}><AddLarge size={16} fill="currentColor" />Добавить этап</Button> : null}</div>{stages.length ? <><div className={styles.columnHeader} aria-hidden="true"><span /><span>№</span><span>Название</span><span>Обяз.</span><span>Активен</span><span>Оценка дней</span><span>Действия</span></div><DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragCancel={() => setActiveStageId(null)} onDragEnd={handleDragEnd}><SortableContext items={stages.map((stage) => stage.id)} strategy={verticalListSortingStrategy}><ol className={styles.stageList}>{stages.map((stage, index) => <WorkflowStageRow key={stage.id} stage={stage} index={index} count={stages.length} saving={savingStageId === stage.id || saveOrder.isPending} orderDirty={orderDirty} onMove={reorderStages} onUpdate={update} onDelete={(item) => { setConfirmationError(null); setConfirmation({ stage: item, mode: 'delete' }); }} />)}</ol></SortableContext><DragOverlay>{activeStage ? <div className={styles.dragOverlay}>{activeStage.orderIndex}. {activeStage.name}</div> : null}</DragOverlay></DndContext></> : <div className={styles.emptyState}><h3>В шаблоне пока нет этапов</h3><p>Добавьте первый этап, чтобы начать настройку маршрута.</p><Button type="button" variant="primary" size="m" onClick={() => setAddOpen(true)}><AddLarge size={18} fill="currentColor" />Добавить этап</Button></div>}</section>{addOpen ? <AddStageModal stages={stages.filter((stage) => !stage.id.startsWith('temp:stage:'))} pending={addStage.isPending} onClose={() => { if (!addStage.isPending) setAddOpen(false); }} onSubmit={createStage} onError={(error) => setNotification({ intent: 'error', title: 'Этап не добавлен', message: error.message })} /> : null}{confirmation ? <StageConfirmationModal stage={confirmation.stage} mode={confirmation.mode} pending={updateStage.isPending} error={confirmationError} onClose={() => { if (!updateStage.isPending) setConfirmation(null); }} onConfirm={() => void confirmRetire()} /> : null}{notification ? <div className={styles.toastViewport}><Toast intent={notification.intent} title={notification.title} message={notification.message} onClose={() => setNotification(null)} /></div> : null}</div>;
 }
