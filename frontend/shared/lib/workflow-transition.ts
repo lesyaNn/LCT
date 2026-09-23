@@ -1,4 +1,4 @@
-import type { UniversityWorkflowStage } from './universities-repository';
+import type { UniversityWorkflow, UniversityWorkflowStage } from './universities-repository';
 
 export const WORKFLOW_TRANSITION_DRAFT_VERSION = 1;
 
@@ -23,6 +23,34 @@ export function getAvailableWorkflowTransitionTargets(stages: UniversityWorkflow
     .filter((target) => target.status !== 'completed' && target.status !== 'skipped')
     .filter((target) => ordered.filter((stage) => stage.orderIndex > currentStage.orderIndex && stage.orderIndex < target.orderIndex).every((stage) => stage.isOptional === true))
     .map((target) => ({ id: target.id, orderIndex: target.orderIndex, name: target.name }));
+}
+
+/**
+ * Apply the visual part of a forward transition to a cached workflow snapshot.
+ * The server remains authoritative; this helper only supplies the immediate UI
+ * state and is paired with a mutation snapshot for exact rollback.
+ */
+export function applyOptimisticWorkflowTransition(workflow: UniversityWorkflow, targetStageId: string, occurredAt = new Date().toISOString()): UniversityWorkflow {
+  const currentStage = workflow.stages.find((stage) => stage.status === 'current') ?? workflow.currentStage;
+  const targetStage = workflow.stages.find((stage) => stage.id === targetStageId);
+  if (!currentStage || !targetStage || targetStage.orderIndex <= currentStage.orderIndex) return workflow;
+  const completion = currentStage.deadline && occurredAt.slice(0, 10) > currentStage.deadline ? 'late' as const : 'on_time' as const;
+
+  const stages = workflow.stages.map((stage) => {
+    if (stage.id === currentStage.id) return { ...stage, status: 'completed' as const, completedAt: occurredAt, completion };
+    if (stage.id === targetStage.id) return { ...stage, status: 'current' as const, startedAt: occurredAt, completedAt: null, completion: null };
+    if (stage.orderIndex > currentStage.orderIndex && stage.orderIndex < targetStage.orderIndex && stage.isOptional) {
+      return { ...stage, status: 'skipped' as const, completedAt: occurredAt, completion: 'on_time' as const };
+    }
+    return stage;
+  });
+
+  return {
+    ...workflow,
+    currentStage: stages.find((stage) => stage.id === targetStage.id) ?? targetStage,
+    completedSteps: stages.filter((stage) => stage.status === 'completed' || stage.status === 'skipped').length,
+    stages,
+  };
 }
 
 export function workflowTransitionDraftKey(instanceId: string, currentStageId: string, userId?: string | null): string {

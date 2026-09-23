@@ -14,8 +14,9 @@ import Trash from '@atomaro/icons/24/action/Trash';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/shared/auth/AuthProvider';
 import { formatRelativeDateRu, formatFileSize } from '@/shared/lib/formatters';
-import { deleteWorkflowAttachment, isWorkflowApiInstanceId, workflowAttachmentDownloadUrl, workflowQueryKey, type UniversityWorkflowAttachment } from '@/shared/lib/universities-repository';
+import { deleteWorkflowAttachment, isWorkflowApiInstanceId, workflowAttachmentDownloadUrl, type UniversityWorkflowAttachment } from '@/shared/lib/universities-repository';
 import { canDeleteWorkflowAttachment, getWorkflowAttachmentCategory, isWorkflowImageAttachment, type WorkflowAttachmentCategory } from '@/shared/lib/workflow-attachments';
+import { invalidateWorkflowDetail } from '@/shared/lib/workflow-cache';
 import { Avatar } from '@/shared/ui/rtk/avatar';
 import { Button } from '@/shared/ui/rtk/button';
 import { Modal } from '@/shared/ui/rtk/modal';
@@ -58,6 +59,6 @@ export function WorkflowAttachments({ instanceId, attachments }: { instanceId: s
   const [selectedImage, setSelectedImage] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const images = useMemo(() => attachments.filter((attachment) => isWorkflowImageAttachment(attachment.mimeType, attachment.fileName) && attachment.previewUrl), [attachments]);
-  const remove = useMutation({ mutationFn: (attachment: UniversityWorkflowAttachment) => deleteWorkflowAttachment(instanceId, attachment.id), onSuccess: async () => { setDeleteCandidate(null); await queryClient.invalidateQueries({ queryKey: workflowQueryKey(instanceId) }); }, onError: (cause: Error) => setError(cause.message) });
+  const remove = useMutation({ mutationFn: (attachment: UniversityWorkflowAttachment) => deleteWorkflowAttachment(instanceId, attachment.id), onSuccess: async () => { setDeleteCandidate(null); await invalidateWorkflowDetail(queryClient, instanceId); }, onError: (cause: Error) => setError(cause.message) });
   return <section className={styles.section} aria-labelledby={`${instanceId}-attachments-title`}><div className={styles.heading}><h3 id={`${instanceId}-attachments-title`}><Attachment size={18} fill="currentColor" />Вложения <span className={styles.count}>{attachments.length}</span></h3></div>{attachments.length ? <ul className={styles.list}>{attachments.map((attachment) => <AttachmentRow key={attachment.id} attachment={attachment} instanceId={instanceId} canDelete={canDeleteWorkflowAttachment(attachment, user) && isWorkflowApiInstanceId(instanceId)} onOpen={() => { const index = images.findIndex((image) => image.id === attachment.id); if (index >= 0) setSelectedImage(index); }} onDelete={setDeleteCandidate} />)}</ul> : <p className={styles.empty}>Вложений пока нет</p>}{deleteCandidate ? <Modal title="Удалить вложение?" onClose={() => setDeleteCandidate(null)}><p className={styles.confirmText}>Файл «{deleteCandidate.fileName}» будет удалён. Это действие нельзя отменить.</p><div className={styles.confirmActions}><Button variant="ghost" size="s" type="button" onClick={() => setDeleteCandidate(null)}>Отмена</Button><Button variant="primary" size="s" type="button" disabled={remove.isPending} onClick={() => { setError(null); remove.mutate(deleteCandidate); }}>{remove.isPending ? 'Удаление…' : 'Удалить'}</Button></div>{error ? <p className={styles.error} role="alert">{error}</p> : null}</Modal> : null}{selectedImage !== null ? <ImagePreviewModal images={images} selected={selectedImage} onClose={() => setSelectedImage(null)} onSelect={setSelectedImage} /> : null}</section>;
 }

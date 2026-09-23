@@ -9,7 +9,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { formatDateTimeRu } from '@/shared/lib/formatters';
 import { historyEventTypeIntent, historyEventTypeLabels } from '@/shared/lib/status-semantics';
-import { getUniversityHistory, getUniversityHistoryFilterOptions, type UniversityHistoryEvent, type UniversityHistoryEventType, type UniversityHistoryFilters } from '@/shared/lib/universities-repository';
+import { getUniversityHistory, getUniversityHistoryFilterOptions, universityHistoryQueryKey, type UniversityHistoryEvent, type UniversityHistoryEventType, type UniversityHistoryFilters } from '@/shared/lib/universities-repository';
 import { Button } from '@/shared/ui/rtk/button';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { TableShell } from '@/shared/ui/rtk/table-shell';
@@ -64,7 +64,7 @@ function HistoryTable({ events }: { events: UniversityHistoryEvent[] }) {
 export function UniversityHistory({ id }: { id: string }) {
   const [filters, setFilters] = useState<UniversityHistoryFilters>({ type: 'all', dateFrom: '', dateTo: '', userId: '', entityId: '' });
   const options = useMemo(() => getUniversityHistoryFilterOptions(id), [id]);
-  const query = useQuery({ queryKey: ['university-history', id, filters], queryFn: () => getUniversityHistory(id, filters), staleTime: 30_000 });
+  const query = useQuery({ queryKey: universityHistoryQueryKey(id, filters), queryFn: () => getUniversityHistory(id, filters), staleTime: 30_000 });
   const filtered = Boolean(filters.type !== 'all' || filters.dateFrom || filters.dateTo || filters.userId || filters.entityId);
   const onChange = (patch: Partial<UniversityHistoryFilters>) => setFilters((current) => {
     const next = { ...current, ...patch };

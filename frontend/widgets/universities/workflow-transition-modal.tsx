@@ -4,8 +4,9 @@ import { useEffect, useMemo, useReducer, useRef, useState, type FormEvent } from
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import ArrowRight from '@atomaro/icons/24/navigation/ArrowRight';
 import TimeStroke from '@atomaro/icons/24/alert/TimeStroke';
-import { getAvailableWorkflowTransitionTargets, getLocalTodayIso, isWorkflowTransitionDraft, workflowTransitionDraftKey, type WorkflowTransitionTarget } from '@/shared/lib/workflow-transition';
-import { isWorkflowApiInstanceId, transitionWorkflowInstance, WorkflowApiError, workflowQueryKey, type UniversityWorkflowStage } from '@/shared/lib/universities-repository';
+import { applyOptimisticWorkflowTransition, getAvailableWorkflowTransitionTargets, getLocalTodayIso, isWorkflowTransitionDraft, workflowTransitionDraftKey, type WorkflowTransitionTarget } from '@/shared/lib/workflow-transition';
+import { invalidateWorkflowRelatedQueries } from '@/shared/lib/workflow-cache';
+import { isWorkflowApiInstanceId, transitionWorkflowInstance, WorkflowApiError, workflowQueryKey, type UniversityWorkflow, type UniversityWorkflowStage, type WorkflowInstanceApiRecord } from '@/shared/lib/universities-repository';
 import { Button } from '@/shared/ui/rtk/button';
 import { Modal } from '@/shared/ui/rtk/modal';
 import type { ToastIntent } from '@/shared/ui/rtk/toast';
@@ -117,22 +118,33 @@ export interface WorkflowTransitionNotification {
   message: string;
 }
 
-export function WorkflowTransitionModal({ open, instanceId, currentStage, stages, userId, onClose, onSuccess, onNotify }: { open: boolean; instanceId: string; currentStage: UniversityWorkflowStage; stages: UniversityWorkflowStage[]; userId?: string | null; onClose: () => void; onSuccess: () => void; onNotify: (notification: WorkflowTransitionNotification) => void }) {
+type TransitionMutationContext = { previousWorkflow?: UniversityWorkflow };
+
+export function WorkflowTransitionModal({ open, instanceId, universityId, currentStage, stages, userId, onClose, onSuccess, onNotify }: { open: boolean; instanceId: string; universityId?: string | null; currentStage: UniversityWorkflowStage; stages: UniversityWorkflowStage[]; userId?: string | null; onClose: () => void; onSuccess: () => void; onNotify: (notification: WorkflowTransitionNotification) => void }) {
   const queryClient = useQueryClient();
   const commentRef = useRef<HTMLTextAreaElement>(null);
   const [showDiscard, setShowDiscard] = useState(false);
   const targets = useMemo(() => getAvailableWorkflowTransitionTargets(stages, currentStage), [currentStage, stages]);
   const apiAvailable = isWorkflowApiInstanceId(instanceId) && targets.every((target) => isWorkflowApiInstanceId(target.id));
   const form = useTransitionForm({ open, instanceId, currentStageId: currentStage.id, userId, targets, apiAvailable });
-  const transition = useMutation({
+  const transition = useMutation<WorkflowInstanceApiRecord, unknown, void, TransitionMutationContext>({
     mutationFn: () => transitionWorkflowInstance(instanceId, form.state.targetStageId, form.trimmedComment),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: workflowQueryKey(instanceId) });
+      const previousWorkflow = queryClient.getQueryData<UniversityWorkflow>(workflowQueryKey(instanceId));
+      if (previousWorkflow) {
+        queryClient.setQueryData(workflowQueryKey(instanceId), applyOptimisticWorkflowTransition(previousWorkflow, form.state.targetStageId));
+      }
+      return { previousWorkflow };
+    },
     onSuccess: async () => {
       form.clearDraft();
-      await queryClient.invalidateQueries({ queryKey: workflowQueryKey(instanceId) });
-      onNotify({ intent: 'success', title: 'Этап переведён', message: 'Workflow обновлён.' });
+      await invalidateWorkflowRelatedQueries(queryClient, instanceId, universityId);
+      onNotify({ intent: 'success', title: 'Этап успешно переведён', message: 'Workflow синхронизирован с сервером.' });
       onSuccess();
     },
-    onError: async (cause: unknown) => {
+    onError: async (cause: unknown, _variables, context) => {
+      if (context?.previousWorkflow) queryClient.setQueryData(workflowQueryKey(instanceId), context.previousWorkflow);
       const error = getTransitionError(cause);
       if (cause instanceof WorkflowApiError && cause.status === 400) await queryClient.invalidateQueries({ queryKey: workflowQueryKey(instanceId) });
       onNotify({ intent: 'error', title: error.title, message: error.message });

@@ -308,6 +308,7 @@ export interface UniversityWorkflowComment {
   text: string;
   canEdit?: boolean;
   canDelete?: boolean;
+  isOptimistic?: boolean;
 }
 
 export interface UniversityWorkflowAttachment {
@@ -342,6 +343,7 @@ export interface UniversityWorkflowTransition {
 
 export interface UniversityWorkflowStage {
   id: string;
+  templateStageId?: string | null;
   orderIndex: number;
   name: string;
   status: UniversityWorkflowStageStatus;
@@ -371,6 +373,7 @@ export interface UniversityWorkflow {
 export const workflowQueryKey = (instanceId: string) => ['workflow', instanceId] as const;
 export const universityWorkflowQueryKey = workflowQueryKey;
 export const workflowCommentsQueryKey = (instanceId: string) => [...workflowQueryKey(instanceId), 'comments'] as const;
+export const universityPassportQueryKey = (id: string) => ['university-passport', id] as const;
 
 export class WorkflowApiError extends Error {
   readonly status: number;
@@ -391,6 +394,8 @@ export interface WorkflowCommentApiRecord {
   is_internal: boolean;
   created_at: string;
   updated_at: string;
+  /** Frontend-only marker used while a create mutation is in flight. */
+  is_optimistic?: boolean;
 }
 
 export function isWorkflowApiInstanceId(instanceId: string): boolean {
@@ -584,6 +589,7 @@ function getApiUniversityWorkflow(instance: WorkflowInstanceApiRecord): Universi
         : stage.is_overdue ? 'overdue' : 'pending';
     return {
       id: stage.id,
+      templateStageId: stage.template_stage_id,
       orderIndex: stage.order_index,
       name: stage.name,
       status,
@@ -641,7 +647,8 @@ export interface UniversityHistoryFilterOptions {
   entities: Array<{ id: string; label: string }>;
 }
 
-export const universityHistoryQueryKey = (id: string, filters: UniversityHistoryFilters) => ['university-history', id, filters] as const;
+export const universityHistoryFamilyQueryKey = (id: string) => ['university-history', id] as const;
+export const universityHistoryQueryKey = (id: string, filters: UniversityHistoryFilters) => [...universityHistoryFamilyQueryKey(id), filters] as const;
 
 const historyEvents = (id: string, university: UniversityListItem): UniversityHistoryEvent[] => {
   const anna = responsible.anna;

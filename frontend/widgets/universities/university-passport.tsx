@@ -21,6 +21,7 @@ import { getHealthStatus, healthStatusMeta, type HealthStatus } from '@/shared/l
 import { workflowStatusIntent } from '@/shared/lib/status-semantics';
 import {
   getUniversityPassport,
+  universityPassportQueryKey,
   type UniversityPassport,
   type UniversityPassportEvent,
   type UniversityPassportEventType,
@@ -36,7 +37,6 @@ import { DocumentsSection, LicensesSection, MeetingsSection, ProductsSection, Pr
 import { UniversityWorkflow } from './university-workflow';
 import styles from './university-passport.module.css';
 
-const passportQueryKey = (id: string) => ['university-passport', id] as const;
 const mobileLayoutQuery = '(max-width: 768px)';
 
 function subscribeToMobileLayout(listener: () => void) {
@@ -203,7 +203,7 @@ export function UniversityPassport({ id }: { id: string }) {
   const searchParams = useSearchParams();
   const { user } = useAuth();
   const activeTab = parseTab(searchParams.get('tab'));
-  const query = useQuery({ queryKey: passportQueryKey(id), queryFn: () => getUniversityPassport(id), staleTime: 30_000 });
+  const query = useQuery({ queryKey: universityPassportQueryKey(id), queryFn: () => getUniversityPassport(id), staleTime: 30_000 });
   const canEdit = user?.role === 'admin';
   const canReport = user?.role === 'admin' || user?.role === 'manager';
   const canAdvance = canReport;
