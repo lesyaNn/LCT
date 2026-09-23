@@ -114,17 +114,36 @@
       "title": "Текущий этап",
       "type": "string",
       "source": "current InstanceStage.name of the latest workflow_instances row (primary branch of workflow_status WITHOUT the university_programs fallback); NULL when no workflow"
+    },
+    {
+      "key": "last_interaction",
+      "title": "Последнее взаимодействие",
+      "type": "date",
+      "source": "frozen P4-02-02 FULL rule: latest interaction date per university = GREATEST(max(meetings.meeting_at), max(interaction_notes.created_at)); NULL when the university has neither meetings nor notes"
+    },
+    {
+      "key": "workflow_progress",
+      "title": "Прогресс workflow, %",
+      "type": "integer",
+      "source": "frozen P4-02-02 FULL rule (mirrors the Dev-2 matrix): percent of completed instance_stages over non-skipped stages across ACTIVE workflow_instances of the university, nearest integer 0..100; NULL when there are no eligible stages"
+    },
+    {
+      "key": "teacher_readiness",
+      "title": "Готовность преподавателей, %",
+      "type": "integer",
+      "source": "frozen P4-02-02 FULL rule: percent of the university teachers with canonical readiness == ready (same compute_teacher_readiness as P1 passports and the Dev-2 matrix, university grain instead of per-program), nearest integer 0..100; NULL when no teachers"
+    },
+    {
+      "key": "overdue_tasks",
+      "title": "Просроченные задачи",
+      "type": "integer",
+      "source": "frozen P4-02-02 FULL rule (P2 canonical overdue rule): count of workflow_tasks with status == open and deadline at least 1 day in the past on ACTIVE workflow_instances of the university; 0 when none"
     }
   ],
-  "optional_columns_unsupported": {
-    "last_interaction": "ambiguous: meetings.meeting_at vs interaction_notes.created_at; no frozen 'last interaction' definition",
-    "workflow_progress": "no frozen percentage definition over instance_stages",
-    "teacher_readiness": "per-teacher grain, no frozen per-row aggregation rule",
-    "overdue_tasks": "countable from workflow_tasks, but the report-level 'overdue' semantics is not frozen"
-  },
+  "optional_columns_unsupported": {},
   "ordering": "University.name ASC, University.id ASC, License.license_number ASC NULLS LAST, License.id ASC (deterministic, never DB natural order)",
   "presets": {
-    "FULL": "== STANDARD until more canonical sources are frozen",
+    "FULL": "14 mandatory + all 6 supported optionals",
     "MINIMAL": "14 mandatory columns",
     "STANDARD": "14 mandatory + city + current_stage"
   },
@@ -132,5 +151,5 @@
   "request_dto": "backend/app/modules/analytics/report_request.py (ReportRequest: format + filters: UnifiedFilter + columns)",
   "row_grain": "one row per (University x License) via universities LEFT JOIN licenses; license-less universities produce exactly one fallback row; no programs x products x responsibles cartesian product",
   "task": "P4-02-01 / P4-02-02",
-  "version": "1.0.0"
+  "version": "1.1.0"
 }

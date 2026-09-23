@@ -35,11 +35,11 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import case, func, nulls_last, select
-from sqlalchemy.orm import Session, aliased
+from sqlalchemy.orm import Session, aliased, selectinload
 
 from app.models.catalog import (
     Contract,
@@ -53,8 +53,11 @@ from app.models.catalog import (
     Vendor,
 )
 from app.models.health_score import HealthScoreSnapshot
-from app.models.interactions import UniversityProgram
-from app.models.workflow_instances import InstanceStage, WorkflowInstance
+from app.models.interactions import InteractionNote, Meeting, UniversityProgram
+from app.models.teachers import Teacher
+from app.models.workflow_instances import InstanceStage, WorkflowInstance, WorkflowTask
+from app.schemas.common import TeacherReadiness
+from app.services.teacher_readiness import compute_teacher_readiness
 from app.modules.analytics.analytics import AnalyticsService
 from app.modules.analytics.columns import COLUMN_REGISTRY, resolve_columns
 from app.modules.analytics.filter_service import UnifiedFilterService
@@ -319,6 +322,11 @@ class ReportDatasetService:
         if need_resp:
             ReportDatasetService._attach_responsibles(db, rows)
 
+        if any(COLUMN_REGISTRY[k].needs_university_maps for k in resolved):
+            ReportDatasetService._attach_extra_maps(
+                db, rows, resolved, today=today
+            )
+
         if health_fallback and "health_score" in resolved:
             ReportDatasetService._attach_health_fallback(db, rows, today=today)
 
@@ -376,14 +384,20 @@ class ReportDatasetService:
             raise ValueError("batch_size must be >= 1")
         resolved = resolve_columns(columns)
         need_resp = any(COLUMN_REGISTRY[k].needs_responsible_agg for k in resolved)
+        need_extra = any(COLUMN_REGISTRY[k].needs_university_maps for k in resolved)
 
         resp_map: dict[uuid.UUID, str] = {}
-        if need_resp:
+        extra_maps: dict[str, dict[uuid.UUID, Any]] = {}
+        if need_resp or need_extra:
             uids = AnalyticsService.filtered_university_ids(
                 db, filters, user=user, today=today
             )
-            if uids:
+            if need_resp and uids:
                 resp_map = ReportDatasetService._responsibles_map(db, uids)
+            if need_extra and uids:
+                extra_maps = ReportDatasetService._extra_maps(
+                    db, uids, resolved, today=today
+                )
 
         stmt = ReportDatasetService.build_query(filters, columns, today=today)
         if user is not None:
@@ -402,6 +416,10 @@ class ReportDatasetService:
                 row["responsible"] = (
                     resp_map.get(uid) if isinstance(uid, uuid.UUID) else None
                 )
+            if extra_maps:
+                uid = row.get("_university_id")
+                for col, mmap in extra_maps.items():
+                    row[col] = mmap.get(uid) if isinstance(uid, uuid.UUID) else None
             row.pop("_license_id", None)
             yield {key: row[key] for key in exec_resolved if key in row}
 
@@ -441,6 +459,155 @@ class ReportDatasetService:
         for row in rows:
             uid = row.get("_university_id")
             row["responsible"] = joined.get(uid) if isinstance(uid, uuid.UUID) else None
+
+    @staticmethod
+    def _extra_maps(
+        db: Session,
+        uids: list[uuid.UUID],
+        resolved: list[str],
+        *,
+        today: date | None = None,
+    ) -> dict[str, dict[uuid.UUID, Any]]:
+        """Batched university-grain maps for the P4-02-02 FULL columns.
+
+        Frozen rules (see ``columns.py`` sources):
+        * ``last_interaction`` — GREATEST(max meetings, max notes) as date;
+        * ``workflow_progress`` — % completed over non-skipped stages of
+          ACTIVE instances (Dev-2 matrix rule), nearest int;
+        * ``teacher_readiness`` — % teachers with canonical readiness ready;
+        * ``overdue_tasks`` — P2 canonical overdue count on ACTIVE instances.
+        Only requested columns are computed (bounded extra SELECTs, never
+        per-row). Missing data -> ``None`` (``0`` for the overdue count).
+        """
+        day = today or date.today()
+        maps: dict[str, dict[uuid.UUID, Any]] = {}
+
+        def _as_date(value: Any) -> date | None:
+            if value is None:
+                return None
+            if isinstance(value, datetime):
+                return value.date()
+            if isinstance(value, date):
+                return value
+            return None
+
+        if "last_interaction" in resolved:
+            last: dict[uuid.UUID, date] = {}
+            for model, field in ((Meeting, Meeting.meeting_at),
+                                 (InteractionNote, InteractionNote.created_at)):
+                for uid, moment in db.execute(
+                    select(model.university_id, func.max(field))
+                    .where(model.university_id.in_(uids))
+                    .group_by(model.university_id)
+                ).all():
+                    day_value = _as_date(moment)
+                    if day_value is not None and day_value > last.get(uid, date.min):
+                        last[uid] = day_value
+            maps["last_interaction"] = last
+
+        active_instances: dict[uuid.UUID, uuid.UUID] | None = None
+        if "workflow_progress" in resolved or "overdue_tasks" in resolved:
+            active_instances = {
+                iid: uid
+                for iid, uid in db.execute(
+                    select(WorkflowInstance.id, WorkflowInstance.university_id)
+                    .where(
+                        WorkflowInstance.university_id.in_(uids),
+                        WorkflowInstance.status == "active",
+                    )
+                ).all()
+            }
+
+        if "workflow_progress" in resolved:
+            eligible: dict[uuid.UUID, int] = {}
+            done: dict[uuid.UUID, int] = {}
+            if active_instances:
+                for uid, status in db.execute(
+                    select(WorkflowInstance.university_id, InstanceStage.status)
+                    .join(InstanceStage,
+                          InstanceStage.instance_id == WorkflowInstance.id)
+                    .where(WorkflowInstance.id.in_(list(active_instances)))
+                ).all():
+                    if status == "skipped":
+                        continue
+                    eligible[uid] = eligible.get(uid, 0) + 1
+                    if status == "completed":
+                        done[uid] = done.get(uid, 0) + 1
+            maps["workflow_progress"] = {
+                uid: round(done.get(uid, 0) / eligible[uid] * 100)
+                for uid in eligible
+            }
+
+        if "overdue_tasks" in resolved:
+            counts: dict[uuid.UUID, int] = {}
+            if active_instances:
+                for uid, total in db.execute(
+                    select(WorkflowInstance.university_id, func.count(WorkflowTask.id))
+                    .join(WorkflowTask,
+                          WorkflowTask.instance_id == WorkflowInstance.id)
+                    .where(
+                        WorkflowInstance.id.in_(list(active_instances)),
+                        WorkflowTask.status == "open",
+                        WorkflowTask.deadline.is_not(None),
+                        WorkflowTask.deadline < day,
+                    )
+                    .group_by(WorkflowInstance.university_id)
+                ).all():
+                    counts[uid] = int(total)
+            maps["overdue_tasks"] = counts
+
+        if "teacher_readiness" in resolved:
+            readiness: dict[uuid.UUID, int | None] = {}
+            teachers = list(
+                db.execute(
+                    select(Teacher)
+                    .where(Teacher.university_id.in_(uids))
+                    .options(
+                        selectinload(Teacher.certificates),
+                        selectinload(Teacher.qualifications),
+                    )
+                ).scalars().all()
+            )
+            by_uni: dict[uuid.UUID, list] = {}
+            for teacher in teachers:
+                by_uni.setdefault(teacher.university_id, []).append(teacher)
+            for uid in uids:
+                group = by_uni.get(uid, [])
+                if not group:
+                    continue
+                ready = sum(
+                    compute_teacher_readiness(
+                        list(t.certificates), list(t.qualifications), day
+                    ).readiness == TeacherReadiness.READY
+                    for t in group
+                )
+                readiness[uid] = round(ready / len(group) * 100)
+            maps["teacher_readiness"] = readiness
+
+        return maps
+
+    @staticmethod
+    def _attach_extra_maps(
+        db: Session,
+        rows: list[dict[str, Any]],
+        resolved: list[str],
+        *,
+        today: date | None = None,
+    ) -> None:
+        """Attach FULL-column values to materialized rows (fetch path)."""
+        uids = [r.get("_university_id") for r in rows]
+        uids = [u for u in uids if isinstance(u, uuid.UUID)]
+        maps = (
+            ReportDatasetService._extra_maps(db, uids, resolved, today=today)
+            if uids
+            else {}
+        )
+        for row in rows:
+            uid = row.get("_university_id")
+            for col, mmap in maps.items():
+                row[col] = mmap.get(uid) if isinstance(uid, uuid.UUID) else None
+            if "overdue_tasks" in maps and row.get("overdue_tasks") is None:
+                row["overdue_tasks"] = 0
 
     @staticmethod
     def _attach_health_fallback(

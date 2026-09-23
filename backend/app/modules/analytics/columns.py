@@ -66,6 +66,9 @@ class ReportColumn:
     needs_workflow_scalar: bool = False
     needs_health_scalar: bool = False
     needs_fallback_contract: bool = False
+    # P4-02-02 FULL set: university-grain aggregates computed Python-side in
+    # one batched pass per column family (like responsibles), never per-row.
+    needs_university_maps: bool = False
     join_dependencies: frozenset[str] = field(default_factory=frozenset)
 
 
@@ -88,6 +91,9 @@ def _col(
         deps.add("workflow_instances")
     if flags.get("needs_health_scalar"):
         deps.add("health_score_snapshots")
+    if flags.get("needs_university_maps"):
+        deps.update({"meetings", "interaction_notes", "workflow_instances",
+                     "instance_stages", "workflow_tasks", "teachers"})
     return ReportColumn(
         key=key,
         title=title,
@@ -235,6 +241,48 @@ for _c in [
         mandatory=False,
         needs_workflow_scalar=True,
     ),
+    _col(
+        "last_interaction",
+        "Последнее взаимодействие",
+        "date",
+        "frozen P4-02-02 FULL rule: latest interaction date per university = "
+        "GREATEST(max(meetings.meeting_at), max(interaction_notes.created_at)); "
+        "NULL when the university has neither meetings nor notes",
+        mandatory=False,
+        needs_university_maps=True,
+    ),
+    _col(
+        "workflow_progress",
+        "Прогресс workflow, %",
+        "integer",
+        "frozen P4-02-02 FULL rule (mirrors the Dev-2 matrix): percent of "
+        "completed instance_stages over non-skipped stages across ACTIVE "
+        "workflow_instances of the university, nearest integer 0..100; "
+        "NULL when there are no eligible stages",
+        mandatory=False,
+        needs_university_maps=True,
+    ),
+    _col(
+        "teacher_readiness",
+        "Готовность преподавателей, %",
+        "integer",
+        "frozen P4-02-02 FULL rule: percent of the university teachers with "
+        "canonical readiness == ready (same compute_teacher_readiness as P1 "
+        "passports and the Dev-2 matrix, university grain instead of "
+        "per-program), nearest integer 0..100; NULL when no teachers",
+        mandatory=False,
+        needs_university_maps=True,
+    ),
+    _col(
+        "overdue_tasks",
+        "Просроченные задачи",
+        "integer",
+        "frozen P4-02-02 FULL rule (P2 canonical overdue rule): count of "
+        "workflow_tasks with status == open and deadline at least 1 day in "
+        "the past on ACTIVE workflow_instances of the university; 0 when none",
+        mandatory=False,
+        needs_university_maps=True,
+    ),
 ]:
     COLUMN_REGISTRY[_c.key] = _c
 del _c
@@ -257,31 +305,31 @@ MANDATORY_COLUMNS: tuple[str, ...] = (
     "health_score",
 )
 
-#: Supported optional columns (real canonical source exists).
-OPTIONAL_COLUMNS: tuple[str, ...] = ("city", "current_stage")
+#: Supported optional columns: city/current_stage (1.0.0) +
+#: last_interaction/workflow_progress/teacher_readiness/overdue_tasks
+#: (1.1.0, frozen P4-02-02 FULL rules, university-grain batched maps).
+OPTIONAL_COLUMNS: tuple[str, ...] = (
+    "city", "current_stage",
+    "last_interaction", "workflow_progress",
+    "teacher_readiness", "overdue_tasks",
+)
 
 #: Immutable default: all 14 mandatory columns.
 DEFAULT_COLUMNS: tuple[str, ...] = MANDATORY_COLUMNS
 
-#: Backend presets. FULL == STANDARD until more canonical sources are frozen.
+#: Backend presets. FULL = everything supported (STANDARD + FULL-only maps).
 MINIMAL_COLUMNS: tuple[str, ...] = MANDATORY_COLUMNS
-STANDARD_COLUMNS: tuple[str, ...] = MANDATORY_COLUMNS + OPTIONAL_COLUMNS
-FULL_COLUMNS: tuple[str, ...] = STANDARD_COLUMNS
+STANDARD_COLUMNS: tuple[str, ...] = MANDATORY_COLUMNS + ("city", "current_stage")
+FULL_COLUMNS: tuple[str, ...] = MANDATORY_COLUMNS + OPTIONAL_COLUMNS
 PRESETS: dict[str, tuple[str, ...]] = {
     "MINIMAL": MINIMAL_COLUMNS,
     "STANDARD": STANDARD_COLUMNS,
     "FULL": FULL_COLUMNS,
 }
 
-#: Candidate optional columns WITHOUT a frozen canonical source (explicit gaps).
-UNSUPPORTED_OPTIONAL_COLUMNS: dict[str, str] = {
-    "last_interaction": "ambiguous: meetings.meeting_at vs interaction_notes.created_at; "
-    "no frozen 'last interaction' definition",
-    "workflow_progress": "no frozen percentage definition over instance_stages",
-    "teacher_readiness": "per-teacher grain, no frozen per-row aggregation rule",
-    "overdue_tasks": "countable from workflow_tasks, but the report-level "
-    "'overdue' semantics is not frozen",
-}
+#: Former candidate columns now frozen (1.1.0) — kept as an empty registry
+#: so the contract diff stays explicit.
+UNSUPPORTED_OPTIONAL_COLUMNS: dict[str, str] = {}
 
 
 def is_known_column(key: str) -> bool:

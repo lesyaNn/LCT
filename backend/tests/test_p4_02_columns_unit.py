@@ -105,17 +105,20 @@ def test_is_known_column():
 def test_presets():
     assert PRESETS["MINIMAL"] == MANDATORY_COLUMNS
     assert STANDARD_COLUMNS[: len(MANDATORY_COLUMNS)] == MANDATORY_COLUMNS
-    assert set(STANDARD_COLUMNS) == set(MANDATORY_COLUMNS) | set(OPTIONAL_COLUMNS)
-    assert FULL_COLUMNS == STANDARD_COLUMNS
-    assert set(OPTIONAL_COLUMNS) == {"city", "current_stage"}
+    assert set(STANDARD_COLUMNS) == set(MANDATORY_COLUMNS) | {"city", "current_stage"}
+    assert set(FULL_COLUMNS) == set(MANDATORY_COLUMNS) | set(OPTIONAL_COLUMNS)
+    assert set(OPTIONAL_COLUMNS) == {
+        "city", "current_stage", "last_interaction", "workflow_progress",
+        "teacher_readiness", "overdue_tasks",
+    }
     for key in OPTIONAL_COLUMNS:
         assert COLUMN_REGISTRY[key].mandatory is False, key
 
 
-def test_unsupported_optionals_explicit():
+def test_full_optionals_frozen():
     for key in ("last_interaction", "workflow_progress", "teacher_readiness", "overdue_tasks"):
-        assert key in UNSUPPORTED_OPTIONAL_COLUMNS, key
-        assert key not in COLUMN_REGISTRY, key
+        assert key in COLUMN_REGISTRY, key
+        assert key not in UNSUPPORTED_OPTIONAL_COLUMNS, key
 
 
 def test_report_format_reuses_shared_enum():
