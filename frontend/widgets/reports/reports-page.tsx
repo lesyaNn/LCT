@@ -143,7 +143,7 @@ function ReportJobRow({ job, pollingError, retryError, retrying, onRetry }: JobV
   const timedOut = hasTimedOut(job);
   const visibleStatus = timedOut ? 'failed' : job.status;
   const details = <JobStateDetails job={job} timedOut={timedOut} pollingError={pollingError} retryError={retryError} />;
-  return <tr>
+  return <tr data-testid={`report-job-${job.id}`}>
     <td><strong>{job.name}</strong>{details}</td>
     <td>{job.format.toUpperCase()}</td>
     <td><JobStatus status={visibleStatus} />{job.error && job.status === 'failed' ? <Tooltip content={<span>{job.error}</span>}><span className={styles.errorHint} tabIndex={0}>Подробнее</span></Tooltip> : null}</td>

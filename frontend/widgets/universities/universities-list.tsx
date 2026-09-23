@@ -481,7 +481,7 @@ function DesktopTable({ table }: { table: Table<UniversityListItem> }) {
           ))}
         </thead>
         <tbody>
-          {table.getRowModel().rows.map((row) => <tr key={row.id}>{row.getVisibleCells().map((cell) => <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}
+          {table.getRowModel().rows.map((row) => <tr key={row.id} data-testid={`university-row-${row.original.id}`}>{row.getVisibleCells().map((cell) => <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}
         </tbody>
       </table>
     </div>
