@@ -103,11 +103,14 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-rtk}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-rtk}
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
       STORAGE_ROOT: /app/storage
+      REPORTS_ROOT: /app/reports
     volumes:
       # Staging survives backend restarts (P0-4: preview -> execute).
       - import-staging:/tmp/rtk-imports
       # P2-05 workflow file objects persist across restarts (never ephemeral).
       - workflow-storage:/app/storage
+      # P4-06-01 generated reports persist across container recreation.
+      - reports-storage:/app/reports
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)\""]
       interval: 15s
@@ -160,3 +163,4 @@ volumes:
   redisdata:
   import-staging:
   workflow-storage:
+  reports-storage:

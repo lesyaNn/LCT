@@ -36,6 +36,7 @@
 | audit | `user_id/entity_id` → TEXT (миграция `000010`) | `AuditEvent` (SQL-управляемый) |
 | dashboard | Агрегаты по отложенным таблицам | Будущие endpoints на каноне |
 | reporting | Генерация XLSX/PDF вне P1 | Будущий `workers/reports.py` |
+| reporting (P4-06-01, 2026-09-23) | Legacy demo stub `app/modules/reporting` (`POST /export` поверх in-memory очереди, поля `region/status` вне P1-схемы) остаётся НЕСМОНТИРОВАННЫМ/deprecated — не удалён, чтобы не ломать историю, но production-путём не является | Канон: `POST /api/v1/reports → 202 {job_id, queued}` + `GET /reports/{job_id}` + `GET /reports/{job_id}/download` (`app/modules/analytics/reports_router.py`, persistent `report_jobs`, миграция `000018_report_jobs`, worker `generate_report_task` на FastAPI BackgroundTasks). Guard: `tests/test_p0_deferred_registry.py::test_legacy_reporting_stub_stays_unmounted` |
 | integrations | Интеграции LMS/сайт — стаб (требование кейса) | Будущий `workers/integrations` |
 | notifications | Стаб рассылок | Будущая очередь + шаблоны |
 

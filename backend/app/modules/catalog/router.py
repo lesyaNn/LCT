@@ -52,6 +52,7 @@ from app.schemas.catalog import (
 )
 from app.models.catalog import ITDirection, ITProgram, License, University
 from app.models.interactions import UniversityProgram
+from app.modules.analytics.filters import UnifiedFilter, get_unified_filter
 from app.schemas.common import ErrorResponse, PaginatedResponse
 from app.schemas.university import UniversityCreate, UniversityUpdate
 
@@ -116,8 +117,9 @@ def list_universities(
     ),
     sort_by: UniversitySortBy = Query(default="name"),
     sort_order: SortOrder = Query(default="asc"),
+    unified: UnifiedFilter = Depends(get_unified_filter),
     db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(READ),
+    user: CurrentUser = Depends(READ),
 ) -> PaginatedResponse[UniversityRead]:
     _ = region  # deprecated no-op, kept for backward compatibility (P1-11-03)
     items, total = service.list_university_page(
@@ -129,6 +131,8 @@ def list_universities(
         responsible_id=responsible_id,
         sort_by=sort_by,
         sort_order=sort_order,
+        unified_filter=unified,
+        user=user,
     )
     return PaginatedResponse(items=items, page=page, page_size=page_size, total=total)
 

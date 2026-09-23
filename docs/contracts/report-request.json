@@ -1,0 +1,146 @@
+{
+  "contract": "p4-report-request",
+  "version": "1.2.0",
+  "task": "P4-03-01 / P4-03-02 / P4-04-01 / P4-04-02 / P4-05-01 / P4-06-01",
+  "status": "frozen",
+  "consumers": [
+    "P4-03-01 report endpoint (async job creation)",
+    "P4-03-02 xlsx generator",
+    "P4-04-01 / P4-04-02 pdf generator",
+    "P4-05-01 json exporter",
+    "P3 frontend report dialog"
+  ],
+  "code": {
+    "dto": "app.modules.analytics.report_request.ReportRequest",
+    "service": "app.modules.analytics.report_service (build_job_payload, create_report_job, FORMAT_GENERATORS, generate_report_file)",
+    "router": "app.modules.analytics.reports_router (MOUNTED in app.api.router since P4-06-01)",
+    "job_store": "app.modules.analytics.report_jobs (ReportJob persistence + lifecycle + cleanup_expired_report_jobs)",
+    "worker": "app.modules.analytics.report_worker.generate_report_task (fresh SessionLocal, BackgroundTasks)",
+    "xlsx_generator": "app.modules.analytics.xlsx.generate_xlsx_report",
+    "pdf_generator": "app.modules.analytics.pdf.generate_pdf_report",
+    "json_generator": "app.modules.analytics.json_export.generate_json_report",
+    "dataset": "app.modules.analytics.dataset.ReportDatasetService (sole data source)",
+    "columns": "app.modules.analytics.columns.COLUMN_REGISTRY (sole title source)"
+  },
+  "request": {
+    "format": {
+      "type": "enum string",
+      "values": ["xlsx", "pdf", "json"],
+      "note": "all three formats share one validation path, one job payload shape and one worker entry point (generate_report_file); each format has its own file generator reading ONLY from ReportDatasetService"
+    },
+    "filters": {
+      "$ref": "unified-filter.json",
+      "note": "frozen P4-01-01 UnifiedFilter, same semantics as P1 list and dataset"
+    },
+    "columns": {
+      "type": "string[] | null",
+      "default": "null = all 14 mandatory columns in documented order",
+      "rules": "duplicates deduped first-seen; unknown keys 422; [] 422",
+      "order": "output column order strictly follows the resolved request order (never sorted)"
+    }
+  },
+  "example": {
+    "format": "xlsx",
+    "filters": {
+      "date_from": null,
+      "date_to": null,
+      "university_ids": [],
+      "direction_ids": [],
+      "program_ids": [],
+      "product_ids": [],
+      "responsible_ids": [],
+      "workflow_statuses": []
+    },
+    "columns": [
+      "university",
+      "direction",
+      "program",
+      "product",
+      "workflow_status",
+      "responsible",
+      "vendor",
+      "software",
+      "contract_number",
+      "license_signed",
+      "license_expires",
+      "transfer_status",
+      "comment",
+      "health_score"
+    ]
+  },
+  "format_examples": {
+    "xlsx": {"format": "xlsx", "note": "workbook: sheets Отчёт + Фильтры (see xlsx_workbook)"},
+    "pdf": {
+      "format": "pdf",
+      "filters": {
+        "date_from": "2026-01-01",
+        "date_to": "2026-09-30",
+        "university_ids": [],
+        "direction_ids": [],
+        "program_ids": [],
+        "product_ids": [],
+        "responsible_ids": [],
+        "workflow_statuses": []
+      },
+      "columns": ["university", "product", "workflow_status", "responsible", "health_score"],
+      "note": "same filters/columns as xlsx; PDF renders title/period/filters/timestamp/KPI/table/charts (see report-output.json)"
+    },
+    "json": {
+      "format": "json",
+      "filters": {
+        "date_from": null,
+        "date_to": null,
+        "university_ids": [],
+        "direction_ids": [],
+        "program_ids": [],
+        "product_ids": [],
+        "responsible_ids": [],
+        "workflow_statuses": []
+      },
+      "columns": null,
+      "note": "columns=null selects all 14 mandatory columns; export shape is {generated_at, filters, columns, total, items} (see report-output.json)"
+    }
+  },
+  "async_api": {
+    "endpoint": "POST /api/v1/reports",
+    "success": "202 Accepted",
+    "success_body": {"job_id": "uuid", "status": "queued"},
+    "response_model": "app.modules.analytics.report_service.ReportQueuedResponse",
+    "rbac": "reports.read (401 without token, 403 without permission; held by admin + manager, never widened)",
+    "lifecycle": "queued -> building -> ready | failed (progress: queued=0, building=10, ready=100; failed keeps current)",
+    "status_endpoint": "GET /api/v1/reports/{job_id} -> 200 ReportJobRead (id/format/status/progress/file_size/created_at/started_at/completed_at/expires_at/error_message; never the filesystem path)",
+    "status_rbac": "admin sees all jobs; other reports.read holders see only their own jobs (foreign -> 403, unknown/malformed -> 404)",
+    "download": "GET /api/v1/reports/{job_id}/download -> 200 file only when ready + fresh + allowed; 409 when not ready/failed; 410 Gone when expires_at passed or the artifact is gone; Content-Disposition attachment report_<job_id>.<ext> with xlsx/pdf/json media types",
+    "expiry": "expires_at = created_at + 24h (tz-aware); cleanup_expired_report_jobs() removes expired artifacts (daily cron/CLI entry run_cleanup_once; no Celery)",
+    "security_snapshot": "job stores actor_sub/actor_roles/effective_university_ids at creation; the worker rehydrates ONLY this snapshot (scoped user asking for foreign universities gets zero rows; empty scope fails closed)",
+    "storage": "REPORTS_ROOT (default /app/reports, REPORTS_DIR honored as legacy alias) via <final>.part + atomic replace; filenames server-generated report_<job_id>.<ext>; stored paths containment-checked on download",
+    "status": "LIVE since P4-06-01: persistent report_jobs storage (migration 000018) + BackgroundTasks worker; the router is mounted and POST returns a real persisted job_id"
+  },
+  "xlsx_workbook": {
+    "sheets": ["Отчёт", "Фильтры"],
+    "report_sheet_rows": {
+      "1": "title: Аналитический отчёт по взаимодействию с ВУЗами",
+      "2": "period (neutral 'Период: не задан' when both bounds absent)",
+      "3": "human-readable filter summary (raw values stay on sheet 2)",
+      "4": "Сформирован: <tz-aware timestamp>",
+      "5": "empty",
+      "6": "column headers (COLUMN_REGISTRY titles)",
+      "7+": "data rows in resolved column order"
+    },
+    "header_row": 6,
+    "freeze_panes": "A7",
+    "auto_filter": "A6:<last_column>6 (header row only; resolves the A7:X7 source contradiction)",
+    "dates": "typed date/datetime cells with DD.MM.YYYY number format",
+    "nulls": "empty cells (never N/A/null/-)",
+    "formula_injection": "leading =,+,-,@ in text escaped with apostrophe; numerics untouched",
+    "storage": "REPORTS_ROOT (default /app/reports, REPORTS_DIR honored as legacy alias) via <final>.part + atomic replace"
+  },
+  "pdf_document": {
+    "$ref": "report-output.json#/pdf",
+    "note": "title/period/filters/timestamp/KPI/table/charts; landscape A4; DejaVu Sans (OS package fonts-dejavu-core)"
+  },
+  "json_export": {
+    "$ref": "report-output.json#/json",
+    "note": "{generated_at, filters, columns, total, items}; typed serialization; streaming writer"
+  }
+}

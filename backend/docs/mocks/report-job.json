@@ -1,0 +1,50 @@
+{
+  "mock": "p4-report-job",
+  "version": "1.0.0",
+  "task": "P4-06-01",
+  "note": "Мок повторяет контракт POST /api/v1/reports (202) + GET /api/v1/reports/{job_id} (ReportJobRead) для P3. Поле file_path никогда не отдаётся API.",
+  "create_response": {
+    "job_id": "7f3a1c9e-2b06-4f3a-9e2b-06f3a1c9e2b0",
+    "status": "queued"
+  },
+  "status_response": {
+    "id": "7f3a1c9e-2b06-4f3a-9e2b-06f3a1c9e2b0",
+    "format": "xlsx",
+    "status": "ready",
+    "progress": 100,
+    "file_size": 48210,
+    "created_at": "2026-09-20T12:00:00+00:00",
+    "started_at": "2026-09-20T12:00:01+00:00",
+    "completed_at": "2026-09-20T12:00:04+00:00",
+    "expires_at": "2026-09-21T12:00:00+00:00",
+    "error_message": null
+  },
+  "failed_status_response": {
+    "id": "7f3a1c9e-2b06-4f3a-9e2b-06f3a1c9e2b0",
+    "format": "pdf",
+    "status": "failed",
+    "progress": 10,
+    "file_size": null,
+    "created_at": "2026-09-20T12:00:00+00:00",
+    "started_at": "2026-09-20T12:00:01+00:00",
+    "completed_at": "2026-09-20T12:00:02+00:00",
+    "expires_at": "2026-09-21T12:00:00+00:00",
+    "error_message": "ValueError: unsupported report format"
+  },
+  "lifecycle": [
+    "queued",
+    "building",
+    "ready",
+    "failed"
+  ],
+  "download": {
+    "endpoint": "GET /api/v1/reports/{job_id}/download",
+    "filename": "report_7f3a1c9e-2b06-4f3a-9e2b-06f3a1c9e2b0.xlsx",
+    "content_disposition": "attachment",
+    "media_types": {
+      "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "pdf": "application/pdf",
+      "json": "application/json"
+    }
+  }
+}

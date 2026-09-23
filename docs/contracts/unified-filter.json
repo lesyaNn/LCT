@@ -1,0 +1,126 @@
+{
+  "contract": "p4-unified-filter",
+  "version": "1.0.0-frozen",
+  "task": "P4-01-01",
+  "status": "frozen",
+  "consumers": [
+    "P4-01-02",
+    "P4-02-01",
+    "P4-02-02",
+    "P4-03-01",
+    "P4-03-02",
+    "P4-04-01",
+    "P4-04-02",
+    "P4-05-01",
+    "analytics",
+    "xlsx",
+    "pdf",
+    "json",
+    "p1-list-endpoints",
+    "frontend"
+  ],
+  "code": {
+    "dto": "app.modules.analytics.filters.UnifiedFilter",
+    "query_dependency": "app.modules.analytics.filters.get_unified_filter",
+    "service": "app.modules.analytics.filter_service.UnifiedFilterService",
+    "status_enum": "app.schemas.common.WorkflowStageStatus (aliased as WorkflowFilterStatus; single source, no second enum)"
+  },
+  "fields": {
+    "date_from": {
+      "type": "date | null",
+      "format": "ISO 8601 date, YYYY-MM-DD",
+      "default": null,
+      "description": "Inclusive lower bound on the report dataset row date."
+    },
+    "date_to": {
+      "type": "date | null",
+      "format": "ISO 8601 date, YYYY-MM-DD",
+      "default": null,
+      "description": "Inclusive upper bound on the report dataset row date."
+    },
+    "university_ids": {
+      "type": "UUID[]",
+      "format": "RFC 4122 UUID strings",
+      "default": [],
+      "description": "University.id IN (...)."
+    },
+    "direction_ids": {
+      "type": "UUID[]",
+      "format": "RFC 4122 UUID strings",
+      "default": [],
+      "description": "Universities linked (via university_programs -> it_programs.direction_id) to one of these IT directions."
+    },
+    "program_ids": {
+      "type": "UUID[]",
+      "format": "RFC 4122 UUID strings",
+      "default": [],
+      "description": "Universities linked via university_programs.program_id."
+    },
+    "product_ids": {
+      "type": "UUID[]",
+      "format": "RFC 4122 UUID strings",
+      "default": [],
+      "description": "Universities linked via university_products.product_id (product, never vendor)."
+    },
+    "responsible_ids": {
+      "type": "UUID[]",
+      "format": "RFC 4122 UUID strings",
+      "default": [],
+      "description": "Universities linked via the canonical M:N university_responsibles."
+    },
+    "workflow_statuses": {
+      "type": "string[]",
+      "format": "enum values, see allowed_workflow_statuses",
+      "default": [],
+      "description": "Universities whose canonical workflow runtime (workflow_instances + instance_stages) matches one of these stage statuses."
+    }
+  },
+  "allowed_workflow_statuses": {
+    "pending": "Stored instance_stages.status = pending (open runtime stage).",
+    "current": "Derived: the instance has a live runtime pointer (workflow_instances.current_instance_stage_id IS NOT NULL).",
+    "completed": "Stored instance_stages.status = completed.",
+    "skipped": "Stored instance_stages.status = skipped.",
+    "overdue": "Derived: an open stage (not completed/skipped) with due_date before today and completed_at IS NULL."
+  },
+  "workflow_status_note": "workflow_statuses filters canonical instance STAGE runtime (instance_stages), not the workflow_instances.status header column (production only ever writes 'active' there, so it carries no filtering signal). Legacy app/modules/workflow tables are never used.",
+  "date_semantics": {
+    "decision": "date_from/date_to are inclusive bounds on the report dataset row date. For university queries the row date is universities.created_at (day precision, UTC).",
+    "source": "No P4 freeze in the repo defines the date dimension; this is a centralized documented P4-01-01 decision. No per-entity date columns (workflow due_date, license signed_at, ...) are mixed in without an explicit contract change."
+  },
+  "empty_list_semantics": "[] (or null, normalized to []) means the dimension filter is not applied. Empty lists are never WHERE FALSE.",
+  "duplicate_ids": "Duplicate IDs are deduplicated preserving first-seen order; semantics are unchanged for IN queries.",
+  "date_range_validation": "date_from <= date_to is enforced. A reversed range is a 422 validation error (Pydantic ValidationError for bodies; HTTPException 422 with the Pydantic error detail for query params).",
+  "combination": {
+    "between_dimensions": "AND",
+    "within_dimension": "OR / IN"
+  },
+  "query_params": {
+    "style": "Repeated params for multi-select: ?university_ids=<uuid1>&university_ids=<uuid2>. Same names and types as the DTO fields.",
+    "names": [
+      "date_from",
+      "date_to",
+      "university_ids",
+      "direction_ids",
+      "program_ids",
+      "product_ids",
+      "responsible_ids",
+      "workflow_statuses"
+    ]
+  },
+  "security": "The filter object never widens access. The caller's data scope (CurrentUser.university_ids) is applied independently and conjunctively (AND): a scoped user requesting a foreign university receives zero rows. Unparseable scope entries are dropped; an empty scope fails closed.",
+  "pagination": "Pagination is a separate contract and is NOT part of UnifiedFilter.",
+  "notes": [
+    "No new DB migration (contract/service task only).",
+    "Existing P1 catalog endpoints are untouched (additive path; full endpoint wiring belongs to P4-01-02)."
+  ],
+  "example": {
+    "date_from": null,
+    "date_to": null,
+    "university_ids": [],
+    "direction_ids": [],
+    "program_ids": [],
+    "product_ids": [],
+    "responsible_ids": [],
+    "workflow_statuses": []
+  }
+}

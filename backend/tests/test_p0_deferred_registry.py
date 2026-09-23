@@ -1,9 +1,10 @@
 """P0-1 guard: one schema universe + deferred modules stay unmounted.
 
 Pins the resolution of the "two schema universes" blocker:
-* canonical ``Base.metadata`` contains exactly the 30 SQL-managed tables
+* canonical ``Base.metadata`` contains exactly the 31 SQL-managed tables
   (21 P1 tables + 8 B1 workflow tables from 000011-000014 + 1 P2 health
-  snapshot table ``health_score_snapshots`` from 000015);
+  snapshot table ``health_score_snapshots`` from 000015 + 1 P4 report job
+  table ``report_jobs`` from 000018);
 * pre-UUID / stub models live on ``DeferredBase`` metadata only;
 * deferred routers are importable but NOT mounted in the production app;
 * ``AuditEvent.user_id/entity_id`` accept Keycloak ``sub`` (TEXT, 000010).
@@ -51,6 +52,7 @@ CANON_TABLES = frozenset(
         "workflow_tasks",
         "instance_stages",
         "health_score_snapshots",
+        "report_jobs",
     }
 )
 
@@ -70,9 +72,13 @@ DEFERRED_TABLES = frozenset(
 # unmounted until the reactivation checklist in docs/AUDIT.md (§0) is done.
 # NOTE (P2-08-03): "/health-score" стал production (ranking) и убран отсюда;
 # legacy health_score router при этом остаётся незамаунченным.
+# NOTE (P4-06-01): "/reports" стал production (canonical async reports:
+# POST queued job + status + download, migration 000018) и убран отсюда;
+# legacy demo stub app/modules/reporting (POST /export over an in-memory
+# queue) при этом остаётся незамаунченным (см. test_legacy_reporting_stub).
 DEFERRED_API_PREFIXES = (
     "/audit", "/dashboard", "/documents", "/users",
-    "/integrations", "/notifications", "/reports", "/workflows", "/tasks",
+    "/integrations", "/notifications", "/workflows", "/tasks",
 )
 
 
@@ -143,6 +149,7 @@ def test_mounted_routers_are_only_the_production_contract():
         "/api/v1/teachers",
         "/api/v1/workflow",
         "/api/v1/health-score",
+        "/api/v1/reports",
     )
     paths = _mounted_api_paths()
     assert all(path.startswith(allowed) for path in paths), paths
@@ -158,6 +165,23 @@ def test_deferred_prefixes_absent_from_openapi_paths():
     paths = _mounted_api_paths()
     for prefix in DEFERRED_API_PREFIXES:
         assert not [p for p in paths if p.startswith(f"/api/v1{prefix}")], prefix
+
+
+def test_legacy_reporting_stub_stays_unmounted():
+    """Legacy demo stub (``POST /export`` over an in-memory queue) is NOT
+    the production report path and must never be mounted alongside the
+    canonical P4-06-01 ``/api/v1/reports`` contract (single creation path).
+    """
+    from app.modules.reporting.router import router as legacy_router
+
+    # NOTE: route.path already carries the router prefix on some FastAPI
+    # versions (and prefix+path on others) — assert on suffixes.
+    legacy_paths = {getattr(route, "path", "") for route in legacy_router.routes}
+    assert any(p.endswith("/reports/export") or p == "/export" for p in legacy_paths)
+    assert any(p.endswith("/reports/jobs/{job_id}") for p in legacy_paths)
+    mounted = _mounted_api_paths()
+    assert not [p for p in mounted if p.endswith("/export")], mounted
+    assert not [p for p in mounted if "/jobs/" in p and "reports" in p], mounted
 
 
 def test_universities_mount_is_passport_or_catalog_crud():

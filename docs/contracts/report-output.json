@@ -1,0 +1,85 @@
+{
+  "contract": "p4-report-output",
+  "version": "1.1.0",
+  "task": "P4-04-01 / P4-04-02 / P4-05-01 / P4-06-01",
+  "status": "frozen",
+  "code": {
+    "dataset": "app.modules.analytics.dataset.ReportDatasetService (sole data source for xlsx/pdf/json)",
+    "columns": "app.modules.analytics.columns.COLUMN_REGISTRY (sole title source; no PDF_COLUMN_MAPPING / JSON_COLUMN_MAPPING)",
+    "pdf_generator": "app.modules.analytics.pdf.generate_pdf_report",
+    "json_generator": "app.modules.analytics.json_export.generate_json_report",
+    "dispatcher": "app.modules.analytics.report_service.FORMAT_GENERATORS + generate_report_file (P4-06-01 worker seam)"
+  },
+  "pdf": {
+    "library": "reportlab>=4.1 (already a pyproject dependency; no second PDF library)",
+    "page": "landscape A4, deterministic single layout for any column count",
+    "font": {
+      "regular": "DejaVuSans",
+      "bold": "DejaVuSans-Bold",
+      "registration": "centralized once via ensure_pdf_fonts (never per cell/row)",
+      "source": "runtime discovery: REPORT_PDF_FONT_DIR override, Debian fonts-dejavu-core paths, matplotlib bundle (dev fallback); no font binary in the repo",
+      "runtime_dependency": "fonts-dejavu-core OS package in backend/Dockerfile"
+    },
+    "sections": [
+      "title: Аналитический отчёт по взаимодействию с ВУЗами",
+      "period: same text as XLSX ('Период: не задан' when unset; never invented)",
+      "filters: human-readable summary (raw values stay in the job payload; UUID names resolved batched, no N+1)",
+      "generated_at: tz-aware timestamp",
+      "KPI: university count + row (license) count + avg health from the SAME filtered dataset",
+      "table: selected columns in request order, COLUMN_REGISTRY titles, header repeated per page, long text wrapped",
+      "charts: health-status distribution (canonical P2 green/yellow/red thresholds) + workflow-status distribution; empty datasets render 'Нет данных для построения графика'"
+    ],
+    "presentation": {
+      "nulls": "empty cells (never None/null/N/A/-)",
+      "dates": "DD.MM.YYYY (semantics untouched)",
+      "health_score": "numeric 0..100, never recomputed in the exporter",
+      "user_text": "literal (PDF executes no formulas; no XLSX apostrophe escaping)"
+    },
+    "metadata": "title + author set; no secrets/tokens embedded",
+    "storage": "REPORTS_DIR (default /app/reports) via <final>.pdf.part + atomic replace; temp cleanup on failure"
+  },
+  "json": {
+    "shape": {
+      "generated_at": "tz-aware ISO8601 string",
+      "filters": "all 8 UnifiedFilter fields, raw serialized (stable order)",
+      "columns": "resolved output column keys (default = all 14 mandatory)",
+      "total": "row count (University x License grain)",
+      "items": "one object per row with ONLY the selected columns in selected order"
+    },
+    "key_order": ["generated_at", "filters", "columns", "total", "items"],
+    "types": {
+      "uuid": "string",
+      "date": "ISO YYYY-MM-DD",
+      "datetime": "ISO8601 with timezone (naive assumed UTC)",
+      "numbers": "numbers (health score stays numeric)",
+      "null": "null",
+      "unicode": "UTF-8, ensure_ascii=False on file (readable Russian text)"
+    },
+    "hidden_keys": "never emitted: _university_id, _license_id",
+    "memory": "streaming writer (iterate_rows, bounded) + temp items file; dataset never materialized twice; huge-export limits owned by P4-06-01",
+    "storage": "REPORTS_DIR (default /app/reports) via <final>.json.part + atomic replace; temp cleanup on failure"
+  },
+  "job_lifecycle": {
+    "states": ["queued", "building", "ready", "failed"],
+    "progress": {"queued": 0, "building": 10, "ready": 100, "failed": "current value kept"},
+    "ordering": "validate -> persist -> commit -> schedule worker -> 202 with the persisted job_id (persistence failure never starts a worker)",
+    "worker": "generate_report_task(job_id) with a fresh SessionLocal; building committed BEFORE generation, ready/failed committed AFTER; idempotency guard never regenerates ready jobs",
+    "expiry": "expires_at = created_at + 24h (tz-aware); download of expired jobs -> 410 Gone; cleanup_expired_report_jobs() removes expired artifacts (run_cleanup_once for daily cron/CLI)",
+    "download": {
+      "ready": "200 file with Content-Disposition attachment report_<job_id>.<ext>",
+      "not_ready_or_failed": "409 Conflict (controlled, never 500)",
+      "expired_or_missing_file": "410 Gone",
+      "path_safety": "stored file_path containment-checked against REPORTS_ROOT (traversal-safe)"
+    },
+    "media_types": {
+      "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "pdf": "application/pdf",
+      "json": "application/json"
+    }
+  },
+  "consistency": {
+    "rule": "for identical filters+columns, ReportDataset / XLSX / PDF table / JSON items carry the same rows, columns and values (presentation formatting aside)",
+    "nulls": "None everywhere (empty XLSX/PDF cell, JSON null)",
+    "scope": "same UnifiedFilter + same actor security intersection in every format"
+  }
+}
