@@ -149,6 +149,7 @@ def test_mounted_routers_are_only_the_production_contract():
         "/api/v1/teachers",
         "/api/v1/workflow",
         "/api/v1/health-score",
+        "/api/v1/analytics",
         "/api/v1/reports",
     )
     paths = _mounted_api_paths()
