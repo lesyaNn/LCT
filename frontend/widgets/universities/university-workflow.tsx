@@ -7,7 +7,6 @@ import { useQuery } from '@tanstack/react-query';
 import Attachment from '@atomaro/icons/24/action/Attachment';
 import CheckLarge from '@atomaro/icons/24/navigation/CheckLarge';
 import Comments from '@atomaro/icons/24/communication/Comments';
-import DocumentText from '@atomaro/icons/24/document/DocumentText';
 import ErrorStroke from '@atomaro/icons/24/alert/ErrorStroke';
 import History from '@atomaro/icons/24/communication/History';
 import InformationStroke from '@atomaro/icons/24/alert/InformationStroke';
@@ -23,6 +22,8 @@ import { Button } from '@/shared/ui/rtk/button';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { Tooltip } from '@/shared/ui/rtk/tooltip';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
+import { WorkflowComments } from './workflow-comments';
+import { WorkflowAttachments } from './workflow-attachments';
 import styles from './university-workflow.module.css';
 
 export type WorkflowViewMode = 'page' | 'embedded';
@@ -102,23 +103,6 @@ function WorkflowStageItem({ stage, selected, detailsId, onSelect }: { stage: Un
   );
 }
 
-function CommentsBlock({ stage, idPrefix }: { stage: UniversityWorkflowStage; idPrefix: string }) {
-  const [showAll, setShowAll] = useState(false);
-  const comments = showAll ? stage.comments : stage.comments.slice(0, 3);
-  const headingId = `${idPrefix}-comments-title`;
-  return (
-    <section className={styles.detailSection} aria-labelledby={headingId}>
-      <div className={styles.detailSectionHeading}><h3 id={headingId}><Comments size={18} fill="currentColor" />Комментарии</h3>{stage.comments.length > 3 ? <Button variant="ghost" size="s" type="button" onClick={() => setShowAll((value) => !value)}>{showAll ? 'Свернуть' : 'Показать все'}</Button> : null}</div>
-      <ul className={styles.commentList}>{comments.map((comment) => <li key={comment.id}><div className={styles.commentMeta}><strong>{comment.author}</strong><time dateTime={comment.occurredAt}>{formatDateTimeRu(comment.occurredAt)}</time></div><p>{comment.text}</p></li>)}</ul>
-      <form className={styles.commentForm} onSubmit={(event) => event.preventDefault()}>
-        <label htmlFor={`${idPrefix}-comment-input`}>Добавить комментарий</label>
-        <textarea id={`${idPrefix}-comment-input`} rows={3} placeholder="Введите комментарий" disabled />
-        <div className={styles.commentFormFooter}><Button variant="secondary" size="s" type="submit" disabled title="Добавление комментариев подключится после появления API">Добавить</Button><span>Форма станет доступна после подключения API.</span></div>
-      </form>
-    </section>
-  );
-}
-
 type WorkflowAction = { label: string; variant: 'primary' | 'secondary'; title: string };
 
 function getStageActions(stage: UniversityWorkflowStage, canManage: boolean, canRestore: boolean): WorkflowAction[] {
@@ -152,7 +136,7 @@ function CompletionSummary({ stage }: { stage: UniversityWorkflowStage }) {
   return <div className={`${styles.completionSummary} ${onTime ? styles.completionOnTime : styles.completionLate}`}><span aria-hidden="true">{onTime ? <CheckLarge size={16} fill="currentColor" /> : <ErrorStroke size={16} fill="currentColor" />}</span><span>{onTime ? 'Выполнено вовремя' : 'Завершено после дедлайна'}</span><time dateTime={stage.completedAt}>Завершено: {formatDateTimeRu(stage.completedAt)}</time></div>;
 }
 
-function WorkflowStageDetails({ stage, canManage, canRestore, idPrefix }: { stage: UniversityWorkflowStage; canManage: boolean; canRestore: boolean; idPrefix: string }) {
+function WorkflowStageDetails({ stage, instanceId, canManage, canRestore, idPrefix }: { stage: UniversityWorkflowStage; instanceId: string; canManage: boolean; canRestore: boolean; idPrefix: string }) {
   const semantics = workflowStageStatusSemantics[stage.status];
   const completedTasks = stage.tasks.filter((task) => task.completed).length;
   const taskProgress = stage.tasks.length ? Math.round((completedTasks / stage.tasks.length) * 100) : 0;
@@ -162,9 +146,9 @@ function WorkflowStageDetails({ stage, canManage, canRestore, idPrefix }: { stag
       <div className={styles.detailHeader}><div><span className={styles.eyebrow}>Детали этапа {stage.orderIndex} из 14</span><h2 id={headingId}>{stage.name}</h2></div><StatusBadge intent={semantics.intent} icon={<StageStatusIcon status={stage.status} />}>{semantics.label}</StatusBadge></div>
       <CompletionSummary stage={stage} />
       <section className={styles.detailSection} aria-labelledby={`${idPrefix}-overview-title`}><div className={styles.detailSectionHeading}><h3 id={`${idPrefix}-overview-title`}><InformationStroke size={18} fill="currentColor" />Основная информация</h3></div><dl className={styles.detailFacts}><div><dt>{stage.status === 'completed' ? 'Дедлайн был' : 'Дедлайн'}</dt><dd className={stage.status === 'overdue' ? styles.overdue : undefined}><StageDeadline stage={stage} /></dd></div>{stage.startedAt ? <div><dt>Начат</dt><dd><time dateTime={stage.startedAt}>{formatDateTimeRu(stage.startedAt)}</time></dd></div> : null}{stage.completedAt && stage.status !== 'completed' ? <div><dt>Завершён</dt><dd><time dateTime={stage.completedAt}>{formatDateTimeRu(stage.completedAt)}</time></dd></div> : null}<div><dt>Ответственный</dt><dd><StageAssignee stage={stage} /></dd></div></dl></section>
-      <CommentsBlock stage={stage} idPrefix={idPrefix} />
-      <section className={styles.detailSection} aria-labelledby={`${idPrefix}-attachments-title`}><div className={styles.detailSectionHeading}><h3 id={`${idPrefix}-attachments-title`}><Attachment size={18} fill="currentColor" />Вложения</h3></div>{stage.attachments.length ? <ul className={styles.attachmentList}>{stage.attachments.map((attachment) => <li key={attachment.id}><DocumentText size={18} fill="currentColor" /><span><strong>{attachment.fileName}</strong><small>{attachment.fileType} · {attachment.fileSize}</small></span></li>)}</ul> : <p className={styles.muted}>Вложений пока нет</p>}</section>
       <section className={styles.detailSection} aria-labelledby={`${idPrefix}-tasks-title`}><div className={styles.detailSectionHeading}><h3 id={`${idPrefix}-tasks-title`}><Task size={18} fill="currentColor" />Задачи этапа</h3><span className={styles.taskCount}>Выполнено {completedTasks} из {stage.tasks.length}</span></div><div className={styles.taskProgress} role="progressbar" aria-label={`Задачи этапа: выполнено ${completedTasks} из ${stage.tasks.length}`} aria-valuemin={0} aria-valuemax={stage.tasks.length} aria-valuenow={completedTasks}><span style={{ width: `${taskProgress}%` }} /></div><ul className={styles.taskList}>{stage.tasks.map((task) => <li key={task.id}><label><input type="checkbox" checked={task.completed} disabled readOnly /><span className={task.completed ? styles.taskCompleted : undefined}>{task.label}</span></label></li>)}</ul></section>
+      <WorkflowComments instanceId={instanceId} stageId={stage.id} comments={stage.comments} />
+      <WorkflowAttachments instanceId={instanceId} attachments={stage.attachments} />
       <section className={styles.detailSection} aria-labelledby={`${idPrefix}-transition-title`}><div className={styles.detailSectionHeading}><h3 id={`${idPrefix}-transition-title`}><History size={18} fill="currentColor" />История переходов</h3></div>{stage.transitions.length ? <ol className={styles.transitionList}>{stage.transitions.map((transition) => <li key={transition.id}><div><strong>{transition.actor}</strong><time dateTime={transition.occurredAt}>{formatDateTimeRu(transition.occurredAt)}</time></div><p>{workflowStageStatusSemantics[transition.fromStatus].label} → {workflowStageStatusSemantics[transition.toStatus].label}. {transition.comment}</p></li>)}</ol> : <p className={styles.muted}>Переходов пока нет</p>}</section>
       <StageActionPanel stage={stage} canManage={canManage} canRestore={canRestore} />
     </section>
@@ -210,7 +194,7 @@ export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride 
   if (query.isError || !query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
   if (!stages.length || !selectedStage) return <WorkflowEmptyState />;
 
-  return <div className={`${styles.page} ${mode === 'embedded' ? styles.embedded : ''}`}>{mode === 'page' ? <WorkflowHeader workflow={query.data} /> : null}<div className={styles.layout}><section className={styles.stagesPanel} aria-labelledby={`${idPrefix}-stages-title`}><div className={styles.panelHeading}><div><span className={styles.eyebrow}>Жизненный цикл проекта</span><h2 id={`${idPrefix}-stages-title`}>Этапы Workflow</h2></div><span className={styles.totalLabel}>{stages.length} этапов</span></div><ol className={styles.stageList}>{stages.map((stage) => <WorkflowStageItem key={stage.id} stage={stage} selected={stage.id === selectedStage.id} detailsId={detailsId} onSelect={() => setSelectedId(stage.id)} />)}</ol></section><WorkflowStageDetails key={selectedStage.id} stage={selectedStage} canManage={canManage} canRestore={canRestore} idPrefix={detailsId} /></div></div>;
+  return <div className={`${styles.page} ${mode === 'embedded' ? styles.embedded : ''}`}>{mode === 'page' ? <WorkflowHeader workflow={query.data} /> : null}<div className={styles.layout}><section className={styles.stagesPanel} aria-labelledby={`${idPrefix}-stages-title`}><div className={styles.panelHeading}><div><span className={styles.eyebrow}>Жизненный цикл проекта</span><h2 id={`${idPrefix}-stages-title`}>Этапы Workflow</h2></div><span className={styles.totalLabel}>{stages.length} этапов</span></div><ol className={styles.stageList}>{stages.map((stage) => <WorkflowStageItem key={stage.id} stage={stage} selected={stage.id === selectedStage.id} detailsId={detailsId} onSelect={() => setSelectedId(stage.id)} />)}</ol></section><WorkflowStageDetails key={selectedStage.id} stage={selectedStage} instanceId={instanceId} canManage={canManage} canRestore={canRestore} idPrefix={detailsId} /></div></div>;
 }
 
 export function UniversityWorkflow({ id, canAdvance }: { id: string; canAdvance: boolean }) {

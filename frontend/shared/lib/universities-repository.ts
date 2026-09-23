@@ -1,6 +1,7 @@
 import { getHealthStatus, type HealthStatus } from './health-score';
 import { programStatusLabels, type ProgramStatus } from './dashboard-repository';
 import { getExpirationStatus, type ExpirationStatus } from './formatters';
+import { apiFetch } from './api-client';
 
 export type { ProgramStatus };
 
@@ -299,8 +300,14 @@ export type UniversityWorkflowStageStatus = 'completed' | 'current' | 'pending' 
 export interface UniversityWorkflowComment {
   id: string;
   author: string;
+  authorId?: string;
+  authorRole?: string;
+  isSystem?: boolean;
   occurredAt: string;
+  updatedAt?: string;
   text: string;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
 export interface UniversityWorkflowAttachment {
@@ -308,6 +315,14 @@ export interface UniversityWorkflowAttachment {
   fileName: string;
   fileType: string;
   fileSize: string;
+  mimeType?: string;
+  fileSizeBytes?: number;
+  uploadedBy?: UniversityResponsible | null;
+  uploadedAt?: string;
+  description?: string;
+  downloadUrl?: string;
+  previewUrl?: string;
+  canDelete?: boolean;
 }
 
 export interface UniversityWorkflowTask {
@@ -355,6 +370,50 @@ export interface UniversityWorkflow {
 
 export const workflowQueryKey = (instanceId: string) => ['workflow', instanceId] as const;
 export const universityWorkflowQueryKey = workflowQueryKey;
+export const workflowCommentsQueryKey = (instanceId: string) => [...workflowQueryKey(instanceId), 'comments'] as const;
+
+export interface WorkflowCommentApiRecord {
+  id: string;
+  instance_id: string;
+  stage_id: string | null;
+  author_keycloak_sub: string;
+  content: string;
+  is_internal: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export function isWorkflowApiInstanceId(instanceId: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(instanceId);
+}
+
+function unwrapApiResult<T>(result: Awaited<ReturnType<typeof apiFetch<T>>>): T {
+  if (result.ok) return result.data;
+  throw new Error(result.error || 'Не удалось выполнить действие Workflow.');
+}
+
+export async function listWorkflowComments(instanceId: string): Promise<WorkflowCommentApiRecord[]> {
+  if (!isWorkflowApiInstanceId(instanceId)) return [];
+  return unwrapApiResult(await apiFetch<WorkflowCommentApiRecord[]>(`/api/v1/workflow/instances/${instanceId}/comments`));
+}
+
+export async function createWorkflowComment(instanceId: string, content: string, stageId?: string): Promise<WorkflowCommentApiRecord> {
+  if (!isWorkflowApiInstanceId(instanceId)) throw new Error('Добавление комментариев недоступно для этого Workflow-источника.');
+  return unwrapApiResult(await apiFetch<WorkflowCommentApiRecord>(`/api/v1/workflow/instances/${instanceId}/comments`, { method: 'POST', body: { content, stage_id: stageId ?? null } }));
+}
+
+export async function editWorkflowComment(commentId: string, content: string): Promise<WorkflowCommentApiRecord> {
+  return unwrapApiResult(await apiFetch<WorkflowCommentApiRecord>(`/api/v1/workflow/comments/${commentId}`, { method: 'PATCH', body: { content } }));
+}
+
+export function workflowAttachmentDownloadUrl(instanceId: string, attachmentId: string): string | null {
+  return isWorkflowApiInstanceId(instanceId) ? `/api/v1/workflow/instances/${instanceId}/attachments/${attachmentId}/download` : null;
+}
+
+export async function deleteWorkflowAttachment(instanceId: string, attachmentId: string): Promise<void> {
+  if (!isWorkflowApiInstanceId(instanceId)) throw new Error('Удаление вложений недоступно для этого Workflow-источника.');
+  unwrapApiResult(await apiFetch<undefined>(`/api/v1/workflow/instances/${instanceId}/attachments/${attachmentId}`, { method: 'DELETE' }));
+}
 
 const workflowStageNames = [
   'Инициация проекта',
@@ -407,10 +466,10 @@ function getWorkflowStageDates(index: number, status: UniversityWorkflowStageSta
 function getWorkflowComments(id: string, index: number, responsible: UniversityResponsible | null): UniversityWorkflowComment[] {
   const author = responsible?.name ?? 'Анна Иванова';
   return [
-    { id: `${id}-stage-${index + 1}-comment-1`, author, occurredAt: '2026-09-20T11:30:00+03:00', text: index === 10 ? 'Зафиксировали контрольные точки запуска и ответственных.' : 'Обновили материалы этапа и подтвердили следующий шаг.' },
-    { id: `${id}-stage-${index + 1}-comment-2`, author: 'Борис Петров', occurredAt: '2026-09-18T16:10:00+03:00', text: 'Проверили комплект данных со стороны вуза.' },
-    { id: `${id}-stage-${index + 1}-comment-3`, author: 'Елена Смирнова', occurredAt: '2026-09-16T13:45:00+03:00', text: 'Добавили комментарий методиста к этапу.' },
-    { id: `${id}-stage-${index + 1}-comment-4`, author: 'Анна Иванова', occurredAt: '2026-09-12T15:00:00+03:00', text: 'Согласовали план ближайших запусков.' },
+    { id: `${id}-stage-${index + 1}-comment-1`, author: 'Система Workflow', authorId: 'system', authorRole: 'Система', isSystem: true, occurredAt: '2026-09-20T11:30:00+03:00', updatedAt: '2026-09-20T11:30:00+03:00', text: index === 10 ? 'Зафиксировали контрольные точки запуска и ответственных.' : 'Обновили материалы этапа и подтвердили следующий шаг.' },
+    { id: `${id}-stage-${index + 1}-comment-2`, author: 'Борис Петров', authorId: 'responsible-boris', authorRole: 'Менеджер', occurredAt: '2026-09-18T16:10:00+03:00', updatedAt: '2026-09-18T16:10:00+03:00', text: 'Проверили комплект данных со стороны вуза.' },
+    { id: `${id}-stage-${index + 1}-comment-3`, author: 'Елена Смирнова', authorId: 'responsible-elena', authorRole: 'Координатор программы', occurredAt: '2026-09-16T13:45:00+03:00', updatedAt: '2026-09-16T13:45:00+03:00', text: 'Добавили комментарий методиста к этапу.' },
+    { id: `${id}-stage-${index + 1}-comment-4`, author: author || 'Анна Иванова', authorId: responsible?.id ?? '1', authorRole: responsible?.role ?? 'Администратор', occurredAt: '2026-09-12T15:00:00+03:00', updatedAt: '2026-09-12T15:00:00+03:00', text: 'Согласовали план ближайших запусков.' },
   ];
 }
 
@@ -423,7 +482,7 @@ export async function getUniversityWorkflow(id: string): Promise<UniversityWorkf
     const status = getWorkflowStageStatus(index, currentIndex, university.attention, numericId);
     const previousStatus = index === 0 ? 'pending' : getWorkflowStageStatus(index - 1, currentIndex, university.attention, numericId);
     const attachments: UniversityWorkflowAttachment[] = index % 3 === 0
-      ? [{ id: `${id}-stage-${index + 1}-attachment`, fileName: index === 6 ? 'дорожная-карта-запуска.pdf' : 'материалы-этапа.docx', fileType: index === 6 ? 'PDF' : 'DOCX', fileSize: index === 6 ? '1,8 МБ' : '420 КБ' }]
+      ? [{ id: `${id}-stage-${index + 1}-attachment`, fileName: index === 6 ? 'дорожная-карта-запуска.pdf' : 'материалы-этапа.docx', fileType: index === 6 ? 'PDF' : 'DOCX', fileSize: index === 6 ? '1,8 МБ' : '420 КБ', mimeType: index === 6 ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', fileSizeBytes: index === 6 ? 1_887_436 : 430_080, uploadedBy: university.responsible, uploadedAt: '2026-09-20T11:30:00+03:00', description: index === 6 ? 'Актуальная версия дорожной карты запуска.' : undefined }]
       : [];
     const tasks: UniversityWorkflowTask[] = [
       { id: `${id}-stage-${index + 1}-task-1`, label: 'Проверить входные данные', completed: status === 'completed' || status === 'skipped' },

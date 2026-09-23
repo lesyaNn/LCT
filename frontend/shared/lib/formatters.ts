@@ -8,6 +8,35 @@ export function formatDateTimeRu(isoDate: string): string {
   return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
 }
 
+export function formatRelativeDateRu(isoDate: string, now = new Date()): string {
+  const date = new Date(isoDate);
+  if (Number.isNaN(date.getTime())) return 'Дата не указана';
+  const diffMs = now.getTime() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / 60_000);
+  const sameDay = date.toLocaleDateString('ru-RU') === now.toLocaleDateString('ru-RU');
+  const time = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(date);
+  if (diffMinutes < 1 && diffMs >= 0) return 'только что';
+  if (diffMinutes < 60 && diffMinutes >= 0) return `${diffMinutes} ${pluralizeMinutes(diffMinutes)} назад`;
+  if (sameDay) return `сегодня в ${time}`;
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (date.toLocaleDateString('ru-RU') === yesterday.toLocaleDateString('ru-RU')) return `вчера в ${time}`;
+  return formatDateTimeRu(isoDate);
+}
+
+export function formatFileSize(sizeInBytes: number | null | undefined, fallback?: string): string {
+  if (typeof sizeInBytes !== 'number' || !Number.isFinite(sizeInBytes) || sizeInBytes < 0) return fallback ?? 'Размер не указан';
+  if (sizeInBytes < 1024) return `${sizeInBytes} Б`;
+  const units = ['КБ', 'МБ', 'ГБ'];
+  let value = sizeInBytes / 1024;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: value >= 10 ? 0 : 1 }).format(value)} ${units[unitIndex]}`;
+}
+
 export type ExpirationStatus = 'current' | 'expires_soon' | 'expired';
 export type UpcomingDateStatus = 'long_term' | 'approaching' | 'urgent' | 'overdue' | 'unknown';
 
@@ -72,4 +101,10 @@ function pluralizeDays(value: number): string {
   if (remainder10 === 1 && remainder100 !== 11) return 'день';
   if (remainder10 >= 2 && remainder10 <= 4 && (remainder100 < 10 || remainder100 >= 20)) return 'дня';
   return 'дней';
+}
+
+function pluralizeMinutes(value: number): string {
+  if (value % 10 === 1 && value % 100 !== 11) return 'минуту';
+  if (value % 10 >= 2 && value % 10 <= 4 && (value % 100 < 10 || value % 100 >= 20)) return 'минуты';
+  return 'минут';
 }
