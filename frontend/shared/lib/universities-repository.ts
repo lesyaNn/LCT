@@ -338,10 +338,17 @@ export interface UniversityWorkflowStage {
 
 export interface UniversityWorkflow {
   universityId: string;
+  universityName: string;
+  universityCity: string;
+  workflowName: string;
+  currentStage: UniversityWorkflowStage | null;
+  completedSteps: number;
+  totalSteps: number;
   stages: UniversityWorkflowStage[];
 }
 
-export const universityWorkflowQueryKey = (id: string) => ['university-workflow', id] as const;
+export const workflowQueryKey = (instanceId: string) => ['workflow', instanceId] as const;
+export const universityWorkflowQueryKey = workflowQueryKey;
 
 const workflowStageNames = [
   'Инициация проекта',
@@ -363,6 +370,11 @@ const workflowStageNames = [
 const workflowStageIndex: Record<UniversityStage['id'], number> = { preparation: 3, launch: 6, support: 10, completed: 13 };
 
 function getWorkflowStageStatus(index: number, currentIndex: number, attention: boolean, numericId: number): UniversityWorkflowStageStatus {
+  if (currentIndex >= workflowStageNames.length - 1) {
+    if (index < currentIndex) return index === 2 && numericId % 2 === 0 ? 'skipped' : 'completed';
+    if (index === currentIndex) return 'completed';
+    return 'pending';
+  }
   if (index === currentIndex && currentIndex < workflowStageNames.length - 1) return 'current';
   if (index < currentIndex) return index === 2 && numericId % 2 === 0 ? 'skipped' : 'completed';
   if (index === currentIndex + 1 && attention) return 'overdue';
@@ -422,7 +434,17 @@ export async function getUniversityWorkflow(id: string): Promise<UniversityWorkf
     } satisfies UniversityWorkflowStage;
   });
 
-  return { universityId: university.id, stages };
+  const currentStage = stages.find((stage) => stage.status === 'current') ?? stages.find((stage) => stage.orderIndex === currentIndex + 1) ?? null;
+  return {
+    universityId: university.id,
+    universityName: university.name,
+    universityCity: university.city,
+    workflowName: 'Подключение университета',
+    currentStage,
+    completedSteps: stages.filter((stage) => stage.status === 'completed').length,
+    totalSteps: stages.length,
+    stages,
+  };
 }
 
 export type UniversityHistoryEventType = 'workflow' | 'document' | 'meeting' | 'note' | 'audit';
