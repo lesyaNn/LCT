@@ -6,7 +6,7 @@ export const navigationItems: NavigationItem[] = [
   { label: 'ВУЗы', href: '/universities', icon: 'university', allowedRoles: ['user', 'manager', 'admin'] },
   { label: 'Преподаватели', href: '/teachers', icon: 'teacher', allowedRoles: ['user', 'manager', 'admin'] },
   { label: 'Workflow', href: '/workflows', icon: 'workflow', allowedRoles: ['user', 'manager', 'admin'] },
-  { label: 'Отчёты', href: '/reports', icon: 'report', allowedRoles: ['user', 'manager', 'admin'] },
+  { label: 'Отчёты', href: '/reports', icon: 'report', allowedRoles: ['manager', 'admin'] },
   { label: 'Аудит', href: '/audit', icon: 'audit', allowedRoles: ['manager', 'admin'] },
   { label: 'Администрирование', href: '/admin', icon: 'admin', allowedRoles: ['admin'] },
   { label: 'Документация', href: '/docs', icon: 'docs', allowedRoles: ['user', 'manager', 'admin'] },

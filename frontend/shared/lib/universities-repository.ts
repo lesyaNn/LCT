@@ -896,6 +896,8 @@ export const universityStudentsQueryKey = (id: string) => ['university-students'
 export const universityProductsQueryKey = (id: string) => ['university-products', id] as const;
 
 const programDirections = ['Аналитика и данные', 'Цифровая трансформация', 'Информационная безопасность', 'Управление проектами'];
+/** Shared catalog dictionary used by university passport and report filters. */
+export const universityProgramDirectionOptions = programDirections.map((name) => ({ id: name.toLocaleLowerCase('ru-RU').replace(/\s+/g, '-'), name }));
 const programNames = ['Аналитика данных', 'Цифровая экономика', 'Кибербезопасность', 'ИТ-менеджмент'];
 const teacherNames = ['Мария Кузнецова', 'Алексей Орлов', 'Ольга Соколова', 'Илья Морозов', 'Наталья Лебедева', 'Сергей Фёдоров'];
 const teacherPositions = ['Руководитель программы', 'Старший преподаватель', 'Преподаватель-практик'];
