@@ -6,10 +6,28 @@ import {
   universityPassportQueryKey,
   universitiesQueryKey,
   workflowQueryKey,
+  type UniversityWorkflow,
+  type UniversityWorkflowAttachment,
 } from './universities-repository';
 
 export function invalidateWorkflowDetail(queryClient: QueryClient, instanceId: string): Promise<void> {
   return queryClient.invalidateQueries({ queryKey: workflowQueryKey(instanceId) });
+}
+
+function patchWorkflowStageAttachments(queryClient: QueryClient, instanceId: string, stageId: string, update: (attachments: UniversityWorkflowAttachment[]) => UniversityWorkflowAttachment[]): void {
+  queryClient.setQueryData<UniversityWorkflow>(workflowQueryKey(instanceId), (current) => {
+    if (!current) return current;
+    const stages = current.stages.map((stage) => stage.id === stageId ? { ...stage, attachments: update(stage.attachments) } : stage);
+    return { ...current, stages, currentStage: current.currentStage ? stages.find((stage) => stage.id === current.currentStage?.id) ?? current.currentStage : null };
+  });
+}
+
+export function addWorkflowAttachmentToCache(queryClient: QueryClient, instanceId: string, stageId: string, attachment: UniversityWorkflowAttachment): void {
+  patchWorkflowStageAttachments(queryClient, instanceId, stageId, (attachments) => attachments.some((item) => item.id === attachment.id) ? attachments : [...attachments, attachment]);
+}
+
+export function removeWorkflowAttachmentFromCache(queryClient: QueryClient, instanceId: string, stageId: string, attachmentId: string): void {
+  patchWorkflowStageAttachments(queryClient, instanceId, stageId, (attachments) => attachments.filter((attachment) => attachment.id !== attachmentId));
 }
 
 /**

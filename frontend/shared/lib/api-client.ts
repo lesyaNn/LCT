@@ -13,6 +13,11 @@ export type ApiOptions = {
   anonymous?: boolean;
 };
 
+export type ApiUploadOptions = {
+  signal?: AbortSignal;
+  onProgress?: (progress: number) => void;
+};
+
 function apiBaseUrl(): string {
   return (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '');
 }
@@ -100,6 +105,65 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
   }
 
   return result;
+}
+
+/**
+ * Multipart transport for uploads that need real browser upload progress.
+ * XMLHttpRequest stays in the shared data layer; callers only provide a
+ * FormData body, progress callback and AbortSignal.
+ */
+export async function apiUploadFormData<T>(path: string, body: FormData, options: ApiUploadOptions = {}): Promise<ApiResult<T>> {
+  if (options.signal?.aborted) throw new DOMException('Загрузка отменена', 'AbortError');
+
+  const keycloak = isKeycloakMode() ? await ensureKeycloak() : null;
+  let token: string | undefined;
+  if (keycloak) {
+    if (!keycloak.authenticated) return { ok: false, status: 401, error: 'AUTH_REQUIRED — войдите в систему' };
+    try {
+      token = await refreshKeycloakToken(30) ?? undefined;
+    } catch {
+      await expireKeycloakSession();
+      return { ok: false, status: 401, error: 'Сессия истекла. Войдите снова.' };
+    }
+    if (!token) return { ok: false, status: 401, error: 'AUTH_REQUIRED — войдите в систему' };
+  }
+  if (options.signal?.aborted) throw new DOMException('Загрузка отменена', 'AbortError');
+
+  return new Promise<ApiResult<T>>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const abort = () => xhr.abort();
+    const cleanup = () => options.signal?.removeEventListener('abort', abort);
+    xhr.open('POST', `${apiBaseUrl()}${path}`);
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable) return;
+      options.onProgress?.(Math.max(0, Math.min(100, Math.round((event.loaded / event.total) * 100))));
+    };
+    xhr.upload.onload = () => options.onProgress?.(100);
+    xhr.onload = () => {
+      cleanup();
+      if (xhr.status === 401 && keycloak) void expireKeycloakSession();
+      if (xhr.status < 200 || xhr.status >= 300) {
+        resolve({ ok: false, status: xhr.status, error: `${xhr.status} ${xhr.responseText}`.trim() });
+        return;
+      }
+      const contentType = xhr.getResponseHeader('content-type') ?? '';
+      if (!contentType.includes('application/json')) {
+        resolve({ ok: false, status: xhr.status, error: 'Неожиданный ответ при upload (не JSON)' });
+        return;
+      }
+      try {
+        resolve({ ok: true, status: xhr.status, data: JSON.parse(xhr.responseText) as T });
+      } catch {
+        resolve({ ok: false, status: xhr.status, error: 'Не удалось разобрать JSON ответа' });
+      }
+    };
+    xhr.onerror = () => { cleanup(); resolve({ ok: false, status: 0, error: 'Backend недоступен во время upload' }); };
+    xhr.onabort = () => { cleanup(); reject(new DOMException('Загрузка отменена', 'AbortError')); };
+    options.signal?.addEventListener('abort', abort, { once: true });
+    options.onProgress?.(0);
+    xhr.send(body);
+  });
 }
 
 export function resetApiClientForTests(): void {
