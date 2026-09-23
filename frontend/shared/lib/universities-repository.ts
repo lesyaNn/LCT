@@ -372,6 +372,16 @@ export const workflowQueryKey = (instanceId: string) => ['workflow', instanceId]
 export const universityWorkflowQueryKey = workflowQueryKey;
 export const workflowCommentsQueryKey = (instanceId: string) => [...workflowQueryKey(instanceId), 'comments'] as const;
 
+export class WorkflowApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'WorkflowApiError';
+    this.status = status;
+  }
+}
+
 export interface WorkflowCommentApiRecord {
   id: string;
   instance_id: string;
@@ -389,7 +399,7 @@ export function isWorkflowApiInstanceId(instanceId: string): boolean {
 
 function unwrapApiResult<T>(result: Awaited<ReturnType<typeof apiFetch<T>>>): T {
   if (result.ok) return result.data;
-  throw new Error(result.error || 'Не удалось выполнить действие Workflow.');
+  throw new WorkflowApiError(result.status, result.error || 'Не удалось выполнить действие Workflow.');
 }
 
 export async function listWorkflowComments(instanceId: string): Promise<WorkflowCommentApiRecord[]> {
@@ -400,6 +410,45 @@ export async function listWorkflowComments(instanceId: string): Promise<Workflow
 export async function createWorkflowComment(instanceId: string, content: string, stageId?: string): Promise<WorkflowCommentApiRecord> {
   if (!isWorkflowApiInstanceId(instanceId)) throw new Error('Добавление комментариев недоступно для этого Workflow-источника.');
   return unwrapApiResult(await apiFetch<WorkflowCommentApiRecord>(`/api/v1/workflow/instances/${instanceId}/comments`, { method: 'POST', body: { content, stage_id: stageId ?? null } }));
+}
+
+export interface WorkflowInstanceApiStage {
+  id: string;
+  template_stage_id: string | null;
+  order_index: number;
+  name: string;
+  description: string | null;
+  is_required: boolean;
+  status: string;
+  due_date: string | null;
+  completed_at: string | null;
+  is_overdue: boolean;
+  days_overdue: number;
+}
+
+export interface WorkflowInstanceApiRecord {
+  id: string;
+  university_id: string;
+  template_id: string;
+  current_stage_id: string | null;
+  current_instance_stage_id: string | null;
+  responsible_id: string | null;
+  status: string;
+  due_date: string | null;
+  completed_at: string | null;
+  is_overdue: boolean;
+  days_overdue: number;
+  stages: WorkflowInstanceApiStage[];
+}
+
+export async function getWorkflowInstance(instanceId: string): Promise<WorkflowInstanceApiRecord> {
+  if (!isWorkflowApiInstanceId(instanceId)) throw new WorkflowApiError(0, 'Workflow instance имеет неверный идентификатор.');
+  return unwrapApiResult(await apiFetch<WorkflowInstanceApiRecord>(`/api/v1/workflow/instances/${instanceId}`));
+}
+
+export async function transitionWorkflowInstance(instanceId: string, targetInstanceStageId: string, comment: string): Promise<WorkflowInstanceApiRecord> {
+  if (!isWorkflowApiInstanceId(instanceId)) throw new WorkflowApiError(0, 'Переход недоступен для этого Workflow-источника.');
+  return unwrapApiResult(await apiFetch<WorkflowInstanceApiRecord>(`/api/v1/workflow/instances/${instanceId}/transition`, { method: 'POST', body: { target_instance_stage_id: targetInstanceStageId, comment } }));
 }
 
 export async function editWorkflowComment(commentId: string, content: string): Promise<WorkflowCommentApiRecord> {
@@ -475,6 +524,7 @@ function getWorkflowComments(id: string, index: number, responsible: UniversityR
 
 /** Typed frontend adapter for the future GET /universities/{id}/workflow endpoint. */
 export async function getUniversityWorkflow(id: string): Promise<UniversityWorkflow> {
+  if (isWorkflowApiInstanceId(id)) return getApiUniversityWorkflow(await getWorkflowInstance(id));
   const university = getUniversityOrThrow(id);
   const numericId = getUniversityNumericId(id);
   const currentIndex = workflowStageIndex[university.currentStage.id] ?? 3;
@@ -519,6 +569,44 @@ export async function getUniversityWorkflow(id: string): Promise<UniversityWorkf
     workflowName: 'Подключение университета',
     currentStage,
     completedSteps: stages.filter((stage) => stage.status === 'completed').length,
+    totalSteps: stages.length,
+    stages,
+  };
+}
+
+function getApiUniversityWorkflow(instance: WorkflowInstanceApiRecord): UniversityWorkflow {
+  const stages = instance.stages.map((stage): UniversityWorkflowStage => {
+    const isCurrent = stage.id === instance.current_instance_stage_id;
+    const status: UniversityWorkflowStageStatus = isCurrent
+      ? 'current'
+      : stage.status === 'completed' || stage.status === 'skipped'
+        ? stage.status
+        : stage.is_overdue ? 'overdue' : 'pending';
+    return {
+      id: stage.id,
+      orderIndex: stage.order_index,
+      name: stage.name,
+      status,
+      deadline: stage.due_date ?? '',
+      startedAt: null,
+      completedAt: stage.completed_at,
+      completion: stage.completed_at && stage.due_date && stage.completed_at.slice(0, 10) > stage.due_date ? 'late' : stage.completed_at ? 'on_time' : null,
+      isOptional: !stage.is_required,
+      responsible: null,
+      comments: [],
+      attachments: [],
+      tasks: [],
+      transitions: [],
+    };
+  });
+  const currentStage = stages.find((stage) => stage.status === 'current') ?? null;
+  return {
+    universityId: instance.university_id,
+    universityName: 'Workflow',
+    universityCity: '',
+    workflowName: 'Workflow',
+    currentStage,
+    completedSteps: stages.filter((stage) => stage.status === 'completed' || stage.status === 'skipped').length,
     totalSteps: stages.length,
     stages,
   };

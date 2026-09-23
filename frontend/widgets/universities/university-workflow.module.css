@@ -114,6 +114,7 @@
 .stageAction { border-top: 1px solid var(--rtk-color-border); display: flex; flex-direction: column; gap: var(--rtk-space-2); padding-top: var(--rtk-space-4); }
 .stageActionButtons { display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); }
 .stageAction span { color: var(--rtk-color-text-tertiary); font-size: 11px; }
+.toastViewport { display: flex; flex-direction: column; gap: var(--rtk-space-2); pointer-events: none; position: fixed; right: var(--rtk-space-5); top: var(--rtk-space-5); z-index: 140; }
 .emptyState { align-items: center; color: var(--rtk-color-text-secondary); display: flex; flex-direction: column; gap: var(--rtk-space-2); justify-content: center; min-height: 240px; text-align: center; }
 .emptyState svg { color: var(--rtk-color-brand); }
 .emptyState p { margin: 0; }
@@ -130,4 +131,5 @@
 @keyframes workflowDetailsReveal { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 900px) { .headerMain, .layout, .skeletonLayout { grid-template-columns: 1fr; } .headerCurrent { max-width: 520px; } }
 @media (max-width: 480px) { .stagesPanel, .detailPanel, .overallProgress { padding: var(--rtk-space-4); } .detailFacts { grid-template-columns: 1fr; } .detailHeader { flex-direction: column; } .stageButton { gap: var(--rtk-space-2); grid-template-columns: 32px minmax(0, 1fr); padding: var(--rtk-space-2); } .stageMarker { height: 32px; width: 32px; } .stageItem:not(:last-child)::after { left: 16px; top: 40px; } .stageMeta { align-items: flex-start; flex-direction: column; gap: var(--rtk-space-1); } .progressLabel { align-items: flex-start; flex-direction: column; gap: var(--rtk-space-1); } }
+@media (max-width: 480px) { .toastViewport { left: var(--rtk-space-3); right: var(--rtk-space-3); top: var(--rtk-space-3); } .toastViewport > * { max-width: none; } }
 @media (prefers-reduced-motion: reduce) { .progressTrack span, .taskProgress span, .skeletonStages span, .skeletonDetails span, .skeletonHeader span, .detailPanel { animation: none; transition: none; } }

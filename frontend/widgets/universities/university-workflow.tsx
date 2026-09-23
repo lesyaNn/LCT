@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import type { ComponentType } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Attachment from '@atomaro/icons/24/action/Attachment';
 import CheckLarge from '@atomaro/icons/24/navigation/CheckLarge';
@@ -22,8 +22,10 @@ import { Button } from '@/shared/ui/rtk/button';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { Tooltip } from '@/shared/ui/rtk/tooltip';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
+import { Toast } from '@/shared/ui/rtk/toast';
 import { WorkflowComments } from './workflow-comments';
 import { WorkflowAttachments } from './workflow-attachments';
+import { WorkflowTransitionModal, type WorkflowTransitionNotification } from './workflow-transition-modal';
 import styles from './university-workflow.module.css';
 
 export type WorkflowViewMode = 'page' | 'embedded';
@@ -124,10 +126,12 @@ function getStageActions(stage: UniversityWorkflowStage, canManage: boolean, can
   return [];
 }
 
-function StageActionPanel({ stage, canManage, canRestore }: { stage: UniversityWorkflowStage; canManage: boolean; canRestore: boolean }) {
+function StageActionPanel({ stage, stages, instanceId, userId, canManage, canRestore, onTransitionSuccess, onNotify }: { stage: UniversityWorkflowStage; stages: UniversityWorkflowStage[]; instanceId: string; userId?: string | null; canManage: boolean; canRestore: boolean; onTransitionSuccess: () => void; onNotify: (notification: WorkflowTransitionNotification) => void }) {
+  const [transitionOpen, setTransitionOpen] = useState(false);
   const actions = getStageActions(stage, canManage, canRestore);
   if (!actions.length) return null;
-  return <div className={styles.stageAction} aria-label="Действия этапа"><div className={styles.stageActionButtons}>{actions.map((action) => <Button key={action.label} variant={action.variant} size="s" type="button" disabled title={action.title}>{action.label}</Button>)}</div><span>Действия станут доступны после подключения API.</span></div>;
+  const transitionAction = actions.find((action) => action.label === 'Перевести на следующий этап');
+  return <div className={styles.stageAction} aria-label="Действия этапа"><div className={styles.stageActionButtons}>{actions.map((action) => { const canOpenTransition = action === transitionAction; return <Button key={action.label} variant={action.variant} size="s" type="button" disabled={!canOpenTransition} title={canOpenTransition ? undefined : action.title} onClick={canOpenTransition ? () => setTransitionOpen(true) : undefined}>{action.label}</Button>; })}</div>{transitionAction ? <span>Комментарий и подтверждение обязательны для перехода.</span> : <span>Действия станут доступны после подключения API.</span>}{transitionAction ? <WorkflowTransitionModal open={transitionOpen} instanceId={instanceId} currentStage={stage} stages={stages} userId={userId} onClose={() => setTransitionOpen(false)} onSuccess={() => { setTransitionOpen(false); onTransitionSuccess(); }} onNotify={onNotify} /> : null}</div>;
 }
 
 function CompletionSummary({ stage }: { stage: UniversityWorkflowStage }) {
@@ -136,7 +140,7 @@ function CompletionSummary({ stage }: { stage: UniversityWorkflowStage }) {
   return <div className={`${styles.completionSummary} ${onTime ? styles.completionOnTime : styles.completionLate}`}><span aria-hidden="true">{onTime ? <CheckLarge size={16} fill="currentColor" /> : <ErrorStroke size={16} fill="currentColor" />}</span><span>{onTime ? 'Выполнено вовремя' : 'Завершено после дедлайна'}</span><time dateTime={stage.completedAt}>Завершено: {formatDateTimeRu(stage.completedAt)}</time></div>;
 }
 
-function WorkflowStageDetails({ stage, instanceId, canManage, canRestore, idPrefix }: { stage: UniversityWorkflowStage; instanceId: string; canManage: boolean; canRestore: boolean; idPrefix: string }) {
+function WorkflowStageDetails({ stage, stages, instanceId, userId, canManage, canRestore, idPrefix, onTransitionSuccess, onNotify }: { stage: UniversityWorkflowStage; stages: UniversityWorkflowStage[]; instanceId: string; userId?: string | null; canManage: boolean; canRestore: boolean; idPrefix: string; onTransitionSuccess: () => void; onNotify: (notification: WorkflowTransitionNotification) => void }) {
   const semantics = workflowStageStatusSemantics[stage.status];
   const completedTasks = stage.tasks.filter((task) => task.completed).length;
   const taskProgress = stage.tasks.length ? Math.round((completedTasks / stage.tasks.length) * 100) : 0;
@@ -150,7 +154,7 @@ function WorkflowStageDetails({ stage, instanceId, canManage, canRestore, idPref
       <WorkflowComments instanceId={instanceId} stageId={stage.id} comments={stage.comments} />
       <WorkflowAttachments instanceId={instanceId} attachments={stage.attachments} />
       <section className={styles.detailSection} aria-labelledby={`${idPrefix}-transition-title`}><div className={styles.detailSectionHeading}><h3 id={`${idPrefix}-transition-title`}><History size={18} fill="currentColor" />История переходов</h3></div>{stage.transitions.length ? <ol className={styles.transitionList}>{stage.transitions.map((transition) => <li key={transition.id}><div><strong>{transition.actor}</strong><time dateTime={transition.occurredAt}>{formatDateTimeRu(transition.occurredAt)}</time></div><p>{workflowStageStatusSemantics[transition.fromStatus].label} → {workflowStageStatusSemantics[transition.toStatus].label}. {transition.comment}</p></li>)}</ol> : <p className={styles.muted}>Переходов пока нет</p>}</section>
-      <StageActionPanel stage={stage} canManage={canManage} canRestore={canRestore} />
+      <StageActionPanel stage={stage} stages={stages} instanceId={instanceId} userId={userId} canManage={canManage} canRestore={canRestore} onTransitionSuccess={onTransitionSuccess} onNotify={onNotify} />
     </section>
   );
 }
@@ -182,6 +186,12 @@ export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride 
   const canManage = canAdvanceOverride ?? (user?.role === 'admin' || user?.role === 'manager');
   const canRestore = user?.role === 'admin';
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [notification, setNotification] = useState<WorkflowTransitionNotification | null>(null);
+  useEffect(() => {
+    if (!notification) return undefined;
+    const timer = window.setTimeout(() => setNotification(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [notification]);
   const stages = useMemo(() => query.data?.stages.slice().sort((left, right) => left.orderIndex - right.orderIndex) ?? [], [query.data]);
   const selectedStage = useMemo(() => {
     if (!stages.length) return null;
@@ -194,7 +204,7 @@ export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride 
   if (query.isError || !query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
   if (!stages.length || !selectedStage) return <WorkflowEmptyState />;
 
-  return <div className={`${styles.page} ${mode === 'embedded' ? styles.embedded : ''}`}>{mode === 'page' ? <WorkflowHeader workflow={query.data} /> : null}<div className={styles.layout}><section className={styles.stagesPanel} aria-labelledby={`${idPrefix}-stages-title`}><div className={styles.panelHeading}><div><span className={styles.eyebrow}>Жизненный цикл проекта</span><h2 id={`${idPrefix}-stages-title`}>Этапы Workflow</h2></div><span className={styles.totalLabel}>{stages.length} этапов</span></div><ol className={styles.stageList}>{stages.map((stage) => <WorkflowStageItem key={stage.id} stage={stage} selected={stage.id === selectedStage.id} detailsId={detailsId} onSelect={() => setSelectedId(stage.id)} />)}</ol></section><WorkflowStageDetails key={selectedStage.id} stage={selectedStage} instanceId={instanceId} canManage={canManage} canRestore={canRestore} idPrefix={detailsId} /></div></div>;
+  return <div className={`${styles.page} ${mode === 'embedded' ? styles.embedded : ''}`}>{mode === 'page' ? <WorkflowHeader workflow={query.data} /> : null}<div className={styles.layout}><section className={styles.stagesPanel} aria-labelledby={`${idPrefix}-stages-title`}><div className={styles.panelHeading}><div><span className={styles.eyebrow}>Жизненный цикл проекта</span><h2 id={`${idPrefix}-stages-title`}>Этапы Workflow</h2></div><span className={styles.totalLabel}>{stages.length} этапов</span></div><ol className={styles.stageList}>{stages.map((stage) => <WorkflowStageItem key={stage.id} stage={stage} selected={stage.id === selectedStage.id} detailsId={detailsId} onSelect={() => setSelectedId(stage.id)} />)}</ol></section><WorkflowStageDetails key={selectedStage.id} stage={selectedStage} stages={stages} instanceId={instanceId} userId={user?.id} canManage={canManage} canRestore={canRestore} idPrefix={detailsId} onTransitionSuccess={() => setSelectedId(null)} onNotify={setNotification} /></div>{notification ? <div className={styles.toastViewport}><Toast intent={notification.intent} title={notification.title} message={notification.message} onClose={() => setNotification(null)} /></div> : null}</div>;
 }
 
 export function UniversityWorkflow({ id, canAdvance }: { id: string; canAdvance: boolean }) {

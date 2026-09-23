@@ -1,0 +1,9 @@
+.toast { align-items: flex-start; border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-medium); box-shadow: var(--rtk-shadow-elevation-2); display: flex; gap: var(--rtk-space-3); justify-content: space-between; max-width: min(420px, calc(100vw - 32px)); padding: var(--rtk-space-3) var(--rtk-space-4); pointer-events: auto; }
+.toast strong { display: block; font-size: 13px; }
+.toast p { color: var(--rtk-color-text-secondary); font-size: 12px; line-height: 1.4; margin: var(--rtk-space-1) 0 0; }
+.success { background: var(--atmr-success-container-soft); border-color: color-mix(in srgb, var(--atmr-success-default) 35%, var(--rtk-color-border)); color: var(--atmr-success-on-container); }
+.error { background: var(--atmr-error-container-soft); border-color: color-mix(in srgb, var(--atmr-error-default) 35%, var(--rtk-color-border)); color: var(--atmr-error-on-container); }
+.info { background: var(--rtk-color-surface); color: var(--rtk-color-text-primary); }
+.close { align-items: center; background: transparent; border: 0; border-radius: var(--rtk-radius-small); color: currentColor; cursor: pointer; display: inline-flex; flex: 0 0 auto; height: 28px; justify-content: center; width: 28px; }
+.close:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+.close:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
