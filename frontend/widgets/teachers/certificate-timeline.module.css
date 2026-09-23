@@ -1,7 +1,7 @@
 .section { display: flex; flex-direction: column; gap: var(--rtk-space-4); min-width: 0; }
 .heading h2 { font-size: 20px; letter-spacing: -.025em; margin: 0; }
 .heading p { color: var(--rtk-color-text-secondary); font-size: 13px; margin: var(--rtk-space-1) 0 0; }
-.surface { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-medium); min-width: 0; padding: var(--rtk-space-5); }
+.surface { background: var(--rtk-color-surface); border: 0; border-radius: var(--rtk-radius-medium); box-shadow: var(--rtk-shadow-elevation-2); min-width: 0; padding: var(--rtk-space-5); }
 .legend { align-items: center; color: var(--rtk-color-text-secondary); display: flex; flex-wrap: wrap; font-size: 11px; gap: var(--rtk-space-4); margin-bottom: var(--rtk-space-4); }
 .legend span { align-items: center; display: inline-flex; gap: var(--rtk-space-1); }
 .legendDot { background: var(--rtk-color-success); border-radius: 50%; display: inline-block; height: 8px; width: 8px; }
@@ -14,9 +14,11 @@
 .todayLabel { color: var(--rtk-color-brand); position: absolute; transform: translateX(-50%); }
 .rows { display: flex; flex-direction: column; gap: var(--rtk-space-3); }
 .row { align-items: center; display: grid; gap: var(--rtk-space-4); grid-template-columns: 220px minmax(0, 1fr); min-height: 42px; }
-.rowLabel { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rowLabel { display: flex; flex-direction: column; gap: var(--rtk-space-1); min-width: 0; }
 .rowLabel strong { font-size: 12px; line-height: 1.3; overflow-wrap: anywhere; }
 .rowLabel span { color: var(--rtk-color-text-tertiary); font-size: 10px; }
+.rowDates { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-1); }
+.rowDates time { font-variant-numeric: tabular-nums; }
 .track { align-items: center; background: var(--rtk-color-surface-subtle); border-radius: 999px; display: flex; height: 14px; min-width: 0; position: relative; }
 .todayLine { border-left: 2px solid var(--rtk-color-brand); bottom: -8px; opacity: .85; position: absolute; top: -22px; z-index: 1; }
 .bar { border-radius: 999px; display: block; height: 10px; min-width: 8px; outline: none; position: absolute; z-index: 2; }
@@ -27,9 +29,15 @@
 .bar.danger { background: var(--rtk-color-danger); }
 .bar.neutral { background: var(--rtk-color-text-tertiary); }
 .bar.openEnded { border-right: 3px dashed var(--rtk-color-text-secondary); border-radius: 999px 2px 2px 999px; }
+.mobileTodayLabel { color: var(--rtk-color-brand); display: none; font-size: 10px; margin-top: var(--rtk-space-1); }
 @media (max-width: 768px) {
   .surface { padding: var(--rtk-space-4); }
-  .timelineCanvas { min-width: 640px; }
-  .axis, .row { grid-template-columns: 185px minmax(0, 1fr); }
+  .timelineCanvas { min-width: 0; }
+  .axis { display: none; }
+  .row { align-items: stretch; display: flex; flex-direction: column; gap: var(--rtk-space-2); min-height: 0; }
+  .rowLabel { gap: var(--rtk-space-1); }
+  .track { height: 12px; margin-top: var(--rtk-space-1); }
+  .todayLine { bottom: -6px; top: -12px; }
+  .mobileTodayLabel { display: block; }
   .legend { gap: var(--rtk-space-2) var(--rtk-space-3); }
 }

@@ -21,6 +21,7 @@
 .progressTrack span, .taskProgress span { background: var(--rtk-color-brand); border-radius: inherit; display: block; height: 100%; transition: width 180ms ease; }
 .layout { align-items: start; display: grid; gap: var(--rtk-space-5); grid-template-columns: minmax(300px, .9fr) minmax(0, 1.4fr); }
 .stagesPanel, .detailPanel { composes: surface from '../../shared/ui/rtk/section-surface.module.css'; min-width: 0; }
+.detailPanel { border: 0; box-shadow: var(--rtk-shadow-elevation-2); }
 .panelHeading, .detailHeader, .detailSectionHeading { align-items: flex-start; display: flex; gap: var(--rtk-space-3); justify-content: space-between; }
 .panelHeading h2, .detailHeader h2 { font-size: 20px; letter-spacing: -.02em; margin: var(--rtk-space-1) 0 0; }
 .totalLabel { color: var(--rtk-color-text-secondary); font-size: 12px; padding-top: var(--rtk-space-1); white-space: nowrap; }
@@ -50,15 +51,16 @@
 .stageResponsible { align-items: center; color: var(--rtk-color-text-tertiary); display: inline-flex; font-size: 11px; gap: var(--rtk-space-1); min-width: 0; overflow-wrap: anywhere; }
 .detailPanel { display: flex; flex-direction: column; gap: var(--rtk-space-5); }
 .detailHeader h2 { font-size: 24px; max-width: 500px; overflow-wrap: anywhere; }
-.detailFacts { border-bottom: 1px solid var(--rtk-color-border); border-top: 1px solid var(--rtk-color-border); display: grid; gap: var(--rtk-space-4); grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; padding: var(--rtk-space-4) 0; }
+.detailFacts { display: grid; gap: var(--rtk-space-4); grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
 .detailFacts div { display: flex; flex-direction: column; gap: var(--rtk-space-1); min-width: 0; }
 .detailFacts dt { color: var(--rtk-color-text-tertiary); font-size: 11px; }
 .detailFacts dd { align-items: center; display: flex; font-size: 13px; gap: var(--rtk-space-2); margin: 0; overflow-wrap: anywhere; }
-.detailSection { min-width: 0; }
+.detailSection { display: flex; flex-direction: column; gap: var(--rtk-space-3); min-width: 0; }
+.detailSection + .detailSection { border-top: 1px solid var(--rtk-color-border); padding-top: var(--rtk-space-5); }
 .detailSectionHeading { align-items: center; }
 .detailSectionHeading h3 { align-items: center; display: inline-flex; font-size: 15px; gap: var(--rtk-space-2); margin: 0; }
 .detailSectionHeading h3 svg { color: var(--rtk-color-brand); flex: 0 0 auto; }
-.commentList, .attachmentList, .taskList, .transitionList { list-style: none; margin: var(--rtk-space-3) 0 0; padding: 0; }
+.commentList, .attachmentList, .taskList, .transitionList { list-style: none; margin: 0; padding: 0; }
 .commentList { display: flex; flex-direction: column; gap: var(--rtk-space-3); }
 .commentList li { border-bottom: 1px solid var(--rtk-color-border); padding-bottom: var(--rtk-space-3); }
 .commentList li:last-child { border-bottom: 0; padding-bottom: 0; }
@@ -66,20 +68,20 @@
 .commentMeta strong { font-size: 12px; }
 .commentMeta time { color: var(--rtk-color-text-tertiary); font-size: 11px; }
 .commentList p { font-size: 13px; line-height: 1.45; margin: var(--rtk-space-1) 0 0; }
-.commentForm { border-top: 1px solid var(--rtk-color-border); display: flex; flex-direction: column; gap: var(--rtk-space-2); margin-top: var(--rtk-space-4); padding-top: var(--rtk-space-4); }
+.commentForm { border-top: 1px solid var(--rtk-color-border); display: flex; flex-direction: column; gap: var(--rtk-space-2); margin-top: var(--rtk-space-1); padding-top: var(--rtk-space-4); }
 .commentForm label { color: var(--rtk-color-text-secondary); font-size: 12px; font-weight: 650; }
 .commentForm textarea { background: var(--rtk-color-surface-subtle); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-primary); font: inherit; font-size: 13px; min-height: 72px; padding: var(--rtk-space-2) var(--rtk-space-3); resize: vertical; }
 .commentForm textarea:disabled { cursor: not-allowed; opacity: .75; }
 .commentFormFooter { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); }
 .commentFormFooter span { color: var(--rtk-color-text-tertiary); font-size: 11px; }
 .attachmentList { display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); }
-.attachmentList li { align-items: center; background: var(--rtk-color-surface-subtle); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); display: flex; gap: var(--rtk-space-2); max-width: 100%; padding: var(--rtk-space-2) var(--rtk-space-3); }
+.attachmentList li { align-items: center; background: var(--rtk-color-surface-subtle); border-radius: var(--rtk-radius-small); display: flex; gap: var(--rtk-space-2); max-width: 100%; padding: var(--rtk-space-2) var(--rtk-space-3); }
 .attachmentList li > svg { color: var(--rtk-color-brand); flex: 0 0 auto; }
 .attachmentList li span { display: flex; flex-direction: column; min-width: 0; }
 .attachmentList strong { font-size: 12px; overflow-wrap: anywhere; }
 .attachmentList small { color: var(--rtk-color-text-tertiary); font-size: 11px; }
 .taskCount { color: var(--rtk-color-text-secondary); font-size: 11px; }
-.taskProgress { height: 6px; margin-top: var(--rtk-space-3); }
+.taskProgress { height: 6px; margin: 0; }
 .taskList { display: flex; flex-direction: column; gap: var(--rtk-space-2); }
 .taskList label { align-items: center; color: var(--rtk-color-text-secondary); display: flex; font-size: 13px; gap: var(--rtk-space-2); }
 .taskList input { accent-color: var(--rtk-color-brand); height: 16px; width: 16px; }
@@ -90,7 +92,7 @@
 .transitionList strong { font-size: 12px; }
 .transitionList time { color: var(--rtk-color-text-tertiary); font-size: 11px; }
 .transitionList p { color: var(--rtk-color-text-secondary); font-size: 12px; line-height: 1.4; margin: var(--rtk-space-1) 0 0; }
-.muted { color: var(--rtk-color-text-tertiary); font-size: 12px; margin: var(--rtk-space-3) 0 0; }
+.muted { color: var(--rtk-color-text-tertiary); font-size: 12px; margin: 0; }
 .stageAction { align-items: center; border-top: 1px solid var(--rtk-color-border); display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); padding-top: var(--rtk-space-4); }
 .stageAction span { color: var(--rtk-color-text-tertiary); font-size: 11px; }
 .emptyState { align-items: center; color: var(--rtk-color-text-secondary); display: flex; flex-direction: column; gap: var(--rtk-space-2); justify-content: center; min-height: 240px; text-align: center; }

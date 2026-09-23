@@ -31,8 +31,8 @@
   --kpi-foreground: var(--atmr-error-on-error);
 }
 .warning {
-  --kpi-background: var(--atmr-warning-default);
-  --kpi-foreground: var(--atmr-warning-on-warning);
+  --kpi-background: var(--atmr-warning-600);
+  --kpi-foreground: var(--atmr-accent-on-accent);
 }
 
 .interactive {
@@ -58,9 +58,10 @@
 
 .icon {
   align-items: center;
-  background: var(--kpi-foreground);
+  background: transparent;
+  border: 1px solid var(--kpi-foreground);
   border-radius: var(--rtk-radius-small);
-  color: var(--kpi-background);
+  color: var(--kpi-foreground);
   display: inline-flex;
   flex: 0 0 36px;
   height: 36px;

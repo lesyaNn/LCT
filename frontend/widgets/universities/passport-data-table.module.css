@@ -13,9 +13,10 @@
 .mobileCard { border-bottom: 1px solid var(--rtk-color-border); display: flex; flex-direction: column; gap: var(--rtk-space-3); padding: var(--rtk-space-4) 0; }
 .mobileCard:first-child { padding-top: 0; }
 .mobileCard:last-child { border-bottom: 0; padding-bottom: 0; }
-.mobileField { display: flex; gap: var(--rtk-space-3); justify-content: space-between; min-width: 0; }
-.mobileLabel { color: var(--rtk-color-text-tertiary); flex: 0 0 38%; font-size: 11px; }
-.mobileValue { font-size: 13px; min-width: 0; overflow-wrap: anywhere; text-align: right; }
+.mobileField { align-items: flex-start; display: flex; gap: var(--rtk-space-4); justify-content: space-between; min-width: 0; }
+.mobileLabel { color: var(--rtk-color-text-tertiary); flex: 0 0 38%; font-size: 11px; line-height: 1.4; padding-top: 2px; }
+.mobileValue { align-items: flex-end; display: flex; flex: 1; flex-direction: column; font-size: 13px; gap: var(--rtk-space-1); min-width: 0; overflow-wrap: anywhere; text-align: right; }
+.mobileValue > * { max-width: 100%; }
 .empty { composes: empty from '../../shared/ui/rtk/data-table.module.css'; }
 .pagination { align-items: center; border-top: 1px solid var(--rtk-color-border); color: var(--rtk-color-text-secondary); display: flex; font-size: 12px; justify-content: space-between; padding-top: var(--rtk-space-4); }
 .paginationActions { display: flex; gap: var(--rtk-space-2); }
@@ -26,8 +27,9 @@
 @keyframes passportTableShimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 @media (max-width: 768px) {
   .desktopTableWrap { display: none; }
-  .mobileCards { display: block; }
+  .mobileCards { display: block; padding: var(--rtk-space-4); }
   .pagination { align-items: flex-start; flex-direction: column; gap: var(--rtk-space-3); }
+  .pagination { margin: 0 var(--rtk-space-4) var(--rtk-space-4); }
 }
 @media (prefers-reduced-motion: reduce) {
   .skeletonHeader, .skeletonRow { animation: none; }
