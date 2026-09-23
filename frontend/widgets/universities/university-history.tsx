@@ -14,6 +14,7 @@ import { Button } from '@/shared/ui/rtk/button';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { TableShell } from '@/shared/ui/rtk/table-shell';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
+import { AuditDiff } from '@/widgets/audit/audit-diff';
 import styles from './university-history.module.css';
 
 const eventTypes: Array<UniversityHistoryEventType | 'all'> = ['all', 'workflow', 'document', 'meeting', 'note', 'audit'];
@@ -29,16 +30,6 @@ function EventTypeIcon({ type }: { type: UniversityHistoryEventType }) {
 
 function EventType({ type }: { type: UniversityHistoryEventType }) {
   return <span className={styles.eventType}><EventTypeIcon type={type} /><StatusBadge intent={historyEventTypeIntent[type]}>{historyEventTypeLabels[type]}</StatusBadge></span>;
-}
-
-function displayValue(value: string | number | null | undefined): string {
-  return value === null || value === undefined ? '—' : String(value);
-}
-
-function AuditDiff({ event }: { event: UniversityHistoryEvent }) {
-  const keys = [...new Set([...Object.keys(event.oldValues ?? {}), ...Object.keys(event.newValues ?? {})])];
-  if (!keys.length) return null;
-  return <div className={styles.auditDetails}><table><thead><tr><th>Поле</th><th>Было</th><th>Стало</th></tr></thead><tbody>{keys.map((key) => <tr key={key}><th scope="row">{key}</th><td>{displayValue(event.oldValues?.[key])}</td><td>{displayValue(event.newValues?.[key])}</td></tr>)}</tbody></table>{event.ip || event.userAgent ? <p>{event.ip ? `IP: ${event.ip}` : ''}{event.ip && event.userAgent ? ' · ' : ''}{event.userAgent ? `User-Agent: ${event.userAgent}` : ''}</p> : null}</div>;
 }
 
 function EventDetails({ event }: { event: UniversityHistoryEvent }) {
