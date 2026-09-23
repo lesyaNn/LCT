@@ -81,8 +81,6 @@
 
 .statusPanelTop { align-items: center; display: flex; gap: var(--rtk-space-3); justify-content: space-between; }
 .overline { color: var(--rtk-color-text-tertiary); letter-spacing: .04em; }
-.readinessReason { color: var(--rtk-color-text-secondary); font-size: 13px; margin: var(--rtk-space-3) 0 0; }
-
 .nextTraining {
   align-items: flex-start;
   border-top: 1px solid var(--rtk-color-border);

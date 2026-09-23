@@ -1,0 +1,7 @@
+.root { align-items: flex-start; display: inline-flex; flex-direction: column; gap: var(--rtk-space-1); max-width: 100%; min-width: 0; }
+.reason { color: var(--rtk-color-text-secondary); font-size: 12px; line-height: 1.45; max-width: 38ch; overflow-wrap: anywhere; }
+.lg .reason { font-size: 13px; max-width: 42ch; }
+
+@media (max-width: 420px) {
+  .lg .reason { max-width: min(42ch, 100%); }
+}

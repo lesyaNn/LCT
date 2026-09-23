@@ -10,16 +10,16 @@ import Edit from '@atomaro/icons/24/editor/Edit';
 import ArrowRight from '@atomaro/icons/24/navigation/ArrowRight';
 import { useAuth } from '@/shared/auth/AuthProvider';
 import { formatDateRu, formatDaysUntilRu, getUpcomingDateStatus } from '@/shared/lib/formatters';
-import { expirationStatusIntent, expirationStatusLabels, readinessIntent, readinessLabels, upcomingDateIntent } from '@/shared/lib/status-semantics';
+import { expirationStatusIntent, expirationStatusLabels, upcomingDateIntent } from '@/shared/lib/status-semantics';
 import {
   getTeacherPassport,
   teacherPassportQueryKey,
   type TeacherQualification,
   type TeacherPassportProfile,
-  type TeacherReadiness,
   type TeacherTraining,
 } from '@/shared/lib/universities-repository';
 import { Button } from '@/shared/ui/rtk/button';
+import { ReadinessBadge } from '@/shared/ui/rtk/readiness-badge';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { PassportDataTable, PassportTableSkeleton, type PassportMobileField, type PassportTableColumn } from '@/widgets/universities/passport-data-table';
@@ -29,10 +29,6 @@ import styles from './teacher-passport.module.css';
 
 function SectionHeading({ id, title, description }: { id: string; title: string; description?: string }) {
   return <div className={styles.sectionHeading}><div><h2 id={id}>{title}</h2>{description ? <p>{description}</p> : null}</div></div>;
-}
-
-function ReadinessBadge({ readiness }: { readiness: TeacherReadiness }) {
-  return <StatusBadge intent={readinessIntent[readiness]}>{readinessLabels[readiness]}</StatusBadge>;
 }
 
 function ExpirationBadge({ status }: { status: TeacherQualification['status'] }) {
@@ -107,8 +103,8 @@ function TeacherHeader({ id, teacher }: { id: string; teacher: TeacherPassportPr
           </div>
         </div>
         <div className={styles.statusPanel} aria-label="Готовность преподавателя">
-          <div className={styles.statusPanelTop}><span className={styles.overline}>Readiness</span><ReadinessBadge readiness={teacher.readiness} /></div>
-          <p className={styles.readinessReason}>{teacher.readinessReason}</p>
+          <div className={styles.statusPanelTop}><span className={styles.overline}>Readiness</span></div>
+          <ReadinessBadge readiness={teacher.readiness} reason={teacher.readinessReason} size="lg" showDetails />
           <div className={styles.nextTraining}><TimeStroke size={18} fill="currentColor" aria-hidden="true" /><div><span>Следующее повышение квалификации</span>{!teacher.qualificationRequired ? <strong>Повышение не требуется</strong> : teacher.nextTrainingDate ? <><strong>{formatDateRu(teacher.nextTrainingDate)}</strong><StatusBadge intent={upcomingDateIntent[nextTrainingStatus]} variant="inline">{formatDaysUntilRu(teacher.nextTrainingDate)}</StatusBadge></> : <strong>Данные отсутствуют</strong>}</div></div>
           <div className={styles.headerActions} aria-label="Действия с преподавателем">
             {canEdit ? <Button variant="secondary" size="s" type="button" disabled title="Редактирование подключится после появления API"><Edit size={16} fill="currentColor" />Редактировать</Button> : null}

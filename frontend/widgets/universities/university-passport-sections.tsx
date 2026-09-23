@@ -14,7 +14,7 @@ import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { MetricCard } from '@/shared/ui/rtk/metric-card';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { formatDateRu, formatDateTimeRu } from '@/shared/lib/formatters';
-import { documentStatusIntent, licenseStatusIntent, productStatusIntent, programStatusIntent, readinessIntent } from '@/shared/lib/status-semantics';
+import { documentStatusIntent, licenseStatusIntent, productStatusIntent, programStatusIntent, readinessSemantics } from '@/shared/lib/status-semantics';
 import {
   getUniversityProducts,
   getUniversityPrograms,
@@ -48,6 +48,7 @@ import {
   type UniversityMeetingType,
 } from '@/shared/lib/universities-repository';
 import { PassportDataTable, PassportTableSkeleton, type PassportMobileField, type PassportTableColumn } from './passport-data-table';
+import { ReadinessBadge } from '@/shared/ui/rtk/readiness-badge';
 import styles from './university-passport-sections.module.css';
 
 const formatDate = formatDateRu;
@@ -55,12 +56,6 @@ const formatDate = formatDateRu;
 function SectionToolbar({ title, children }: { title?: string; children: ReactNode }) {
   return <div className={styles.sectionToolbar}>{title ? <h2>{title}</h2> : null}<div className={styles.toolbarControls}>{children}</div></div>;
 }
-
-const readinessLabels: Record<TeacherReadiness, string> = {
-  ready: 'Готов',
-  attention: 'Требует внимания',
-  expired: 'Просрочено',
-};
 
 const productStatusLabels: Record<UniversityProductStatus, string> = {
   active: 'Действует',
@@ -72,10 +67,6 @@ function ProgramStatusBadge({ status }: { status: ProgramStatus }) {
   return <StatusBadge intent={programStatusIntent[status]}>{programStatusLabels[status]}</StatusBadge>;
 }
 
-function ReadinessBadge({ readiness }: { readiness: TeacherReadiness }) {
-  return <StatusBadge intent={readinessIntent[readiness]}>{readinessLabels[readiness]}</StatusBadge>;
-}
-
 function ProductStatusBadge({ status }: { status: UniversityProductStatus }) {
   return <StatusBadge intent={productStatusIntent[status]}>{productStatusLabels[status]}</StatusBadge>;
 }
@@ -85,7 +76,7 @@ function ProgramFilter({ value, onChange }: { value: ProgramStatus | 'all'; onCh
 }
 
 function TeacherFilter({ value, onChange }: { value: TeacherReadiness | 'all'; onChange: (value: TeacherReadiness | 'all') => void }) {
-  return <label className={styles.filter}><span>Готовность</span><select value={value} onChange={(event) => onChange(event.target.value as TeacherReadiness | 'all')}><option value="all">Все статусы</option>{Object.entries(readinessLabels).map(([status, label]) => <option value={status} key={status}>{label}</option>)}</select></label>;
+  return <label className={styles.filter}><span>Готовность</span><select value={value} onChange={(event) => onChange(event.target.value as TeacherReadiness | 'all')}><option value="all">Все статусы</option>{Object.entries(readinessSemantics).map(([status, meta]) => <option value={status} key={status}>{meta.label}</option>)}</select></label>;
 }
 
 function ProgramRow({ row }: { row: UniversityProgramRow }) {
@@ -135,7 +126,7 @@ function TeachersSection({ id }: { id: string }) {
   const columns: PassportTableColumn<UniversityTeacherRow>[] = [
     { id: 'name', label: 'ФИО', sortable: true, sortValue: (row) => row.name, render: (row) => <strong className={styles.primaryCell}>{row.name}</strong> },
     { id: 'position', label: 'Должность', sortable: true, sortValue: (row) => row.position, render: (row) => row.position },
-    { id: 'readiness', label: 'Готовность', sortable: true, sortValue: (row) => ({ expired: 0, attention: 1, ready: 2 }[row.readiness]), render: (row) => <ReadinessBadge readiness={row.readiness} /> },
+    { id: 'readiness', label: 'Готовность', sortable: true, sortValue: (row) => ({ expired: 0, attention: 1, ready: 2 }[row.readiness]), render: (row) => <ReadinessBadge readiness={row.readiness} size="sm" /> },
     { id: 'training', label: 'Следующее обучение', sortable: true, sortValue: (row) => row.nextTrainingDate ?? '', render: (row) => row.nextTrainingDate ? formatDate(row.nextTrainingDate) : 'Данные отсутствуют' },
     { id: 'programs', label: 'Программы', render: (row) => <ProgramChips programs={row.allowedPrograms} /> },
     { id: 'actions', label: 'Действия', render: (row) => <Link className={styles.actionLink} href={`/teachers/${row.id}`}>Открыть</Link> },
@@ -143,7 +134,7 @@ function TeachersSection({ id }: { id: string }) {
   const mobileFields: PassportMobileField<UniversityTeacherRow>[] = [
     { label: 'ФИО', render: (row) => <strong className={styles.primaryCell}>{row.name}</strong> },
     { label: 'Должность', render: (row) => row.position },
-    { label: 'Готовность', render: (row) => <ReadinessBadge readiness={row.readiness} /> },
+    { label: 'Готовность', render: (row) => <ReadinessBadge readiness={row.readiness} size="md" /> },
     { label: 'Обучение', render: (row) => row.nextTrainingDate ? formatDate(row.nextTrainingDate) : 'Данные отсутствуют' },
     { label: 'Программы', render: (row) => <ProgramChips programs={row.allowedPrograms} /> },
     { label: 'Действия', render: (row) => <Link className={styles.actionLink} href={`/teachers/${row.id}`}>Открыть профиль</Link> },

@@ -3,10 +3,15 @@ import type { ProgramStatus, TeacherCertificateStatus, TeacherReadiness, Univers
 import type { AttentionItem } from './dashboard-repository';
 
 export type SemanticIntent = 'neutral' | 'brand' | 'success' | 'warning' | 'danger';
+export type ReadinessIcon = 'success' | 'warning' | 'error';
+
+export const readinessSemantics: Record<TeacherReadiness, { label: string; intent: SemanticIntent; icon: ReadinessIcon }> = {
+  ready: { label: 'Готов', intent: 'success', icon: 'success' },
+  attention: { label: 'Требует внимания', intent: 'warning', icon: 'warning' },
+  expired: { label: 'Просрочено', intent: 'danger', icon: 'error' },
+};
 
 export const programStatusIntent: Record<ProgramStatus, SemanticIntent> = { planned: 'neutral', active: 'brand', launched: 'success', archived: 'neutral' };
-export const readinessIntent: Record<TeacherReadiness, SemanticIntent> = { ready: 'success', attention: 'warning', expired: 'danger' };
-export const readinessLabels: Record<TeacherReadiness, string> = { ready: 'Готов', attention: 'Требует внимания', expired: 'Просрочено' };
 export const expirationStatusIntent: Record<ExpirationStatus, SemanticIntent> = { current: 'success', expires_soon: 'warning', expired: 'danger' };
 export const expirationStatusLabels: Record<ExpirationStatus, string> = { current: 'Актуально', expires_soon: 'Скоро истекает', expired: 'Просрочено' };
 export const certificateStatusIntent: Record<TeacherCertificateStatus, SemanticIntent> = { ...expirationStatusIntent, no_expiry: 'neutral' };
