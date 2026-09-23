@@ -607,7 +607,7 @@ export interface UniversityTeacherRow {
   name: string;
   position: string;
   readiness: TeacherReadiness;
-  nextTrainingDate: string;
+  nextTrainingDate: string | null;
   allowedPrograms: string[];
 }
 
@@ -629,25 +629,36 @@ export interface TeacherTraining {
   certificate: string | null;
 }
 
-export type TeacherCertificateStatus = ExpirationStatus;
+export type TeacherCertificateStatus = ExpirationStatus | 'no_expiry';
 
 export interface TeacherCertificate {
   id: string;
   name: string;
   issuer: string;
   issuedAt: string;
-  expiresAt: string;
+  expiresAt: string | null;
   mandatory: boolean;
-  program: string;
+  program: string | null;
   status: TeacherCertificateStatus;
   document: { name: string; fileType: string; fileSize: string; downloadUrl: string | null } | null;
 }
 
-export interface TeacherPassportProfile extends UniversityTeacherRow {
+export interface TeacherPassportProfile extends Omit<UniversityTeacherRow, 'nextTrainingDate'> {
   universityId: string;
   universityName: string;
   universityCity: string;
   readinessReason: string;
+  nextTrainingDate: string | null;
+  qualificationRequired: boolean;
+}
+
+export interface TeacherProgramAssignment {
+  id: string;
+  name: string;
+  direction: string;
+  canTeach: boolean;
+  assignedAt: string;
+  status: ProgramStatus;
 }
 
 export interface TeacherPassport {
@@ -655,7 +666,7 @@ export interface TeacherPassport {
   qualifications: TeacherQualification[];
   trainings: TeacherTraining[];
   certificates: TeacherCertificate[];
-  allowedPrograms: Array<{ id: string; name: string }>;
+  allowedPrograms: TeacherProgramAssignment[];
 }
 
 export interface UniversityStudentsByProgram {
@@ -766,7 +777,7 @@ function getReadinessReason(readiness: TeacherReadiness, certificates: TeacherCe
   const expired = certificates.find((item) => item.mandatory && item.status === 'expired');
   if (readiness === 'ready') return 'Все обязательные сертификаты актуальны';
   if (readiness === 'expired' && expired) return `Истёк обязательный сертификат: ${expired.name}`;
-  if (expiring) return `Сертификат «${expiring.name}» истекает ${new Intl.DateTimeFormat('ru-RU').format(new Date(expiring.expiresAt))}`;
+  if (expiring?.expiresAt) return `Сертификат «${expiring.name}» истекает ${new Intl.DateTimeFormat('ru-RU').format(new Date(expiring.expiresAt))}`;
   return 'Нужно обновить данные о квалификации';
 }
 
@@ -774,11 +785,11 @@ function getReadinessReason(readiness: TeacherReadiness, certificates: TeacherCe
 export async function getTeacherPassport(id: string): Promise<TeacherPassport> {
   const { teacher, university } = getTeacherPassportContext(id);
   const numericId = getUniversityNumericId(university.id);
-  const certificateDates = teacher.readiness === 'expired'
-    ? ['2026-08-15', '2027-02-20', '2026-09-10', '2027-03-05']
+  const certificateDates: Array<string | null> = teacher.readiness === 'expired'
+    ? ['2026-08-15', '2027-02-20', '2026-09-10', null]
     : teacher.readiness === 'attention'
-      ? ['2026-10-15', '2027-02-20', '2027-04-10', '2027-03-05']
-      : ['2027-01-15', '2027-02-20', '2027-04-10', '2027-03-05'];
+      ? ['2026-10-15', '2027-02-20', '2027-04-10', null]
+      : ['2027-01-15', '2027-02-20', '2027-04-10', null];
   const certificates: TeacherCertificate[] = certificateNames.map((name, index) => {
     const expiresAt = certificateDates[index];
     return {
@@ -788,8 +799,8 @@ export async function getTeacherPassport(id: string): Promise<TeacherPassport> {
       issuedAt: `202${index % 2 + 3}-${String(((numericId + index) % 8) + 1).padStart(2, '0')}-12`,
       expiresAt,
       mandatory: index < 3,
-      program: programNames[(index + numericId) % programNames.length],
-      status: getExpirationStatus(expiresAt),
+      program: index === 3 ? null : programNames[(index + numericId) % programNames.length],
+      status: expiresAt ? getExpirationStatus(expiresAt, 30) : ('no_expiry' as const),
       document: {
         name: `${name}.pdf`,
         fileType: 'PDF',
@@ -797,7 +808,7 @@ export async function getTeacherPassport(id: string): Promise<TeacherPassport> {
         downloadUrl: null,
       },
     };
-  }).sort((left, right) => Number(right.mandatory) - Number(left.mandatory) || left.expiresAt.localeCompare(right.expiresAt));
+  }).sort((left, right) => Number(right.mandatory) - Number(left.mandatory) || (left.expiresAt ?? '9999-12-31').localeCompare(right.expiresAt ?? '9999-12-31'));
 
   const qualifications: TeacherQualification[] = qualificationNames.map((name, index) => {
     const expiresAt = [`2027-04-18`, `2026-12-12`, `2026-09-10`][index];
@@ -817,6 +828,8 @@ export async function getTeacherPassport(id: string): Promise<TeacherPassport> {
     { id: `${id}-training-3`, name: 'Работа с данными в образовательных программах', provider: 'НОЦ «Цифровые кадры»', completedAt: '2025-04-09', hours: 32, certificate: null },
   ];
 
+  const teacherNumber = Number(id.split('-').at(-1)) || 1;
+  const qualificationRequired = teacherNumber % 5 !== 0;
   return {
     teacher: {
       ...teacher,
@@ -824,11 +837,20 @@ export async function getTeacherPassport(id: string): Promise<TeacherPassport> {
       universityName: university.name,
       universityCity: university.city,
       readinessReason: getReadinessReason(teacher.readiness, certificates),
+      nextTrainingDate: qualificationRequired ? teacher.nextTrainingDate : null,
+      qualificationRequired,
     },
     qualifications,
     trainings,
     certificates,
-    allowedPrograms: teacher.allowedPrograms.map((name, index) => ({ id: `${university.id}-program-${index + 1}`, name })),
+    allowedPrograms: teacher.allowedPrograms.map((name, index) => ({
+      id: `${university.id}-program-${index + 1}`,
+      name,
+      direction: programDirections[(index + numericId) % programDirections.length],
+      canTeach: index !== 1,
+      assignedAt: `2026-${String(((index + numericId) % 6) + 3).padStart(2, '0')}-${String(((index * 5 + numericId) % 20) + 1).padStart(2, '0')}`,
+      status: (['active', 'launched', 'planned', 'archived'] as ProgramStatus[])[(index + numericId) % 4],
+    })),
   };
 }
 

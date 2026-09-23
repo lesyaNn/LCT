@@ -9,6 +9,7 @@ export function formatDateTimeRu(isoDate: string): string {
 }
 
 export type ExpirationStatus = 'current' | 'expires_soon' | 'expired';
+export type UpcomingDateStatus = 'long_term' | 'approaching' | 'urgent' | 'overdue' | 'unknown';
 
 export function getDaysUntil(isoDate: string, now = new Date()): number | null {
   const date = new Date(isoDate);
@@ -28,7 +29,17 @@ export function formatDaysUntilRu(isoDate: string, now = new Date()): string {
   if (days === null) return 'Срок не указан';
   if (days < 0) return `Просрочено на ${Math.abs(days)} ${pluralizeDays(Math.abs(days))}`;
   if (days === 0) return 'Истекает сегодня';
-  return `Осталось ${days} ${pluralizeDays(days)}`;
+  return `Через ${days} ${pluralizeDays(days)}`;
+}
+
+export function getUpcomingDateStatus(isoDate: string | null, now = new Date()): UpcomingDateStatus {
+  if (!isoDate) return 'unknown';
+  const days = getDaysUntil(isoDate, now);
+  if (days === null) return 'unknown';
+  if (days < 0) return 'overdue';
+  if (days < 30) return 'urgent';
+  if (days <= 90) return 'approaching';
+  return 'long_term';
 }
 
 function pluralizeDays(value: number): string {

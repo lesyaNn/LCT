@@ -110,6 +110,10 @@
 .sectionHeading { align-items: end; display: flex; justify-content: space-between; min-width: 0; }
 .sectionHeading h2 { font-size: 20px; letter-spacing: -.025em; margin: 0; }
 .sectionHeading p { color: var(--rtk-color-text-secondary); font-size: 13px; margin: var(--rtk-space-1) 0 0; }
+.filter { align-items: flex-start; display: flex; flex-direction: column; gap: var(--rtk-space-1); min-width: 190px; }
+.filter span { color: var(--rtk-color-text-secondary); font-size: 11px; font-weight: 600; }
+.filter select { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border-strong); border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-primary); font: inherit; font-size: 13px; min-height: 36px; padding: 0 var(--rtk-space-3); width: 100%; }
+.filter select:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
 
 .primaryCell { display: block; font-size: 13px; font-weight: 650; line-height: 1.35; }
 .muted { color: var(--rtk-color-text-tertiary); font-size: 12px; }
@@ -126,6 +130,15 @@
 .statusWithIcon { align-items: center; display: inline-flex; gap: var(--rtk-space-1); }
 .criticalStatus > .statusWithIcon { color: var(--rtk-color-danger); }
 .statusContext { color: var(--rtk-color-text-tertiary); font-size: 11px; }
+.rowActions { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-1); }
+.rowActions button { white-space: nowrap; }
+.detailPanel { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-medium); padding: var(--rtk-space-5); }
+.detailHeader { align-items: flex-start; display: flex; gap: var(--rtk-space-4); justify-content: space-between; }
+.detailHeader h3 { font-size: 17px; margin: var(--rtk-space-1) 0 0; }
+.detailGrid { display: grid; gap: var(--rtk-space-4); grid-template-columns: repeat(3, minmax(0, 1fr)); margin: var(--rtk-space-5) 0 0; }
+.detailGrid > div { min-width: 0; }
+.detailGrid dt { color: var(--rtk-color-text-tertiary); font-size: 11px; margin-bottom: 3px; }
+.detailGrid dd { margin: 0; overflow-wrap: anywhere; }
 
 .programsSurface {
   background: var(--rtk-color-surface);
@@ -180,6 +193,13 @@
   .sections { gap: var(--rtk-space-6); }
   .sectionHeading h2 { font-size: 18px; }
   .programsSurface { padding: var(--rtk-space-4); }
+  .sectionHeading { align-items: stretch; flex-direction: column; gap: var(--rtk-space-3); }
+  .filter { max-width: 280px; }
+  .detailGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 420px) {
+  .detailGrid { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

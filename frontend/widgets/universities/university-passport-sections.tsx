@@ -136,7 +136,7 @@ function TeachersSection({ id }: { id: string }) {
     { id: 'name', label: 'ФИО', sortable: true, sortValue: (row) => row.name, render: (row) => <strong className={styles.primaryCell}>{row.name}</strong> },
     { id: 'position', label: 'Должность', sortable: true, sortValue: (row) => row.position, render: (row) => row.position },
     { id: 'readiness', label: 'Готовность', sortable: true, sortValue: (row) => ({ expired: 0, attention: 1, ready: 2 }[row.readiness]), render: (row) => <ReadinessBadge readiness={row.readiness} /> },
-    { id: 'training', label: 'Следующее обучение', sortable: true, sortValue: (row) => row.nextTrainingDate, render: (row) => formatDate(row.nextTrainingDate) },
+    { id: 'training', label: 'Следующее обучение', sortable: true, sortValue: (row) => row.nextTrainingDate ?? '', render: (row) => row.nextTrainingDate ? formatDate(row.nextTrainingDate) : 'Данные отсутствуют' },
     { id: 'programs', label: 'Программы', render: (row) => <ProgramChips programs={row.allowedPrograms} /> },
     { id: 'actions', label: 'Действия', render: (row) => <Link className={styles.actionLink} href={`/teachers/${row.id}`}>Открыть</Link> },
   ];
@@ -144,7 +144,7 @@ function TeachersSection({ id }: { id: string }) {
     { label: 'ФИО', render: (row) => <strong className={styles.primaryCell}>{row.name}</strong> },
     { label: 'Должность', render: (row) => row.position },
     { label: 'Готовность', render: (row) => <ReadinessBadge readiness={row.readiness} /> },
-    { label: 'Обучение', render: (row) => formatDate(row.nextTrainingDate) },
+    { label: 'Обучение', render: (row) => row.nextTrainingDate ? formatDate(row.nextTrainingDate) : 'Данные отсутствуют' },
     { label: 'Программы', render: (row) => <ProgramChips programs={row.allowedPrograms} /> },
     { label: 'Действия', render: (row) => <Link className={styles.actionLink} href={`/teachers/${row.id}`}>Открыть профиль</Link> },
   ];

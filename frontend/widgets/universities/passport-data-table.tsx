@@ -27,6 +27,7 @@ interface PassportDataTableProps<T extends { id: string }> {
   mobileFields: PassportMobileField<T>[];
   emptyMessage: string;
   pageSize?: number;
+  groupBy?: (row: T) => string;
 }
 
 type SortDirection = 'asc' | 'desc';
@@ -42,7 +43,7 @@ function SortIcon({ direction }: { direction: SortDirection | null }) {
   return <ChevronSort size={16} fill="currentColor" />;
 }
 
-export function PassportDataTable<T extends { id: string }>({ rows, columns, mobileFields, emptyMessage, pageSize = 20 }: PassportDataTableProps<T>) {
+export function PassportDataTable<T extends { id: string }>({ rows, columns, mobileFields, emptyMessage, pageSize = 20, groupBy }: PassportDataTableProps<T>) {
   const [sortId, setSortId] = useState<string | null>(null);
   const [direction, setDirection] = useState<SortDirection>('asc');
   const [page, setPage] = useState(1);
@@ -58,6 +59,15 @@ export function PassportDataTable<T extends { id: string }>({ rows, columns, mob
   const totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const visibleRows = sortedRows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const visibleGroups = useMemo(() => {
+    if (!groupBy) return [{ label: null, rows: visibleRows }];
+    const groups = new Map<string, T[]>();
+    visibleRows.forEach((row) => {
+      const label = groupBy(row);
+      groups.set(label, [...(groups.get(label) ?? []), row]);
+    });
+    return [...groups.entries()].map(([label, groupedRows]) => ({ label, rows: groupedRows }));
+  }, [groupBy, visibleRows]);
 
   const handleSort = (column: PassportTableColumn<T>) => {
     if (!column.sortable || !column.sortValue) return;
@@ -94,17 +104,11 @@ export function PassportDataTable<T extends { id: string }>({ rows, columns, mob
               })}
             </tr>
           </thead>
-          <tbody>
-            {visibleRows.map((row) => <tr key={row.id}>{columns.map((column) => <td key={column.id}>{column.render(row)}</td>)}</tr>)}
-          </tbody>
+          {visibleGroups.map((group) => <tbody key={group.label ?? 'all'}>{group.label ? <tr className={styles.groupRow} key={`group-${group.label}`}><th colSpan={columns.length} scope="rowgroup"><span>{group.label}</span><span className={styles.groupCount}>{group.rows.length}</span></th></tr> : null}{group.rows.map((row) => <tr key={row.id}>{columns.map((column) => <td key={column.id}>{column.render(row)}</td>)}</tr>)}</tbody>)}
         </table>
       </div>
       <div className={styles.mobileCards}>
-        {visibleRows.map((row) => (
-          <article className={styles.mobileCard} key={row.id}>
-            {mobileFields.map((field) => <div className={styles.mobileField} key={field.label}><span className={styles.mobileLabel}>{field.label}</span><div className={styles.mobileValue}>{field.render(row)}</div></div>)}
-          </article>
-        ))}
+        {visibleGroups.map((group) => <div className={styles.mobileGroup} key={group.label ?? 'all'}>{group.label ? <h3 className={styles.groupHeading}>{group.label}<span className={styles.groupCount}>{group.rows.length}</span></h3> : null}{group.rows.map((row) => <article className={styles.mobileCard} key={row.id}>{mobileFields.map((field) => <div className={styles.mobileField} key={field.label}><span className={styles.mobileLabel}>{field.label}</span><div className={styles.mobileValue}>{field.render(row)}</div></div>)}</article>)}</div>)}
       </div>
       {totalPages > 1 ? (
         <div className={styles.pagination} aria-label="Пагинация таблицы">
