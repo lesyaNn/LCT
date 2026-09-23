@@ -1,3 +1,6 @@
 .progress { background: var(--rtk-color-surface-hover); border-radius: 999px; height: 6px; overflow: hidden; width: 100%; }
 .progress > span { background: var(--rtk-color-brand); border-radius: inherit; display: block; height: 100%; transition: width 160ms ease; width: var(--rtk-progress-value); }
+.indeterminate > span { animation: rtkProgressIndeterminate 1.4s ease-in-out infinite; width: 38%; }
 @media (prefers-reduced-motion: reduce) { .progress > span { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .indeterminate > span { animation: none; width: 60%; } }
+@keyframes rtkProgressIndeterminate { 0% { transform: translateX(-130%); } 50% { transform: translateX(120%); } 100% { transform: translateX(280%); } }

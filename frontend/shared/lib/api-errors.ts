@@ -8,6 +8,7 @@ export const ERROR_MESSAGES = {
   FILE_TOO_LARGE: 'Файл слишком большой. Максимальный размер — 50 MB.',
   DUPLICATE_ENTITY: 'Такая запись уже существует.',
   ENTITY_NOT_FOUND: 'Объект не найден или был удалён.',
+  REPORT_FAILED: 'Не удалось сформировать отчёт. Попробуйте уменьшить период или изменить фильтры.',
 } as const;
 
 export type BusinessErrorCode = keyof typeof ERROR_MESSAGES;

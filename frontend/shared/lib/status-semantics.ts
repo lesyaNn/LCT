@@ -2,7 +2,7 @@ import type { ExpirationStatus, UpcomingDateStatus } from './formatters';
 import type { ProgramStatus, TeacherCertificateStatus, TeacherReadiness, UniversityDocumentStatus, UniversityHistoryEventType, UniversityLicenseStatus, UniversityPassportWorkflow, UniversityProductStatus, UniversityWorkflowStageStatus } from './universities-repository';
 import type { AttentionItem } from './dashboard-repository';
 
-export type SemanticIntent = 'neutral' | 'brand' | 'success' | 'warning' | 'danger';
+export type SemanticIntent = 'neutral' | 'brand' | 'info' | 'success' | 'warning' | 'danger';
 export type ReadinessIcon = 'success' | 'warning' | 'error';
 export type WorkflowStageIcon = 'check' | 'information' | 'time' | 'skip' | 'error';
 

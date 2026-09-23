@@ -52,10 +52,15 @@
 .progressCell > div { flex: 1; }
 .progressCell > span { color: var(--rtk-color-text-secondary); font-size: 11px; }
 .muted { color: var(--rtk-color-text-tertiary); }
+.timeoutProgress { color: var(--atmr-error-on-container, var(--rtk-color-danger)); font-size: 11px; }
 .jobActions { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-1); }
 .actionLink { align-items: center; color: var(--rtk-color-brand); display: inline-flex; font-size: 12px; gap: var(--rtk-space-1); text-decoration: none; }
 .actionLink:hover { text-decoration: underline; }
+.actionUnavailable { color: var(--rtk-color-text-tertiary); font-size: 11px; }
 .errorHint { color: var(--atmr-error-on-container, var(--rtk-color-danger)); cursor: help; display: block; font-size: 10px; margin-top: var(--rtk-space-1); }
+.timeoutMessage, .jobError, .jobActionError, .pollingError { font-size: 11px; line-height: 1.4; margin: var(--rtk-space-2) 0 0; }
+.timeoutMessage, .jobActionError { color: var(--atmr-error-on-container, var(--rtk-color-danger)); }
+.pollingError { color: var(--rtk-color-text-secondary); }
 .jobsMobile { display: none; }
 .jobsSkeleton { display: flex; flex-direction: column; gap: 1px; min-width: 660px; }
 .jobsSkeleton > div { display: grid; gap: 1px; grid-template-columns: 1.5fr repeat(3, 1fr); }
@@ -72,7 +77,7 @@
 .jobCard dl { display: grid; gap: var(--rtk-space-2); margin: 0; }
 .jobCard dl div { display: grid; gap: var(--rtk-space-2); grid-template-columns: 80px minmax(0, 1fr); }
 .jobCard dt { color: var(--rtk-color-text-secondary); font-size: 11px; }
-.jobCard dd { font-size: 12px; margin: 0; overflow-wrap: anywhere; }
+.jobCard dd { font-size: 12px; margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .jobError { color: var(--atmr-error-on-container, var(--rtk-color-danger)); font-size: 12px; margin: 0; }
 .jobCardActions { display: flex; gap: var(--rtk-space-2); }
 .visuallyHidden { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }

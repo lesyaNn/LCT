@@ -1,5 +1,5 @@
 import { apiFetch } from './api-client';
-import { ApiRequestError } from './api-errors';
+import { ApiRequestError, ERROR_MESSAGES } from './api-errors';
 import { universityFilterOptions, universityProgramDirectionOptions, type UniversityWorkflowStageStatus } from './universities-repository';
 import { workflowStageStatusSemantics } from './status-semantics';
 
@@ -39,7 +39,10 @@ export interface ReportJob {
   progress: number | null;
   createdAt: string;
   error?: string;
+  errorCode?: string;
   downloadUrl?: string;
+  /** The original form request is retained for create-based retry. */
+  request?: ReportRequest;
 }
 
 export interface ReportFilterOptions {
@@ -72,7 +75,9 @@ export const REPORTS_API_CAPABILITIES: ReportsApiCapabilities = {
   createJob: true,
   jobStatus: true,
   jobList: false,
-  retry: false,
+  // The current API has no dedicated retry route. The UI retries by creating
+  // another job with the original request payload.
+  retry: true,
   download: false,
   formats: { xlsx: true, pdf: false, json: false },
   filters: false,
@@ -186,6 +191,21 @@ function safeJobError(value: unknown): string | undefined {
   return message;
 }
 
+function reportErrorCode(item: Record<string, unknown>, result: Record<string, unknown>): string | undefined {
+  const direct = stringValue(item.error_code ?? item.errorCode ?? result.code ?? item.code);
+  if (direct) return direct.toUpperCase();
+  const raw = item.error ?? result.error;
+  if (isRecord(raw)) return stringValue(raw.code)?.toUpperCase();
+  return stringValue(raw)?.toUpperCase() === 'REPORT_FAILED' ? 'REPORT_FAILED' : undefined;
+}
+
+function reportErrorMessage(item: Record<string, unknown>, result: Record<string, unknown>, code?: string): string | undefined {
+  if (code === 'REPORT_FAILED') return ERROR_MESSAGES.REPORT_FAILED;
+  const raw = item.error ?? result.error ?? item.message ?? result.message;
+  if (isRecord(raw)) return safeJobError(raw.message ?? raw.detail);
+  return safeJobError(raw);
+}
+
 function reportName(item: Record<string, unknown>, format: ReportFormat): string {
   const direct = stringValue(item.name ?? item.title);
   if (direct) return direct;
@@ -197,10 +217,12 @@ export function adaptReportJob(raw: unknown, fallbackId?: string): ReportJob {
   const id = stringValue(item.id ?? item.job_id) ?? fallbackId ?? 'unknown';
   const rawFormat = stringValue(item.format ?? (isRecord(item.payload) ? item.payload.format : undefined));
   const format: ReportFormat = rawFormat === 'pdf' || rawFormat === 'json' ? rawFormat : 'xlsx';
-  const timestamp = item.created_at ?? item.createdAt;
+  const timestamp = item.created_at ?? item.createdAt ?? item.started_at ?? item.startedAt;
   const createdAt = typeof timestamp === 'number' ? new Date(timestamp * 1000).toISOString() : stringValue(timestamp) ?? new Date().toISOString();
-  const progress = typeof item.progress === 'number' && Number.isFinite(item.progress) ? Math.max(0, Math.min(100, item.progress)) : null;
   const result = isRecord(item.result) ? item.result : {};
+  const rawProgress = item.progress ?? result.progress;
+  const progress = typeof rawProgress === 'number' && Number.isFinite(rawProgress) ? Math.max(0, Math.min(100, rawProgress)) : null;
+  const errorCode = reportErrorCode(item, result);
   return {
     id,
     name: reportName(item, format),
@@ -208,7 +230,8 @@ export function adaptReportJob(raw: unknown, fallbackId?: string): ReportJob {
     status: reportStatus(item.status),
     progress,
     createdAt,
-    error: safeJobError(item.error ?? result.error),
+    error: reportErrorMessage(item, result, errorCode),
+    errorCode,
     downloadUrl: stringValue(item.download_url ?? item.downloadUrl ?? result.download_url ?? result.downloadUrl),
   };
 }
@@ -222,12 +245,18 @@ export async function createReportJob(request: ReportRequest): Promise<ReportJob
   // Only format/columns exist in the current reporting router. Filters stay in
   // the normalized form model and are not silently sent as invented DTO keys.
   const result = await apiFetch<unknown>('/api/v1/reports/export', { method: 'POST', body: { format: request.format, columns: request.columns } });
-  return adaptReportJob(unwrap(result, 'Не удалось создать задачу отчёта.'));
+  return { ...adaptReportJob(unwrap(result, 'Не удалось создать задачу отчёта.')), request };
 }
 
 export async function getReportJob(jobId: string): Promise<ReportJob> {
   const result = await apiFetch<unknown>(`/api/v1/reports/jobs/${encodeURIComponent(jobId)}`);
   return adaptReportJob(unwrap(result, 'Не удалось обновить статус отчёта.'), jobId);
+}
+
+/** Retry uses the supported create contract because no retry endpoint exists. */
+export async function retryReportJob(job: ReportJob): Promise<ReportJob> {
+  if (!job.request) throw new ApiRequestError(409, { code: 'REPORT_RETRY_UNAVAILABLE' }, 'Параметры исходного отчёта недоступны для повтора.');
+  return createReportJob(job.request);
 }
 
 /** No list endpoint exists in the current reporting API. */

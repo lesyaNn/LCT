@@ -1,17 +1,21 @@
 'use client';
 
 import Calendar from '@atomaro/icons/24/communication/Calendar';
+import CheckStatistics from '@atomaro/icons/24/action/CheckStatistics';
 import CloudDownload from '@atomaro/icons/24/action/CloudDownload';
 import Filter from '@atomaro/icons/24/action/Filter';
-import InformationStroke from '@atomaro/icons/24/alert/InformationStroke';
 import RefreshSmall from '@atomaro/icons/24/action/RefreshSmall';
+import ErrorStroke from '@atomaro/icons/24/alert/ErrorStroke';
+import InformationStroke from '@atomaro/icons/24/alert/InformationStroke';
+import TimeStroke from '@atomaro/icons/24/alert/TimeStroke';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import { applyServerErrorsToForm, normalizeApiError } from '@/shared/lib/api-errors';
 import { formatDateTimeRu } from '@/shared/lib/formatters';
+import { type SemanticIntent } from '@/shared/lib/status-semantics';
 import { Button } from '@/shared/ui/rtk/button';
 import { FormError, FormErrorBanner, FormField } from '@/shared/ui/rtk/form-field';
 import { Input } from '@/shared/ui/rtk/form-controls';
@@ -34,6 +38,7 @@ import {
   reportPeriodPreset,
   reportQueryKeys,
   reportRequestFromForm,
+  retryReportJob,
   type ReportFormValues,
   type ReportJob,
   type ReportJobStatus,
@@ -42,6 +47,8 @@ import {
 import styles from './reports-page.module.css';
 
 const reportFields = ['dateFrom', 'dateTo', 'universityIds', 'directionIds', 'productIds', 'responsibleIds', 'workflowStatuses', 'columnIds', 'format'] as const;
+const REPORT_JOB_TIMEOUT_MS = 60_000;
+export { REPORT_JOB_TIMEOUT_MS };
 
 const reportSchema = z.object({
   dateFrom: z.string(),
@@ -66,11 +73,11 @@ const periodPresets: Array<{ id: Exclude<ReportPeriodPreset, null>; label: strin
   { id: 'previous_year', label: 'Прошлый год' },
 ];
 
-const statusMeta: Record<ReportJobStatus, { label: string; intent: 'neutral' | 'brand' | 'success' | 'danger' }> = {
-  queued: { label: 'В очереди', intent: 'neutral' },
-  building: { label: 'Формируется', intent: 'brand' },
-  ready: { label: 'Готов', intent: 'success' },
-  failed: { label: 'Ошибка', intent: 'danger' },
+const statusMeta: Record<ReportJobStatus, { label: string; intent: SemanticIntent; icon: ReactNode }> = {
+  queued: { label: 'В очереди', intent: 'neutral', icon: <TimeStroke size={14} fill="currentColor" aria-hidden="true" /> },
+  building: { label: 'Формируется', intent: 'info', icon: <InformationStroke size={14} fill="currentColor" aria-hidden="true" /> },
+  ready: { label: 'Готов', intent: 'success', icon: <CheckStatistics size={14} fill="currentColor" aria-hidden="true" /> },
+  failed: { label: 'Ошибка', intent: 'danger', icon: <ErrorStroke size={14} fill="currentColor" aria-hidden="true" /> },
 };
 
 function activePreset(values: Pick<ReportFormValues, 'dateFrom' | 'dateTo'>): ReportPeriodPreset {
@@ -80,35 +87,92 @@ function activePreset(values: Pick<ReportFormValues, 'dateFrom' | 'dateTo'>): Re
   })?.id ?? null;
 }
 
-function JobStatus({ status }: { status: ReportJobStatus }) {
-  const meta = statusMeta[status];
-  return <StatusBadge intent={meta.intent}>{meta.label}</StatusBadge>;
+function isActiveJob(job: ReportJob): boolean {
+  return job.status === 'queued' || job.status === 'building';
 }
 
-function ReportJobRow({ job }: { job: ReportJob }) {
-  const canDownload = Boolean(REPORTS_API_CAPABILITIES.download && job.downloadUrl);
+function hasTimedOut(job: ReportJob): boolean {
+  if (!isActiveJob(job)) return false;
+  const createdAt = Date.parse(job.createdAt);
+  return Number.isFinite(createdAt) && Date.now() - createdAt >= REPORT_JOB_TIMEOUT_MS;
+}
+
+function JobStatus({ status }: { status: ReportJobStatus }) {
+  const meta = statusMeta[status];
+  return <StatusBadge intent={meta.intent} icon={meta.icon}>{meta.label}</StatusBadge>;
+}
+
+function JobProgress({ job, timedOut }: { job: ReportJob; timedOut: boolean }) {
+  if (timedOut) return <span className={styles.timeoutProgress}>Ожидание прервано</span>;
+  if (job.status === 'ready' && job.progress !== null) return <div className={styles.progressCell}><Progress value={job.progress} label={`Прогресс отчёта ${job.name}`} /><span>{job.progress}%</span></div>;
+  if (job.status !== 'building') return <span className={styles.muted}>—</span>;
+  return <div className={styles.progressCell}><Progress value={job.progress} label={`Прогресс отчёта ${job.name}`} /><span>{job.progress === null ? 'Выполняется' : `${job.progress}%`}</span></div>;
+}
+
+function JobStateDetails({ job, timedOut, pollingError, retryError }: { job: ReportJob; timedOut: boolean; pollingError?: string; retryError?: string }) {
+  if (timedOut) return <p className={styles.timeoutMessage}>Формирование отчёта занимает слишком много времени. Попробуйте уменьшить период или количество выбранных фильтров.</p>;
+  if (job.status === 'failed') return <p className={styles.jobError}>{job.error ?? 'Не удалось сформировать отчёт.'}</p>;
+  if (retryError) return <p className={styles.jobActionError} role="alert">{retryError}</p>;
+  if (pollingError) return <p className={styles.pollingError}>Не удалось обновить статус. Повторяем попытку…</p>;
+  return null;
+}
+
+function JobActions({ job, timedOut, retrying, onRetry }: { job: ReportJob; timedOut: boolean; retrying: boolean; onRetry: (job: ReportJob) => void }) {
+  if (job.status === 'ready') {
+    if (job.downloadUrl) return <a className={styles.actionLink} href={job.downloadUrl} download aria-label={`Скачать ${job.name}`}><CloudDownload size={16} fill="currentColor" />Скачать</a>;
+    return <span className={styles.actionUnavailable} title="Сервер не вернул download_url">Файл недоступен</span>;
+  }
+  if ((job.status === 'failed' || timedOut) && REPORTS_API_CAPABILITIES.retry && job.request) {
+    return <Button variant="ghost" size="s" type="button" onClick={() => onRetry(job)} disabled={retrying} aria-label={`Повторить ${job.name}`}><RefreshSmall size={16} fill="currentColor" />{retrying ? 'Повтор…' : 'Повторить'}</Button>;
+  }
+  return null;
+}
+
+type JobViewProps = {
+  job: ReportJob;
+  pollingError?: string;
+  retryError?: string;
+  retrying: boolean;
+  onRetry: (job: ReportJob) => void;
+};
+
+function ReportJobRow({ job, pollingError, retryError, retrying, onRetry }: JobViewProps) {
+  const timedOut = hasTimedOut(job);
+  const visibleStatus = timedOut ? 'failed' : job.status;
+  const details = <JobStateDetails job={job} timedOut={timedOut} pollingError={pollingError} retryError={retryError} />;
   return <tr>
-    <td><strong>{job.name}</strong></td>
+    <td><strong>{job.name}</strong>{details}</td>
     <td>{job.format.toUpperCase()}</td>
-    <td><JobStatus status={job.status} />{job.error ? <Tooltip content={<span>{job.error}</span>}><span className={styles.errorHint} tabIndex={0}>Подробнее</span></Tooltip> : null}</td>
-    <td>{job.status === 'building' ? job.progress !== null ? <div className={styles.progressCell}><Progress value={job.progress} label={`Прогресс отчёта ${job.name}`} /><span>{job.progress}%</span></div> : <span className={styles.muted}>Статус обновляется…</span> : <span className={styles.muted}>—</span>}</td>
+    <td><JobStatus status={visibleStatus} />{job.error && job.status === 'failed' ? <Tooltip content={<span>{job.error}</span>}><span className={styles.errorHint} tabIndex={0}>Подробнее</span></Tooltip> : null}</td>
+    <td><JobProgress job={job} timedOut={timedOut} /></td>
     <td><time dateTime={job.createdAt}>{formatDateTimeRu(job.createdAt)}</time></td>
-    <td><div className={styles.jobActions}>{job.status === 'ready' ? canDownload ? <a className={styles.actionLink} href={job.downloadUrl} download><CloudDownload size={16} fill="currentColor" />Скачать</a> : <Button variant="ghost" size="s" type="button" disabled title="Download endpoint отсутствует в текущем Reports API"><CloudDownload size={16} fill="currentColor" />Скачать</Button> : null}{job.status === 'failed' ? <Button variant="ghost" size="s" type="button" disabled={!REPORTS_API_CAPABILITIES.retry} title="Retry endpoint отсутствует в текущем Reports API"><RefreshSmall size={16} fill="currentColor" />Повторить</Button> : null}</div></td>
+    <td><div className={styles.jobActions}><JobActions job={job} timedOut={timedOut} retrying={retrying} onRetry={onRetry} /></div></td>
   </tr>;
 }
 
-function ReportJobCard({ job }: { job: ReportJob }) {
-  return <article className={styles.jobCard}><div className={styles.jobCardHeader}><strong>{job.name}</strong><JobStatus status={job.status} /></div><dl><div><dt>Формат</dt><dd>{job.format.toUpperCase()}</dd></div><div><dt>Создан</dt><dd><time dateTime={job.createdAt}>{formatDateTimeRu(job.createdAt)}</time></dd></div><div><dt>Прогресс</dt><dd>{job.status === 'building' ? job.progress !== null ? `${job.progress}%` : 'Статус обновляется…' : '—'}</dd></div></dl>{job.error ? <p className={styles.jobError}>{job.error}</p> : null}<div className={styles.jobCardActions}>{job.status === 'ready' ? <Button variant="secondary" size="s" type="button" disabled title="Download endpoint отсутствует в текущем Reports API"><CloudDownload size={16} fill="currentColor" />Скачать</Button> : null}{job.status === 'failed' ? <Button variant="ghost" size="s" type="button" disabled={!REPORTS_API_CAPABILITIES.retry} title="Retry endpoint отсутствует в текущем Reports API"><RefreshSmall size={16} fill="currentColor" />Повторить</Button> : null}</div></article>;
+function ReportJobCard({ job, pollingError, retryError, retrying, onRetry }: JobViewProps) {
+  const timedOut = hasTimedOut(job);
+  const visibleStatus = timedOut ? 'failed' : job.status;
+  return <article className={styles.jobCard}>
+    <div className={styles.jobCardHeader}><strong>{job.name}</strong><JobStatus status={visibleStatus} /></div>
+    <dl>
+      <div><dt>Формат</dt><dd>{job.format.toUpperCase()}</dd></div>
+      <div><dt>Создан</dt><dd><time dateTime={job.createdAt}>{formatDateTimeRu(job.createdAt)}</time></dd></div>
+      <div><dt>Прогресс</dt><dd><JobProgress job={job} timedOut={timedOut} /></dd></div>
+    </dl>
+    <JobStateDetails job={job} timedOut={timedOut} pollingError={pollingError} retryError={retryError} />
+    <div className={styles.jobCardActions}><JobActions job={job} timedOut={timedOut} retrying={retrying} onRetry={onRetry} /></div>
+  </article>;
 }
 
-function JobsPanel({ jobs, loading, error, onRetry }: { jobs: ReportJob[]; loading: boolean; error: unknown; onRetry: () => void }) {
+function JobsPanel({ jobs, loading, error, pollingErrors, retryErrors, retryingId, onRetry, onRefresh }: { jobs: ReportJob[]; loading: boolean; error: unknown; pollingErrors: ReadonlyMap<string, string>; retryErrors: ReadonlyMap<string, string>; retryingId: string | null; onRetry: (job: ReportJob) => void; onRefresh: () => void }) {
   if (loading) return <TableShell ariaLabel="Загрузка задач отчётов" ariaBusy><div className={styles.jobsSkeleton}>{Array.from({ length: 4 }, (_, index) => <div key={index}><span /><span /><span /><span /></div>)}</div></TableShell>;
   if (error) {
     const normalized = normalizeApiError(error, { fallbackMessage: 'Не удалось загрузить задачи отчётов.' });
-    return <div className={styles.jobsError} role="alert"><h3>{normalized.message}</h3><Button variant="secondary" size="s" type="button" onClick={onRetry}>Повторить</Button></div>;
+    return <div className={styles.jobsError} role="alert"><h3>{normalized.message}</h3><Button variant="secondary" size="s" type="button" onClick={onRefresh}>Повторить</Button></div>;
   }
-  if (!jobs.length) return <div className={styles.jobsEmpty} role="status"><h3>Отчёты ещё не формировались</h3><p>Созданные в этой сессии задачи появятся здесь.</p><p className={styles.apiNote}>В текущем Reports API нет endpoint списка jobs, поэтому история задач пока недоступна.</p></div>;
-  return <TableShell ariaLabel="Задачи отчётов"><div className={styles.jobsDesktop}><table><caption className={styles.visuallyHidden}>Задачи отчётов</caption><thead><tr><th scope="col">Отчёт</th><th scope="col">Формат</th><th scope="col">Статус</th><th scope="col">Прогресс</th><th scope="col">Создан</th><th scope="col">Действия</th></tr></thead><tbody>{jobs.map((job) => <ReportJobRow key={job.id} job={job} />)}</tbody></table></div><div className={styles.jobsMobile}>{jobs.map((job) => <ReportJobCard key={job.id} job={job} />)}</div></TableShell>;
+  if (!jobs.length) return <div className={styles.jobsEmpty} role="status"><h3>Отчёты ещё не формировались</h3><p>Созданные в этой сессии задачи появятся здесь.</p><p className={styles.apiNote}>История jobs станет доступна после появления list endpoint.</p></div>;
+  return <TableShell ariaLabel="Задачи отчётов"><div className={styles.jobsDesktop}><table><caption className={styles.visuallyHidden}>Задачи отчётов</caption><thead><tr><th scope="col">Отчёт</th><th scope="col">Формат</th><th scope="col">Статус</th><th scope="col">Прогресс</th><th scope="col">Создан</th><th scope="col">Действия</th></tr></thead><tbody>{jobs.map((job) => <ReportJobRow key={job.id} job={job} pollingError={pollingErrors.get(job.id)} retryError={retryErrors.get(job.id)} retrying={retryingId === job.id} onRetry={onRetry} />)}</tbody></table></div><div className={styles.jobsMobile}>{jobs.map((job) => <ReportJobCard key={job.id} job={job} pollingError={pollingErrors.get(job.id)} retryError={retryErrors.get(job.id)} retrying={retryingId === job.id} onRetry={onRetry} />)}</div></TableShell>;
 }
 
 function ColumnSelector({ control, errors }: { control: ReturnType<typeof useForm<ReportFormSchema>>['control']; errors: ReturnType<typeof useForm<ReportFormSchema>>['formState']['errors'] }) {
@@ -133,7 +197,7 @@ function ReportForm({ onCreated }: { onCreated: (job: ReportJob) => void }) {
       <section className={styles.formSection} aria-labelledby="report-filters-heading"><div className={styles.sectionHeading}><div><h3 id="report-filters-heading">Фильтры</h3><p>Опции берутся из общих каталогов проекта.</p></div></div><div className={styles.filterGrid}><Controller control={control} name="universityIds" render={({ field }) => <MultiSelect label="ВУЗы" searchable options={reportFilterOptions.universities} values={field.value} onChange={field.onChange} />} /><Controller control={control} name="directionIds" render={({ field }) => <MultiSelect label="Направления" options={reportFilterOptions.directions} values={field.value} onChange={field.onChange} />} /><Controller control={control} name="productIds" render={({ field }) => <MultiSelect label="Продукты" options={reportFilterOptions.products} values={field.value} onChange={field.onChange} />} /><Controller control={control} name="responsibleIds" render={({ field }) => <MultiSelect label="ФИО" searchable options={reportFilterOptions.responsibles} values={field.value} onChange={field.onChange} />} /><Controller control={control} name="workflowStatuses" render={({ field }) => <MultiSelect label="Статусы Workflow" options={reportFilterOptions.workflowStatuses} values={field.value} onChange={field.onChange} />} /></div></section>
       <ColumnSelector control={control} errors={errors} />
       <section className={styles.formSection} aria-labelledby="report-format-heading"><div className={styles.sectionHeading}><div><h3 id="report-format-heading">Формат</h3><p>Выберите формат файла отчёта.</p></div></div><Controller control={control} name="format" render={({ field }) => <fieldset className={styles.radioGroup}><legend className={styles.visuallyHidden}>Формат отчёта</legend>{REPORT_FORMATS.map((format) => <label key={format.id} className={!REPORTS_API_CAPABILITIES.formats[format.id] ? styles.optionDisabled : undefined}><input type="radio" value={format.id} checked={field.value === format.id} disabled={!REPORTS_API_CAPABILITIES.formats[format.id]} onChange={() => field.onChange(format.id)} />{format.label}{!REPORTS_API_CAPABILITIES.formats[format.id] ? <small>ожидает API</small> : null}</label>)}</fieldset>} /></section>
-      <div className={styles.formActions}><Button type="submit" variant="primary" size="m" disabled={createMutation.isPending}>{createMutation.isPending ? 'Формирование…' : 'Сформировать отчёт'}</Button><span className={styles.actionHint}>Задача будет добавлена в Report Jobs без перезагрузки страницы.</span></div>
+      <div className={styles.formActions}><Button type="submit" variant="primary" size="m" disabled={createMutation.isPending}>{createMutation.isPending ? 'Формирование…' : 'Сформировать отчёт'}</Button><span className={styles.actionHint}>Задача добавляется в Report Jobs без перезагрузки страницы; значения формы сохраняются при ошибке.</span></div>
     </form>
     {notification ? <div className={styles.toastViewport}><Toast intent={notification.intent} title={notification.title} message={notification.message} onClose={() => setNotification(null)} /></div> : null}
   </div>;
@@ -141,14 +205,49 @@ function ReportForm({ onCreated }: { onCreated: (job: ReportJob) => void }) {
 
 function JobsSection() {
   const queryClient = useQueryClient();
-  const jobsQuery = useQuery({ queryKey: reportQueryKeys.jobs, queryFn: listReportJobs, placeholderData: keepPreviousData, staleTime: 30_000 });
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [retryErrors, setRetryErrors] = useState<Map<string, string>>(new Map());
+  const jobsQuery = useQuery({ queryKey: reportQueryKeys.jobs, queryFn: listReportJobs, placeholderData: keepPreviousData, staleTime: Infinity });
   const baseJobs = jobsQuery.data ?? [];
-  const activeJobs = baseJobs.filter((job) => job.status === 'queued' || job.status === 'building');
-  const statusQueries = useQueries({ queries: activeJobs.map((job) => ({ queryKey: reportQueryKeys.job(job.id), queryFn: () => getReportJob(job.id), enabled: REPORTS_API_CAPABILITIES.jobStatus, refetchInterval: (query: { state: { data?: unknown } }) => { const current = query.state.data as ReportJob | undefined; return !current || current.status === 'queued' || current.status === 'building' ? 3_000 : false; } })) });
+  const addJob = useCallback((job: ReportJob) => {
+    queryClient.setQueryData<ReportJob[]>(reportQueryKeys.jobs, (current = []) => [job, ...current.filter((item) => item.id !== job.id)]);
+    queryClient.setQueryData(reportQueryKeys.job(job.id), job);
+  }, [queryClient]);
+  const activeJobs = baseJobs.filter(isActiveJob);
+  const statusQueries = useQueries({ queries: activeJobs.map((job) => ({
+    queryKey: reportQueryKeys.job(job.id),
+    queryFn: async () => {
+      const next = await getReportJob(job.id);
+      queryClient.setQueryData<ReportJob[]>(reportQueryKeys.jobs, (current = []) => current.map((item) => item.id === next.id ? { ...next, request: item.request ?? next.request } : item));
+      return next;
+    },
+    enabled: REPORTS_API_CAPABILITIES.jobStatus,
+    retry: 3,
+    retryDelay: (attemptIndex: number) => Math.min(1_000 * 2 ** attemptIndex, 8_000),
+    refetchInterval: (query: { state: { data?: ReportJob } }) => {
+      const current = query.state.data;
+      return !current || isActiveJob(current) ? 3_000 : false;
+    },
+  })) });
   const statusById = new Map(statusQueries.flatMap((query) => query.data ? [[query.data.id, query.data] as const] : []));
-  const jobs = baseJobs.map((job) => statusById.get(job.id) ?? job);
-  const addJob = (job: ReportJob) => { queryClient.setQueryData<ReportJob[]>(reportQueryKeys.jobs, (current = []) => [job, ...current.filter((item) => item.id !== job.id)]); queryClient.setQueryData(reportQueryKeys.job(job.id), job); };
-  return <div className={styles.reportsLayout}><ReportForm onCreated={addJob} /><section className={styles.jobsSurface} aria-labelledby="report-jobs-heading"><div className={styles.jobsHeader}><div><p className={styles.eyebrow}>Очередь формирования</p><h2 id="report-jobs-heading">Задачи отчётов</h2><p>Статусы обновляются для незавершённых задач.</p></div><span className={styles.jobsCapability}><InformationStroke size={16} fill="currentColor" aria-hidden="true" />История jobs подключится после появления list endpoint</span></div><JobsPanel jobs={jobs} loading={jobsQuery.isPending} error={jobsQuery.error} onRetry={() => void jobsQuery.refetch()} /></section></div>;
+  const jobs = baseJobs.map((job) => {
+    const current = statusById.get(job.id);
+    return current ? { ...current, request: job.request ?? current.request } : job;
+  });
+  const pollingErrors = new Map<string, string>(statusQueries.flatMap((query, index) => query.error ? [[activeJobs[index].id, normalizeApiError(query.error, { fallbackMessage: 'Не удалось обновить статус отчёта.' }).message] as const] : []));
+  const onRetry = async (job: ReportJob) => {
+    if (retryingId || !job.request) return;
+    setRetryingId(job.id);
+    setRetryErrors((current) => { const next = new Map(current); next.delete(job.id); return next; });
+    try {
+      addJob(await retryReportJob(job));
+    } catch (cause) {
+      setRetryErrors((current) => new Map(current).set(job.id, normalizeApiError(cause, { fallbackMessage: 'Не удалось повторить формирование отчёта.' }).message));
+    } finally {
+      setRetryingId(null);
+    }
+  };
+  return <div className={styles.reportsLayout}><ReportForm onCreated={addJob} /><section className={styles.jobsSurface} aria-labelledby="report-jobs-heading"><div className={styles.jobsHeader}><div><p className={styles.eyebrow}>Очередь формирования</p><h2 id="report-jobs-heading">Задачи отчётов</h2><p>В очереди и во время формирования статус обновляется примерно каждые 3 секунды.</p></div><span className={styles.jobsCapability}><InformationStroke size={16} fill="currentColor" aria-hidden="true" />История jobs доступна в текущей сессии; list endpoint пока не опубликован.</span></div><JobsPanel jobs={jobs} loading={jobsQuery.isPending} error={jobsQuery.error} pollingErrors={pollingErrors} retryErrors={retryErrors} retryingId={retryingId} onRetry={onRetry} onRefresh={() => void jobsQuery.refetch()} /></section></div>;
 }
 
 export function ReportsPage() {
