@@ -21,6 +21,7 @@
 .progressTrack span, .taskProgress span { background: var(--rtk-color-brand); border-radius: inherit; display: block; height: 100%; transition: width 180ms ease; }
 .layout { align-items: start; display: grid; gap: var(--rtk-space-5); grid-template-columns: minmax(300px, .9fr) minmax(0, 1.4fr); }
 .stagesPanel, .detailPanel { composes: surface from '../../shared/ui/rtk/section-surface.module.css'; min-width: 0; }
+.detailPanel { animation: workflowDetailsReveal 180ms ease both; }
 .detailPanel { border: 0; box-shadow: var(--rtk-shadow-elevation-2); }
 .panelHeading, .detailHeader, .detailSectionHeading { align-items: flex-start; display: flex; gap: var(--rtk-space-3); justify-content: space-between; }
 .panelHeading h2, .detailHeader h2 { font-size: 20px; letter-spacing: -.02em; margin: var(--rtk-space-1) 0 0; }
@@ -32,6 +33,9 @@
 .stageButton:hover { background: var(--rtk-color-surface-hover); }
 .stageButton:focus-visible { border-color: var(--rtk-color-brand); outline: 2px solid var(--rtk-color-brand); outline-offset: 1px; }
 .stageItemSelected .stageButton { background: var(--rtk-color-brand-soft); border-color: var(--rtk-color-brand); }
+.stageButtonCurrent { border-left: 3px solid var(--rtk-color-brand); }
+.stageButtonError { border-left: 3px solid var(--atmr-error-on-container); }
+.stageItemMuted .stageButton { color: var(--rtk-color-text-secondary); }
 .stageMarker { align-items: center; background: var(--rtk-color-surface-subtle); border: 1px solid var(--rtk-color-border); border-radius: 50%; color: var(--rtk-color-text-secondary); display: inline-flex; height: 36px; justify-content: center; width: 36px; }
 .status-completed { background: var(--atmr-success-container-soft); border-color: var(--atmr-success-on-container); color: var(--atmr-success-on-container); }
 .status-current { background: var(--atmr-accent-container-default); border-color: var(--rtk-color-brand); color: var(--rtk-color-brand); }
@@ -40,8 +44,7 @@
 .stageContent { display: flex; flex-direction: column; gap: var(--rtk-space-2); min-width: 0; }
 .stageTopline { align-items: baseline; display: flex; gap: var(--rtk-space-2); min-width: 0; }
 .stageTopline strong { font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
-.stageTitleCompleted, .stageTitleSkipped { color: var(--rtk-color-text-secondary); text-decoration: line-through; text-decoration-thickness: 1px; }
-.stageTitleSkipped { color: var(--rtk-color-text-tertiary); }
+.stageTitleMuted { color: var(--rtk-color-text-secondary); text-decoration: line-through; text-decoration-thickness: 1px; }
 .stageOrder { color: var(--rtk-color-text-tertiary); font-size: 11px; font-variant-numeric: tabular-nums; }
 .stageMeta { align-items: center; color: var(--rtk-color-text-tertiary); display: flex; flex-wrap: wrap; font-size: 11px; gap: var(--rtk-space-2); }
 .stageDeadline { display: inline-flex; flex-direction: column; gap: 1px; }
@@ -49,8 +52,18 @@
 .stageDeadline small { color: inherit; font-size: 10px; padding-left: 18px; }
 .overdue { color: var(--rtk-color-danger) !important; }
 .stageResponsible { align-items: center; color: var(--rtk-color-text-tertiary); display: inline-flex; font-size: 11px; gap: var(--rtk-space-1); min-width: 0; overflow-wrap: anywhere; }
+.assigneeTrigger { align-items: center; color: var(--rtk-color-text-secondary); display: inline-flex; font-size: 11px; gap: var(--rtk-space-1); max-width: 100%; min-width: 0; overflow-wrap: anywhere; }
+.assigneeTrigger:focus-visible { border-radius: var(--rtk-radius-small); outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
+.assigneeTrigger > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.unassigned { color: var(--rtk-color-text-tertiary); }
+.dueSoon { color: var(--atmr-warning-on-container) !important; font-weight: 650; }
+.stageSummary { align-items: center; color: var(--rtk-color-text-tertiary); display: flex; flex-wrap: wrap; font-size: 10px; gap: var(--rtk-space-3); }
+.stageSummary > span { align-items: center; display: inline-flex; gap: 4px; }
+.stageSummary svg { color: var(--rtk-color-text-secondary); }
 .detailPanel { display: flex; flex-direction: column; gap: var(--rtk-space-5); }
 .detailHeader h2 { font-size: 24px; max-width: 500px; overflow-wrap: anywhere; }
+.detail-current { border-top: 2px solid var(--rtk-color-brand); }
+.detail-overdue { border-top: 2px solid var(--atmr-error-on-container); }
 .detailFacts { display: grid; gap: var(--rtk-space-4); grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
 .detailFacts div { display: flex; flex-direction: column; gap: var(--rtk-space-1); min-width: 0; }
 .detailFacts dt { color: var(--rtk-color-text-tertiary); font-size: 11px; }
@@ -93,7 +106,13 @@
 .transitionList time { color: var(--rtk-color-text-tertiary); font-size: 11px; }
 .transitionList p { color: var(--rtk-color-text-secondary); font-size: 12px; line-height: 1.4; margin: var(--rtk-space-1) 0 0; }
 .muted { color: var(--rtk-color-text-tertiary); font-size: 12px; margin: 0; }
-.stageAction { align-items: center; border-top: 1px solid var(--rtk-color-border); display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); padding-top: var(--rtk-space-4); }
+.completionSummary { align-items: center; border-radius: var(--rtk-radius-small); display: flex; flex-wrap: wrap; font-size: 12px; gap: var(--rtk-space-2); padding: var(--rtk-space-3); }
+.completionSummary > span:first-child { align-items: center; display: inline-flex; }
+.completionSummary time { color: var(--rtk-color-text-secondary); font-size: 11px; margin-left: auto; }
+.completionOnTime { background: var(--atmr-success-container-soft); color: var(--atmr-success-on-container); }
+.completionLate { background: var(--atmr-warning-container-soft); color: var(--atmr-warning-on-container); }
+.stageAction { border-top: 1px solid var(--rtk-color-border); display: flex; flex-direction: column; gap: var(--rtk-space-2); padding-top: var(--rtk-space-4); }
+.stageActionButtons { display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); }
 .stageAction span { color: var(--rtk-color-text-tertiary); font-size: 11px; }
 .emptyState { align-items: center; color: var(--rtk-color-text-secondary); display: flex; flex-direction: column; gap: var(--rtk-space-2); justify-content: center; min-height: 240px; text-align: center; }
 .emptyState svg { color: var(--rtk-color-brand); }
@@ -108,6 +127,7 @@
 .skeletonHeader span:nth-child(3) { height: 18px; width: 50%; }
 .skeletonDetails span { height: 84px; }
 @keyframes workflowShimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@keyframes workflowDetailsReveal { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 900px) { .headerMain, .layout, .skeletonLayout { grid-template-columns: 1fr; } .headerCurrent { max-width: 520px; } }
 @media (max-width: 480px) { .stagesPanel, .detailPanel, .overallProgress { padding: var(--rtk-space-4); } .detailFacts { grid-template-columns: 1fr; } .detailHeader { flex-direction: column; } .stageButton { gap: var(--rtk-space-2); grid-template-columns: 32px minmax(0, 1fr); padding: var(--rtk-space-2); } .stageMarker { height: 32px; width: 32px; } .stageItem:not(:last-child)::after { left: 16px; top: 40px; } .stageMeta { align-items: flex-start; flex-direction: column; gap: var(--rtk-space-1); } .progressLabel { align-items: flex-start; flex-direction: column; gap: var(--rtk-space-1); } }
-@media (prefers-reduced-motion: reduce) { .progressTrack span, .taskProgress span, .skeletonStages span, .skeletonDetails span, .skeletonHeader span { animation: none; transition: none; } }
+@media (prefers-reduced-motion: reduce) { .progressTrack span, .taskProgress span, .skeletonStages span, .skeletonDetails span, .skeletonHeader span, .detailPanel { animation: none; transition: none; } }

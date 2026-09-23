@@ -25,11 +25,34 @@ export function getExpirationStatus(isoDate: string, soonDays = 45, now = new Da
 }
 
 export function formatDaysUntilRu(isoDate: string, now = new Date()): string {
+  const relative = getRelativeDueDateRu(isoDate, now);
+  return relative.overdueLabel ?? relative.label;
+}
+
+export interface RelativeDueDateRu {
+  days: number | null;
+  label: string;
+  overdueLabel: string | null;
+  dueSoonLabel: string | null;
+}
+
+/** Shared Russian relative date presentation for workflow and other deadline UI. */
+export function getRelativeDueDateRu(isoDate: string, now = new Date()): RelativeDueDateRu {
   const days = getDaysUntil(isoDate, now);
-  if (days === null) return 'Срок не указан';
-  if (days < 0) return `Просрочено на ${Math.abs(days)} ${pluralizeDays(Math.abs(days))}`;
-  if (days === 0) return 'Истекает сегодня';
-  return `Через ${days} ${pluralizeDays(days)}`;
+  if (days === null) return { days: null, label: 'Срок не указан', overdueLabel: null, dueSoonLabel: null };
+  if (days < 0) {
+    const absoluteDays = Math.abs(days);
+    return {
+      days,
+      label: absoluteDays === 1 ? 'Вчера' : `${absoluteDays} ${pluralizeDays(absoluteDays)} назад`,
+      overdueLabel: `Просрочено на ${absoluteDays} ${pluralizeDays(absoluteDays)}`,
+      dueSoonLabel: null,
+    };
+  }
+  if (days === 0) return { days, label: 'Сегодня', overdueLabel: null, dueSoonLabel: 'Срочно: сегодня' };
+  if (days === 1) return { days, label: 'Завтра', overdueLabel: null, dueSoonLabel: 'Срочно: завтра' };
+  const relative = `Через ${days} ${pluralizeDays(days)}`;
+  return { days, label: relative, overdueLabel: null, dueSoonLabel: days <= 3 ? `Срочно: ${relative.toLocaleLowerCase('ru-RU')}` : null };
 }
 
 export function getUpcomingDateStatus(isoDate: string | null, now = new Date()): UpcomingDateStatus {

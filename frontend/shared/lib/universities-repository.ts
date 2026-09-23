@@ -7,6 +7,8 @@ export type { ProgramStatus };
 export interface UniversityResponsible {
   id: string;
   name: string;
+  email?: string;
+  role?: string;
 }
 
 export interface UniversityStage {
@@ -83,10 +85,10 @@ const programCounts = (planned: number, active: number, launched = 0, archived =
 });
 
 const responsible = {
-  anna: { id: 'responsible-anna', name: 'Анна Иванова' },
-  boris: { id: 'responsible-boris', name: 'Борис Петров' },
-  elena: { id: 'responsible-elena', name: 'Елена Смирнова' },
-  dmitry: { id: 'responsible-dmitry', name: 'Дмитрий Волков' },
+  anna: { id: 'responsible-anna', name: 'Анна Иванова', email: 'anna.ivanova@example.ru', role: 'Куратор проекта' },
+  boris: { id: 'responsible-boris', name: 'Борис Петров', email: 'boris.petrov@example.ru', role: 'Менеджер' },
+  elena: { id: 'responsible-elena', name: 'Елена Смирнова', email: 'elena.smirnova@example.ru', role: 'Координатор программы' },
+  dmitry: { id: 'responsible-dmitry', name: 'Дмитрий Волков', email: 'dmitry.volkov@example.ru', role: 'Менеджер' },
 } satisfies Record<string, UniversityResponsible>;
 
 const stage = {
@@ -329,6 +331,10 @@ export interface UniversityWorkflowStage {
   name: string;
   status: UniversityWorkflowStageStatus;
   deadline: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  completion: 'on_time' | 'late' | null;
+  isOptional?: boolean;
   responsible: UniversityResponsible | null;
   comments: UniversityWorkflowComment[];
   attachments: UniversityWorkflowAttachment[];
@@ -384,7 +390,18 @@ function getWorkflowStageStatus(index: number, currentIndex: number, attention: 
 function getWorkflowDeadline(index: number, status: UniversityWorkflowStageStatus): string {
   if (status === 'overdue') return '2026-09-18';
   if (status === 'current') return '2026-09-30';
-  return `2026-${String(Math.min(12, 3 + Math.floor(index / 2))).padStart(2, '0')}-${String(8 + (index % 6)).padStart(2, '0')}`;
+  if (status === 'pending') return index % 3 === 0 ? '2026-09-25' : `2026-10-${String(1 + (index % 9)).padStart(2, '0')}`;
+  return `2026-09-${String(Math.max(2, 20 - (13 - index) * 2)).padStart(2, '0')}`;
+}
+
+function getWorkflowStageDates(index: number, status: UniversityWorkflowStageStatus): Pick<UniversityWorkflowStage, 'startedAt' | 'completedAt' | 'completion'> {
+  if (status === 'pending') return { startedAt: null, completedAt: null, completion: null };
+  const startedAt = `2026-09-${String(Math.max(2, 4 + index)).padStart(2, '0')}T09:15:00+03:00`;
+  if (status === 'completed' || status === 'skipped') {
+    const completedAt = `2026-09-${String(Math.max(3, 8 + index)).padStart(2, '0')}T16:20:00+03:00`;
+    return { startedAt, completedAt, completion: index % 4 === 0 ? 'late' : 'on_time' };
+  }
+  return { startedAt, completedAt: null, completion: null };
 }
 
 function getWorkflowComments(id: string, index: number, responsible: UniversityResponsible | null): UniversityWorkflowComment[] {
@@ -419,6 +436,7 @@ export async function getUniversityWorkflow(id: string): Promise<UniversityWorkf
       name,
       status,
       deadline: getWorkflowDeadline(index, status),
+      ...getWorkflowStageDates(index, status),
       responsible: university.responsible,
       comments: getWorkflowComments(id, index, university.responsible),
       attachments,
