@@ -1,13 +1,5 @@
-import { ButtonLink } from '@/shared/ui/rtk/button';
-import styles from './not-found-state.module.css';
+import { StatusPage } from './status-page';
 
 export function NotFoundState() {
-  return (
-    <main className={styles.page}>
-      <p className={styles.eyebrow}>404</p>
-      <h1>Страница не найдена</h1>
-      <p>Проверьте адрес или вернитесь на главную страницу CRM.</p>
-      <ButtonLink href="/dashboard" variant="primary" size="m">На главную</ButtonLink>
-    </main>
-  );
+  return <StatusPage code="404" title="Страница не найдена" description="Возможно, адрес изменился или такой страницы больше нет." />;
 }

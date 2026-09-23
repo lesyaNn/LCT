@@ -3,6 +3,9 @@
   --rtk-color-brand: var(--atmr-accent-default);
   --rtk-color-brand-hover: var(--atmr-accent-hover);
   --rtk-color-brand-soft: var(--atmr-accent-container-default);
+  /* Official Rostelecom Default Light Accent 500, used as a restrained secondary brand accent. */
+  --rtk-color-brand-secondary: #ff4f12;
+  --rtk-color-brand-secondary-soft: rgba(255, 79, 18, .1);
   --rtk-color-text-primary: var(--atmr-fg-default, #101828);
   --rtk-color-text-secondary: var(--atmr-fg-soft, rgba(16,24,40,.75));
   --rtk-color-text-tertiary: var(--atmr-fg-muted, rgba(16,24,40,.55));
@@ -25,7 +28,7 @@
   --rtk-space-5: 20px;
   --rtk-space-6: 24px;
   --rtk-space-8: 32px;
-  --rtk-font-family: Inter, Roboto, Arial, sans-serif;
+  --rtk-font-family: "Rostelecom Basis", "Basis Grotesque Pro", Inter, Roboto, Arial, sans-serif;
   --sidebar-width: 260px;
   --sidebar-collapsed-width: 64px;
   --topbar-height: 72px;

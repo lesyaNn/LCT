@@ -1,18 +1,7 @@
 'use client';
 
-import { Button, ButtonLink } from '@/shared/ui/rtk/button';
-import styles from './route-state.module.css';
+import { ErrorState } from './error-state';
 
-export function RouteErrorState({ onRetry }: { onRetry: () => void }) {
-  return (
-    <section className={styles.error} aria-labelledby="route-error-title">
-      <p className={styles.eyebrow}>Ошибка загрузки</p>
-      <h1 id="route-error-title">Не удалось открыть раздел</h1>
-      <p>Повторите попытку. Если ошибка сохранится, вернитесь на главную страницу CRM.</p>
-      <div className={styles.actions}>
-        <Button variant="primary" size="m" onClick={onRetry}>Повторить</Button>
-        <ButtonLink href="/dashboard" variant="secondary" size="m">На главную</ButtonLink>
-      </div>
-    </section>
-  );
+export function RouteErrorState({ onRetry, compact = false, title = 'Не удалось загрузить данные', description = 'Попробуйте повторить запрос.' }: { onRetry: () => void | Promise<void>; compact?: boolean; title?: string; description?: string }) {
+  return <ErrorState title={title} description={description} presentation={compact ? 'compact' : 'large'} onRetry={onRetry} secondaryAction={compact ? undefined : { label: 'На главную', href: '/dashboard' }} />;
 }

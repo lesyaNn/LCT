@@ -1,0 +1,115 @@
+.state {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+}
+
+.compact {
+  gap: var(--rtk-space-3);
+  min-height: 168px;
+  padding: var(--rtk-space-6) var(--rtk-space-4);
+}
+
+.large {
+  display: grid;
+  gap: clamp(var(--rtk-space-6), 6vw, 72px);
+  grid-template-columns: minmax(280px, .8fr) minmax(360px, 1.2fr);
+  margin: 0 auto;
+  min-height: min(720px, calc(100dvh - var(--topbar-height) - (2 * var(--rtk-space-8))));
+  padding: clamp(var(--rtk-space-6), 5vw, 64px);
+  text-align: left;
+  width: min(100%, 1180px);
+}
+
+.content {
+  align-items: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: var(--rtk-space-3);
+  min-width: 0;
+}
+
+.visual {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+
+.label,
+.code,
+.title,
+.description { margin: 0; }
+
+.label {
+  color: var(--rtk-color-brand);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.code {
+  color: var(--rtk-color-text-primary);
+  font-size: clamp(64px, 10vw, 120px);
+  font-weight: 700;
+  letter-spacing: -.06em;
+  line-height: .9;
+}
+
+.title {
+  color: var(--rtk-color-text-primary);
+  font-size: 18px;
+  letter-spacing: -.02em;
+  line-height: 1.25;
+}
+
+.large .title { font-size: clamp(28px, 4vw, 42px); }
+
+.description {
+  color: var(--rtk-color-text-secondary);
+  line-height: 1.6;
+  max-width: 520px;
+}
+
+.large .description { font-size: 16px; }
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rtk-space-3);
+  justify-content: inherit;
+  margin-top: var(--rtk-space-2);
+}
+
+.icon {
+  align-items: center;
+  background: var(--rtk-color-brand-soft);
+  border-radius: 50%;
+  color: var(--rtk-color-brand);
+  display: inline-flex;
+  height: 44px;
+  justify-content: center;
+  width: 44px;
+}
+
+@media (max-width: 768px) {
+  .large {
+    display: flex;
+    gap: var(--rtk-space-5);
+    min-height: calc(100dvh - var(--topbar-height) - (2 * var(--rtk-space-5)));
+    padding: var(--rtk-space-5) var(--rtk-space-4);
+    text-align: center;
+  }
+  .large .visual { order: -1; }
+  .large .content { align-items: center; }
+}
+
+@media (max-width: 390px) {
+  .compact { padding-inline: var(--rtk-space-3); }
+  .large { padding-inline: var(--rtk-space-3); }
+  .actions { align-items: stretch; flex-direction: column; width: 100%; }
+  .actions > * { width: 100%; }
+}

@@ -1,0 +1,53 @@
+.illustration {
+  display: block;
+  height: auto;
+  max-width: 100%;
+  width: min(100%, 520px);
+}
+
+.compact { width: 144px; }
+.surface { fill: var(--rtk-color-surface-subtle); }
+.surfaceStrong { fill: var(--rtk-color-surface-hover); }
+.brandSoft { fill: var(--rtk-color-brand-soft); }
+.brand { fill: var(--rtk-color-brand); }
+.orangeSoft { fill: var(--rtk-color-brand-secondary-soft); }
+.orange { fill: var(--rtk-color-brand-secondary); }
+.neutral { fill: var(--rtk-color-text-tertiary); }
+.ink { fill: var(--rtk-color-text-primary); }
+.paper { fill: var(--rtk-color-surface); }
+.line {
+  fill: none;
+  stroke: var(--rtk-color-text-primary);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4;
+}
+.lineSoft {
+  fill: none;
+  stroke: var(--rtk-color-border-strong);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4;
+}
+.brandLine {
+  fill: none;
+  stroke: var(--rtk-color-brand);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 5;
+}
+.orangeLine {
+  fill: none;
+  stroke: var(--rtk-color-brand-secondary);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 5;
+}
+
+@media (max-width: 768px) {
+  .illustration:not(.compact) { width: min(100%, 360px); }
+}
+
+@media (max-width: 390px) {
+  .illustration:not(.compact) { width: min(100%, 280px); }
+}

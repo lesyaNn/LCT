@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import remarkGfm from 'remark-gfm';
+import { EmptyState } from '@/shared/ui/empty-state';
 import { Drawer } from '@/shared/ui/rtk/drawer';
 import { IconButton } from '@/shared/ui/rtk/icon-button';
 import { Input } from '@/shared/ui/rtk/form-controls';
@@ -27,7 +28,7 @@ function DocsNavigation({ sections, activeArticleId, query, onQueryChange, onNav
   const results = normalizedQuery ? articles.filter((article) => articleSearchText(article).includes(normalizedQuery)).slice(0, 12) : [];
   return <>
     <label className={styles.searchField}><Search size={18} fill="currentColor" aria-hidden="true" /><span className={styles.visuallyHidden}>Поиск по документации</span><Input type="search" value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="Поиск по документации" aria-label="Поиск по документации" /></label>
-    {normalizedQuery ? <div className={styles.searchResults} aria-label="Результаты поиска">{results.length ? results.map((article) => <Link className={styles.searchResult} href={article.href} key={article.id} onClick={onNavigate}><strong>{article.title}</strong><span>{article.sectionTitle}</span></Link>) : <p className={styles.searchEmpty}>Ничего не найдено</p>}</div> : null}
+    {normalizedQuery ? <div className={styles.searchResults} aria-label="Результаты поиска">{results.length ? results.map((article) => <Link className={styles.searchResult} href={article.href} key={article.id} onClick={onNavigate}><strong>{article.title}</strong><span>{article.sectionTitle}</span></Link>) : <EmptyState icon={<Search size={18} fill="currentColor" />} title="Ничего не найдено" description="Попробуйте изменить поисковый запрос." headingLevel={3} />}</div> : null}
     <nav className={styles.docsNav} aria-label="Навигация по документации">
       {sections.map((section) => <section className={styles.navSection} key={section.id}><h2>{section.title}</h2>{section.articles.length ? <ul>{section.articles.map((article) => <li key={article.id}><Link className={activeArticleId === article.id ? styles.activeArticle : undefined} href={article.href} onClick={onNavigate} aria-current={activeArticleId === article.id ? 'page' : undefined}>{article.title}</Link></li>)}</ul> : <p className={styles.navEmpty}>Материал пока недоступен</p>}</section>)}
     </nav>
@@ -48,7 +49,8 @@ function ArticleContent({ article }: { article: DocsArticle }) {
 }
 
 function EmptyDocumentation({ sections, invalidArticle }: { sections: DocsSection[]; invalidArticle: boolean }) {
-  return <section className={styles.emptyState} aria-labelledby="docs-empty-title"><p className={styles.eyebrow}>{invalidArticle ? 'Документация' : 'Раздел CRM'}</p><h1 id="docs-empty-title">{invalidArticle ? 'Материал пока недоступен' : 'Документация готовится'}</h1><p>{invalidArticle ? 'Запрошенная статья отсутствует или ещё не опубликована.' : 'Статьи появятся здесь после публикации контента P5-15-01. Навигация уже готова для подключения Markdown-файлов.'}</p><div className={styles.sectionOverview}>{sections.map((section) => <div className={styles.sectionSummary} key={section.id}><h2>{section.title}</h2>{section.topics.length ? <ul>{section.topics.map((topic) => <li key={topic.slug}>{topic.title}</li>)}</ul> : <p>Раздел ожидает материалы.</p>}</div>)}</div></section>;
+  const availableTopics = sections.reduce((total, section) => total + section.topics.length, 0);
+  return <EmptyState presentation="large" title={invalidArticle ? 'Материал пока недоступен' : 'Документация готовится'} description={invalidArticle ? 'Запрошенная статья отсутствует или ещё не опубликована.' : availableTopics ? 'Материалы готовятся к публикации и появятся в этом разделе.' : 'Статьи появятся здесь после публикации материалов.'} />;
 }
 
 export function DocsPage({ docs, initialArticleId }: DocsPageProps) {

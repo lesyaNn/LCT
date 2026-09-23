@@ -11,9 +11,11 @@ import { formatDateTimeRu } from '@/shared/lib/formatters';
 import { historyEventTypeIntent, historyEventTypeLabels } from '@/shared/lib/status-semantics';
 import { getUniversityHistory, getUniversityHistoryFilterOptions, universityHistoryQueryKey, type UniversityHistoryEvent, type UniversityHistoryEventType, type UniversityHistoryFilters } from '@/shared/lib/universities-repository';
 import { Button } from '@/shared/ui/rtk/button';
+import { EmptyState } from '@/shared/ui/empty-state';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { TableShell } from '@/shared/ui/rtk/table-shell';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
+import { TableSkeleton } from '@/shared/ui/skeleton';
 import { AuditDiff } from '@/widgets/audit/audit-diff';
 import styles from './university-history.module.css';
 
@@ -40,14 +42,6 @@ function HistoryFilters({ filters, options, onChange, onReset }: { filters: Univ
   return <div className={styles.filters} aria-label="Фильтры истории"><label><span>Тип события</span><select value={filters.type} onChange={(event) => onChange({ type: event.target.value as UniversityHistoryFilters['type'] })}>{eventTypes.map((type) => <option value={type} key={type}>{eventTypeOptions[type]}</option>)}</select></label><label><span>С даты</span><input type="date" value={filters.dateFrom} onChange={(event) => onChange({ dateFrom: event.target.value })} /></label><label><span>По дату</span><input type="date" value={filters.dateTo} onChange={(event) => onChange({ dateTo: event.target.value })} /></label><label><span>Пользователь</span><select value={filters.userId} onChange={(event) => onChange({ userId: event.target.value })}><option value="">Все пользователи</option>{options.users.map((user) => <option value={user.id} key={user.id}>{user.name}</option>)}</select></label><label><span>Сущность</span><select value={filters.entityId} onChange={(event) => onChange({ entityId: event.target.value })}><option value="">Все сущности</option>{options.entities.map((entity) => <option value={entity.id} key={entity.id}>{entity.label}</option>)}</select></label><Button variant="ghost" size="s" type="button" onClick={onReset}>Сбросить</Button></div>;
 }
 
-function HistorySkeleton() {
-  return <TableShell><div className={styles.skeleton} aria-live="polite" aria-busy="true">{Array.from({ length: 6 }, (_, index) => <span key={index} />)}</div></TableShell>;
-}
-
-function HistoryEmpty({ filtered, onReset }: { filtered: boolean; onReset: () => void }) {
-  return <div className={styles.empty} role="status"><HistoryAction size={22} fill="currentColor" /><p>{filtered ? 'По заданным фильтрам события не найдены' : 'Событий пока нет'}</p>{filtered ? <Button variant="secondary" size="s" type="button" onClick={onReset}>Сбросить фильтры</Button> : null}</div>;
-}
-
 function HistoryTable({ events }: { events: UniversityHistoryEvent[] }) {
   return <TableShell><div className={styles.desktopTable}><table><caption className={styles.visuallyHidden}>История событий университета</caption><thead><tr><th scope="col">Время</th><th scope="col">Тип</th><th scope="col">Пользователь</th><th scope="col">Действие</th><th scope="col">Детали</th></tr></thead><tbody>{events.map((event) => <tr key={event.id}><td><time dateTime={event.occurredAt}>{formatDateTimeRu(event.occurredAt)}</time></td><td><EventType type={event.type} /></td><td>{event.user.name}</td><td><strong>{event.action}</strong></td><td><EventDetails event={event} /></td></tr>)}</tbody></table></div><div className={styles.mobileList}>{events.map((event) => <article className={styles.mobileEvent} key={event.id}><div className={styles.mobileEventTop}><time dateTime={event.occurredAt}>{formatDateTimeRu(event.occurredAt)}</time><EventType type={event.type} /></div><strong>{event.action}</strong><span>{event.user.name}</span><EventDetails event={event} /></article>)}</div></TableShell>;
 }
@@ -64,5 +58,5 @@ export function UniversityHistory({ id }: { id: string }) {
   });
   const resetFilters = () => setFilters({ type: 'all', dateFrom: '', dateTo: '', userId: '', entityId: '' });
 
-  return <div className={styles.page}><HistoryFilters filters={filters} options={options} onChange={onChange} onReset={resetFilters} />{query.isPending ? <HistorySkeleton /> : query.isError || !query.data ? <RouteErrorState onRetry={() => void query.refetch()} /> : query.data.length ? <HistoryTable events={query.data} /> : <HistoryEmpty filtered={filtered} onReset={resetFilters} />}</div>;
+  return <div className={styles.page}><HistoryFilters filters={filters} options={options} onChange={onChange} onReset={resetFilters} />{query.isPending ? <TableSkeleton rows={6} columns={5} label="Загрузка истории университета" /> : query.isError || !query.data ? <RouteErrorState compact onRetry={() => void query.refetch()} /> : query.data.length ? <HistoryTable events={query.data} /> : <EmptyState icon={<HistoryAction size={22} fill="currentColor" />} title={filtered ? 'По заданным фильтрам события не найдены' : 'Событий пока нет'} description={filtered ? 'Измените условия поиска или сбросьте фильтры.' : 'История появится после первого события.'} primaryAction={filtered ? { label: 'Сбросить фильтры', onClick: resetFilters, variant: 'secondary' } : undefined} />}</div>;
 }

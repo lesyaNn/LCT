@@ -27,7 +27,10 @@ import {
 } from '@/shared/lib/audit-repository';
 import { Button } from '@/shared/ui/rtk/button';
 import { Drawer } from '@/shared/ui/rtk/drawer';
+import { EmptyState } from '@/shared/ui/empty-state';
+import { ErrorState } from '@/shared/ui/error-state';
 import { Modal } from '@/shared/ui/rtk/modal';
+import { TableSkeleton } from '@/shared/ui/skeleton';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { TableShell } from '@/shared/ui/rtk/table-shell';
 import { Tooltip } from '@/shared/ui/rtk/tooltip';
@@ -153,14 +156,6 @@ function DetailsModal({ event, onClose }: { event: AuditEvent; onClose: () => vo
   return <Modal title={`${getAuditActionMeta(event.action).label}: ${event.entity.label}`} onClose={onClose} size="l"><div className={styles.modalMeta}><span>Время</span><time dateTime={event.occurredAt}>{formatDateTimeRu(event.occurredAt)}</time><span>Пользователь</span><strong>{event.user.name}</strong><span>Роль</span><span>{getAuditRoleLabel(event.role)}</span><span>ВУЗ</span><span>{event.university.name}</span></div><AuditDiff event={event} /></Modal>;
 }
 
-function AuditSkeleton() {
-  return <TableShell ariaLabel="Загрузка журнала аудита" ariaBusy><div className={styles.skeleton}>{Array.from({ length: 6 }, (_, row) => <div key={row}>{Array.from({ length: 8 }, (_, cell) => <span key={cell} />)}</div>)}</div></TableShell>;
-}
-
-function AuditEmpty({ filtered, onReset }: { filtered: boolean; onReset: () => void }) {
-  return <div className={styles.empty} role="status"><SecurityCheck size={24} fill="currentColor" /><h2>{filtered ? 'По заданным фильтрам события не найдены' : 'Событий пока нет'}</h2><p>{filtered ? 'Измените условия поиска или сбросьте фильтры.' : 'Когда появятся записи, они будут отображены в этом журнале.'}</p>{filtered ? <Button variant="secondary" size="s" type="button" onClick={onReset}>Сбросить фильтры</Button> : null}</div>;
-}
-
 function AuditTable({ events, onOpen }: { events: AuditEvent[]; onOpen: (event: AuditEvent) => void }) {
   return <TableShell ariaLabel="Журнал действий"><div className={styles.desktopTable}><table><caption className={styles.visuallyHidden}>Полный журнал аудита</caption><thead><tr><th scope="col">Время</th><th scope="col">Пользователь</th><th scope="col">Роль</th><th scope="col">Действие</th><th scope="col">Сущность</th><th scope="col">ВУЗ</th><th scope="col">Старое значение</th><th scope="col">Новое значение</th></tr></thead><tbody>{events.map((event) => <tr key={event.id}><td><TimeCell value={event.occurredAt} /></td><td><span className={styles.userCell}>{event.user.name}</span></td><td>{getAuditRoleLabel(event.role)}</td><td><ActionBadge action={event.action} /></td><td><EntityCell event={event} /></td><td>{event.university.name}</td><td><span className={styles.valuePreview}>{formatAuditValue(event.oldValues)}</span></td><td><button className={styles.valueButton} type="button" onClick={() => onOpen(event)}><span className={styles.valuePreview}>{formatAuditValue(event.newValues)}</span><span className={styles.detailsLink}>Подробнее</span></button></td></tr>)}</tbody></table></div><div className={styles.mobileList}>{events.map((event) => <article className={styles.mobileCard} key={event.id}><div className={styles.mobileTop}><TimeCell value={event.occurredAt} /><ActionBadge action={event.action} /></div><dl><div><dt>Пользователь</dt><dd>{event.user.name}</dd></div><div><dt>Роль</dt><dd>{getAuditRoleLabel(event.role)}</dd></div><div><dt>Сущность</dt><dd><EntityCell event={event} /></dd></div><div><dt>ВУЗ</dt><dd>{event.university.name}</dd></div><div><dt>Было</dt><dd>{formatAuditValue(event.oldValues)}</dd></div><div><dt>Стало</dt><dd>{formatAuditValue(event.newValues)}</dd></div></dl><Button variant="secondary" size="s" type="button" onClick={() => onOpen(event)}>Открыть детали</Button></article>)}</div></TableShell>;
 }
@@ -196,7 +191,7 @@ export function AuditPage() {
     <div className={styles.toolbar}><p className={styles.eyebrow}>Только просмотр</p><Button className={styles.mobileFilterButton} variant="secondary" size="s" type="button" onClick={() => setMobileFiltersOpen(true)}>Фильтры{filtered ? ` (${selectedFilterCount(query.filters)})` : ''}</Button></div>
     <AuditFilters query={query} result={auditQuery.data} onPatch={patchFilters} onReset={resetFilters} open={mobileFiltersOpen} onClose={() => setMobileFiltersOpen(false)} />
     {filterHint ? <p className={styles.loadingHint}>{filterHint}</p> : null}
-    {auditQuery.isPending ? <AuditSkeleton /> : auditQuery.isError || !auditQuery.data ? <div className={styles.errorState} role="alert"><h2>{normalizedError?.message ?? 'Не удалось загрузить журнал аудита.'}</h2><p>Повторите попытку или обратитесь к администратору.</p><Button variant="primary" size="s" type="button" onClick={retry}>Повторить</Button></div> : auditQuery.data.items.length ? <AuditTable events={auditQuery.data.items} onOpen={setSelectedEvent} /> : <AuditEmpty filtered={filtered} onReset={resetFilters} />}
+    {auditQuery.isPending ? <TableSkeleton rows={6} columns={8} label="Загрузка журнала аудита" /> : auditQuery.isError || !auditQuery.data ? <ErrorState title={normalizedError?.message ?? 'Не удалось загрузить журнал аудита'} description="Повторите попытку или обратитесь к администратору." onRetry={retry} /> : auditQuery.data.items.length ? <AuditTable events={auditQuery.data.items} onOpen={setSelectedEvent} /> : <EmptyState icon={<SecurityCheck size={24} fill="currentColor" />} title={filtered ? 'По заданным фильтрам события не найдены' : 'Событий пока нет'} description={filtered ? 'Измените условия поиска или сбросьте фильтры.' : 'Когда появятся записи, они будут отображены в этом журнале.'} primaryAction={filtered ? { label: 'Сбросить фильтры', onClick: resetFilters, variant: 'secondary' } : undefined} />}
     {auditQuery.data ? <Pagination result={auditQuery.data} pageSize={query.pageSize} onPage={(page) => setQuery((current) => ({ ...current, page }))} onPageSize={(pageSize) => setQuery((current) => ({ ...current, page: 1, pageSize }))} /> : null}
     {selectedEvent ? <DetailsModal event={selectedEvent} onClose={() => setSelectedEvent(null)} /> : null}
   </div>;

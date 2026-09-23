@@ -27,7 +27,9 @@ import {
   type LaunchDynamicsItem,
   type ProgramStatusItem,
 } from '@/shared/lib/dashboard-repository';
+import { EmptyState } from '@/shared/ui/empty-state';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
+import { ChartSkeleton } from '@/shared/ui/skeleton';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { attentionSeverityIntent } from '@/shared/lib/status-semantics';
 import styles from './dashboard-charts.module.css';
@@ -79,15 +81,6 @@ function ChartCard({ title, description, children, action }: ChartCardProps) {
       </header>
       <div className={styles.cardBody}>{children}</div>
     </article>
-  );
-}
-
-function ChartSkeleton() {
-  return (
-    <div className={styles.skeletonCard} aria-hidden="true">
-      <span className={styles.skeletonTitle} />
-      <span className={styles.skeletonChart} />
-    </div>
   );
 }
 
@@ -254,11 +247,11 @@ export function DashboardAnalytics() {
         <p className={styles.sectionDescription}>Сводка по состоянию вузов, программ и задач, требующих внимания.</p>
       </div>
       {analyticsQuery.isPending ? (
-        <div className={styles.grid} aria-live="polite" aria-busy="true">
-          {Array.from({ length: 4 }, (_, index) => <ChartSkeleton key={index} />)}
+        <div className={styles.grid}>
+          {Array.from({ length: 4 }, (_, index) => <ChartSkeleton label={`Загрузка графика ${index + 1}`} key={index} />)}
         </div>
       ) : analyticsQuery.isError || !analyticsQuery.data ? (
-        <RouteErrorState onRetry={() => void analyticsQuery.refetch()} />
+        <RouteErrorState compact onRetry={() => void analyticsQuery.refetch()} />
       ) : (
         <AnalyticsGrid data={analyticsQuery.data} />
       )}
@@ -286,5 +279,5 @@ function AnalyticsGrid({ data }: { data: DashboardAnalytics }) {
 }
 
 function EmptyChart() {
-  return <p className={styles.emptyState}>Нет данных для отображения</p>;
+  return <EmptyState title="Нет данных для отображения" description="Данные появятся после обновления источника." headingLevel={3} />;
 }

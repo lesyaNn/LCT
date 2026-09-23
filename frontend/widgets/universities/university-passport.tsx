@@ -28,9 +28,11 @@ import {
 } from '@/shared/lib/universities-repository';
 import { Avatar } from '@/shared/ui/rtk/avatar';
 import { Button } from '@/shared/ui/rtk/button';
+import { EmptyState } from '@/shared/ui/empty-state';
 import { MetricCard } from '@/shared/ui/rtk/metric-card';
 import { StatusBadge as SemanticStatusBadge } from '@/shared/ui/rtk/status-badge';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
+import { MetricCardSkeleton, Skeleton, SkeletonGroup } from '@/shared/ui/skeleton';
 import { UniversityHealthScore } from './university-health-score';
 import { UniversityHistory } from './university-history';
 import { DocumentsSection, LicensesSection, MeetingsSection, ProductsSection, ProgramsSection, ResponsiblesSection, StudentsSection, TeachersSection } from './university-passport-sections';
@@ -179,7 +181,7 @@ function RecentInteractions({ events, onTabChange }: { events: UniversityPasspor
   return (
     <section className={styles.timelineCard} aria-labelledby="passport-timeline-title">
       <div className={styles.sectionHeading}><h2 id="passport-timeline-title">Последние взаимодействия</h2><Button variant="ghost" size="s" type="button" onClick={() => onTabChange('history')}>Показать всё <ArrowRight size={14} fill="currentColor" /></Button></div>
-      <ol className={styles.timeline}>{events.slice(0, 5).map((event) => <TimelineItem event={event} key={event.id} />)}</ol>
+      {events.length ? <ol className={styles.timeline}>{events.slice(0, 5).map((event) => <TimelineItem event={event} key={event.id} />)}</ol> : <EmptyState title="Взаимодействий пока нет" description="Встречи, документы и изменения Workflow появятся здесь." headingLevel={3} />}
     </section>
   );
 }
@@ -189,11 +191,11 @@ function OverviewContent({ passport, canAdvance, onTabChange }: { passport: Univ
 }
 
 function PlaceholderContent({ tab }: { tab: (typeof tabDefinitions)[number] }) {
-  return <section className={styles.placeholderPanel} aria-label={tab.label}><span className={styles.placeholderIcon} aria-hidden="true"><StatisticsBoard size={24} fill="currentColor" /></span><p>Данные появятся после подключения модуля.</p></section>;
+  return <EmptyState icon={<StatisticsBoard size={24} fill="currentColor" />} title={`${tab.label}: данных пока нет`} description="Данные появятся после подключения модуля." />;
 }
 
 function PassportSkeleton() {
-  return <div className={styles.skeletonPage} aria-live="polite" aria-busy="true"><span className={styles.skeletonLine} /><span className={`${styles.skeletonLine} ${styles.skeletonTitle}`} /><div className={styles.skeletonHeader} /><div className={styles.skeletonMetrics}>{Array.from({ length: 4 }, (_, index) => <span className={styles.skeletonCard} key={index} />)}</div><span className={`${styles.skeletonLine} ${styles.skeletonSection}`} /><div className={styles.skeletonBlock} /><div className={styles.skeletonBlock} /></div>;
+  return <SkeletonGroup label="Загрузка паспорта вуза"><Skeleton variant="text" width="220px" /><Skeleton variant="text" width="min(72%, 520px)" height={36} /><Skeleton height={180} /><MetricCardSkeleton count={4} /><Skeleton height={260} /><Skeleton height={220} /></SkeletonGroup>;
 }
 
 export function UniversityPassport({ id }: { id: string }) {

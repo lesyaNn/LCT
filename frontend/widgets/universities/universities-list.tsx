@@ -23,9 +23,11 @@ import SortDown from '@atomaro/icons/24/editor/SortDown';
 import SortUp from '@atomaro/icons/24/editor/SortUp';
 import { Button } from '@/shared/ui/rtk/button';
 import { Drawer } from '@/shared/ui/rtk/drawer';
+import { EmptyState } from '@/shared/ui/empty-state';
 import { StatusBadge as SemanticStatusBadge } from '@/shared/ui/rtk/status-badge';
 import { TableShell } from '@/shared/ui/rtk/table-shell';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
+import { TableSkeleton } from '@/shared/ui/skeleton';
 import {
   getHealthStatus,
   healthStatusMeta,
@@ -407,40 +409,6 @@ function ActiveFilterChips({ filters, onPatch, onReset }: { filters: UniversityF
   );
 }
 
-function UniversityListSkeleton() {
-  return (
-    <TableShell ariaLabel="Загрузка списка вузов" ariaBusy>
-      <div className={styles.desktopOnly}>
-        <div className={styles.tableScroll}>
-          <table className={styles.table} aria-label="Загрузка списка вузов">
-            <tbody>
-              {Array.from({ length: 6 }, (_, index) => (
-                <tr key={index}>{Array.from({ length: 7 }, (_, cellIndex) => <td key={cellIndex}><span className={styles.skeletonLine} /></td>)}</tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <div className={styles.mobileOnly}>
-        <div className={styles.mobileSkeletons} aria-label="Загрузка списка вузов">
-          {Array.from({ length: 4 }, (_, index) => <div className={styles.mobileSkeletonCard} key={index}><span className={styles.skeletonLine} /><span className={styles.skeletonLine} /><span className={styles.skeletonLine} /></div>)}
-        </div>
-      </div>
-    </TableShell>
-  );
-}
-
-function EmptyState({ filtered, onReset }: { filtered: boolean; onReset: () => void }) {
-  return (
-    <div className={styles.emptyState} role="status">
-      <div className={styles.emptyIcon} aria-hidden="true"><Search size={20} fill="currentColor" /></div>
-      <h2>{filtered ? 'По заданным фильтрам ничего не найдено' : 'Вузы пока не добавлены'}</h2>
-      <p>{filtered ? 'Измените условия поиска или сбросьте фильтры.' : 'Когда появятся записи, они будут отображены в этом списке.'}</p>
-      {filtered ? <Button variant="secondary" size="s" type="button" onClick={onReset}>Сбросить фильтры</Button> : null}
-    </div>
-  );
-}
-
 function MobileUniversityCards({ items }: { items: UniversityListItem[] }) {
   return (
     <div className={styles.mobileCards} aria-label="Список вузов в формате карточек">
@@ -643,7 +611,7 @@ export function UniversitiesList() {
         {filterDrawerOpen ? <Drawer title="Фильтры" onClose={() => setFilterDrawerOpen(false)}><div className={styles.mobileFilterContent}><Filters compact state={state} searchInput={searchInput} setSearchInput={setSearchInput} onPatch={goToState} onReset={resetFilters} hasFilters={hasFilters} onClose={() => setFilterDrawerOpen(false)} /></div></Drawer> : null}
         <ActiveFilterChips filters={state.filters} onPatch={goToState} onReset={resetFilters} />
       </div>
-      {query.isPending ? <UniversityListSkeleton /> : query.isError || !query.data ? <RouteErrorState onRetry={() => void query.refetch()} /> : query.data.total === 0 ? <EmptyState filtered={hasFilters} onReset={resetFilters} /> : (
+      {query.isPending ? <TableSkeleton rows={6} columns={7} label="Загрузка списка вузов" /> : query.isError || !query.data ? <RouteErrorState onRetry={() => void query.refetch()} /> : query.data.total === 0 ? <EmptyState icon={<Search size={20} fill="currentColor" />} title={hasFilters ? 'По заданным фильтрам ничего не найдено' : 'Вузы пока не добавлены'} description={hasFilters ? 'Измените условия поиска или сбросьте фильтры.' : 'Когда появятся записи, они будут отображены в этом списке.'} primaryAction={hasFilters ? { label: 'Сбросить фильтры', onClick: resetFilters, variant: 'secondary' } : undefined} /> : (
         <>
           {query.isFetching ? <p className={styles.fetching} role="status">Обновляем список…</p> : null}
           <TableShell>

@@ -3,8 +3,10 @@
 import ChevronSort from '@atomaro/icons/24/navigation/ChevronSort';
 import SortDown from '@atomaro/icons/24/editor/SortDown';
 import SortUp from '@atomaro/icons/24/editor/SortUp';
+import { EmptyState } from '@/shared/ui/empty-state';
 import { Button } from '@/shared/ui/rtk/button';
 import { TableShell } from '@/shared/ui/rtk/table-shell';
+import { TableSkeleton } from '@/shared/ui/skeleton';
 import { useMemo, useState, type ReactNode } from 'react';
 import styles from './passport-data-table.module.css';
 
@@ -81,7 +83,7 @@ export function PassportDataTable<T extends { id: string }>({ rows, columns, mob
   };
 
   if (!rows.length) {
-    return <div className={styles.empty} role="status">{emptyMessage}</div>;
+    return <EmptyState title={emptyMessage} description="Данные появятся здесь после добавления записей." headingLevel={3} />;
   }
 
   return (
@@ -124,5 +126,5 @@ export function PassportDataTable<T extends { id: string }>({ rows, columns, mob
 }
 
 export function PassportTableSkeleton() {
-  return <TableShell><div className={styles.tableSkeleton} aria-live="polite" aria-busy="true"><span className={styles.skeletonHeader} />{Array.from({ length: 5 }, (_, index) => <span className={styles.skeletonRow} key={index} />)}</div></TableShell>;
+  return <TableSkeleton rows={5} columns={5} label="Загрузка данных паспорта" />;
 }

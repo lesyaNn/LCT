@@ -19,9 +19,11 @@ import { workflowStageStatusSemantics, type WorkflowStageIcon } from '@/shared/l
 import { getUniversityWorkflow, workflowQueryKey, type UniversityWorkflow, type UniversityWorkflowStage, type UniversityWorkflowStageStatus } from '@/shared/lib/universities-repository';
 import { Avatar } from '@/shared/ui/rtk/avatar';
 import { Button } from '@/shared/ui/rtk/button';
+import { EmptyState } from '@/shared/ui/empty-state';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { Tooltip } from '@/shared/ui/rtk/tooltip';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
+import { ListSkeleton, Skeleton, SkeletonGroup } from '@/shared/ui/skeleton';
 import { Toast } from '@/shared/ui/rtk/toast';
 import { WorkflowComments } from './workflow-comments';
 import { WorkflowAttachments } from './workflow-attachments';
@@ -153,7 +155,7 @@ function WorkflowStageDetails({ stage, stages, instanceId, universityId, userId,
       <section className={styles.detailSection} aria-labelledby={`${idPrefix}-tasks-title`}><div className={styles.detailSectionHeading}><h3 id={`${idPrefix}-tasks-title`}><Task size={18} fill="currentColor" />Задачи этапа</h3><span className={styles.taskCount}>Выполнено {completedTasks} из {stage.tasks.length}</span></div><div className={styles.taskProgress} role="progressbar" aria-label={`Задачи этапа: выполнено ${completedTasks} из ${stage.tasks.length}`} aria-valuemin={0} aria-valuemax={stage.tasks.length} aria-valuenow={completedTasks}><span style={{ width: `${taskProgress}%` }} /></div><ul className={styles.taskList}>{stage.tasks.map((task) => <li key={task.id}><label><input type="checkbox" checked={task.completed} disabled readOnly /><span className={task.completed ? styles.taskCompleted : undefined}>{task.label}</span></label></li>)}</ul></section>
       <WorkflowComments instanceId={instanceId} stageId={stage.templateStageId ?? stage.id} comments={stage.comments} onNotify={onNotify} />
       <WorkflowAttachments instanceId={instanceId} stageId={stage.id} attachments={stage.attachments} onNotify={onNotify} />
-      <section className={styles.detailSection} aria-labelledby={`${idPrefix}-transition-title`}><div className={styles.detailSectionHeading}><h3 id={`${idPrefix}-transition-title`}><History size={18} fill="currentColor" />История переходов</h3></div>{stage.transitions.length ? <ol className={styles.transitionList}>{stage.transitions.map((transition) => <li key={transition.id}><div><strong>{transition.actor}</strong><time dateTime={transition.occurredAt}>{formatDateTimeRu(transition.occurredAt)}</time></div><p>{workflowStageStatusSemantics[transition.fromStatus].label} → {workflowStageStatusSemantics[transition.toStatus].label}. {transition.comment}</p></li>)}</ol> : <p className={styles.muted}>Переходов пока нет</p>}</section>
+      <section className={styles.detailSection} aria-labelledby={`${idPrefix}-transition-title`}><div className={styles.detailSectionHeading}><h3 id={`${idPrefix}-transition-title`}><History size={18} fill="currentColor" />История переходов</h3></div>{stage.transitions.length ? <ol className={styles.transitionList}>{stage.transitions.map((transition) => <li key={transition.id}><div><strong>{transition.actor}</strong><time dateTime={transition.occurredAt}>{formatDateTimeRu(transition.occurredAt)}</time></div><p>{workflowStageStatusSemantics[transition.fromStatus].label} → {workflowStageStatusSemantics[transition.toStatus].label}. {transition.comment}</p></li>)}</ol> : <EmptyState title="Переходов пока нет" description="История появится после первого изменения этапа." headingLevel={3} />}</section>
       <StageActionPanel stage={stage} stages={stages} instanceId={instanceId} universityId={universityId} userId={userId} canManage={canManage} canRestore={canRestore} onTransitionOpen={onTransitionOpen} onTransitionClose={onTransitionClose} onTransitionSuccess={onTransitionSuccess} onNotify={onNotify} />
     </section>
   );
@@ -173,11 +175,7 @@ function WorkflowHeader({ workflow }: { workflow: UniversityWorkflow }) {
 }
 
 function WorkflowSkeleton({ mode }: { mode: WorkflowViewMode }) {
-  return <div className={`${styles.skeleton} ${mode === 'page' ? styles.skeletonPage : ''}`} aria-live="polite" aria-busy="true">{mode === 'page' ? <div className={styles.skeletonHeader}><span /><span /><span /></div> : null}<div className={styles.skeletonLayout}><div className={styles.skeletonStages}>{Array.from({ length: 8 }, (_, index) => <span key={index} />)}</div><div className={styles.skeletonDetails}><span /><span /><span /><span /></div></div></div>;
-}
-
-function WorkflowEmptyState() {
-  return <div className={styles.emptyState} role="status"><InformationStroke size={22} fill="currentColor" /><p>Этапы Workflow пока не добавлены</p></div>;
+  return <SkeletonGroup label="Загрузка Workflow">{mode === 'page' ? <><Skeleton variant="text" width="220px" /><Skeleton variant="text" width="min(72%, 520px)" height={36} /><Skeleton height={96} /></> : null}<div className={styles.skeletonLayout}><ListSkeleton items={6} withAvatar /><Skeleton height={520} /></div></SkeletonGroup>;
 }
 
 export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride }: { instanceId: string; mode: WorkflowViewMode; canAdvance?: boolean }) {
@@ -201,8 +199,8 @@ export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride 
   const detailsId = `${idPrefix}-details`;
 
   if (query.isPending) return <WorkflowSkeleton mode={mode} />;
-  if (query.isError || !query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
-  if (!stages.length || !selectedStage) return <WorkflowEmptyState />;
+  if (query.isError || !query.data) return <RouteErrorState compact={mode === 'embedded'} onRetry={() => void query.refetch()} />;
+  if (!stages.length || !selectedStage) return <EmptyState presentation={mode === 'page' ? 'large' : 'compact'} icon={mode === 'embedded' ? <InformationStroke size={22} fill="currentColor" /> : undefined} title="Этапы Workflow пока не добавлены" description="Настроенные этапы появятся здесь после запуска процесса." />;
 
   return <div className={`${styles.page} ${mode === 'embedded' ? styles.embedded : ''}`}>{mode === 'page' ? <WorkflowHeader workflow={query.data} /> : null}<div className={styles.layout}><section className={styles.stagesPanel} aria-labelledby={`${idPrefix}-stages-title`}><div className={styles.panelHeading}><div><span className={styles.eyebrow}>Жизненный цикл проекта</span><h2 id={`${idPrefix}-stages-title`}>Этапы Workflow</h2></div><span className={styles.totalLabel}>{stages.length} этапов</span></div><ol className={styles.stageList}>{stages.map((stage) => <WorkflowStageItem key={stage.id} stage={stage} selected={stage.id === selectedStage.id} detailsId={detailsId} onSelect={() => setSelectedId(stage.id)} />)}</ol></section><WorkflowStageDetails key={selectedStage.id} stage={selectedStage} stages={stages} instanceId={instanceId} universityId={query.data.universityId} userId={user?.id} canManage={canManage} canRestore={canRestore} idPrefix={detailsId} onTransitionOpen={() => setSelectedId(selectedStage.id)} onTransitionClose={() => setSelectedId(null)} onTransitionSuccess={() => setSelectedId(null)} onNotify={setNotification} /></div>{notification ? <div className={styles.toastViewport}><Toast intent={notification.intent} title={notification.title} message={notification.message} onClose={() => setNotification(null)} /></div> : null}</div>;
 }

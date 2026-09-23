@@ -22,7 +22,8 @@ import { Button } from '@/shared/ui/rtk/button';
 import { ReadinessBadge } from '@/shared/ui/rtk/readiness-badge';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
-import { PassportDataTable, PassportTableSkeleton, type PassportMobileField, type PassportTableColumn } from '@/widgets/universities/passport-data-table';
+import { Skeleton, SkeletonGroup, TableSkeleton } from '@/shared/ui/skeleton';
+import { PassportDataTable, type PassportMobileField, type PassportTableColumn } from '@/widgets/universities/passport-data-table';
 import { TeacherCertificatesSection } from './teacher-certificates-section';
 import { TeacherProgramsSection } from './teacher-programs-section';
 import styles from './teacher-passport.module.css';
@@ -118,7 +119,7 @@ function TeacherHeader({ id, teacher }: { id: string; teacher: TeacherPassportPr
 }
 
 function TeacherPassportSkeleton() {
-  return <div className={styles.skeletonPage} aria-live="polite" aria-busy="true"><span className={styles.skeletonLine} /><span className={`${styles.skeletonLine} ${styles.skeletonTitle}`} /><div className={styles.skeletonHeader} /><span className={`${styles.skeletonLine} ${styles.skeletonSection}`} /><PassportTableSkeleton /><span className={`${styles.skeletonLine} ${styles.skeletonSection}`} /><PassportTableSkeleton /></div>;
+  return <SkeletonGroup label="Загрузка паспорта преподавателя"><Skeleton variant="text" width="220px" /><Skeleton variant="text" width="min(72%, 520px)" height={36} /><Skeleton height={210} /><TableSkeleton rows={4} columns={5} label="Загрузка квалификаций" /><TableSkeleton rows={4} columns={5} label="Загрузка обучений" /></SkeletonGroup>;
 }
 
 export function TeacherPassport({ id }: { id: string }) {

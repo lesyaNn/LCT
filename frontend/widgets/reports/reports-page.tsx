@@ -17,12 +17,15 @@ import { applyServerErrorsToForm, normalizeApiError } from '@/shared/lib/api-err
 import { formatDateTimeRu } from '@/shared/lib/formatters';
 import { type SemanticIntent } from '@/shared/lib/status-semantics';
 import { Button } from '@/shared/ui/rtk/button';
+import { EmptyState } from '@/shared/ui/empty-state';
+import { ErrorState } from '@/shared/ui/error-state';
 import { FormError, FormErrorBanner, FormField } from '@/shared/ui/rtk/form-field';
 import { Input } from '@/shared/ui/rtk/form-controls';
 import { MultiSelect } from '@/shared/ui/rtk/multiselect';
 import { Progress } from '@/shared/ui/rtk/progress';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { TableShell } from '@/shared/ui/rtk/table-shell';
+import { TableSkeleton } from '@/shared/ui/skeleton';
 import { Toast, type ToastIntent } from '@/shared/ui/rtk/toast';
 import { Tooltip } from '@/shared/ui/rtk/tooltip';
 import {
@@ -166,12 +169,12 @@ function ReportJobCard({ job, pollingError, retryError, retrying, onRetry }: Job
 }
 
 function JobsPanel({ jobs, loading, error, pollingErrors, retryErrors, retryingId, onRetry, onRefresh }: { jobs: ReportJob[]; loading: boolean; error: unknown; pollingErrors: ReadonlyMap<string, string>; retryErrors: ReadonlyMap<string, string>; retryingId: string | null; onRetry: (job: ReportJob) => void; onRefresh: () => void }) {
-  if (loading) return <TableShell ariaLabel="Загрузка задач отчётов" ariaBusy><div className={styles.jobsSkeleton}>{Array.from({ length: 4 }, (_, index) => <div key={index}><span /><span /><span /><span /></div>)}</div></TableShell>;
+  if (loading) return <TableSkeleton rows={4} columns={6} label="Загрузка задач отчётов" />;
   if (error) {
     const normalized = normalizeApiError(error, { fallbackMessage: 'Не удалось загрузить задачи отчётов.' });
-    return <div className={styles.jobsError} role="alert"><h3>{normalized.message}</h3><Button variant="secondary" size="s" type="button" onClick={onRefresh}>Повторить</Button></div>;
+    return <ErrorState title={normalized.message} description="Попробуйте повторить запрос." headingLevel={3} onRetry={onRefresh} />;
   }
-  if (!jobs.length) return <div className={styles.jobsEmpty} role="status"><h3>Отчёты ещё не формировались</h3><p>Созданные в этой сессии задачи появятся здесь.</p><p className={styles.apiNote}>История jobs станет доступна после появления list endpoint.</p></div>;
+  if (!jobs.length) return <EmptyState title="Отчёты ещё не формировались" description="Созданные в этой сессии задачи появятся здесь. История станет доступна после появления list endpoint." headingLevel={3} />;
   return <TableShell ariaLabel="Задачи отчётов"><div className={styles.jobsDesktop}><table><caption className={styles.visuallyHidden}>Задачи отчётов</caption><thead><tr><th scope="col">Отчёт</th><th scope="col">Формат</th><th scope="col">Статус</th><th scope="col">Прогресс</th><th scope="col">Создан</th><th scope="col">Действия</th></tr></thead><tbody>{jobs.map((job) => <ReportJobRow key={job.id} job={job} pollingError={pollingErrors.get(job.id)} retryError={retryErrors.get(job.id)} retrying={retryingId === job.id} onRetry={onRetry} />)}</tbody></table></div><div className={styles.jobsMobile}>{jobs.map((job) => <ReportJobCard key={job.id} job={job} pollingError={pollingErrors.get(job.id)} retryError={retryErrors.get(job.id)} retrying={retryingId === job.id} onRetry={onRetry} />)}</div></TableShell>;
 }
 

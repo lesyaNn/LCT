@@ -1,19 +1,11 @@
-import styles from './route-state.module.css';
+import { MetricCardSkeleton, Skeleton, SkeletonGroup, TextSkeleton } from './skeleton';
 
 export function PageSkeleton({ cardCount = 3, variant = 'default' }: { cardCount?: number; variant?: 'default' | 'dashboard' }) {
   return (
-    <section className={styles.loading} aria-live="polite" aria-busy="true">
-      <div className={styles.loadingHeader} role="status">
-        <span className={styles.loader} aria-hidden="true" />
-        <p className={styles.loadingText}>Загружаем раздел…</p>
-      </div>
-      <div className={styles.skeleton} aria-hidden="true">
-        <span className={`${styles.skeletonLine} ${styles.skeletonLineShort}`} />
-        <span className={styles.skeletonLine} />
-        <div className={`${styles.skeletonCards} ${variant === 'dashboard' ? styles.skeletonCardsDashboard : ''}`}>
-          {Array.from({ length: cardCount }, (_, index) => <span className={styles.skeletonCard} key={index} />)}
-        </div>
-      </div>
-    </section>
+    <SkeletonGroup label="Загружаем раздел">
+      <Skeleton variant="text" width="min(44%, 280px)" height={14} />
+      <TextSkeleton lines={2} widths={['min(72%, 520px)', 'min(54%, 390px)']} />
+      <MetricCardSkeleton count={variant === 'dashboard' ? cardCount : Math.min(cardCount, 4)} />
+    </SkeletonGroup>
   );
 }

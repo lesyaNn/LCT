@@ -1,10 +1,10 @@
 'use client';
 
-import { RouteErrorState } from '@/shared/ui/route-error-state';
+import { StatusPage } from '@/shared/ui/status-page';
 
 export default function ErrorPage({ reset }: Readonly<{
   error: Error & { digest?: string };
   reset: () => void;
 }>) {
-  return <RouteErrorState onRetry={reset} />;
+  return <StatusPage code="500" title="Ошибка сервера" description="Что-то пошло не так. Попробуйте повторить действие." onRetry={reset} withinAppShell />;
 }
