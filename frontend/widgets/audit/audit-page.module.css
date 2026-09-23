@@ -19,7 +19,7 @@
 .multiSelectMenu p { color: var(--rtk-color-text-secondary); font-size: 11px; margin: var(--rtk-space-1) var(--rtk-space-2) var(--rtk-space-2); }
 .multiSelectMenu label { align-items: center; display: flex; font-size: 12px; gap: var(--rtk-space-2); padding: var(--rtk-space-2); }
 .multiSelectMenu label:hover { background: var(--rtk-color-surface-hover); }
-.mobileFilters { display: none; }
+.drawerContent { min-width: 0; }
 .loadingHint { color: var(--rtk-color-text-tertiary); font-size: 12px; margin: 0; }
 .desktopTable { overflow-x: auto; }
 .desktopTable table { border-collapse: collapse; min-width: 1180px; table-layout: fixed; width: 100%; }
@@ -67,12 +67,8 @@
 @media (max-width: 768px) {
   .desktopFilters { display: none; }
   .mobileFilterButton { display: inline-flex; }
-  .mobileFilters { display: block; }
-  .mobileFiltersOpen { display: block; }
-  .mobileBackdrop { background: var(--atmr-overlay-default, rgba(16,24,40,.32)); border: 0; inset: 0; position: fixed; z-index: 40; }
-  .mobileDrawer { background: var(--rtk-color-surface); bottom: 0; box-shadow: var(--rtk-shadow-elevation-2); left: 0; max-height: 92vh; overflow: auto; padding: var(--rtk-space-5); position: fixed; right: 0; top: 0; z-index: 41; }
-  .drawerHeader { align-items: center; display: flex; justify-content: space-between; margin-bottom: var(--rtk-space-4); }
-  .drawerHeader h2 { font-size: 18px; margin: 0; }
+  .mobileFilterButton { min-height: 44px; }
+  .drawerContent .dateInputs input, .drawerContent .multiSelect summary { min-height: 44px; }
   .filterGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .filterGrid > button { justify-self: start; }
   .desktopTable { display: none; }

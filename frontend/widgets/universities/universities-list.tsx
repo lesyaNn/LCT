@@ -22,6 +22,7 @@ import ChevronSort from '@atomaro/icons/24/navigation/ChevronSort';
 import SortDown from '@atomaro/icons/24/editor/SortDown';
 import SortUp from '@atomaro/icons/24/editor/SortUp';
 import { Button } from '@/shared/ui/rtk/button';
+import { Drawer } from '@/shared/ui/rtk/drawer';
 import { StatusBadge as SemanticStatusBadge } from '@/shared/ui/rtk/status-badge';
 import { TableShell } from '@/shared/ui/rtk/table-shell';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
@@ -305,7 +306,7 @@ function MultiSelectField({
   );
 }
 
-function Filters({ state, searchInput, setSearchInput, onPatch, onReset, hasFilters, onClose }: {
+function Filters({ state, searchInput, setSearchInput, onPatch, onReset, hasFilters, onClose, compact = false }: {
   state: UniversityUrlState;
   searchInput: string;
   setSearchInput: (value: string) => void;
@@ -313,8 +314,10 @@ function Filters({ state, searchInput, setSearchInput, onPatch, onReset, hasFilt
   onReset: () => void;
   hasFilters: boolean;
   onClose: () => void;
+  compact?: boolean;
 }) {
   const filters = filtersFromState(state);
+  const searchId = compact ? 'universities-search-mobile' : 'universities-search';
   const updateDateRange = (key: 'date_from' | 'date_to', value: string) => {
     if (key === 'date_from' && value && filters.dateTo && value > filters.dateTo) {
       onPatch({ date_from: value, date_to: value, page: 1 });
@@ -329,18 +332,18 @@ function Filters({ state, searchInput, setSearchInput, onPatch, onReset, hasFilt
 
   return (
     <section className={styles.filters} aria-label="Фильтры списка вузов">
-      <div className={styles.filterPanelHeader}>
+      {!compact ? <div className={styles.filterPanelHeader}>
         <div>
           <h2 id="universities-filter-title">Фильтры</h2>
           <p>Уточните список вузов по организации, продукту и состоянию.</p>
         </div>
         <button className={styles.filterCloseButton} type="button" onClick={onClose} aria-label="Закрыть фильтры"><CloseSmall size={20} fill="currentColor" /></button>
-      </div>
+      </div> : null}
       <div className={`${styles.field} ${styles.searchField}`}>
-        <label htmlFor="universities-search">Поиск по названию вуза</label>
+        <label htmlFor={searchId}>Поиск по названию вуза</label>
         <div className={styles.inputWrap}>
           <Search size={18} fill="currentColor" />
-          <input id="universities-search" type="search" value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Поиск по названию вуза" />
+          <input id={searchId} type="search" value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Поиск по названию вуза" />
         </div>
       </div>
       <MultiSelectField label="Вуз" options={universityFilterOptions.universities} values={filters.universityIds} onChange={(values) => onPatch({ university: values, page: 1 })} searchable />
@@ -566,24 +569,6 @@ export function UniversitiesList() {
     window.localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(state.filters));
   }, [state.filters]);
 
-  useEffect(() => {
-    if (!filterDrawerOpen) return undefined;
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setFilterDrawerOpen(false); };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [filterDrawerOpen]);
-
-  useEffect(() => {
-    if (!filterDrawerOpen) return undefined;
-    const frame = window.requestAnimationFrame(() => document.getElementById('universities-search')?.focus());
-    return () => window.cancelAnimationFrame(frame);
-  }, [filterDrawerOpen]);
-
-  useEffect(() => {
-    document.body.classList.toggle(styles.bodyLock, filterDrawerOpen);
-    return () => document.body.classList.remove(styles.bodyLock);
-  }, [filterDrawerOpen]);
-
   const query = useQuery({
     queryKey: [...universitiesQueryKey, state],
     queryFn: () => getUniversities(state),
@@ -649,12 +634,12 @@ export function UniversitiesList() {
         }} aria-expanded={filterDrawerOpen || filtersExpanded} aria-controls="universities-filter-panel">
           <Filter size={18} fill="currentColor" />Фильтры{activeFilterCount ? ` (${activeFilterCount})` : ''}
         </Button>
-        <div className={`${styles.filterPanelWrap} ${filtersExpanded ? styles.filterPanelVisible : ''} ${filterDrawerOpen ? styles.filterDrawerVisible : ''}`}>
-          {filterDrawerOpen ? <button className={styles.filterBackdrop} type="button" aria-label="Закрыть фильтры" onClick={() => setFilterDrawerOpen(false)} /> : null}
-          <div className={styles.filterPanel} id="universities-filter-panel" role={filterDrawerOpen ? 'dialog' : undefined} aria-modal={filterDrawerOpen || undefined} aria-labelledby="universities-filter-title">
+        <div className={`${styles.filterPanelWrap} ${filtersExpanded ? styles.filterPanelVisible : ''}`}>
+          <div className={styles.filterPanel} id="universities-filter-panel">
             <Filters state={state} searchInput={searchInput} setSearchInput={setSearchInput} onPatch={goToState} onReset={resetFilters} hasFilters={hasFilters} onClose={() => { setFilterDrawerOpen(false); setFiltersExpanded(false); }} />
           </div>
         </div>
+        {filterDrawerOpen ? <Drawer title="Фильтры" onClose={() => setFilterDrawerOpen(false)}><div className={styles.mobileFilterContent}><Filters compact state={state} searchInput={searchInput} setSearchInput={setSearchInput} onPatch={goToState} onReset={resetFilters} hasFilters={hasFilters} onClose={() => setFilterDrawerOpen(false)} /></div></Drawer> : null}
         <ActiveFilterChips filters={state.filters} onPatch={goToState} onReset={resetFilters} />
       </div>
       {query.isPending ? <UniversityListSkeleton /> : query.isError || !query.data ? <RouteErrorState onRetry={() => void query.refetch()} /> : query.data.total === 0 ? <EmptyState filtered={hasFilters} onReset={resetFilters} /> : (

@@ -4,7 +4,7 @@
 .l { width: min(880px, 100%); }
 .header { align-items: center; border-bottom: 1px solid var(--rtk-color-border); display: flex; gap: var(--rtk-space-3); justify-content: space-between; padding: var(--rtk-space-4) var(--rtk-space-5); }
 .header h2 { font-size: 18px; margin: 0; overflow-wrap: anywhere; }
-.close { align-items: center; background: transparent; border: 0; border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-secondary); cursor: pointer; display: inline-flex; flex: 0 0 auto; height: 36px; justify-content: center; width: 36px; }
+.close { align-items: center; background: transparent; border: 0; border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-secondary); cursor: pointer; display: inline-flex; flex: 0 0 auto; height: 44px; justify-content: center; width: 44px; }
 .close:hover { background: var(--rtk-color-surface-hover); color: var(--rtk-color-text-primary); }
 .close:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
 .body { min-height: 0; overflow: auto; padding: var(--rtk-space-5); }

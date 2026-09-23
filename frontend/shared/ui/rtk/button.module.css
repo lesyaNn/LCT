@@ -23,3 +23,4 @@
 .s { min-height: 32px; padding: 0 var(--rtk-space-3); font-size: 12px; }
 .m { min-height: 36px; padding: 0 var(--rtk-space-4); font-size: 14px; }
 .l { min-height: 48px; padding: 0 var(--rtk-space-5); font-size: 16px; }
+@media (max-width: 768px) { .s, .m { min-height: 44px; } }

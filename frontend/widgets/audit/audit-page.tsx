@@ -26,6 +26,7 @@ import {
   type AuditListResult,
 } from '@/shared/lib/audit-repository';
 import { Button } from '@/shared/ui/rtk/button';
+import { Drawer } from '@/shared/ui/rtk/drawer';
 import { Modal } from '@/shared/ui/rtk/modal';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { TableShell } from '@/shared/ui/rtk/table-shell';
@@ -129,10 +130,7 @@ function AuditFilters({ query, result, onPatch, onReset, open, onClose }: { quer
   return (
     <>
       <div className={styles.desktopFilters} aria-label="Фильтры журнала аудита">{content}</div>
-      <div className={`${styles.mobileFilters} ${open ? styles.mobileFiltersOpen : ''}`}>
-        {open ? <button className={styles.mobileBackdrop} type="button" aria-label="Закрыть фильтры" onClick={onClose} /> : null}
-        {open ? <aside className={styles.mobileDrawer} aria-label="Фильтры журнала аудита"><div className={styles.drawerHeader}><h2>Фильтры</h2><Button variant="ghost" size="s" type="button" onClick={onClose}>Закрыть</Button></div>{content}</aside> : null}
-      </div>
+      {open ? <Drawer title="Фильтры" onClose={onClose}><div className={styles.drawerContent}>{content}</div></Drawer> : null}
     </>
   );
 }

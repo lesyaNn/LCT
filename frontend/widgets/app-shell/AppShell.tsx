@@ -29,17 +29,6 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
   }, []);
 
   useEffect(() => {
-    document.body.style.overflow = mobileOpen ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
-  }, [mobileOpen]);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') setMobileOpen(false); };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, []);
-
-  useEffect(() => {
     if (mobileOpen) {
       document.querySelector<HTMLButtonElement>('[aria-label="Закрыть меню"]')?.focus();
     } else if (wasMobileOpen.current) {
@@ -59,7 +48,6 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
   return (
     <div className={styles.shell}>
       <Sidebar role={user.role} pathname={pathname} collapsed={collapsed} mobileOpen={mobileOpen} onToggleCollapse={() => setCollapsed((value) => !value)} onCloseMobile={() => setMobileOpen(false)} />
-      {mobileOpen && <button className={styles.backdrop} type="button" aria-label="Закрыть меню" onClick={() => setMobileOpen(false)} />}
       <div className={styles.workspace}>
         <Topbar pathname={pathname} mobileOpen={mobileOpen} onMenuOpen={() => setMobileOpen(true)} />
         <main className={styles.content}>{forbidden ? <ForbiddenState /> : children}</main>

@@ -4,7 +4,7 @@ import CloseLarge from '@atomaro/icons/24/navigation/CloseLarge';
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import styles from './drawer.module.css';
 
-export function Drawer({ title, children, onClose, side = 'right', labelledBy }: { title: string; children: ReactNode; onClose: () => void; side?: 'left' | 'right'; labelledBy?: string }) {
+export function Drawer({ title, children, onClose, side = 'right', labelledBy, closeLabel = 'Закрыть' }: { title: string; children: ReactNode; onClose: () => void; side?: 'left' | 'right'; labelledBy?: string; closeLabel?: string }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const generatedTitleId = useId();
   const titleId = labelledBy ?? `rtk-drawer-title-${generatedTitleId}`;
@@ -31,5 +31,5 @@ export function Drawer({ title, children, onClose, side = 'right', labelledBy }:
     return () => { document.body.style.overflow = ''; document.removeEventListener('keydown', handleKeyDown); previous?.focus(); };
   }, []);
 
-  return <div className={styles.overlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><aside className={`${styles.drawer} ${styles[side]}`} role="dialog" aria-modal="true" aria-labelledby={titleId}><div className={styles.header}><h2 id={titleId}>{title}</h2><button ref={closeRef} className={styles.close} type="button" aria-label="Закрыть" onClick={onClose}><CloseLarge size={20} fill="currentColor" /></button></div><div className={styles.body}>{children}</div></aside></div>;
+  return <div className={styles.overlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><aside className={`${styles.drawer} ${styles[side]}`} role="dialog" aria-modal="true" aria-labelledby={titleId}><div className={styles.header}><h2 id={titleId}>{title}</h2><button ref={closeRef} className={styles.close} type="button" aria-label={closeLabel} onClick={onClose}><CloseLarge size={20} fill="currentColor" /></button></div><div className={styles.body}>{children}</div></aside></div>;
 }
