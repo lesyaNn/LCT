@@ -23,7 +23,10 @@
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-hook-form": "^7.88.0",
+    "react-markdown": "^10.1.0",
     "recharts": "^3.10.1",
+    "rehype-highlight": "^7.0.2",
+    "remark-gfm": "^4.0.1",
     "styled-components": "^6.5.3",
     "zod": "^3.25.76"
   },
