@@ -26,6 +26,7 @@ export function getExpirationStatus(isoDate: string, soonDays = 45, now = new Da
 
 export function formatDaysUntilRu(isoDate: string, now = new Date()): string {
   const relative = getRelativeDueDateRu(isoDate, now);
+  if (relative.days === 0) return 'Истекает сегодня';
   return relative.overdueLabel ?? relative.label;
 }
 
