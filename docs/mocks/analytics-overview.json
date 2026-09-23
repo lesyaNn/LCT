@@ -1,0 +1,170 @@
+{
+  "kpi": {
+    "universities": 10,
+    "average_health_score": 67,
+    "red_universities": 3,
+    "yellow_universities": 4,
+    "green_universities": 3,
+    "overdue_stages": 12,
+    "expiring_licenses": 8,
+    "teacher_readiness_issues": 10,
+    "active_programs": 25,
+    "launched_programs": 15
+  },
+  "health_distribution": [
+    {
+      "range": "0-20",
+      "count": 0
+    },
+    {
+      "range": "21-40",
+      "count": 1
+    },
+    {
+      "range": "41-60",
+      "count": 2
+    },
+    {
+      "range": "61-80",
+      "count": 4
+    },
+    {
+      "range": "81-100",
+      "count": 3
+    }
+  ],
+  "workflow_distribution": [
+    {
+      "stage": "Поиск контактов",
+      "count": 0
+    },
+    {
+      "stage": "Коммуникация/актуальность программ",
+      "count": 1
+    },
+    {
+      "stage": "Встреча",
+      "count": 1
+    },
+    {
+      "stage": "Обмен документами",
+      "count": 2
+    },
+    {
+      "stage": "Корректировка документов",
+      "count": 2
+    },
+    {
+      "stage": "Подписание",
+      "count": 2
+    },
+    {
+      "stage": "Передача материалов",
+      "count": 1
+    },
+    {
+      "stage": "Сопровождение внедрения",
+      "count": 0
+    },
+    {
+      "stage": "Обучение преподавателей",
+      "count": 1
+    },
+    {
+      "stage": "Актуализация программы",
+      "count": 0
+    },
+    {
+      "stage": "Ведение занятий",
+      "count": 0
+    },
+    {
+      "stage": "Актуализация документации",
+      "count": 0
+    },
+    {
+      "stage": "Повышение квалификации",
+      "count": 0
+    },
+    {
+      "stage": "Контроль исполнения",
+      "count": 0
+    }
+  ],
+  "program_statuses": [
+    {
+      "status": "planned",
+      "count": 5
+    },
+    {
+      "status": "active",
+      "count": 12
+    },
+    {
+      "status": "launched",
+      "count": 8
+    },
+    {
+      "status": "archived",
+      "count": 2
+    }
+  ],
+  "expiring_licenses": [
+    {
+      "university": "ИТМО",
+      "product": "Product X",
+      "expires_at": "2026-10-01",
+      "days_left": 15
+    },
+    {
+      "university": "СПбГУ",
+      "product": "Product Y",
+      "expires_at": "2026-10-15",
+      "days_left": 29
+    }
+  ],
+  "teacher_readiness": [
+    {
+      "university": "МФТИ",
+      "teacher": "Петров П.",
+      "certificate": "Инф. безопасность",
+      "expires_at": "2026-10-15",
+      "days_left": 30
+    },
+    {
+      "university": "УрФУ",
+      "teacher": "Сидоров С.",
+      "certificate": "Кубербезопасность",
+      "expires_at": "2026-10-05",
+      "days_left": 20
+    }
+  ],
+  "overdue_items": [
+    {
+      "type": "stage",
+      "university": "УрФУ",
+      "stage": "Обмен документами",
+      "days_overdue": 5
+    },
+    {
+      "type": "task",
+      "university": "Тюменский",
+      "task": "Подготовить договор",
+      "days_overdue": 12
+    }
+  ],
+  "health_trend": [
+    {
+      "date": "2026-08-01",
+      "avg_score": 65
+    },
+    {
+      "date": "2026-09-01",
+      "avg_score": 67
+    },
+    {
+      "date": "2026-09-15",
+      "avg_score": 67
+    }
+  ]
+}
