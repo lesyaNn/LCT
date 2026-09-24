@@ -10,7 +10,7 @@
     <element identifier="user" type="BusinessActor"><name>User / Manager / Admin (browser)</name></element>
     <element identifier="fe" type="ApplicationComponent"><name>Frontend (React SPA :3000, nginx)</name></element>
     <element identifier="be" type="ApplicationComponent"><name>Backend API (FastAPI :8000, /api/v1)</name></element>
-    <element identifier="worker" type="ApplicationComponent"><name>Worker (reports/imports, claim SKIP LOCKED)</name></element>
+    <element identifier="worker" type="ApplicationComponent"><name>Worker (reports/imports/audit relay, claim SKIP LOCKED)</name></element>
     <element identifier="db" type="DataObject"><name>PostgreSQL (rtk + keycloak)</name></element>
     <element identifier="kc" type="ApplicationComponent"><name>Keycloak 26 (realm rtk, aud rtk-api)</name></element>
     <element identifier="redis" type="TechnologyService"><name>Redis 7 (cache/jobs)</name></element>

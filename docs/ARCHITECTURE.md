@@ -43,5 +43,5 @@ flowchart LR
 ## ArchiMate
 8 слоёв P5-16-01 отражены выше; `.archimate`-модель — в
 `docs/archimate/architecture.archimate` (Dev-3, открывается в Archi),
-PNG-экспорт — `docs/archimate/README.md` (Archi Export As Image или
-mermaid-cli по Mermaid-блоку выше).
+PNG-схема — `docs/archimate/architecture.png`; генератор и инструкция —
+`docs/archimate/README.md`.
