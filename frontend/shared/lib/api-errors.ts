@@ -9,6 +9,7 @@ export const ERROR_MESSAGES = {
   DUPLICATE_ENTITY: 'Такая запись уже существует.',
   ENTITY_NOT_FOUND: 'Объект не найден или был удалён.',
   REPORT_FAILED: 'Не удалось сформировать отчёт. Попробуйте уменьшить период или изменить фильтры.',
+  EXTERNAL_SOURCE_UNAVAILABLE: 'Внешний источник временно недоступен. Показаны доступные данные.',
 } as const;
 
 export type BusinessErrorCode = keyof typeof ERROR_MESSAGES;

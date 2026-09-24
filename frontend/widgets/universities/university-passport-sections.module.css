@@ -17,6 +17,11 @@
 .chipMore { color: var(--rtk-color-brand); font-weight: 700; }
 .studentPage { display: flex; flex-direction: column; gap: var(--rtk-space-5); }
 .studentSummary { display: grid; gap: var(--rtk-space-3); grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.integrationControls { align-items: flex-end; display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); }
+.integrationMeta { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); }
+.integrationMeta time { color: var(--rtk-color-text-tertiary); font-size: 11px; white-space: nowrap; }
+.externalNotice { background: var(--rtk-color-surface-subtle); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-secondary); font-size: 12px; margin: 0; padding: var(--rtk-space-3); }
+.toastViewport { bottom: var(--rtk-space-5); max-width: min(420px, calc(100vw - 32px)); position: fixed; right: var(--rtk-space-5); z-index: 30; }
 .license { display: flex; flex-direction: column; gap: 2px; }
 .license strong { font-size: 12px; }
 .license span { color: var(--rtk-color-text-tertiary); font-size: 11px; }
@@ -65,6 +70,7 @@
   .toolbarControls { margin-left: 0; }
   .toolbarControls,
   .filter { max-width: 100%; width: 100%; }
+  .integrationControls { align-items: stretch; flex-direction: column; width: 100%; }
   .filter { max-width: none; }
   .filter select { min-height: 48px; }
   .actionLink, .iconAction, .inlineDetails summary { align-items: center; display: inline-flex; min-height: 44px; }

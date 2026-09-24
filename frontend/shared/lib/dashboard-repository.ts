@@ -2,6 +2,7 @@ import { apiFetch } from './api-client';
 import { ApiRequestError } from './api-errors';
 import { fromDataSource } from './data-source';
 import { queryKeys } from './query-keys';
+import { getExternalDashboardMetrics } from './external-integrations-repository';
 
 export interface DashboardOverview {
   universitiesTotal: number | null;
@@ -11,6 +12,10 @@ export interface DashboardOverview {
   expiringLicenses: number | null;
   activePrograms: number | null;
   teachersNeedUpgrade: number | null;
+  websiteApplications7d: number | null;
+  lmsStudents: number | null;
+  websiteSyncedAt: string | null;
+  lmsSyncedAt: string | null;
 }
 
 export type HealthScoreRange = '0–20' | '21–40' | '41–60' | '61–80' | '81–100';
@@ -79,6 +84,10 @@ const dashboardOverviewMock: DashboardOverview = {
   expiringLicenses: 8,
   activePrograms: 24,
   teachersNeedUpgrade: 17,
+  websiteApplications7d: 38,
+  lmsStudents: 126,
+  websiteSyncedAt: '2026-09-24T08:45:00.000Z',
+  lmsSyncedAt: '2026-09-24T08:45:00.000Z',
 };
 
 type CatalogOverviewApi = {
@@ -94,7 +103,7 @@ async function getCatalogOverview(): Promise<CatalogOverviewApi> {
 }
 
 async function getRealDashboardOverview(): Promise<DashboardOverview> {
-  const overview = await getCatalogOverview();
+  const [overview, integration] = await Promise.all([getCatalogOverview(), getExternalDashboardMetrics()]);
   const expiryThreshold = new Date();
   expiryThreshold.setDate(expiryThreshold.getDate() + 30);
   const expiringLicenses = (overview.rows ?? []).filter((row) => {
@@ -110,6 +119,10 @@ async function getRealDashboardOverview(): Promise<DashboardOverview> {
     expiringLicenses,
     activePrograms: (overview.directions ?? []).reduce((sum, direction) => sum + (direction.programs ?? 0), 0),
     teachersNeedUpgrade: null,
+    websiteApplications7d: integration.websiteApplications7d,
+    lmsStudents: integration.lmsStudents,
+    websiteSyncedAt: integration.websiteSyncedAt,
+    lmsSyncedAt: integration.lmsSyncedAt,
   };
 }
 

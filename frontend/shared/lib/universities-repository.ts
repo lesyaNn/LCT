@@ -105,6 +105,23 @@ export interface UniversityFilterOptions {
 }
 
 export { programStatusLabels };
+// External LMS/website methods share the same Mock ↔ Real repository boundary.
+export {
+  createWorkflowFromExternal,
+  getExternalDashboardMetrics,
+  getUniversityExternalData,
+  isExternalSourceUnavailable,
+  universityExternalDataQueryKey,
+} from './external-integrations-repository';
+export type {
+  CreateWorkflowFromExternalInput,
+  CreateWorkflowFromExternalResult,
+  ExternalApplication,
+  ExternalDashboardMetrics,
+  ExternalDataSource,
+  ExternalStudent,
+  UniversityExternalData,
+} from './external-integrations-repository';
 
 const programCounts = (planned: number, active: number, launched = 0, archived = 0): ProgramStatusCounts => ({
   planned,

@@ -37,6 +37,14 @@ import type {
   UniversityStudentsSummary,
   UniversityTeacherRow,
 } from './universities-repository';
+import type {
+  CreateWorkflowFromExternalInput,
+  CreateWorkflowFromExternalResult,
+  ExternalApplication,
+  ExternalDataSource,
+  ExternalStudent,
+  UniversityExternalData,
+} from './external-integrations-repository';
 
 type ApiPage<T> = { items: T[]; page: number; page_size: number; total: number };
 type ApiUniversity = { id: string; name: string; city: string | null; created_at: string; updated_at: string };
@@ -201,6 +209,120 @@ export async function realGetUniversityStudentsSummary(id: string): Promise<Univ
     graduated: data.graduated,
     academicLeave: data.by_status.academic_leave ?? 0,
     byProgram: data.by_program.map((item) => ({ programId: item.program_id, programName: item.program_name, active: item.active, graduated: item.graduated, total: item.total })),
+  };
+}
+
+function externalRows(value: unknown, keys: string[]): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (!isRecord(value)) return [];
+  for (const key of keys) {
+    const candidate = value[key];
+    if (Array.isArray(candidate)) return candidate;
+    if (isRecord(candidate) && Array.isArray(candidate.items)) return candidate.items;
+  }
+  if (isRecord(value.data)) return externalRows(value.data, keys);
+  return [];
+}
+
+function externalSyncAt(value: unknown): string | null {
+  if (!isRecord(value)) return null;
+  const candidate = value.synced_at ?? value.sync_at ?? value.last_sync_at ?? value.synchronized_at;
+  return typeof candidate === 'string' && candidate.trim() ? candidate : null;
+}
+
+function externalNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() && Number.isFinite(Number(value))) return Number(value);
+  return null;
+}
+
+function externalPayload(value: unknown): Record<string, unknown> {
+  if (!isRecord(value)) return {};
+  if (isRecord(value.data)) return externalPayload(value.data);
+  return value;
+}
+
+function workflowInstanceIdFrom(value: unknown): string {
+  if (!isRecord(value)) return '';
+  const direct = stringValue(value.instance_id ?? value.workflow_instance_id ?? value.workflow_id ?? value.id);
+  if (direct) return direct;
+  for (const key of ['data', 'detail', 'error', 'result', 'instance', 'workflow']) {
+    const nested = workflowInstanceIdFrom(value[key]);
+    if (nested) return nested;
+  }
+  return '';
+}
+
+function normalizeExternalData(value: unknown, universityId: string, source: ExternalDataSource): UniversityExternalData {
+  const payload = externalPayload(value);
+  const syncedAt = externalSyncAt(payload);
+  const students: ExternalStudent[] = source === 'lms'
+    ? externalRows(payload, ['students', 'learners', 'items']).flatMap((raw, index) => {
+      const item = isRecord(raw) ? raw : {};
+      const id = stringValue(item.id ?? item.student_id ?? item.external_id, `${universityId}-lms-${index + 1}`);
+      return [{
+        id,
+        name: stringValue(item.name ?? item.full_name ?? item.student_name, 'Обучающийся'),
+        programName: stringValue(item.program_name ?? item.program ?? item.direction_name) || null,
+        flow: stringValue(item.flow ?? item.flow_name ?? item.cohort) || null,
+        progress: externalNumber(item.progress ?? item.progress_percent ?? item.completion_percent),
+        source: 'lms' as const,
+        syncedAt: externalSyncAt(item) ?? syncedAt,
+      }];
+    })
+    : [];
+  const applications: ExternalApplication[] = source === 'website'
+    ? externalRows(payload, ['applications', 'website_applications', 'items']).flatMap((raw, index) => {
+      const item = isRecord(raw) ? raw : {};
+      const id = stringValue(item.id ?? item.application_id ?? item.external_id, `${universityId}-website-${index + 1}`);
+      const count = externalNumber(item.applications_count ?? item.application_count ?? item.count ?? item.total) ?? 0;
+      return [{
+        id,
+        universityId,
+        programId: stringValue(item.program_id) || null,
+        programName: stringValue(item.program_name ?? item.program ?? item.name, 'Программа'),
+        applicationsCount: count,
+        demandScore: externalNumber(item.demand_score ?? item.demand ?? item.score),
+        source: 'website' as const,
+        syncedAt: externalSyncAt(item) ?? syncedAt,
+        workflowInstanceId: stringValue(item.workflow_instance_id ?? item.workflow_id) || null,
+      }];
+    })
+    : [];
+  return { universityId, source, syncedAt, students, applications };
+}
+
+export async function realGetUniversityExternalData(
+  universityId: string,
+  source: ExternalDataSource,
+  signal?: AbortSignal,
+): Promise<UniversityExternalData> {
+  const result = await apiFetch<unknown>(`/api/v1/universities/${encodeURIComponent(universityId)}/external-data?source=${source}`, { signal });
+  return normalizeExternalData(unwrap(result, 'Не удалось загрузить данные внешнего источника.'), universityId, source);
+}
+
+export async function realCreateWorkflowFromExternal(
+  input: CreateWorkflowFromExternalInput,
+): Promise<CreateWorkflowFromExternalResult> {
+  const result = await apiFetch<unknown>('/api/v1/workflow/instances/from-external', {
+    method: 'POST',
+    body: { university_id: input.universityId, source: input.source, external_id: input.externalId },
+  });
+  if (!result.ok && result.status !== 409) {
+    throw new ApiRequestError(result.status, result.body, 'Не удалось создать Workflow из внешней заявки.', result.error);
+  }
+  const rawPayload: unknown = result.ok ? result.data : result.body;
+  const rawBody: unknown = result.ok ? undefined : result.body;
+  const payload = isRecord(rawPayload) ? rawPayload : {};
+  const instanceId = workflowInstanceIdFrom(payload);
+  if (!instanceId) {
+    throw new ApiRequestError(result.status, rawBody, 'Backend не вернул идентификатор Workflow.');
+  }
+  return {
+    instanceId,
+    universityId: input.universityId,
+    externalId: input.externalId,
+    existing: result.status === 409 || payload.existing === true || payload.already_exists === true,
   };
 }
 

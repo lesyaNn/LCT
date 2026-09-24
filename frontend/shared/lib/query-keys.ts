@@ -17,6 +17,7 @@ export const queryKeys = {
     healthScoreBatch: (ids: readonly string[]) => ['university-health-score-batch', [...ids].sort()] as const,
     programs: (id: string) => ['university-programs', id] as const,
     programsAll: ['university-programs'] as const,
+    externalData: (id: string, source: 'lms' | 'website') => ['university-external-data', id, source] as const,
     teachers: (id: string) => ['university-teachers', id] as const,
     students: (id: string) => ['university-students', id] as const,
     products: (id: string) => ['university-products', id] as const,

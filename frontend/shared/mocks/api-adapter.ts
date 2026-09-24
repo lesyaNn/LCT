@@ -26,6 +26,15 @@ import type {
   WorkflowTemplatePage,
   WorkflowTemplateStage,
 } from '@/shared/lib/workflow-templates-repository';
+import type {
+  CreateWorkflowFromExternalInput,
+  CreateWorkflowFromExternalResult,
+  ExternalApplication,
+  ExternalDashboardMetrics,
+  ExternalDataSource,
+  ExternalStudent,
+  UniversityExternalData,
+} from '@/shared/lib/external-integrations-repository';
 
 function id(prefix: string): string {
   const suffix = typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -589,6 +598,82 @@ export function mockAssignUniversityResponsible(input: ResponsibleAssignmentInpu
   const candidate = mockListResponsibleCandidates().find((item) => item.id === input.responsibleId);
   if (!candidate) throw new Error('Ответственный не найден.');
   setMockResponsibleAssignment(input.universityId, { responsibleId: candidate.id, reason: input.reason, assignedAt: new Date().toISOString() });
+}
+
+// -------------------------------------------------------------- external integrations
+
+const mockExternalSyncAt = '2026-09-24T08:45:00.000Z';
+
+function externalIndex(universityId: string): number {
+  const digits = universityId.match(/\d+/)?.[0];
+  return Math.max(1, Number(digits ?? 1));
+}
+
+function mockLmsStudents(universityId: string): ExternalStudent[] {
+  const index = externalIndex(universityId);
+  return [
+    { id: `lms-${universityId}-001`, name: 'Алексей Морозов', programName: 'Аналитика данных', flow: 'Поток «Осень 2026»', progress: 78, source: 'lms', syncedAt: mockExternalSyncAt },
+    { id: `lms-${universityId}-002`, name: 'Мария Кузнецова', programName: 'Информационная безопасность', flow: 'Поток «Осень 2026»', progress: 64, source: 'lms', syncedAt: mockExternalSyncAt },
+    { id: `lms-${universityId}-003`, name: 'Илья Соколов', programName: 'ИТ-менеджмент', flow: `Поток «Весна ${2026 + (index % 2)}»`, progress: 91, source: 'lms', syncedAt: mockExternalSyncAt },
+    { id: `lms-${universityId}-004`, name: 'Ольга Белова', programName: 'Аналитика данных', flow: 'Поток «Весна 2026»', progress: 48, source: 'lms', syncedAt: mockExternalSyncAt },
+    { id: `lms-${universityId}-005`, name: 'Роман Фёдоров', programName: 'ИТ-менеджмент', flow: 'Поток «Осень 2026»', progress: 33, source: 'lms', syncedAt: mockExternalSyncAt },
+  ];
+}
+
+function mockWebsiteApplications(universityId: string): ExternalApplication[] {
+  const index = externalIndex(universityId);
+  const definitions = [
+    ['Аналитика данных', 12 + index, 82],
+    ['Информационная безопасность', 8 + index, 67],
+    ['ИТ-менеджмент', 5 + index, 49],
+  ] as const;
+  return definitions.map(([programName, applicationsCount, demandScore], position) => ({
+    id: `website-${universityId}-${position + 1}`,
+    universityId,
+    programId: `program-${universityId}-${position + 1}`,
+    programName,
+    applicationsCount,
+    demandScore,
+    source: 'website' as const,
+    syncedAt: mockExternalSyncAt,
+    workflowInstanceId: readSession<string | null>(`external-workflow:${universityId}:website-${universityId}-${position + 1}`, null),
+  }));
+}
+
+export function mockGetUniversityExternalData(universityId: string, source: ExternalDataSource): UniversityExternalData {
+  if (source === 'lms') {
+    return { universityId, source, syncedAt: mockExternalSyncAt, students: mockLmsStudents(universityId), applications: [] };
+  }
+  return { universityId, source, syncedAt: mockExternalSyncAt, students: [], applications: mockWebsiteApplications(universityId) };
+}
+
+export function mockCreateWorkflowFromExternal(input: CreateWorkflowFromExternalInput): CreateWorkflowFromExternalResult {
+  const storageKey = `external-workflow:${input.universityId}:${input.externalId}`;
+  const existing = readSession<string | null>(storageKey, null);
+  if (existing) {
+    return { instanceId: existing, universityId: input.universityId, externalId: input.externalId, existing: true };
+  }
+
+  const instanceId = id('mock-external-workflow');
+  writeSession(storageKey, instanceId);
+  registerMockWorkflow({
+    instanceId,
+    universityId: input.universityId,
+    universityName: 'Университет из внешнего источника',
+    currentStageId: `${instanceId}-workflow-stage-1`,
+    stages: ['Инициация проекта', 'Проверка заявки', 'Согласование программы', 'Запуск обучения']
+      .map((name, index) => ({ id: `${instanceId}-workflow-stage-${index + 1}`, name, orderIndex: index + 1, isRequired: true })),
+  });
+  return { instanceId, universityId: input.universityId, externalId: input.externalId, existing: false };
+}
+
+export function mockGetExternalDashboardMetrics(): ExternalDashboardMetrics {
+  return {
+    websiteApplications7d: 38,
+    lmsStudents: 126,
+    websiteSyncedAt: mockExternalSyncAt,
+    lmsSyncedAt: mockExternalSyncAt,
+  };
 }
 
 // -------------------------------------------------------------- catalog CRUD
