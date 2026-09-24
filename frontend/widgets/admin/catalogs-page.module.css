@@ -1,17 +1,8 @@
 .page { display: flex; flex-direction: column; gap: var(--rtk-space-5); min-width: 0; }
-.localBreadcrumbs { display: none; }
-.localBreadcrumbs a { text-decoration: none; }
-.localBreadcrumbs a:hover { color: var(--rtk-color-brand); text-decoration: underline; }
 .pageHeader { align-items: flex-start; display: flex; justify-content: space-between; }
 .pageHeader h1 { font-size: clamp(26px, 4vw, 36px); letter-spacing: -.035em; line-height: 1.12; margin: 0; }
 .pageHeader > div > p:last-child { display: none; }
 .pageHeader p:last-child { color: var(--rtk-color-text-secondary); margin: var(--rtk-space-2) 0 0; }
-.eyebrow { display: none; }
-.tabScroller { max-width: 100%; overflow-x: auto; scrollbar-width: thin; }
-.tabs { border-bottom: 1px solid var(--rtk-color-border); display: inline-flex; min-width: max-content; }
-.tab, .tabActive { background: transparent; border: 0; border-bottom: 3px solid transparent; color: var(--rtk-color-text-secondary); cursor: pointer; font: inherit; font-weight: 700; min-height: 48px; padding: 0 var(--rtk-space-4); }
-.tab:hover { background: var(--rtk-color-surface-muted); color: var(--rtk-color-text); }
-.tabActive { border-bottom-color: var(--rtk-color-brand); color: var(--rtk-color-brand); }
 .panel { display: flex; flex-direction: column; gap: var(--rtk-space-4); min-width: 0; }
 .toolbar { align-items: flex-end; display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); }
 .search { display: flex; flex: 1 1 320px; flex-direction: column; gap: var(--rtk-space-1); max-width: 480px; min-width: 220px; }
@@ -23,7 +14,7 @@
 .integrationNote { background: var(--rtk-color-surface-subtle); border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-secondary); font-size: 12px; line-height: 1.45; padding: var(--rtk-space-3) var(--rtk-space-4); }
 .integrationNote p { margin: 0; }
 .integrationNote p + p { margin-top: var(--rtk-space-1); }
-.surface { background: var(--rtk-color-surface); border-radius: var(--rtk-radius-medium); box-shadow: var(--rtk-shadow-elevation-2); min-width: 0; overflow: hidden; }
+.surface { background: var(--rtk-color-surface); min-width: 0; overflow: hidden; }
 .surfaceHeader { border-bottom: 1px solid var(--rtk-color-border); padding: var(--rtk-space-4) var(--rtk-space-5); }
 .surfaceHeader h2 { font-size: 20px; margin: 0; }
 .surfaceHeader p { color: var(--rtk-color-text-tertiary); font-size: 12px; margin: var(--rtk-space-1) 0 0; }
@@ -35,7 +26,7 @@
 .nameButton { background: transparent; border: 0; color: inherit; cursor: pointer; font: inherit; font-weight: 700; padding: 0; text-align: left; }
 .nameButton:not(:disabled):hover { color: var(--rtk-color-brand); text-decoration: underline; }
 .nameButton:disabled { cursor: default; }
-.rowActions { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-1); }
+.rowActions { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-1); justify-content: flex-end; }
 .mobileList { display: none; }
 .catalogCard { border-bottom: 1px solid var(--rtk-color-border); display: flex; flex-direction: column; gap: var(--rtk-space-3); padding: var(--rtk-space-4); }
 .catalogCard:last-child { border-bottom: 0; }
@@ -70,12 +61,10 @@
   .actions > *, .actions > span, .actions button, .actions a { width: 100%; }
   .actions > span > span:first-child, .rowActions > span > span:first-child { width: 100%; }
   .inactiveFilter { min-height: 48px; }
-  .tabs { width: max-content; }
-  .tab, .tabActive { min-height: 48px; padding: 0 var(--rtk-space-3); }
   .surfaceHeader { padding: var(--rtk-space-4); }
   .catalogCard dl, .formGrid { grid-template-columns: 1fr; }
-  .rowActions { align-items: stretch; flex-direction: column; }
-  .rowActions > *, .rowActions > span, .rowActions button { width: 100%; }
+  .rowActions { align-items: center; flex-direction: row; justify-content: flex-end; }
+  .rowActions > span, .rowActions button { min-height: 44px; min-width: 44px; }
   .pagination { align-items: stretch; flex-wrap: wrap; }
   .pagination span { flex-basis: 100%; }
   .pagination button { flex: 1; min-height: 44px; }

@@ -89,7 +89,7 @@ export function WorkflowStageRow({ stage, index, count, saving, orderDirty, onMo
   return <li ref={setNodeRef} className={`${styles.stageRow} ${isDragging ? styles.dragging : ''} ${isOver && !isDragging ? styles.dragOver : ''} ${!stage.isActive ? styles.inactiveRow : ''}`} style={style} aria-busy={saving}>
     <div className={styles.dragCell}>
       <Tooltip content="Перетащите или нажмите Space, затем стрелки">
-        <button ref={setActivatorNodeRef} className={styles.dragHandle} type="button" disabled={saving} aria-label={`Переместить этап «${stage.name}»`} {...attributes} {...listeners}><DragVerticalDots size={20} fill="currentColor" /></button>
+        <button ref={setActivatorNodeRef} className={styles.dragHandle} type="button" disabled={saving} aria-label={`Переместить этап «${stage.name}»: нажмите пробел, затем стрелки`} {...attributes} {...listeners}><DragVerticalDots size={20} fill="currentColor" /></button>
       </Tooltip>
     </div>
     <span className={styles.orderCell} data-label="№">{index + 1}</span>

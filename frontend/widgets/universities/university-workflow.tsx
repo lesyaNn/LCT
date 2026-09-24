@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import type { ComponentType } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -167,7 +166,6 @@ function WorkflowHeader({ workflow }: { workflow: UniversityWorkflow }) {
   const progress = workflow.totalSteps ? Math.round((workflow.completedSteps / workflow.totalSteps) * 100) : 0;
   return (
     <header className={styles.pageHeader}>
-      <nav className={styles.breadcrumbs} aria-label="Навигация Workflow"><Link href="/universities">ВУЗы</Link><span aria-hidden="true">/</span><Link href={`/universities/${workflow.universityId}?tab=workflow`}>{workflow.universityName}</Link><span aria-hidden="true">/</span><span>Workflow</span></nav>
       <div className={styles.headerMain}><div><p className={styles.eyebrow}>WORKFLOW</p><h1>Взаимодействие с вузом</h1><p className={styles.headerContext}>{workflow.universityName} · {workflow.universityCity} · {workflow.workflowName}</p></div>{currentStage && currentSemantics ? <div className={styles.headerCurrent}><span>Текущий этап</span><strong>{currentStage.name}</strong><StatusBadge intent={currentSemantics.intent} icon={<StageStatusIcon status={currentStage.status} />}>{currentSemantics.label}</StatusBadge></div> : null}</div>
       <div className={styles.overallProgress}><div className={styles.progressLabel}><span>Прогресс Workflow</span><strong>{workflow.completedSteps} из {workflow.totalSteps} этапов завершено</strong></div><div className={styles.progressTrack} role="progressbar" aria-label={`Прогресс Workflow: завершено ${workflow.completedSteps} из ${workflow.totalSteps} этапов`} aria-valuemin={0} aria-valuemax={workflow.totalSteps} aria-valuenow={workflow.completedSteps}><span style={{ width: `${progress}%` }} /></div></div>
     </header>

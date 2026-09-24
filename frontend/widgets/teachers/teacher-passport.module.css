@@ -62,10 +62,11 @@
 .metaList {
   color: var(--rtk-color-text-secondary);
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--rtk-space-4) var(--rtk-space-6);
-  margin-top: var(--rtk-space-4);
+  flex-direction: column;
+  gap: var(--rtk-space-1);
+  margin-top: var(--rtk-space-3);
 }
+.position { color: var(--rtk-color-text-secondary); font-size: 13px; }
 
 .metaList > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .metaLabel { color: var(--rtk-color-text-tertiary); font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }

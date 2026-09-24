@@ -28,6 +28,7 @@ import {
 import { Avatar } from '@/shared/ui/rtk/avatar';
 import { Button } from '@/shared/ui/rtk/button';
 import { Tabs } from '@/shared/ui/rtk/tabs';
+import { TabbedSurface } from '@/shared/ui/rtk/tabbed-surface';
 import { EmptyState } from '@/shared/ui/empty-state';
 import { MetricCard } from '@/shared/ui/rtk/metric-card';
 import { StatusBadge as SemanticStatusBadge } from '@/shared/ui/rtk/status-badge';
@@ -248,7 +249,7 @@ export function UniversityPassport({ id }: { id: string }) {
   return (
     <div className={styles.page}>
       <PassportHeader passport={passport} canEdit={canEdit} canReport={canReport} onTabChange={selectTab} />
-      {!mobileLayout ? <Tabs items={tabDefinitions} activeId={activeTab} onChange={(id) => selectTab(id as PassportTabId)} label="Разделы паспорта вуза" prefix="passport-tab" /> : null}
+      <TabbedSurface tabs={!mobileLayout ? <Tabs items={tabDefinitions} activeId={activeTab} onChange={(id) => selectTab(id as PassportTabId)} label="Разделы паспорта вуза" prefix="passport-tab" /> : undefined}>
       {!mobileLayout ? <div className={styles.desktopPanel} id="passport-panel" role="tabpanel" aria-labelledby={`passport-tab-${activeTab}`}>{renderContent(activeTab)}</div> : null}
       {mobileLayout ? <div className={styles.mobileAccordion} aria-label="Разделы паспорта вуза">
         {tabDefinitions.map((tab) => {
@@ -256,6 +257,7 @@ export function UniversityPassport({ id }: { id: string }) {
           return <section className={styles.accordionItem} key={tab.id}><button className={isOpen ? styles.accordionTriggerActive : styles.accordionTrigger} type="button" aria-expanded={isOpen} onClick={() => selectTab(tab.id)}><span>{tab.label}</span><ArrowRight size={18} fill="currentColor" /></button>{isOpen ? <div className={styles.accordionPanel}>{renderContent(tab.id)}</div> : null}</section>;
         })}
       </div> : null}
+      </TabbedSurface>
     </div>
   );
 }

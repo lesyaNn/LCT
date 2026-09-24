@@ -7,7 +7,7 @@ import ErrorStroke from '@atomaro/icons/24/alert/ErrorStroke';
 import { formatDateRu, formatDaysUntilRu } from '@/shared/lib/formatters';
 import { certificateStatusIntent, certificateStatusLabels } from '@/shared/lib/status-semantics';
 import type { TeacherCertificate } from '@/shared/lib/universities-repository';
-import { Button } from '@/shared/ui/rtk/button';
+import { Button, ButtonAnchor } from '@/shared/ui/rtk/button';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { PassportDataTable, type PassportMobileField, type PassportTableColumn } from '@/widgets/universities/passport-data-table';
 import { CertificateTimeline } from './certificate-timeline';
@@ -29,7 +29,7 @@ function CertificateDocument({ document }: { document: TeacherCertificate['docum
 }
 
 function CertificateDetails({ certificate, onClose }: { certificate: TeacherCertificate; onClose: () => void }) {
-  return <section className={styles.detailPanel} aria-labelledby="teacher-certificate-detail-title"><div className={styles.detailHeader}><div><p className={styles.overline}>Детали сертификата</p><h3 id="teacher-certificate-detail-title">{certificate.name}</h3></div><Button variant="ghost" size="s" type="button" onClick={onClose}>Закрыть</Button></div><dl className={styles.detailGrid}><div><dt>Кем выдан</dt><dd>{certificate.issuer}</dd></div><div><dt>Выдан</dt><dd>{formatDateRu(certificate.issuedAt)}</dd></div><div><dt>Истекает</dt><dd>{certificate.expiresAt ? formatDateRu(certificate.expiresAt) : 'Бессрочно'}</dd></div><div><dt>Обязательный</dt><dd><MandatoryBadge mandatory={certificate.mandatory} /></dd></div><div><dt>Программа</dt><dd>{certificate.program ?? 'Без программы'}</dd></div><div><dt>Статус</dt><dd><StatusBadge intent={certificateStatusIntent[certificate.status]}>{certificateStatusLabels[certificate.status]}</StatusBadge></dd></div><div><dt>Документ</dt><dd><CertificateDocument document={certificate.document} /></dd></div></dl></section>;
+  return <section className={styles.detailPanel} aria-labelledby="teacher-certificate-detail-title"><div className={styles.detailHeader}><div><p className={styles.overline}>Детали сертификата</p><h3 id="teacher-certificate-detail-title">{certificate.name}</h3></div><Button variant="ghost" size="s" type="button" onClick={onClose}>Закрыть</Button></div><dl className={styles.detailGrid}><div><dt>Кем выдан</dt><dd>{certificate.issuer}</dd></div><div><dt>Выдан</dt><dd>{formatDateRu(certificate.issuedAt)}</dd></div><div><dt>Истекает</dt><dd>{certificate.expiresAt ? formatDateRu(certificate.expiresAt) : 'Бессрочно'}</dd></div><div><dt>Обязательный</dt><dd><MandatoryBadge mandatory={certificate.mandatory} /></dd></div><div><dt>Программа</dt><dd>{certificate.program ?? 'Без программы'}</dd></div><div><dt>Статус</dt><dd><StatusBadge intent={certificateStatusIntent[certificate.status]}>{certificateStatusLabels[certificate.status]}</StatusBadge></dd></div><div><dt>Документ</dt><dd><CertificateDocument document={certificate.document} /></dd></div></dl>{certificate.document?.downloadUrl ? <ButtonAnchor href={certificate.document.downloadUrl} download={certificate.document.name} aria-label={`Скачать файл ${certificate.document.name}`} variant="secondary" size="s"><Download size={16} fill="currentColor" />Скачать файл</ButtonAnchor> : null}</section>;
 }
 
 export function TeacherCertificatesSection({ rows }: { rows: TeacherCertificate[] }) {

@@ -1,0 +1,5 @@
+.surface { background: var(--rtk-color-surface); border-radius: var(--rtk-radius-medium); box-shadow: var(--rtk-shadow-elevation-2); min-width: 0; overflow: hidden; }
+.tabs { border-bottom: 1px solid var(--rtk-color-border); min-width: 0; padding: 0 var(--rtk-space-3); }
+.tabs > nav { border-bottom: 0; }
+.content { min-width: 0; padding: var(--rtk-space-5); }
+@media (max-width: 768px) { .tabs { padding: 0 var(--rtk-space-2); } .content { padding: var(--rtk-space-3); } }

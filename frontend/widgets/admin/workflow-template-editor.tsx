@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -28,7 +27,7 @@ function EditorSkeleton() {
 }
 
 function EditorHeader({ template, dirty, savingOrder, onAdd, onSaveOrder, onCancelOrder }: { template: WorkflowTemplate; dirty: boolean; savingOrder: boolean; onAdd: () => void; onSaveOrder: () => void; onCancelOrder: () => void }) {
-  return <><nav className={styles.localBreadcrumbs} aria-label="Хлебные крошки редактора"><Link href="/admin">Администрирование</Link><span aria-hidden="true">/</span><Link href="/admin/workflow/templates">Шаблоны Workflow</Link><span aria-hidden="true">/</span><span aria-current="page">{template.name}</span></nav><header className={styles.editorHeader}><div><p className={styles.eyebrow}>Редактор Workflow</p><h1>{template.name}</h1>{template.description ? <p className={styles.description}>{template.description}</p> : null}</div><div className={styles.headerActions}>{dirty ? <><span className={styles.dirtyStatus} role="status">Порядок изменён</span><Button type="button" variant="ghost" size="m" disabled={savingOrder} onClick={onCancelOrder}>Отменить</Button><Button type="button" variant="primary" size="m" loading={savingOrder} disabled={savingOrder} onClick={onSaveOrder}><CheckLarge size={18} fill="currentColor" />Сохранить порядок</Button></> : <Button type="button" variant="primary" size="m" onClick={onAdd}><AddLarge size={18} fill="currentColor" />Добавить этап</Button>}</div></header></>;
+  return <header className={styles.editorHeader}><div><h1>{template.name}</h1>{template.description ? <p className={styles.description}>{template.description}</p> : null}</div><div className={styles.headerActions}>{dirty ? <><span className={styles.dirtyStatus} role="status">Порядок изменён</span><Button type="button" variant="ghost" size="m" disabled={savingOrder} onClick={onCancelOrder}>Отменить</Button><Button type="button" variant="primary" size="m" loading={savingOrder} disabled={savingOrder} onClick={onSaveOrder}><CheckLarge size={18} fill="currentColor" />Сохранить порядок</Button></> : <Button type="button" variant="primary" size="m" onClick={onAdd}><AddLarge size={18} fill="currentColor" />Добавить этап</Button>}</div></header>;
 }
 
 export function WorkflowTemplateEditor({ templateId }: { templateId: string }) {

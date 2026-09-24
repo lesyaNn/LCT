@@ -97,8 +97,8 @@ function TeacherHeader({ id, teacher }: { id: string; teacher: TeacherPassportPr
         <div className={styles.identity}>
           <h1>{teacher.name}</h1>
           <div className={styles.metaList}>
-            <span><span className={styles.metaLabel}>ВУЗ</span><Link className={styles.universityLink} href={`/universities/${teacher.universityId}`}>{teacher.universityName}</Link></span>
-            <span><span className={styles.metaLabel}>Должность</span>{teacher.position}</span>
+            <Link className={styles.universityLink} href={`/universities/${teacher.universityId}`}>{teacher.universityName}</Link>
+            <span className={styles.position}>{teacher.position}</span>
           </div>
         </div>
         <div className={styles.statusPanel} aria-label="Готовность преподавателя">

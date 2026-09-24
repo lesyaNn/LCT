@@ -12,11 +12,13 @@
   white-space: nowrap;
 }
 .label { align-items: center; display: inline-flex; gap: inherit; }
+.button.primary .label, .button.orange .label, .button.danger .label { color: inherit; }
 .spinner { animation: button-spin 700ms linear infinite; border: 2px solid currentColor; border-radius: 50%; border-right-color: transparent; display: inline-flex; flex: 0 0 14px; height: 14px; width: 14px; }
 .button:disabled { cursor: not-allowed; opacity: .48; }
+.primary:disabled, .orange:disabled, .danger:disabled { color: var(--rtk-color-text-inverse); opacity: 1; filter: grayscale(.32); }
 .primary { background: var(--rtk-color-brand); color: var(--rtk-color-text-inverse); }
 .primary:hover:not(:disabled) { background: var(--rtk-color-brand-hover); }
-.orange { background: var(--rtk-color-brand-secondary); color: #fff; }
+.orange { background: var(--rtk-color-brand-secondary); color: var(--rtk-color-text-inverse); }
 .orange:hover:not(:disabled) { background: #d9430f; }
 .secondary { background: var(--rtk-color-surface); border-color: var(--rtk-color-border-strong); color: var(--rtk-color-text-primary); }
 .secondary:hover:not(:disabled) { background: var(--rtk-color-surface-hover); }

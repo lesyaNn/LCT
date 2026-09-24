@@ -20,10 +20,20 @@ interface ButtonLinkProps {
   children: ReactNode;
 }
 
+interface ButtonAnchorProps extends Omit<ButtonLinkProps, 'href'> {
+  href: string;
+  download?: string;
+  'aria-label'?: string;
+}
+
 export function Button({ variant = 'secondary', size = 'm', className = '', children, loading = false, ...props }: ButtonProps) {
   return <button aria-busy={loading || undefined} className={`${styles.button} ${styles[variant]} ${styles[size]} ${className}`} {...props}>{loading ? <span className={styles.spinner} aria-hidden="true" /> : null}<span className={styles.label}>{children}</span></button>;
 }
 
 export function ButtonLink({ href, variant = 'secondary', size = 'm', className = '', children }: ButtonLinkProps) {
   return <Link className={`${styles.button} ${styles[variant]} ${styles[size]} ${className}`} href={href}>{children}</Link>;
+}
+
+export function ButtonAnchor({ href, download, variant = 'secondary', size = 'm', className = '', children, 'aria-label': ariaLabel }: ButtonAnchorProps) {
+  return <a className={`${styles.button} ${styles[variant]} ${styles[size]} ${className}`} href={href} download={download} aria-label={ariaLabel}>{children}</a>;
 }

@@ -1,7 +1,4 @@
 .page { display: flex; flex-direction: column; gap: var(--rtk-space-5); min-width: 0; }
-.localBreadcrumbs { display: none; }
-.localBreadcrumbs a { text-decoration: none; }
-.localBreadcrumbs a:hover { color: var(--rtk-color-brand); text-decoration: underline; }
 .editorHeader { align-items: flex-start; display: flex; gap: var(--rtk-space-5); justify-content: space-between; }
 .editorHeader > div:first-child { min-width: 0; }
 .eyebrow { color: var(--rtk-color-brand); font-size: 12px; font-weight: 700; letter-spacing: .08em; margin: 0 0 var(--rtk-space-1); text-transform: uppercase; }
