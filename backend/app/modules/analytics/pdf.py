@@ -426,9 +426,26 @@ def generate_pdf_report(
     tmp_path = final_path.with_name(final_path.name + ".part")
 
     try:
-        dataset = ReportDatasetService.fetch_rows(db, filters, resolved, user=user)
-        rows = list(dataset.rows)
-        kpi = compute_kpi(dataset)
+        # Stream the dataset cursor. We retain only transformed table rows for
+        # ReportLab's LongTable; ORM mappings are never materialized by
+        # fetch_rows or list(iterator). KPI counters are accumulated inline.
+        rows: list[dict[str, Any]] = []
+        university_ids: set[Any] = set()
+        score_sum = 0.0
+        score_count = 0
+        for row in ReportDatasetService.iterate_rows(db, filters, resolved, user=user):
+            rows.append(row)
+            if row.get("university") is not None:
+                university_ids.add(row.get("university"))
+            score = row.get("health_score")
+            if isinstance(score, (int, float)) and not isinstance(score, bool):
+                score_sum += float(score)
+                score_count += 1
+        kpi = {
+            "university_count": len(university_ids),
+            "row_count": len(rows),
+            "avg_health_score": round(score_sum / score_count, 2) if score_count else None,
+        }
 
         page = landscape(A4)
         margin = 12 * mm
@@ -546,7 +563,7 @@ def generate_pdf_report(
     return _xlsx.GeneratedReport(
         path=final_path,
         size_bytes=final_path.stat().st_size,
-        row_count=dataset.total,
+        row_count=len(rows),
         generated_at=moment,
         columns=resolved,
     )

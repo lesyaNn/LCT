@@ -14,6 +14,7 @@ from app.core.permissions import effective_role
 from app.core.security import CurrentUser, get_current_user
 from app.db.session import get_db
 from app.modules.audit.models import AuditEvent
+from app.models.audit_outbox import AuditOutbox
 
 
 class AuditAction(StrEnum):
@@ -45,6 +46,11 @@ class AuditEntityType(StrEnum):
 
 _SECRET = re.compile(r"password|passwd|access.?token|refresh.?token|authorization|cookie|client.?secret|secret|private.?key|jwt", re.I)
 _JWT = re.compile(r"\beyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b")
+_INLINE_SECRET = re.compile(
+    r"(password|passwd|access.?token|refresh.?token|authorization|cookie|client.?secret|secret|private.?key)"
+    r"\s*[:=]\s*\S+",
+    re.I,
+)
 _MAX_BYTES = 8192
 
 
@@ -62,7 +68,8 @@ def sanitize(value: Any, depth: int = 0) -> Any:
     if isinstance(value, bytes):
         return "***REDACTED***"
     if isinstance(value, str):
-        return _JWT.sub("***REDACTED***", value[:2048])
+        value = _JWT.sub("***REDACTED***", value[:2048])
+        return _INLINE_SECRET.sub(lambda m: f"{m.group(1)}=***REDACTED***", value)
     if value is None or isinstance(value, (bool, int, float)):
         return value
     return str(value)[:2048]
@@ -123,6 +130,36 @@ class AuditService:
         if flush:
             self.db.flush()
         return event
+
+    def enqueue_event(
+        self, *, context: AuditContext, action: AuditAction | str,
+        entity_type: AuditEntityType | str, entity_id: uuid.UUID,
+        university_id: uuid.UUID | None = None, old_value: Any = None,
+        new_value: Any = None, dedupe_key: str | None = None,
+    ) -> AuditOutbox:
+        """Persist sanitized audit intent with the business transaction."""
+        outbox_id = uuid.uuid4()
+        payload = {
+            "user_id": context.user_id, "user_name": context.user_name,
+            "role": context.role, "action": str(action),
+            "entity_type": str(entity_type), "entity_id": str(entity_id),
+            "university_id": str(university_id) if university_id else None,
+            "old_value": bounded_snapshot(old_value),
+            "new_value": bounded_snapshot(new_value),
+            "request_id": str(context.request_id) if context.request_id else None,
+            # Request metadata is bounded and JWT-shaped strings are redacted
+            # before crossing the durable outbox boundary.
+            "ip_address": bounded_snapshot(context.ip),
+            "user_agent": bounded_snapshot(context.user_agent),
+        }
+        row = AuditOutbox(
+            id=outbox_id, event_type=str(action), aggregate_type=str(entity_type),
+            aggregate_id=entity_id,
+            payload=payload,
+            dedupe_key=dedupe_key or f"{entity_type}:{entity_id}:{action}:{outbox_id}",
+        )
+        self.db.add(row)
+        return row
 
     def log(
         self, user_id: str | int, entity_type: str, entity_id: str | int | uuid.UUID,

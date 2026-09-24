@@ -90,7 +90,7 @@ def _col(
     if flags.get("needs_workflow_scalar"):
         deps.add("workflow_instances")
     if flags.get("needs_health_scalar"):
-        deps.add("health_score_snapshots")
+        deps.add("health_score_current")
     if flags.get("needs_university_maps"):
         deps.update({"meetings", "interaction_notes", "workflow_instances",
                      "instance_stages", "workflow_tasks", "teachers"})
@@ -218,10 +218,9 @@ for _c in [
         "health_score",
         "Health Score",
         "integer",
-        "latest health_score_snapshots.score per university "
-        "(ORDER BY calculated_at DESC); NULL when no snapshot; optional Python "
-        "fallback via canonical calculate_health_score (P2-07-08), never a new "
-        "formula. int 0..100, missing is NULL (never 0)",
+        "health_score_current.score per university, materialized by the "
+        "canonical calculator; NULL until backfill/refresh. int 0..100, "
+        "missing is NULL (never 0)",
         needs_health_scalar=True,
     ),
     _col(

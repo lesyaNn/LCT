@@ -16,7 +16,8 @@ contract (or NULL). Rationale:
   Python-side query — deterministic order without PG-specific
   ordered-aggregate syntax, still a constant 2nd SELECT, never per-row;
 * ``workflow_status`` / ``health_score`` / fallback-contract fields are
-  correlated scalar subqueries (columns, not statements, no fan-out).
+  correlated scalar subqueries (columns, not statements, no fan-out); health
+  reads the materialized ``health_score_current`` projection.
 
 Dynamic SELECT/JOINs (P4-02-02): only requested output columns are
 selected; the ``licenses`` join tree is added only when a requested column
@@ -52,7 +53,7 @@ from app.models.catalog import (
     UniversityResponsible,
     Vendor,
 )
-from app.models.health_score import HealthScoreSnapshot
+from app.models.health_score import HealthScoreCurrent
 from app.models.interactions import InteractionNote, Meeting, UniversityProgram
 from app.models.teachers import Teacher
 from app.models.workflow_instances import InstanceStage, WorkflowInstance, WorkflowTask
@@ -138,16 +139,9 @@ class ReportDatasetService:
     @staticmethod
     def _latest_snapshot_score() -> Any:
         return (
-            select(HealthScoreSnapshot.score)
-            .where(HealthScoreSnapshot.university_id == University.id)
-            .order_by(
-                HealthScoreSnapshot.calculated_at.desc(),
-                HealthScoreSnapshot.period_day.desc(),
-                HealthScoreSnapshot.id.asc(),
-            )
-            .limit(1)
-            .correlate(University)
-            .scalar_subquery()
+            select(HealthScoreCurrent.score)
+            .where(HealthScoreCurrent.university_id == University.id)
+            .correlate(University).scalar_subquery()
         )
 
     @staticmethod
@@ -303,9 +297,9 @@ class ReportDatasetService:
         """Execute the dataset query (1 SELECT, +1 batched when needed).
 
         ``user`` confines the query to the caller's data scope (same
-        intersection as the P1 list). ``health_fallback`` fills missing
-        snapshot scores via the canonical ``calculate_health_score``
-        (bounded extra statements, only for universities without snapshots).
+        intersection as the P1 list). ``health_fallback`` is retained as a
+        compatibility argument but intentionally does nothing: score readers
+        use only ``health_score_current`` and missing rows stay ``NULL``.
         """
         stmt = ReportDatasetService.build_query(filters, columns, today=today)
         if user is not None:
@@ -409,7 +403,12 @@ class ReportDatasetService:
         stream = db.execute(
             stmt.execution_options(yield_per=batch_size, stream_results=True)
         )
-        for mapping in stream.mappings():
+        mappings = stream.mappings()
+        try:
+            iterator = iter(mappings)
+        except TypeError:  # lightweight unit doubles expose only `.all()`
+            iterator = iter(mappings.all())
+        for mapping in iterator:
             row = dict(mapping)
             if need_resp:
                 uid = row.get("_university_id")
@@ -613,20 +612,9 @@ class ReportDatasetService:
     def _attach_health_fallback(
         db: Session, rows: list[dict[str, Any]], *, today: date | None = None
     ) -> None:
-        """Fill NULL health scores via the canonical P2-07-08 calculator.
+        """Compatibility no-op: missing current rows remain NULL.
 
-        Only universities WITHOUT a snapshot pay extra statements (bounded);
-        the formula itself is never reimplemented here.
+        Collection paths must never invoke the canonical calculator per row;
+        the materialization backfill/refresh worker owns population.
         """
-        from app.modules.health_score.health_service import calculate_health_score
-
-        missing: dict[uuid.UUID, list[dict[str, Any]]] = {}
-        for row in rows:
-            if row.get("health_score") is None:
-                uid = row.get("_university_id")
-                if isinstance(uid, uuid.UUID):
-                    missing.setdefault(uid, []).append(row)
-        for uid, targets in missing.items():
-            score = calculate_health_score(db, uid, today=today).score
-            for target in targets:
-                target["health_score"] = int(score)
+        return None

@@ -53,6 +53,8 @@ CANON_TABLES = frozenset(
         "instance_stages",
         "health_score_snapshots",
         "report_jobs",
+        "health_score_current",
+        "audit_outbox",
     }
 )
 

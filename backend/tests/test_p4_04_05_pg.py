@@ -38,7 +38,7 @@ from app.models.catalog import (
     UniversityResponsible,
     Vendor,
 )
-from app.models.health_score import HealthScoreSnapshot
+from app.models.health_score import HealthScoreSnapshot, HealthScoreCurrent
 from app.models.interactions import UniversityProduct, UniversityProgram
 from app.models.workflow_instances import InstanceStage, WorkflowInstance
 from app.models.workflow_templates import WorkflowStage, WorkflowTemplate
@@ -106,6 +106,14 @@ def _seed(s: Session) -> dict:
             UniversityResponsible(university_id=delta.id, responsible_id=r2.id),
         ]
     )
+    s.add_all([
+        HealthScoreCurrent(university_id=mgu.id, score=85, status="green",
+                           breakdown={}, reasons=[], input_counters={},
+                           calculated_at=datetime(2026, 9, 1, tzinfo=timezone.utc)),
+        HealthScoreCurrent(university_id=beta.id, score=60, status="yellow",
+                           breakdown={}, reasons=[], input_counters={},
+                           calculated_at=datetime(2026, 9, 1, tzinfo=timezone.utc)),
+    ])
     c1 = Contract(
         id=uuid4(),
         university_id=mgu.id,

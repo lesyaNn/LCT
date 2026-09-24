@@ -28,7 +28,8 @@ from app.models.catalog import (  # noqa: F401
     UniversityResponsible,
     Vendor,
 )
-from app.models.health_score import HealthScoreSnapshot  # noqa: F401
+from app.models.health_score import HealthScoreCurrent, HealthScoreSnapshot  # noqa: F401
+from app.models.audit_outbox import AuditOutbox  # noqa: F401
 from app.models.report_job import (  # noqa: F401
     REPORT_JOB_STATUSES,
     STATUS_BUILDING,
@@ -46,7 +47,6 @@ from app.models.interactions import (  # noqa: F401
     UniversityProduct,
     UniversityProgram,
 )
-from app.models.report_job import ReportJob  # noqa: F401
 from app.models.teachers import (  # noqa: F401
     Teacher,
     TeacherCertificate,
@@ -96,5 +96,7 @@ __all__ = [
     "WorkflowTask",
     "InstanceStage",
     "HealthScoreSnapshot",
+    "HealthScoreCurrent",
+    "AuditOutbox",
     "ReportJob",
 ]

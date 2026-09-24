@@ -6,9 +6,9 @@ the whole import. Idempotency via natural keys (``contract_number`` is
 UNIQUE; licenses match on ``(university, product, license_number)``;
 directions on ``code``; programs on ``(direction_id, name)``).
 
-``execute_import`` runs synchronously in the MVP; the router wraps it into
-the ``task_queue`` stub so the API shape (``job_id`` + job status) already
-matches the background-worker design from P4-06-01.
+``execute_import`` is the worker-owned business operation.  The HTTP route
+persists a queued ledger row; ``report_worker`` calls this function after an
+atomic claim and commits the terminal summary.
 """
 
 from __future__ import annotations

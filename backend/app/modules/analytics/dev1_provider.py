@@ -37,6 +37,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models.catalog import ITProgram, License
+from app.models.interactions import UniversityProgram
 from app.core.errors import BusinessException
 from app.schemas.errors import ErrorCode
 from app.models.workflow_instances import InstanceStage, WorkflowInstance
@@ -46,7 +47,7 @@ from app.modules.analytics.filter_service import (
     CLOSED_STAGE_STATUSES,
     STORED_STAGE_STATUSES,
 )
-from app.modules.analytics.integration import Selection
+from app.modules.analytics.integration import Selection, data_scope, restrict_selection
 from app.schemas.common import WorkflowStageStatus
 
 __all__ = ["Dev1FilterProvider", "provider"]
@@ -97,8 +98,14 @@ class Dev1FilterProvider:
                     )
                 ).all()
             )
+        elif user is not None and data_scope(user) is not None:
+            program_ids = _sorted_ids(db.scalars(
+                select(UniversityProgram.program_id).distinct().where(
+                    UniversityProgram.university_id.in_(uni_ids)
+                )
+            ))
         else:
-            program_ids = _sorted_ids(db.scalars(select(ITProgram.id)).all())
+            program_ids = _sorted_ids(db.scalars(select(ITProgram.id)))
 
         license_ids: list[UUID] | None = None
         if dto.product_ids:
@@ -122,13 +129,26 @@ class Dev1FilterProvider:
                 ).all()
             )
 
-        return Selection(
+        selection = Selection(
             university_ids=_sorted_ids(uni_ids),
             program_ids=program_ids,
             university_program_ids=None,
             license_ids=license_ids,
             workflow_instance_ids=instance_ids,
         )
+        # An empty scoped university set must remain an explicit empty
+        # selection for every child dimension.  ``None`` means "all children"
+        # to the analytics loader and would otherwise make an empty scope
+        # indistinguishable from a global selection for callers that inspect
+        # child IDs before loading data.
+        if user is not None and data_scope(user) is not None and not uni_ids:
+            selection = selection.model_copy(update={
+                "program_ids": [],
+                "university_program_ids": [],
+                "license_ids": [],
+                "workflow_instance_ids": [],
+            })
+        return restrict_selection(selection, data_scope(user), db) if user is not None else selection
 
     def select_scoped(self, db: Session, filters: dict[str, Any], user) -> Selection:
         return self.select(db, filters, user=user)

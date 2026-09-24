@@ -44,7 +44,7 @@ from app.models.catalog import (
     UniversityResponsible,
     Vendor,
 )
-from app.models.health_score import HealthScoreSnapshot
+from app.models.health_score import HealthScoreSnapshot, HealthScoreCurrent
 from app.models.interactions import UniversityProduct, UniversityProgram
 from app.models.workflow_instances import InstanceStage, WorkflowInstance
 from app.models.workflow_templates import WorkflowStage, WorkflowTemplate
@@ -130,6 +130,14 @@ def _seed(s: Session) -> dict:
             UniversityResponsible(university_id=delta.id, responsible_id=r2.id),
         ]
     )
+    s.add_all([
+        HealthScoreCurrent(university_id=alpha.id, score=85, status="green",
+                           breakdown={}, reasons=[], input_counters={},
+                           calculated_at=datetime(2026, 9, 1, tzinfo=timezone.utc)),
+        HealthScoreCurrent(university_id=beta.id, score=60, status="yellow",
+                           breakdown={}, reasons=[], input_counters={},
+                           calculated_at=datetime(2026, 9, 1, tzinfo=timezone.utc)),
+    ])
     c1 = Contract(
         id=uuid4(), university_id=alpha.id, contract_number="C-001",
         product_id=prod1.id, signed_at=date(2026, 1, 20),
@@ -570,13 +578,12 @@ def test_dataset_matches_p1_and_analytics_university_sets(fx):
     assert set(AnalyticsService.filtered_university_ids(s, f, today=TODAY)) == p1_ids
 
 
-def test_health_fallback_uses_canonical_service(fx):
+def test_health_fallback_does_not_reintroduce_snapshot_reads(fx):
     s, _, ids = fx
     ds = _fetch(s, UnifiedFilter(university_ids=[ids["gamma"]]), None)
     assert _by_uni(ds.rows)["Uni Gamma"][0]["health_score"] is None
     ds = _fetch(s, UnifiedFilter(university_ids=[ids["gamma"]]), None, health_fallback=True)
-    score = _by_uni(ds.rows)["Uni Gamma"][0]["health_score"]
-    assert isinstance(score, int) and 0 <= score <= 100
+    assert _by_uni(ds.rows)["Uni Gamma"][0]["health_score"] is None
     # Snapshotted universities keep their snapshot values.
     ds = _fetch(
         s,

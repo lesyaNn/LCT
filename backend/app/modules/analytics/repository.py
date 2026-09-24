@@ -6,7 +6,7 @@ is delegated unchanged and uses P2's existing cache.
 """
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -14,13 +14,11 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload, raiseload
 
 from app.models.catalog import ITProgram, License, University
-from app.models.health_score import HealthScoreSnapshot
+from app.models.health_score import HealthScoreSnapshot, HealthScoreCurrent
 from app.models.interactions import UniversityProgram
 from app.models.teachers import Teacher, TeacherCertificate, TeacherProgram, TeacherQualification
 from app.models.workflow_instances import InstanceStage, WorkflowInstance, WorkflowTask
 from app.modules.analytics.integration import Selection
-from app.modules.health_score import cache as health_cache
-from app.modules.health_score.health_service import calculate_health_score
 
 
 @dataclass
@@ -126,20 +124,10 @@ def load_data(
     instance_ids = [item.id for item in data.instances]
     data.stages = selected_rows(db, InstanceStage, InstanceStage.instance_id.in_(instance_ids))
     data.tasks = selected_rows(db, WorkflowTask, WorkflowTask.instance_id.in_(instance_ids))
-    for university_id in uni_ids:
-        try:
-            score = health_cache.get_cached(university_id)
-        except Exception:
-            score = None
-        if score is None:
-            score = calculate_health_score(
-                db, university_id, today=today, now=datetime.now(timezone.utc)
-            )
-            try:
-                health_cache.put_cached(score)
-            except Exception:
-                pass  # Redis is an optimization, not a data dependency.
-        data.scores[university_id] = score
+    current_scores = db.execute(select(HealthScoreCurrent).where(
+        HealthScoreCurrent.university_id.in_(uni_ids)
+    )).scalars()
+    data.scores = {row.university_id: row for row in current_scores}
     filters = filters or {}
     start = max(
         today - timedelta(days=29),

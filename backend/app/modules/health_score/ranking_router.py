@@ -5,11 +5,9 @@
 на 10 минут. Если времени нет — Dashboard использует batch (P2-08-02).
 """
 
-import uuid
-
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.permissions import require_permission
@@ -18,9 +16,8 @@ from app.core.security import CurrentUser
 from app.db.session import get_db
 from app.infrastructure import redis as redis_infra
 from app.models.catalog import University
-from app.modules.health_score import cache as health_cache
-from app.modules.health_score.health_service import calculate_health_score
-from app.modules.health_score.schemas import HealthScoreRankItem, HealthScoreShort
+from app.models.health_score import HealthScoreCurrent
+from app.modules.health_score.schemas import HealthScoreRankItem
 from app.schemas.common import HealthScoreStatus
 
 router = APIRouter(prefix="/health-score", tags=["health-score"])
@@ -66,32 +63,30 @@ def get_health_score_ranking(
             return HealthScoreRankingResponse.model_validate_json(raw)
         except ValueError:
             pass
-    universities = list(
-        db.execute(apply_university_scope(
-            select(University.id, University.name).order_by(University.name),
-            University.id, user,
-        )).all()
-    )
-    scored: list[tuple[uuid.UUID, str, HealthScoreShort]] = []
-    for university_id, name in universities:
-        cached = health_cache.get_cached(university_id)
-        full = cached if cached is not None else calculate_health_score(db, university_id)
-        if cached is None:
-            health_cache.put_cached(full)
-        short = HealthScoreShort.from_full(full)
-        if status is not None and short.status != status:
-            continue
-        scored.append((university_id, name, short))
-    scored.sort(key=lambda row: row[2].score, reverse=True)
-    total = len(scored)
+    base = select(
+        University.id.label("university_id"), University.name.label("university_name"),
+        HealthScoreCurrent.score, HealthScoreCurrent.status, HealthScoreCurrent.breakdown,
+    ).join(HealthScoreCurrent, HealthScoreCurrent.university_id == University.id)
+    base = apply_university_scope(base, University.id, user)
+    if status is not None:
+        base = base.where(HealthScoreCurrent.status == status)
+    # Keep the window in the scoped/filtered subquery; no hidden universities
+    # influence the public rank. SQL applies offset/limit before response build.
+    scoped = base.subquery("scoped")
+    ranked = select(
+        scoped,
+        func.row_number().over(order_by=(scoped.c.score.desc(), scoped.c.university_id.asc())).label("rank"),
+    ).subquery("ranked")
+    rows = list(db.execute(select(ranked).where(
+        ranked.c.rank > offset, ranked.c.rank <= offset + limit
+    ).order_by(ranked.c.rank)).all())
+    total = int(db.execute(select(func.count()).select_from(scoped)).scalar() or 0)
     items = [
         HealthScoreRankItem(
-            university_id=university_id, score=short.score, status=short.status,
-            breakdown=short.breakdown, rank=index, university_name=name,
+            university_id=row.university_id, score=row.score, status=row.status,
+            breakdown=row.breakdown, rank=int(row.rank), university_name=row.university_name,
         )
-        for index, (university_id, name, short) in enumerate(
-            scored[offset:offset + limit], start=offset + 1
-        )
+        for row in rows
     ]
     result = HealthScoreRankingResponse(items=items, total=total)
     if global_scope:
