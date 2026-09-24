@@ -175,7 +175,7 @@ function OptionsAndRun({
       <div><Switch checked={dryRun} onChange={setDryRun} label="Проверочный запуск" testId="dry-run-toggle" /><span><strong>Проверочный запуск</strong><small>Не сохранять изменения при первой проверке</small></span></div>
     </div>
     {dryRunSummary ? <><Summary summary={dryRunSummary} />{hasErrors ? <label className={styles.skipErrors}><input type="checkbox" checked={allowSkipErrors} onChange={(event) => setAllowSkipErrors(event.target.checked)} />Пропустить строки с ошибками при итоговом импорте</label> : <p className={styles.successMessage} role="status">Критических ошибок не найдено. Импорт готов к подтверждению.</p>}</> : null}
-    <div className={styles.runActions}><Button type="button" variant="secondary" loading={dryRunLoading} disabled={dryRunLoading || importLoading} onClick={onDryRun}>Запустить dry-run</Button><Button type="button" variant="primary" data-testid="import-confirm" loading={importLoading} disabled={!canImport || dryRunLoading} onClick={onImport}>Импортировать</Button></div>
+    <div className={styles.runActions}><Button type="button" variant="orange" loading={dryRunLoading} disabled={dryRunLoading || importLoading} onClick={onDryRun}>Запустить dry-run</Button><Button type="button" variant="primary" data-testid="import-confirm" loading={importLoading} disabled={!canImport || dryRunLoading} onClick={onImport}>Импортировать</Button></div>
   </section>;
 }
 

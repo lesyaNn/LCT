@@ -42,7 +42,7 @@ function DocumentCell({ document }: { document: TeacherQualification['document']
     <div className={styles.documentCell}>
       <DocumentText size={20} fill="currentColor" aria-hidden="true" />
       <div className={styles.documentInfo}>
-        <strong>{document.name}</strong>
+        <strong title={document.name}>{document.name}</strong>
         <span>{document.fileType} · {document.fileSize}</span>
       </div>
       {document.downloadUrl ? <a className={styles.iconAction} href={document.downloadUrl} download aria-label={`Скачать ${document.name}`}><Download size={17} fill="currentColor" /></a> : null}

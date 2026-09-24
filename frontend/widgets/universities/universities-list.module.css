@@ -63,13 +63,13 @@
   border-radius: var(--rtk-radius-small);
   color: var(--rtk-color-text-primary);
   display: flex;
-  min-height: 38px;
+  min-height: 46px;
   padding: 0 var(--rtk-space-3);
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
 .field select { cursor: pointer; width: 100%; }
-.field input[type='date'] { color: var(--rtk-color-text-primary); min-height: 38px; width: 100%; }
+.field input[type='date'] { color: var(--rtk-color-text-primary); min-height: 46px; width: 100%; }
 .field select:focus-visible,
 .inputWrap:focus-within,
 .multiselect[open] summary,

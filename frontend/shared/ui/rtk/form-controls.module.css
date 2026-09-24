@@ -3,7 +3,7 @@
   border: 1px solid var(--rtk-color-border-strong);
   border-radius: var(--rtk-radius-small);
   color: var(--rtk-color-text-primary);
-  min-height: 40px;
+  min-height: 46px;
   padding: 8px 12px;
   width: 100%;
 }

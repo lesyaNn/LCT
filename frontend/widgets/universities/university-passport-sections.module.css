@@ -5,7 +5,7 @@
 .toolbarControls { align-items: flex-end; display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); margin-left: auto; }
 .filter { align-items: flex-start; display: flex; flex-direction: column; gap: var(--rtk-space-1); min-width: 180px; }
 .filter span { color: var(--rtk-color-text-secondary); font-size: 11px; font-weight: 600; }
-.filter select { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border-strong); border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-primary); font: inherit; font-size: 13px; min-height: 36px; padding: 0 var(--rtk-space-3); width: 100%; }
+.filter select { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border-strong); border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-primary); font: inherit; font-size: 13px; min-height: 46px; padding: 0 var(--rtk-space-3); width: 100%; }
 .filter select:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
 .primaryCell { display: block; font-size: 13px; font-weight: 650; line-height: 1.35; }
 .secondaryCell { color: var(--rtk-color-text-tertiary); display: block; font-size: 11px; margin-top: var(--rtk-space-1); }
@@ -28,6 +28,8 @@
 .filtersRow { align-items: flex-end; display: flex; gap: var(--rtk-space-3); }
 .fileCell { align-items: center; display: flex; gap: var(--rtk-space-2); min-width: 180px; }
 .fileCell > svg { color: var(--rtk-color-brand); flex: 0 0 auto; }
+.fileCell > div { flex: 1 1 auto; min-width: 0; }
+.fileCell .primaryCell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .iconAction { align-items: center; background: transparent; border: 0; color: var(--rtk-color-brand); cursor: pointer; display: inline-flex; justify-content: center; min-height: 32px; min-width: 32px; padding: var(--rtk-space-1); }
 .iconAction:hover { color: var(--rtk-color-brand-hover); }
 .iconAction:disabled { color: var(--rtk-color-text-tertiary); cursor: not-allowed; }

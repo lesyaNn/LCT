@@ -9,12 +9,13 @@
 .disabled { opacity: .55; }
 .disabled summary { cursor: not-allowed; }
 .menu { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border-strong); border-radius: var(--rtk-radius-small); box-shadow: var(--rtk-shadow-elevation-2); display: flex; flex-direction: column; gap: 4px; left: 0; max-height: 280px; min-width: 100%; overflow: auto; padding: 8px; position: absolute; top: calc(100% + 5px); z-index: 30; }
-.menu label { align-items: flex-start; border-radius: var(--rtk-radius-small); cursor: pointer; display: flex; font-size: 12px; gap: 8px; padding: 8px; }
+.menu label { align-items: center; border-radius: var(--rtk-radius-small); cursor: pointer; display: flex; font-size: 12px; gap: 8px; justify-content: space-between; min-height: 36px; padding: 8px 10px; }
 .menu label:hover { background: var(--rtk-color-surface-hover); }
-.menu input { accent-color: var(--rtk-color-brand); margin-top: 2px; }
-.optionText { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.optionText strong { font-weight: 600; }
-.optionText small { color: var(--rtk-color-text-tertiary); font-size: 11px; }
+.optionContent { display: flex; flex: 1 1 auto; flex-direction: column; gap: 2px; min-width: 0; }
+.optionContent strong { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.optionContent small { color: var(--rtk-color-text-tertiary); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.optionCheck { accent-color: var(--rtk-color-brand); flex: 0 0 16px; height: 16px; margin: 0; width: 16px; }
+.hint { color: var(--rtk-color-text-secondary); font-size: 11px; line-height: 1.4; margin: 4px 8px 2px; }
 .selected { display: flex; flex-wrap: wrap; gap: 4px; }
 .chip { align-items: center; background: var(--atmr-accent-container-default); border: 1px solid var(--rtk-color-border); border-radius: 999px; color: var(--rtk-color-brand); cursor: pointer; display: inline-flex; font-size: 11px; gap: 4px; max-width: 100%; padding: 4px 8px; }
 .chip:hover { background: var(--atmr-accent-container-hover); }

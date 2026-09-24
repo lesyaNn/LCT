@@ -111,17 +111,17 @@
 .sectionHeading p { color: var(--rtk-color-text-secondary); font-size: 13px; margin: var(--rtk-space-1) 0 0; }
 .filter { align-items: flex-start; display: flex; flex-direction: column; gap: var(--rtk-space-1); min-width: 190px; }
 .filter span { color: var(--rtk-color-text-secondary); font-size: 11px; font-weight: 600; }
-.filter select { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border-strong); border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-primary); font: inherit; font-size: 13px; min-height: 36px; padding: 0 var(--rtk-space-3); width: 100%; }
+.filter select { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border-strong); border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-primary); font: inherit; font-size: 13px; min-height: 46px; padding: 0 var(--rtk-space-3); width: 100%; }
 .filter select:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
 
 .primaryCell { display: block; font-size: 13px; font-weight: 650; line-height: 1.35; }
 .muted { color: var(--rtk-color-text-tertiary); font-size: 12px; }
 .documentCell { align-items: center; display: flex; gap: var(--rtk-space-3); min-width: 190px; }
-.documentCell > svg { color: var(--rtk-color-brand); flex: 0 0 20px; }
-.documentInfo { display: flex; flex-direction: column; min-width: 0; }
-.documentInfo strong { font-size: 12px; overflow-wrap: anywhere; }
+.documentCell > svg { color: var(--rtk-color-brand); flex: 0 0 20px; height: 20px; width: 20px; }
+.documentInfo { display: flex; flex: 1 1 auto; flex-direction: column; min-width: 0; }
+.documentInfo strong { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .documentInfo span { color: var(--rtk-color-text-tertiary); font-size: 11px; }
-.iconAction { align-items: center; background: transparent; border: 0; color: var(--rtk-color-brand); display: inline-flex; margin-left: auto; padding: var(--rtk-space-1); }
+.iconAction { align-items: center; background: transparent; border: 0; color: var(--rtk-color-brand); display: inline-flex; flex: 0 0 32px; justify-content: center; margin-left: auto; padding: var(--rtk-space-1); }
 .iconAction:hover { color: var(--rtk-color-brand-hover); }
 .iconAction:focus-visible { border-radius: var(--rtk-radius-small); outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
 .statusCell,

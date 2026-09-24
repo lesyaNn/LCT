@@ -25,7 +25,7 @@ function MandatoryBadge({ mandatory }: { mandatory: boolean }) {
 
 function CertificateDocument({ document }: { document: TeacherCertificate['document'] }) {
   if (!document) return <span className={styles.muted}>Не приложен</span>;
-  return <div className={styles.documentCell}><DocumentText size={20} fill="currentColor" aria-hidden="true" /><div className={styles.documentInfo}><strong>{document.name}</strong><span>{document.fileType} · {document.fileSize}</span></div>{document.downloadUrl ? <a className={styles.iconAction} href={document.downloadUrl} download aria-label={`Скачать ${document.name}`}><Download size={17} fill="currentColor" /></a> : null}</div>;
+  return <div className={styles.documentCell}><DocumentText size={20} fill="currentColor" aria-hidden="true" /><div className={styles.documentInfo}><strong title={document.name}>{document.name}</strong><span>{document.fileType} · {document.fileSize}</span></div>{document.downloadUrl ? <a className={styles.iconAction} href={document.downloadUrl} download aria-label={`Скачать ${document.name}`}><Download size={17} fill="currentColor" /></a> : null}</div>;
 }
 
 function CertificateDetails({ certificate, onClose }: { certificate: TeacherCertificate; onClose: () => void }) {

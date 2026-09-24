@@ -30,6 +30,7 @@ import { Drawer } from '@/shared/ui/rtk/drawer';
 import { EmptyState } from '@/shared/ui/empty-state';
 import { ErrorState } from '@/shared/ui/error-state';
 import { Modal } from '@/shared/ui/rtk/modal';
+import { MultiSelect } from '@/shared/ui/rtk/multiselect';
 import { TableSkeleton } from '@/shared/ui/skeleton';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { TableShell } from '@/shared/ui/rtk/table-shell';
@@ -91,20 +92,6 @@ function normalizeFilters(filters: AuditFilters): AuditFilters {
 
 function selectedFilterCount(filters: AuditFilters): number {
   return [filters.dateFrom, filters.dateTo, ...filters.userIds, ...filters.universityIds, ...filters.actions, ...filters.entityTypes].filter(Boolean).length;
-}
-
-function MultiSelect({ label, values, options, onChange, disabled = false, hint }: { label: string; values: string[]; options: Array<{ id: string; name: string }>; onChange: (values: string[]) => void; disabled?: boolean; hint?: string }) {
-  return (
-    <details className={`${styles.multiSelect} ${disabled ? styles.disabled : ''}`}>
-      <summary aria-disabled={disabled || undefined} onClick={(event) => { if (disabled) event.preventDefault(); }}>
-        <span>{label}{values.length ? ` (${values.length})` : ''}</span>
-      </summary>
-      <div className={styles.multiSelectMenu}>
-        {hint ? <p>{hint}</p> : null}
-        {options.map((option) => <label key={option.id}><input type="checkbox" checked={values.includes(option.id)} disabled={disabled} onChange={(event) => onChange(event.target.checked ? [...values, option.id] : values.filter((value) => value !== option.id))} />{option.name}</label>)}
-      </div>
-    </details>
-  );
 }
 
 function AuditFilters({ query, result, onPatch, onReset, open, onClose }: { query: AuditListQuery; result?: AuditListResult; onPatch: (patch: Partial<AuditFilters>) => void; onReset: () => void; open: boolean; onClose: () => void }) {

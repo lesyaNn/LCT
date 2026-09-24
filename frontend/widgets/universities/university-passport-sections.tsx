@@ -335,7 +335,7 @@ function LicensesSection({ id }: { id: string }) {
 }
 
 function DocumentFile({ row }: { row: UniversityDocumentRow }) {
-  return <div className={styles.fileCell}><DocumentText size={20} fill="currentColor" /><div><strong className={styles.primaryCell}>{row.fileName}</strong><span className={styles.secondaryCell}>{row.fileSize}</span></div></div>;
+  return <div className={styles.fileCell}><DocumentText size={20} fill="currentColor" /><div><strong className={styles.primaryCell} title={row.fileName}>{row.fileName}</strong><span className={styles.secondaryCell}>{row.fileSize}</span></div></div>;
 }
 
 function DocumentsSection({ id }: { id: string }) {

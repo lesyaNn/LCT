@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
   flexRender,
@@ -17,13 +17,13 @@ import Attention from '@atomaro/icons/24/action/Attention';
 import Filter from '@atomaro/icons/24/action/Filter';
 import Search from '@atomaro/icons/24/action/Search';
 import CloseSmall from '@atomaro/icons/24/navigation/CloseSmall';
-import ChevronDown from '@atomaro/icons/24/navigation/ChevronDown';
 import ChevronSort from '@atomaro/icons/24/navigation/ChevronSort';
 import SortDown from '@atomaro/icons/24/editor/SortDown';
 import SortUp from '@atomaro/icons/24/editor/SortUp';
 import { Button } from '@/shared/ui/rtk/button';
 import { Drawer } from '@/shared/ui/rtk/drawer';
 import { EmptyState } from '@/shared/ui/empty-state';
+import { MultiSelect } from '@/shared/ui/rtk/multiselect';
 import { StatusBadge as SemanticStatusBadge } from '@/shared/ui/rtk/status-badge';
 import { TableShell } from '@/shared/ui/rtk/table-shell';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
@@ -263,51 +263,6 @@ function SortIndicator({ sorted }: { sorted: false | 'asc' | 'desc' }) {
   return <ChevronSort size={16} fill="currentColor" />;
 }
 
-function MultiSelectField({
-  label,
-  options,
-  values,
-  onChange,
-  renderOption,
-  searchable = false,
-}: {
-  label: string;
-  options: Array<{ id: string; name: string }>;
-  values: string[];
-  onChange: (values: string[]) => void;
-  renderOption?: (option: { id: string; name: string }) => ReactNode;
-  searchable?: boolean;
-}) {
-  const [optionSearch, setOptionSearch] = useState('');
-  const visibleOptions = searchable
-    ? options.filter((option) => option.name.toLocaleLowerCase('ru-RU').includes(optionSearch.trim().toLocaleLowerCase('ru-RU')))
-    : options;
-  const selectedOptions = options.filter((option) => values.includes(option.id));
-
-  return (
-    <details className={styles.multiselect}>
-      <summary>
-        <span>{label}{values.length ? ` (${values.length})` : ''}</span>
-        <ChevronDown size={16} fill="currentColor" />
-      </summary>
-      <div className={styles.multiselectMenu}>
-        {selectedOptions.length ? <div className={styles.selectedOptions}>{selectedOptions.map((option) => <button type="button" className={styles.selectedOption} key={option.id} onClick={() => onChange(values.filter((value) => value !== option.id))} aria-label={`Удалить ${option.name} из фильтра «${label}»`}>{option.name}<CloseSmall size={14} fill="currentColor" aria-hidden="true" /></button>)}</div> : null}
-        {searchable ? <div className={styles.optionSearch}><Search size={16} fill="currentColor" /><input type="search" value={optionSearch} onChange={(event) => setOptionSearch(event.target.value)} placeholder="Найти в списке" aria-label={`Поиск в поле «${label}»`} /></div> : null}
-        {visibleOptions.map((option) => (
-          <label key={option.id}>
-            <input
-              type="checkbox"
-              checked={values.includes(option.id)}
-              onChange={(event) => onChange(event.target.checked ? [...values, option.id] : values.filter((value) => value !== option.id))}
-            />
-            {renderOption ? renderOption(option) : <span>{option.name}</span>}
-          </label>
-        ))}
-      </div>
-    </details>
-  );
-}
-
 function Filters({ state, searchInput, setSearchInput, onPatch, onReset, hasFilters, onClose, compact = false }: {
   state: UniversityUrlState;
   searchInput: string;
@@ -348,9 +303,9 @@ function Filters({ state, searchInput, setSearchInput, onPatch, onReset, hasFilt
           <input id={searchId} type="search" value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Поиск по названию вуза" />
         </div>
       </div>
-      <MultiSelectField label="Вуз" options={universityFilterOptions.universities} values={filters.universityIds} onChange={(values) => onPatch({ university: values, page: 1 })} searchable />
-      <MultiSelectField label="Программа" options={universityFilterOptions.programs} values={filters.programIds} onChange={(values) => onPatch({ program: values, page: 1 })} />
-      <MultiSelectField label="Продукт" options={universityFilterOptions.products} values={filters.productIds} onChange={(values) => onPatch({ product: values, page: 1 })} />
+      <MultiSelect label="Вуз" options={universityFilterOptions.universities} values={filters.universityIds} onChange={(values) => onPatch({ university: values, page: 1 })} searchable />
+      <MultiSelect label="Программа" options={universityFilterOptions.programs} values={filters.programIds} onChange={(values) => onPatch({ program: values, page: 1 })} />
+      <MultiSelect label="Продукт" options={universityFilterOptions.products} values={filters.productIds} onChange={(values) => onPatch({ product: values, page: 1 })} />
       <label className={styles.field}>
         <span>Город</span>
         <select value={filters.city} onChange={(event) => onPatch({ city: event.target.value, page: 1 })}>
@@ -358,8 +313,8 @@ function Filters({ state, searchInput, setSearchInput, onPatch, onReset, hasFilt
           {universityFilterOptions.cities.map((city) => <option key={city} value={city}>{city}</option>)}
         </select>
       </label>
-      <MultiSelectField label="Ответственный" options={universityFilterOptions.responsibles.map((person) => ({ id: person.id, name: person.name }))} values={filters.responsibleIds} onChange={(values) => onPatch({ responsible: values, page: 1 })} />
-      <MultiSelectField label="Health Score" options={HEALTH_STATUS_OPTIONS.map((option) => ({ id: option.value, name: option.label }))} values={filters.healthStatuses} onChange={(values) => onPatch({ health_status: values, page: 1 })} renderOption={(option) => <StatusBadge status={option.id as HealthStatus} />} />
+      <MultiSelect label="Ответственный" options={universityFilterOptions.responsibles.map((person) => ({ id: person.id, name: person.name }))} values={filters.responsibleIds} onChange={(values) => onPatch({ responsible: values, page: 1 })} />
+      <MultiSelect label="Health Score" options={HEALTH_STATUS_OPTIONS.map((option) => ({ id: option.value, name: option.label }))} values={filters.healthStatuses} onChange={(values) => onPatch({ health_status: values, page: 1 })} renderOption={(option) => <StatusBadge status={option.id as HealthStatus} />} />
       <label className={styles.field}>
         <span>Текущий этап</span>
         <select value={filters.workflowStageId} onChange={(event) => onPatch({ stage: event.target.value, page: 1 })}>
