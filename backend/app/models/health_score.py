@@ -17,6 +17,7 @@ from typing import Any
 from sqlalchemy import (
     Date,
     DateTime,
+    CheckConstraint,
     ForeignKey,
     Index,
     Integer,
@@ -94,9 +95,38 @@ class HealthScoreSnapshot(UUIDPKMixin, Base):
     )
 
 
+class HealthScoreCurrent(Base):
+    """One persisted result of the canonical Health Score formula per university."""
+
+    __tablename__ = "health_score_current"
+    __table_args__ = (
+        CheckConstraint("score BETWEEN 0 AND 100", name="ck_health_score_current_score"),
+        CheckConstraint("status IN ('green', 'yellow', 'red')", name="ck_health_score_current_status"),
+        Index("ix_health_score_current_score", "score", "university_id"),
+        Index("ix_health_score_current_status_score", "status", "score", "university_id"),
+    )
+
+    university_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("universities.id", ondelete="CASCADE"), primary_key=True
+    )
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    breakdown: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(GenericJSON(), "sqlite"), nullable=False
+    )
+    reasons: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB().with_variant(GenericJSON(), "sqlite"), nullable=False
+    )
+    input_counters: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(GenericJSON(), "sqlite"), nullable=False
+    )
+    calculated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 __all__ = [
     "TRIGGER_DAILY_CRON",
     "TRIGGER_DOCUMENT_UPDATE",
     "TRIGGER_TRANSITION",
     "HealthScoreSnapshot",
+    "HealthScoreCurrent",
 ]

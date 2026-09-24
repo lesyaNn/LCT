@@ -33,6 +33,7 @@ from __future__ import annotations
 import argparse
 import logging
 import time
+from datetime import datetime, timezone
 import uuid
 from pathlib import Path
 
@@ -224,8 +225,19 @@ def main(argv: list[str] | None = None) -> int:
         "--idle-sleep", type=float, default=2.0, help="idle sleep seconds"
     )
     args = parser.parse_args(argv)
+    last_daily_day = None
     while True:
         try:
+            now = datetime.now(timezone.utc)
+            if now.hour == 0 and now.minute < 5 and last_daily_day != now.date():
+                from app.db.session import SessionLocal
+                from app.modules.health_score.materialization import run_daily_snapshot_once
+                snapshot_db = SessionLocal()
+                try:
+                    run_daily_snapshot_once(snapshot_db, day=now.date())
+                finally:
+                    snapshot_db.close()
+                last_daily_day = now.date()
             outcome = run_worker_once()
         except Exception:
             logger.exception("report worker iteration failed")

@@ -99,7 +99,7 @@
       "key": "health_score",
       "title": "Health Score",
       "type": "integer",
-      "source": "latest health_score_snapshots.score per university (ORDER BY calculated_at DESC); NULL when no snapshot; optional Python fallback via canonical calculate_health_score (P2-07-08), never a new formula. int 0..100, missing is NULL (never 0)"
+      "source": "health_score_current.score per university, materialized by the canonical calculator; NULL until backfill/refresh. int 0..100, missing is NULL (never 0)"
     }
   ],
   "optional_columns_supported": [

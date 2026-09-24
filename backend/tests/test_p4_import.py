@@ -13,6 +13,7 @@ from app.core.security import CurrentUser, get_current_user
 from app.db.session import get_db
 from app.modules.imports import service
 from app.modules.imports.service import ImportValidationError
+from app.modules.analytics.report_worker import generate_report_task
 
 HEADERS = ["ВУЗ", "Вендор", "ПО", "Номер договора", "Подписание лицензии",
            "Срок лицензии", "Статус передачи", "ФИО менеджера",
@@ -189,6 +190,9 @@ def client(tmp_path, monkeypatch):
     eng = require_pg_engine(os.getenv("TEST_DATABASE_URL", "sqlite://"))
 
     from app.main import app
+    from app.db import session as db_session
+    old_bind = db_session.SessionLocal.kw["bind"]
+    db_session.SessionLocal.configure(bind=eng)
 
     def _override_db():
         with Session(eng) as session:
@@ -201,6 +205,7 @@ def client(tmp_path, monkeypatch):
         yield TestClient(app, raise_server_exceptions=False)
     finally:
         app.dependency_overrides.clear()
+        db_session.SessionLocal.configure(bind=old_bind)
         eng.dispose()
 
 
@@ -232,6 +237,14 @@ def test_api_preview_execute_job_flow(client):
     assert resp.status_code == 200, resp.text
     job = resp.json()
     assert job["type"] == "xlsx_import"
+    assert job["status"] == "queued"
+    assert job["progress"] == 0
+    assert job["result"] is None
+
+    # The HTTP request only enqueues.  The worker performs the business
+    # import and then publishes the terminal status.
+    assert generate_report_task(job_id) == "ready"
+    job = client.get(f"/api/v1/import/jobs/{job_id}").json()
     assert job["status"] == "ready"
     assert job["progress"] == 100
     assert job["error"] is None

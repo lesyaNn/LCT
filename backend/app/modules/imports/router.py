@@ -8,10 +8,9 @@ the frontend polls ``GET /import/jobs/{id}`` until ``ready | failed``
 ``GET /import/jobs/{id}/report`` (P4-10-02). Repeated POSTs with the same
 file + mapping + options reuse the live job (``idempotency_key``).
 
-MVP note: the import still runs inside the request (lifecycle
-``queued -> building -> ready | failed`` is committed to the DB, so polling
-never hangs on "queued"). Moving execution to the dedicated ``worker``
-container is TODO(P4-06-01); ``BackgroundTasks`` are banned by the spec.
+Execution is owned by the dedicated worker container.  The request only
+persists the queued ledger row and returns; the worker claims it with
+``FOR UPDATE SKIP LOCKED`` and drives ``queued -> building -> ready | failed``.
 """
 
 import hashlib
@@ -179,29 +178,8 @@ def import_execute(
     if job.status == STATUS_BUILDING:
         # Another runner owns it — the client just polls.
         return ImportExecuteResponse(job_id=str(job.id))
-    if not ledger.mark_building(db, job):
-        # Lost the claim race — whoever won will finish it; poll it.
-        return ImportExecuteResponse(job_id=str(job.id))
-    try:
-        summary = service.execute_import(
-            db,
-            req.file_id,
-            req.mapping,
-            update_existing=req.options.update_existing,
-            dry_run=req.options.dry_run,
-        )
-    except service.ImportValidationError as exc:
-        ledger.mark_failed(db, job, exc)
-        raise BusinessException(ErrorCode.IMPORT_VALIDATION_FAILED) from exc
-    except Exception as exc:
-        ledger.mark_failed(db, job, exc)
-        raise
-    # P4-10-02: файловый артефакт job — XLSX-отчёт (Итог + Ошибки).
-    artifact = job.file_path or str(ledger.job_file_path(job.id, "xlsx"))
-    size = service.write_error_report(summary, artifact)
-    job.result = summary
-    db.add(job)
-    ledger.mark_ready(db, job, file_path=artifact, file_size=size)
+    # The persisted queued job is the sole hand-off. Only report_worker may
+    # claim it and call execute_import; HTTP never runs the import body.
     return ImportExecuteResponse(job_id=str(job.id))
 
 

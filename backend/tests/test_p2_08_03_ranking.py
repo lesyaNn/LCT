@@ -14,6 +14,7 @@ from app.db.session import get_db
 from app.main import app
 from app.models.catalog import University
 from app.models.interactions import Document
+from app.modules.health_score.materialization import refresh_health_score
 
 TODAY = date(2026, 9, 20)
 
@@ -46,6 +47,9 @@ def client():
                 title=f"Договор {i}", file_path="/f", file_name="d.pdf",
                 status_raw="signed", expires_at=TODAY - timedelta(days=1),
                 uploaded_by_keycloak_sub="t"))
+        session.commit()
+        refresh_health_score(session, good.id, "test")
+        refresh_health_score(session, bad.id, "test")
         session.commit()
     try:
         yield TestClient(app, raise_server_exceptions=False)

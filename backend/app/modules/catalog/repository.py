@@ -23,6 +23,7 @@ from app.models.catalog import (
     UniversityResponsible,
     Vendor,
 )
+from app.models.health_score import HealthScoreCurrent
 from app.modules.audit.service import AuditAction, AuditService, context_for
 
 
@@ -74,6 +75,42 @@ UNIVERSITY_SORT = {
     "city": University.city,
     "created_at": University.created_at,
 }
+
+
+def list_universities_health(
+    db: Session, *, page: int, page_size: int, search: str | None,
+    city: str | None, responsible_id: uuid.UUID | None, sort_order: str,
+    health_status: str | None = None, unified_filter=None, unified_today=None,
+    user=None,
+) -> tuple[list[tuple[University, int | None, str | None]], int]:
+    """SQL scoped health filter/order/page over the materialized projection."""
+    conds = university_conditions(search=search, city=city,
+        responsible_id=responsible_id, unified_filter=unified_filter,
+        today=unified_today)
+    base = select(University).outerjoin(
+        HealthScoreCurrent, HealthScoreCurrent.university_id == University.id
+    ).where(*conds)
+    if health_status is not None:
+        base = base.where(HealthScoreCurrent.status == health_status)
+    count = select(func.count()).select_from(University).outerjoin(
+        HealthScoreCurrent, HealthScoreCurrent.university_id == University.id
+    ).where(*conds)
+    if health_status is not None:
+        count = count.where(HealthScoreCurrent.status == health_status)
+    page_stmt = select(University, HealthScoreCurrent.score, HealthScoreCurrent.status).select_from(
+        University
+    ).outerjoin(HealthScoreCurrent, HealthScoreCurrent.university_id == University.id).where(*conds)
+    if health_status is not None:
+        page_stmt = page_stmt.where(HealthScoreCurrent.status == health_status)
+    score = HealthScoreCurrent.score.asc() if sort_order == "asc" else HealthScoreCurrent.score.desc()
+    page_stmt = page_stmt.order_by(score.nulls_last(), University.id.asc()).limit(page_size).offset((page - 1) * page_size)
+    if user is not None:
+        from app.modules.analytics.filter_service import UnifiedFilterService
+        count = UnifiedFilterService.apply_security_scope(count, user)
+        page_stmt = UnifiedFilterService.apply_security_scope(page_stmt, user)
+    total = int(db.execute(count).scalar() or 0)
+    rows = list(db.execute(page_stmt).all())
+    return rows, total
 
 
 def university_conditions(

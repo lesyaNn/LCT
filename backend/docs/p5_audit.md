@@ -10,9 +10,12 @@ JSONB. Existing integer event and entity IDs are mapped deterministically to
 UUIDs. The university foreign key is removed so a DELETE event can retain the
 deleted university ID for historical scope checks.
 
-`AuditService.log_event` only adds or flushes. The business transaction owns
-the commit. Catalog repository writes, workflow transitions and template edits,
-and report/import job creation append their event before the same commit.
+`AuditService.log_event` remains available for legacy direct-write paths.
+Workflow transitions use `AuditService.enqueue_event`: the business mutation,
+transition history and sanitized `audit_outbox` intent commit together. A
+worker relay later materializes `audit_events` in one transaction. Delivery is
+eventually consistent and idempotent (the outbox UUID is the audit event UUID);
+an unavailable audit sink therefore never rolls back the workflow transition.
 
 ## Current production paths
 
@@ -30,10 +33,9 @@ and report/import job creation append their event before the same commit.
 The production teacher router is not mounted. License and contract changes
 currently occur in the import orchestrator and are represented by its IMPORT
 event; there are no mounted standalone license/contract mutation endpoints.
-`IMPORT_AUDIT_INTEGRATION_GAP`: the IMPORT event records the durable job
-creation in the same transaction. The current orchestrator executes the row
-import through later commits, so the event does not certify successful import
-of every row. Adapters are unchanged.
+The IMPORT event records the durable job creation in the same transaction.
+The worker executes row imports through later commits, so the event does not
+certify successful import of every row. Adapters are unchanged.
 The Keycloak OIDC flow has no reliable backend LOGIN/LOGOUT lifecycle hook, so
 those actions are registered but no synthetic events are emitted.
 

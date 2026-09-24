@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401 (register metadata on Base)
 from app.models.catalog import University
+from app.modules.health_score.materialization import refresh_health_score
 
 TEST_URL = os.getenv("TEST_DATABASE_URL", "sqlite://")
 
@@ -60,8 +61,14 @@ def client(engine):
 
 
 def _seed_two(db: Session) -> None:
+    rows = []
     for name in (f"Alpha-{_tag()}", f"Beta-{_tag()}"):
-        db.add(University(name=name, city="Moscow"))
+        row = University(name=name, city="Moscow")
+        db.add(row)
+        rows.append(row)
+    db.commit()
+    for row in rows:
+        refresh_health_score(db, row.id, "test")
     db.commit()
 
 

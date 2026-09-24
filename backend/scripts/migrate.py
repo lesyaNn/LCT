@@ -47,7 +47,8 @@ LEGACY_SQL_HEAD = "000010_audit_identity"
 
 # Canonical application tables (alembic_version/schema_migrations excluded):
 # 21 P1 tables + 8 B1 workflow tables (000011-000014) + health_score_snapshots
-# (P2-09-01, 000015) + report_jobs (P4-06-01, 000018).
+# (P2-09-01, 000015) + report_jobs (P4-06-01, 000018) + the materialized
+# health score projection (000022) and audit outbox (000023).
 # Must match backend/migrations/*.up.sql exactly.
 EXPECTED_TABLES = [
     "universities",
@@ -81,6 +82,7 @@ EXPECTED_TABLES = [
     "instance_stages",
     "health_score_snapshots",
     "report_jobs",
+    "audit_outbox",
 ]
 
 VERSION_RE = re.compile(r"^(?P<ver>\d{6}_[a-z0-9_]+)\.(?P<dir>up|down)\.sql$")

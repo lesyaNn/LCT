@@ -52,29 +52,6 @@ from app.schemas.catalog import (
 HEALTH_STATUSES = ("green", "yellow", "red")
 
 
-def _health_of(db: Session, university_id: uuid.UUID) -> tuple[int | None, str | None]:
-    """(score, status) via the 5-minute cache; (None, None) when uncomputable.
-
-    A per-university failure must never break the whole list: such rows are
-    dropped by an active health_status filter and sorted last otherwise.
-    """
-    from app.modules.health_score import cache as health_cache
-    from app.modules.health_score.health_service import calculate_health_score
-
-    cached = health_cache.get_cached(university_id)
-    if cached is not None:
-        return cached.score, cached.status.value
-    try:
-        full = calculate_health_score(db, university_id)
-    except Exception:
-        return None, None
-    try:
-        health_cache.put_cached(full)
-    except Exception:
-        pass
-    return full.score, full.status.value
-
-
 def list_university_page(
     db: Session,
     *,
@@ -90,12 +67,11 @@ def list_university_page(
     user=None,
     health_status: str | None = None,
 ) -> tuple[list[UniversityRead], int]:
-    """List universities; health path computes scores in Python (P1-03-01).
+    """List universities from the materialized health projection.
 
-    When ``health_status`` is set or ``sort_by == "health_score"``, all
-    candidates matching the other filters are scored (cached 5 min),
-    then filtered/sorted/paginated in memory. Total is AFTER the health
-    filter. Otherwise the plain 2-SELECT SQL path is used.
+    Health filtering, sorting, count and pagination stay in SQL so query
+    work is independent of the number of universities. Missing projections
+    remain ``NULL`` until the deployment backfill/refresh job runs.
     """
     if health_status is not None and health_status not in HEALTH_STATUSES:
         raise ValueError(f"Unknown health_status: {health_status!r}")
@@ -114,29 +90,14 @@ def list_university_page(
             user=user,
         )
         return [UniversityRead.model_validate(r) for r in rows], total
-    scored: list[tuple[object, int | None, str | None]] = [
-        (u, *_health_of(db, u.id))
-        for u in repo.list_university_candidates(
-            db,
-            search=search,
-            city=city,
-            responsible_id=responsible_id,
-            unified_filter=unified_filter,
-            unified_today=unified_today,
-            user=user,
-        )
-    ]
-    if health_status is not None:
-        scored = [t for t in scored if t[2] == health_status]
-    reverse = sort_order == "desc"
-    if sort_by == "health_score":
-        scored.sort(
-            key=lambda t: (t[1] is None, -(t[1] or 0) if reverse else (t[1] or 0), t[0].name)
-        )
-    total = len(scored)
-    page_rows = scored[(page - 1) * page_size : page * page_size]
+    rows, total = repo.list_universities_health(
+        db, page=page, page_size=page_size, search=search, city=city,
+        responsible_id=responsible_id, sort_order=sort_order,
+        health_status=health_status, unified_filter=unified_filter,
+        unified_today=unified_today, user=user,
+    )
     items = []
-    for u, score, status in page_rows:
+    for u, score, status in rows:
         dto = UniversityRead.model_validate(u)
         dto.health_score = score
         dto.health_status = status

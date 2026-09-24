@@ -51,6 +51,7 @@ logger = logging.getLogger("rtk")
 #: Spec retries (P4-06-01): a failed attempt with attempts < MAX is
 #: requeued, otherwise the job goes failed.
 MAX_JOB_ATTEMPTS = 3
+STALE_CLAIM_TIMEOUT = timedelta(minutes=30)
 
 __all__ = [
     "MAX_JOB_ATTEMPTS",
@@ -382,6 +383,29 @@ def claim_next_job(db: Session, *, job_type: str | None = None) -> ReportJob | N
     fall back to a plain oldest-first select — the atomic ``claim_job``
     UPDATE guard still prevents double execution. Commits.
     """
+    # Crash recovery: a worker that died after claiming leaves `building`.
+    # Requeue stale claims so the durable queue can make progress.
+    stale_before = _utcnow() - STALE_CLAIM_TIMEOUT
+    # A claim that already exhausted the retry budget must not remain stuck
+    # in ``building`` forever.  It is terminally failed before eligible rows
+    # are selected for the next worker pass.
+    db.execute(update(ReportJob).where(
+        ReportJob.status == STATUS_BUILDING,
+        ReportJob.started_at < stale_before,
+        ReportJob.attempts >= MAX_JOB_ATTEMPTS,
+    ).values(
+        status=STATUS_FAILED,
+        completed_at=_utcnow(),
+        error_message="RuntimeError: stale job exceeded maximum attempts",
+    ).execution_options(synchronize_session=False))
+    db.execute(update(ReportJob).where(
+        ReportJob.status == STATUS_BUILDING,
+        ReportJob.started_at < stale_before,
+        ReportJob.attempts < MAX_JOB_ATTEMPTS,
+    ).values(status=STATUS_QUEUED, progress=0, started_at=None).execution_options(
+        synchronize_session=False
+    ))
+    db.commit()
     stmt = (
         select(ReportJob.id, ReportJob.format)
         .where(

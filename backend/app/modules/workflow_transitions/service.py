@@ -172,7 +172,7 @@ def transition_instance(
             comment=text,
         )
     )
-    AuditService(db).log_event(
+    AuditService(db).enqueue_event(
         context=context_for(db, actor),
         action=AuditAction.WORKFLOW_TRANSITION,
         entity_type="workflow_instance",
@@ -191,9 +191,9 @@ def transition_instance(
     except Exception:
         pass
     try:
-        from app.modules.health_score.snapshots import write_transition_snapshot
-
-        write_transition_snapshot(db, instance.university_id)
+        from app.modules.health_score.materialization import refresh_health_score
+        refresh_health_score(db, instance.university_id, "transition", create_snapshot=True)
+        db.commit()
     except Exception:
         pass
     return get_instance_or_404(db, instance.id)
