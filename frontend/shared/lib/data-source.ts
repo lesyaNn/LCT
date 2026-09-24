@@ -4,7 +4,9 @@ export type DataSourceMode = 'mock' | 'real';
 
 const mockRequested = process.env.NEXT_PUBLIC_DATA_SOURCE === 'mock';
 const mockAllowed = process.env.NODE_ENV !== 'production'
-  || process.env.NEXT_PUBLIC_ALLOW_MOCK_API_IN_PRODUCTION === 'true';
+  || process.env.NEXT_PUBLIC_ALLOW_MOCK_API_IN_PRODUCTION === 'true'
+  // Explicit mock auth is the local demo switch used by Docker preview runs.
+  || process.env.NEXT_PUBLIC_AUTH_MODE === 'mock';
 
 /**
  * Public, build-time Next.js data-source selection.

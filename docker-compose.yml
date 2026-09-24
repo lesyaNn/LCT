@@ -129,6 +129,8 @@ services:
         NEXT_PUBLIC_KEYCLOAK_REALM: ${KEYCLOAK_REALM:-rtk}
         NEXT_PUBLIC_KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-rtk-frontend}
         NEXT_PUBLIC_API_URL: ${FRONTEND_API_URL:-}
+        NEXT_PUBLIC_DATA_SOURCE: ${NEXT_PUBLIC_DATA_SOURCE:-real}
+        NEXT_PUBLIC_ALLOW_MOCK_API_IN_PRODUCTION: ${NEXT_PUBLIC_ALLOW_MOCK_API_IN_PRODUCTION:-false}
     restart: unless-stopped
     networks: [rtk-net]
     ports:
@@ -139,7 +141,7 @@ services:
     environment:
       NODE_ENV: production
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/dashboard >/dev/null"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/dashboard >/dev/null"]
       interval: 15s
       timeout: 5s
       retries: 5
