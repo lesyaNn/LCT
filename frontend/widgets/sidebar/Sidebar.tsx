@@ -47,8 +47,11 @@ function SidebarContent({ role, pathname, collapsed, mobile = false, onToggleCol
   return (
     <div className={mobile ? styles.mobileDrawerContent : undefined}>
       <div className={styles.brand}>
-        <Image className={styles.brandLogo} src="/brand/rostelecom-horizontal.svg" alt="Ростелеком" width={174} height={46} priority unoptimized />
-        {collapsed && !mobile ? <Image className={styles.brandLogoCompact} src="/brand/rostelecom-vertical.svg" alt="" aria-hidden="true" width={38} height={38} unoptimized /> : null}
+        <div className={styles.brandVisual}>
+          <Image className={styles.brandLogo} src="/brand/rostelecom-horizontal.svg" alt="Ростелеком" width={174} height={46} priority unoptimized />
+          {collapsed && !mobile ? <Image className={styles.brandLogoCompact} src="/brand/rostelecom-vertical.svg" alt="" aria-hidden="true" width={38} height={38} unoptimized /> : null}
+        </div>
+        {!mobile && onToggleCollapse ? <IconButton icon="chevron-right" label={collapsed ? 'Развернуть меню' : 'Свернуть меню'} className={`${styles.collapseButton} ${collapsed ? styles.collapseButtonRotated : ''}`} onClick={onToggleCollapse} /> : null}
       </div>
 
       <nav className={styles.nav}>
@@ -85,10 +88,7 @@ function SidebarContent({ role, pathname, collapsed, mobile = false, onToggleCol
         </> : null}
       </nav>
 
-      <div className={styles.bottom}>
-        {(!collapsed || mobile) && <p className={styles.version}>CRM ИТ-Школа Ростелеком</p>}
-        {!mobile && onToggleCollapse && <IconButton icon="chevron-right" label={collapsed ? 'Развернуть меню' : 'Свернуть меню'} className={`${styles.collapseButton} ${collapsed ? styles.collapseButtonRotated : ''}`} onClick={onToggleCollapse} />}
-      </div>
+      <div className={styles.bottom} />
     </div>
   );
 }

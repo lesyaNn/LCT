@@ -10,6 +10,7 @@ export const navigationItems: NavigationItem[] = [
   { label: 'Пользователи и права', href: '/admin/users', icon: 'admin', allowedRoles: ['admin'] },
   { label: 'Управление каталогами', href: '/admin/catalogs', icon: 'admin', allowedRoles: ['manager', 'admin'] },
   { label: 'Импорт каталогов', href: '/admin/import', icon: 'admin', allowedRoles: ['manager', 'admin'] },
+  { label: 'Шаблоны Workflow', href: '/admin/workflow/templates', icon: 'workflow', allowedRoles: ['admin'] },
   { label: 'Документация', href: '/docs', icon: 'docs', allowedRoles: ['user', 'manager', 'admin'] },
 ];
 

@@ -4,6 +4,7 @@
 .adminLink { align-items: center; border-bottom: 1px solid var(--rtk-color-border); color: var(--rtk-color-text-primary); display: flex; font-weight: 650; justify-content: space-between; min-height: 58px; padding: 0 var(--rtk-space-5); text-decoration: none; transition: background-color 160ms ease, color 160ms ease; }
 .adminLink:last-child { border-bottom: 0; }
 .adminLink:hover { background: var(--rtk-color-brand-soft); color: var(--rtk-color-brand); }
+.adminLink:nth-child(2) span:last-child { color: var(--rtk-color-brand-secondary); }
 .card { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-medium); display: flex; flex-direction: column; gap: var(--rtk-space-2); min-height: 150px; padding: var(--rtk-space-5); text-decoration: none; transition: border-color 140ms ease, transform 140ms ease; }
 .card:hover { border-color: color-mix(in srgb, var(--rtk-color-brand) 35%, var(--rtk-color-border)); transform: translateY(-1px); }
 .card span { color: var(--rtk-color-text-secondary); font-size: 13px; }

@@ -26,7 +26,7 @@
 }
 
 .brand { --kpi-background: var(--atmr-accent-default); --kpi-foreground: var(--atmr-accent-on-accent); }
-.orange { --kpi-background: var(--rtk-color-brand-secondary-soft); --kpi-foreground: var(--rtk-color-text-primary); }
+.orange { --kpi-background: var(--rtk-color-brand-secondary); --kpi-foreground: #fff; }
 .danger {
   --kpi-background: var(--atmr-error-default);
   --kpi-foreground: var(--atmr-error-on-error);
