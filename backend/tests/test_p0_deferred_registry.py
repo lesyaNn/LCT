@@ -7,7 +7,7 @@ Pins the resolution of the "two schema universes" blocker:
   table ``report_jobs`` from 000018);
 * pre-UUID / stub models live on ``DeferredBase`` metadata only;
 * deferred routers are importable but NOT mounted in the production app;
-* ``AuditEvent.user_id/entity_id`` accept Keycloak ``sub`` (TEXT, 000010).
+* ``AuditEvent.user_id`` accepts Keycloak ``sub``; entity identity is UUID (000021).
 
 The deferred-module table (reasons + reactivation checklist) lives in
 ``docs/AUDIT.md`` (§0); this test pins its enforcement side.
@@ -77,7 +77,7 @@ DEFERRED_TABLES = frozenset(
 # legacy demo stub app/modules/reporting (POST /export over an in-memory
 # queue) при этом остаётся незамаунченным (см. test_legacy_reporting_stub).
 DEFERRED_API_PREFIXES = (
-    "/audit", "/dashboard", "/documents", "/users",
+    "/dashboard", "/documents", "/users",
     "/integrations", "/notifications", "/workflows", "/tasks",
 )
 
@@ -153,6 +153,7 @@ def test_mounted_routers_are_only_the_production_contract():
         "/api/v1/health-score",
         "/api/v1/analytics",
         "/api/v1/reports",
+        "/api/v1/audit/events",
     )
     paths = _mounted_api_paths()
     assert all(path.startswith(allowed) for path in paths), paths
@@ -163,7 +164,7 @@ def test_deferred_prefixes_absent_from_openapi_paths():
 
     Module list mirrors ``docs/AUDIT.md`` (§0): universities-CRUD,
     teachers-CRUD, programs, workflow, documents, health_score, identity,
-    audit, dashboard, reporting, integrations, notifications.
+    dashboard, reporting, integrations, notifications. P5 mounted audit events.
     """
     paths = _mounted_api_paths()
     for prefix in DEFERRED_API_PREFIXES:
@@ -215,7 +216,7 @@ def test_audit_service_coerces_identity_to_str():
             seen["ev"] = ev
 
         def commit(self):
-            pass
+            raise AssertionError("AuditService must not commit")
 
         def refresh(self, ev):
             pass
@@ -225,4 +226,4 @@ def test_audit_service_coerces_identity_to_str():
     ev = AuditService(_DB()).log("sub-abc", "university", uuid.uuid4(), "update")  # type: ignore[arg-type]
     assert isinstance(ev, AuditEvent)
     assert isinstance(seen["ev"].user_id, str)
-    assert isinstance(seen["ev"].entity_id, str)
+    assert isinstance(seen["ev"].entity_id, uuid.UUID)

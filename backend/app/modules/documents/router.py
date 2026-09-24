@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.core.security import CurrentUser, get_current_user
+from app.core.errors import BusinessException
+from app.schemas.errors import ErrorCode
 from app.db.session import get_db
 from app.infrastructure import storage
 from app.modules.documents.models import FileMeta
@@ -34,9 +36,9 @@ async def upload(entity_type: str = "university", entity_id: int = 0,
                  user: CurrentUser = Depends(get_current_user)):
     content = await f.read()
     if len(content) > settings.max_upload_mb * 1024 * 1024:
-        raise HTTPException(413, "File too large")
+        raise BusinessException(ErrorCode.FILE_TOO_LARGE)
     if f.content_type and f.content_type not in ALLOWED:
-        raise HTTPException(415, f"MIME not allowed: {f.content_type}")
+        raise BusinessException(ErrorCode.FILE_TYPE_NOT_ALLOWED)
     key = storage.save_file(f.filename or "file", content)
     meta = FileMeta(original_filename=f.filename or "file", storage_key=key,
                     content_type=f.content_type or "", size=len(content),

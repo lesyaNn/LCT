@@ -23,7 +23,7 @@ router = APIRouter(prefix="/teachers", tags=["Teachers"])
 
 _NOT_FOUND = {"description": "Teacher not found"}
 _UNAUTHORIZED = {"description": "Missing bearer token"}
-_FORBIDDEN = {"description": "Forbidden: need university.read"}
+_FORBIDDEN = {"description": "FORBIDDEN"}
 
 
 @router.get(
@@ -39,6 +39,6 @@ _FORBIDDEN = {"description": "Forbidden: need university.read"}
 def get_teacher_passport(
     teacher_id: uuid.UUID,
     db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(require_permission("university.read")),
+    user: CurrentUser = Depends(require_permission("university.read")),
 ) -> TeacherPassport:
-    return passport_service.get_teacher_passport(db, teacher_id)
+    return passport_service.get_teacher_passport(db, teacher_id, user=user)

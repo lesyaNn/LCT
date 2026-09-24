@@ -23,12 +23,13 @@ from __future__ import annotations
 import uuid
 from typing import BinaryIO
 
-from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFound
-from app.core.permissions import user_permissions
+from app.core.errors import BusinessException
+from app.schemas.errors import ErrorCode
+from app.core.policies import ensure_university_access
 from app.models.workflow_instances import WorkflowAttachment, WorkflowInstance
 
 from .policy import (
@@ -53,18 +54,8 @@ def get_instance_or_404(db: Session, instance_id: uuid.UUID) -> WorkflowInstance
 
 
 def authorize_scope(user, instance: WorkflowInstance) -> None:
-    """University-scope gate for one instance (permission checked by router).
-
-    Admins (``*``) skip scoping; other roles are confined to
-    ``user.university_ids`` when the token carries that optional claim.
-    Tokens without the claim keep the pre-existing global RBAC behaviour.
-    """
-    perms = user_permissions(user)
-    if "*" in perms:
-        return
-    scope = getattr(user, "university_ids", None)
-    if scope is not None and str(instance.university_id) not in set(scope):
-        raise HTTPException(status_code=403, detail="Forbidden: other university")
+    """Compatibility adapter for existing P2 call sites."""
+    ensure_university_access(instance.university_id, user)
 
 
 def get_bound_attachment(
@@ -110,7 +101,7 @@ def _limited_chunks(stream: BinaryIO):
             return
         total += len(piece)
         if total > MAX_FILE_SIZE_BYTES:
-            raise HTTPException(status_code=413, detail="File too large (limit 50 MiB)")
+            raise BusinessException(ErrorCode.FILE_TOO_LARGE)
         yield piece
 
 
@@ -131,10 +122,10 @@ def upload_attachment(
     key = new_storage_key()
     try:
         size = storage.save_stream(key, _limited_chunks(stream))
-    except HTTPException:
+    except BusinessException:
         raise
     except StorageError as exc:
-        raise HTTPException(status_code=500, detail="File storage unavailable") from exc
+        raise BusinessException(ErrorCode.INTERNAL_ERROR) from exc
     attachment = WorkflowAttachment(
         instance_id=instance.id,
         original_filename=safe_name,
@@ -166,7 +157,7 @@ def open_download(db: Session, storage: StorageBackend, *, attachment: WorkflowA
     except StorageObjectNotFound:
         raise NotFound("Attachment file not found") from None
     except StorageError as exc:
-        raise HTTPException(status_code=500, detail="File storage unavailable") from exc
+        raise BusinessException(ErrorCode.INTERNAL_ERROR) from exc
     return attachment, opener, handle
 
 
@@ -179,6 +170,6 @@ def delete_attachment(
     except StorageObjectNotFound:
         pass  # idempotent: row cleanup below still happens
     except StorageError as exc:
-        raise HTTPException(status_code=500, detail="File storage unavailable") from exc
+        raise BusinessException(ErrorCode.INTERNAL_ERROR) from exc
     db.delete(attachment)
     db.commit()

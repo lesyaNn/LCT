@@ -20,6 +20,8 @@ from typing import Generic, TypeVar
 
 from pydantic import BaseModel, Field
 
+from app.schemas.errors import ErrorDetail, ErrorResponse
+
 #: Days before ``expires_at`` when a license/contract/certificate counts as
 #: "expiring soon". Mirrors ``app.models.enums.EXPIRY_WARNING_DAYS``.
 EXPIRY_WARNING_DAYS = 30
@@ -178,17 +180,6 @@ class PaginatedResponse(BaseModel, Generic[T]):
     total: int = Field(examples=[128])
 
     model_config = {"from_attributes": True}
-
-
-class ErrorDetail(BaseModel):
-    code: str = Field(examples=["not_found"])
-    message: str = Field(examples=["University not found"])
-    request_id: str | None = Field(default=None, examples=["req-7f3a1c"])
-    details: dict | None = None
-
-
-class ErrorResponse(BaseModel):
-    error: ErrorDetail
 
 
 class FilterBase(BaseModel):

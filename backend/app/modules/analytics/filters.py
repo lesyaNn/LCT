@@ -32,8 +32,9 @@ import uuid
 from datetime import date
 from typing import Annotated, Any
 
-from fastapi import HTTPException, Query
-from fastapi.encoders import jsonable_encoder
+from fastapi import Query
+from app.core.errors import BusinessException
+from app.schemas.errors import ErrorCode
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 
 from app.schemas.common import WorkflowStageStatus
@@ -215,7 +216,4 @@ def get_unified_filter(
             workflow_statuses=workflow_statuses,
         )
     except ValidationError as exc:
-        raise HTTPException(
-            status_code=422,
-            detail=jsonable_encoder(exc.errors(include_url=False)),
-        ) from exc
+        raise BusinessException(ErrorCode.VALIDATION_ERROR) from exc

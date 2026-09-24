@@ -382,10 +382,11 @@ def test_security_scope_admin_keeps_global():
     assert UnifiedFilterService.apply_security_scope(stmt, admin) is stmt
 
 
-def test_security_scope_none_claim_keeps_global():
+def test_security_scope_none_claim_fails_closed():
     stmt = select(University)
     user = CurrentUser(id="u", roles={"user"})
-    assert UnifiedFilterService.apply_security_scope(stmt, user) is stmt
+    scoped = UnifiedFilterService.apply_security_scope(stmt, user)
+    assert "false" in str(scoped.compile(compile_kwargs={"literal_binds": True})).lower()
 
 
 def test_security_scope_confines_scoped_user():

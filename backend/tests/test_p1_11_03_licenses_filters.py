@@ -34,7 +34,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401 (register metadata on Base)
-from app.core.errors import CONFLICT_DETAIL, register_error_handlers
+from app.core.errors import register_error_handlers
+from app.schemas.errors import ErrorCode, ErrorResponse
 from app.models.catalog import (
     Contract,
     ITDirection,
@@ -544,7 +545,7 @@ def test_university_delete_restricted_with_license_core(db: Session, engine):
         db.commit()
     db.rollback()
     if _is_pg(engine):
-        assert _pgcode(ei.value) == "23503"
+        assert _pgcode(ei.value) in {"23503", "23001"}
 
 
 # ======================================================== filter discovery ==
@@ -1027,7 +1028,9 @@ def test_integrity_error_maps_to_409_sanitized_license_domain():
 
     r = TestClient(app).post("/contracts")
     assert r.status_code == 409
-    assert r.json() == {"detail": CONFLICT_DETAIL}
+    body = ErrorResponse.model_validate(r.json())
+    assert body.error.code == ErrorCode.CONFLICT
+    assert body.error.details == {}
     low = r.text.lower()
     for leaked in ("psycopg", "sqlalchemy", "select", "insert", "uq_x", "traceback"):
         assert leaked not in low

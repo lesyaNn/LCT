@@ -56,14 +56,13 @@ convention.
 
 from __future__ import annotations
 
-import uuid
 from datetime import date, datetime, time, timedelta, timezone
 from typing import TYPE_CHECKING
 
-from sqlalchemy import exists, false, func, or_, select
+from sqlalchemy import exists, func, or_, select
 from sqlalchemy.sql.selectable import Select
 
-from app.core.permissions import user_permissions
+from app.core.policies import apply_university_scope
 from app.models.catalog import ITProgram, University, UniversityResponsible
 from app.models.interactions import UniversityProduct, UniversityProgram
 from app.models.workflow_instances import InstanceStage, WorkflowInstance
@@ -240,30 +239,8 @@ class UnifiedFilterService:
 
     @staticmethod
     def apply_security_scope(stmt: Select, user: CurrentUser) -> Select:
-        """Conjunctively confine a university query to the user's data scope.
-
-        Admins (``*``) and tokens without the optional ``university_ids``
-        claim keep global behaviour; scoped users are restricted to their
-        universities and can never widen access via the filter object.
-        Unparseable scope entries are dropped; an empty scope fails closed
-        (zero rows).
-        """
-        if "*" in user_permissions(user):
-            return stmt
-        scope = getattr(user, "university_ids", None)
-        if scope is None:
-            return stmt
-        ids: list[uuid.UUID] = []
-        for raw in scope:
-            try:
-                candidate = uuid.UUID(str(raw))
-            except (ValueError, AttributeError, TypeError):
-                continue
-            if candidate not in ids:
-                ids.append(candidate)
-        if not ids:
-            return stmt.where(false())
-        return stmt.where(University.id.in_(ids))
+        """Conjunctive adapter to the canonical P5 university policy."""
+        return apply_university_scope(stmt, University.id, user)
 
     # ------------------------------------------------- P1 list adapter (P4-01-02 seam)
 

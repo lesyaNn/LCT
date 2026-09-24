@@ -282,7 +282,7 @@ def test_include_query_count_deltas(db: Session, select_counter):
     uid = u.id
     db.add(
         AuditEvent(
-            user_id=1, entity_type="university", entity_id=1, action="update", university_id=uid
+            user_id="1", entity_type="university", entity_id=uuid.uuid4(), action="update", university_id=uid
         )
     )
     db.commit()

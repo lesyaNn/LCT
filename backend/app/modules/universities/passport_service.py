@@ -68,10 +68,11 @@ from datetime import date, datetime, timedelta, timezone
 import enum
 import logging
 
-from fastapi import HTTPException
 from sqlalchemy import Date, Integer, Text, Uuid, func, literal, select, union_all
 
 from app.core.exceptions import NotFound
+from app.core.errors import BusinessException
+from app.schemas.errors import ErrorCode
 from app.models.catalog import (
     Contract,
     ITDirection,
@@ -170,10 +171,7 @@ def parse_include(raw: str | None) -> frozenset[PassportInclude]:
         try:
             blocks.add(PassportInclude(token))
         except ValueError:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Unknown passport include: {token!r}. Allowed values: health_score, audit.",
-            )
+            raise BusinessException(ErrorCode.VALIDATION_ERROR)
     return frozenset(blocks)
 
 

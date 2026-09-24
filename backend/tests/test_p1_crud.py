@@ -34,7 +34,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401  (register metadata on Base)
-from app.core.errors import CONFLICT_DETAIL, register_error_handlers
+from app.core.errors import register_error_handlers
+from app.schemas.errors import ErrorCode, ErrorResponse
 from app.models.catalog import (
     Contract,
     ITDirection,
@@ -342,7 +343,7 @@ def test_university_delete_restricted_when_in_use(db: Session, engine):
         db.commit()
     db.rollback()
     if _is_pg(engine):
-        assert _pgcode(ei.value) == "23503"  # foreign_key_violation, real PG
+        assert _pgcode(ei.value) in {"23503", "23001"}  # FK/RESTRICT (PG16/PG18)
 
 
 def test_university_orm_delete_nullifies_first_still_controlled(db: Session, engine):
@@ -398,7 +399,7 @@ def test_direction_delete_restricted_when_used(db: Session, engine):
         db.commit()
     db.rollback()
     if _is_pg(engine):
-        assert _pgcode(ei.value) == "23503"  # RESTRICT per migration/model
+        assert _pgcode(ei.value) in {"23503", "23001"}  # RESTRICT (PG16/PG18)
 
 
 # =============================================================== programs ==
@@ -422,7 +423,7 @@ def test_program_create_invalid_direction_rejected(db: Session, engine):
         db.commit()
     db.rollback()
     if _is_pg(engine):
-        assert _pgcode(ei.value) == "23503"
+        assert _pgcode(ei.value) in {"23503", "23001"}
 
 
 def test_program_create_list_get_update(db: Session):
@@ -457,7 +458,7 @@ def test_program_delete_restricted_by_university_link(db: Session, engine):
         db.commit()
     db.rollback()
     if _is_pg(engine):
-        assert _pgcode(ei.value) == "23503"
+        assert _pgcode(ei.value) in {"23503", "23001"}
 
 
 def test_program_delete_restricted_by_teacher_link(db: Session, engine):
@@ -473,7 +474,7 @@ def test_program_delete_restricted_by_teacher_link(db: Session, engine):
         db.commit()
     db.rollback()
     if _is_pg(engine):
-        assert _pgcode(ei.value) == "23503"
+        assert _pgcode(ei.value) in {"23503", "23001"}
 
 
 # ================================================================ vendors ==
@@ -509,7 +510,7 @@ def test_vendor_delete_restricted_when_used(db: Session, engine):
         db.commit()
     db.rollback()
     if _is_pg(engine):
-        assert _pgcode(ei.value) == "23503"
+        assert _pgcode(ei.value) in {"23503", "23001"}
 
 
 # ================================================================ products ==
@@ -556,7 +557,7 @@ def test_product_invalid_vendor_rejected(db: Session, engine):
         db.commit()
     db.rollback()
     if _is_pg(engine):
-        assert _pgcode(ei.value) == "23503"
+        assert _pgcode(ei.value) in {"23503", "23001"}
 
 
 def test_product_delete_restricted_by_license(db: Session, engine):
@@ -569,7 +570,7 @@ def test_product_delete_restricted_by_license(db: Session, engine):
         db.commit()
     db.rollback()
     if _is_pg(engine):
-        assert _pgcode(ei.value) == "23503"
+        assert _pgcode(ei.value) in {"23503", "23001"}
 
 
 def test_product_delete_restricted_by_university_product(db: Session, engine):
@@ -582,7 +583,7 @@ def test_product_delete_restricted_by_university_product(db: Session, engine):
         db.commit()
     db.rollback()
     if _is_pg(engine):
-        assert _pgcode(ei.value) == "23503"
+        assert _pgcode(ei.value) in {"23503", "23001"}
 
 
 # ============================================================ responsibles ==
@@ -661,13 +662,15 @@ def test_integrity_error_maps_to_409_sanitized():
     c = TestClient(_error_app())
     r = c.post("/boom")
     assert r.status_code == 409
-    assert r.json() == {"detail": CONFLICT_DETAIL}
+    body = ErrorResponse.model_validate(r.json())
+    assert body.error.code == ErrorCode.CONFLICT
+    assert body.error.details == {}
     low = r.text.lower()
     for leaked in ("psycopg", "sqlalchemy", "select", "insert", "uq_x", "traceback"):
         assert leaked not in low  # no driver/SQL internals leak
 
 
-def test_http_404_contract_unchanged():
+def test_http_404_uses_unified_error_contract():
     from fastapi import HTTPException
 
     app = FastAPI()
@@ -678,13 +681,16 @@ def test_http_404_contract_unchanged():
         raise HTTPException(status_code=404, detail="Not found")
 
     r = TestClient(app).get("/x/1")
-    assert r.status_code == 404 and r.json() == {"detail": "Not found"}
+    assert r.status_code == 404
+    assert ErrorResponse.model_validate(r.json()).error.code == ErrorCode.NOT_FOUND
 
 
-def test_validation_422_contract_unchanged():
+def test_validation_422_uses_unified_error_contract():
     r = TestClient(_error_app()).post("/items", json={})
     assert r.status_code == 422
-    assert isinstance(r.json()["detail"], list)  # stock FastAPI shape, no envelope
+    body = ErrorResponse.model_validate(r.json())
+    assert body.error.code == ErrorCode.VALIDATION_ERROR
+    assert body.error.details["field_errors"]
 
 
 # ================================================================== RBAC ==

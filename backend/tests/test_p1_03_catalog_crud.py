@@ -255,7 +255,9 @@ def test_university_duplicate_name_409_sanitized(client):
     _uni(client, name="Дубль")
     r = client.post("/api/v1/universities", json={"name": "Дубль"})
     assert r.status_code == 409, r.text
-    assert r.json() == {"detail": "Conflict: duplicate or referenced resource"}
+    assert set(r.json()) == {"error"}
+    assert r.json()["error"]["code"] == "CONFLICT"
+    assert r.json()["error"]["request_id"] == r.headers["X-Request-ID"]
     low = r.text.lower()
     for leaked in ("psycopg", "traceback", "uq_universities", "insert into"):
         assert leaked not in low

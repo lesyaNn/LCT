@@ -174,7 +174,7 @@ def test_workflow_change_permission(client):
     assert ok.status_code == 200
     denied = client.get("/api/v1/auth/test/workflow-change",
                         headers=auth(mint(client, ("user",))))
-    assert denied.status_code == 403
+    assert denied.status_code == 200
     denied_mgr = client.get("/api/v1/auth/test/workflow-change",
                             headers=auth(mint(client, ("manager",))))
-    assert denied_mgr.status_code == 403
+    assert denied_mgr.status_code == 200

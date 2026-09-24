@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.core.permissions import require_permission
 from app.core.security import CurrentUser
-from app.db.session import get_db
+from app.modules.audit.service import get_audit_db
 from app.modules.meetings import service
 from app.modules.meetings.schemas import MeetingCreate, MeetingRead, MeetingUpdate
 from app.schemas.common import PaginatedResponse
@@ -35,7 +35,7 @@ WRITE = require_permission("university.edit")
 def create_meeting(
     university_id: uuid.UUID,
     data: MeetingCreate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(WRITE),
 ) -> MeetingRead:
     return service.create_meeting(
@@ -53,7 +53,7 @@ def list_meetings(
     university_id: uuid.UUID,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(READ),
 ) -> PaginatedResponse[MeetingRead]:
     items, total = service.list_meeting_page(
@@ -70,7 +70,7 @@ def list_meetings(
 )
 def get_meeting(
     meeting_id: uuid.UUID,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(READ),
 ) -> MeetingRead:
     return service.get_meeting(db, meeting_id, user=user)
@@ -85,7 +85,7 @@ def get_meeting(
 def patch_meeting(
     meeting_id: uuid.UUID,
     data: MeetingUpdate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(WRITE),
 ) -> MeetingRead:
     return service.patch_meeting(db, meeting_id, data, user=user)
@@ -94,12 +94,13 @@ def patch_meeting(
 @router.delete(
     "/meetings/{meeting_id}",
     status_code=204,
+    response_model=None,
     tags=["Universities"],
     summary="Delete meeting (its document links cascade)",
 )
 def delete_meeting(
     meeting_id: uuid.UUID,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(WRITE),
 ) -> None:
     service.delete_meeting(db, meeting_id, user=user)
