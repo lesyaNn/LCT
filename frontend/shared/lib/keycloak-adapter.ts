@@ -1,6 +1,7 @@
 'use client';
 
 import type KeycloakInstance from 'keycloak-js';
+import { authService } from './auth-service';
 
 /**
  * Keycloak is the auth source for the existing backend. It is enabled by
@@ -34,7 +35,7 @@ let sessionExpiredHandler: (() => void) | null = null;
 let sessionExpiredRedirectArmed = false;
 
 export function isKeycloakMode(): boolean {
-  return process.env.NEXT_PUBLIC_AUTH_MODE !== 'mock';
+  return authService.mode() === 'keycloak';
 }
 
 export function getKeycloakConfig(): KeycloakRuntimeConfig {

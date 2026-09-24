@@ -6,5 +6,5 @@ export default async function CatalogImportRoute({ searchParams }: { searchParam
   const rawType = (await searchParams).type;
   const requestedType = Array.isArray(rawType) ? rawType.at(-1) : rawType;
   const initialCatalogType = isImportCatalogType(requestedType) ? requestedType : '';
-  return <><PageIntro eyebrow="Администрирование" title="Импорт каталогов" description="Загрузите XLSX, сопоставьте колонки и безопасно проверьте изменения перед импортом." /><ImportPage initialCatalogType={initialCatalogType} /></>;
+  return <><PageIntro title="Импорт каталогов" description="Загрузите XLSX, сопоставьте колонки и безопасно проверьте изменения перед импортом." /><ImportPage initialCatalogType={initialCatalogType} /></>;
 }

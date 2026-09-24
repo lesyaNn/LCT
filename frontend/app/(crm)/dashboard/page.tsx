@@ -88,7 +88,7 @@ export default function DashboardPage() {
 
   return (
     <div className={styles.page}>
-      <PageIntro title="Обзор" description="Ключевые показатели состояния образовательной сети и операционных задач команды." eyebrow="Исполнительный обзор" />
+      <PageIntro title="Обзор" description="Ключевые показатели состояния образовательной сети и операционных задач команды." />
       <section className={styles.section} aria-labelledby="dashboard-kpi-title" data-testid="dashboard-kpi">
         <h2 className={styles.sectionTitle} id="dashboard-kpi-title">Ключевые показатели</h2>
         <div className={styles.grid}>

@@ -10,7 +10,7 @@ import Edit from '@atomaro/icons/24/editor/Edit';
 import ArrowRight from '@atomaro/icons/24/navigation/ArrowRight';
 import { useAuth } from '@/shared/auth/AuthProvider';
 import { formatDateRu, formatDaysUntilRu, getUpcomingDateStatus } from '@/shared/lib/formatters';
-import { expirationStatusIntent, expirationStatusLabels, upcomingDateIntent } from '@/shared/lib/status-semantics';
+import { expirationStatusIntent, expirationStatusLabels } from '@/shared/lib/status-semantics';
 import {
   getTeacherPassport,
   teacherPassportQueryKey,
@@ -19,6 +19,7 @@ import {
   type TeacherTraining,
 } from '@/shared/lib/universities-repository';
 import { Button } from '@/shared/ui/rtk/button';
+import { Avatar } from '@/shared/ui/rtk/avatar';
 import { ReadinessBadge } from '@/shared/ui/rtk/readiness-badge';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
@@ -86,7 +87,7 @@ function TrainingsSection({ rows }: { rows: TeacherTraining[] }) {
   return <section className={styles.section} aria-labelledby="teacher-trainings-title"><SectionHeading id="teacher-trainings-title" title="Обучения" description="Завершённые курсы и тренинги преподавателя." /><PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Обучения пока отсутствуют" /></section>;
 }
 
-function TeacherHeader({ id, teacher }: { id: string; teacher: TeacherPassportProfile }) {
+function TeacherHeader({ teacher }: { teacher: TeacherPassportProfile }) {
   const { user } = useAuth();
   const canEdit = user?.role === 'admin';
   const canReport = user?.role === 'admin' || user?.role === 'manager';
@@ -95,23 +96,25 @@ function TeacherHeader({ id, teacher }: { id: string; teacher: TeacherPassportPr
     <header className={styles.header}>
       <div className={styles.headerGrid}>
         <div className={styles.identity}>
-          <h1>{teacher.name}</h1>
-          <div className={styles.metaList}>
-            <Link className={styles.universityLink} href={`/universities/${teacher.universityId}`}>{teacher.universityName}</Link>
-            <span className={styles.position}>{teacher.position}</span>
+          <Avatar initials={teacher.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toLocaleUpperCase('ru-RU')} size="l" />
+          <div className={styles.identityText}>
+            <h1>{teacher.name}</h1>
+            <div className={styles.metaList}>
+              <Link className={styles.universityLink} href={`/universities/${teacher.universityId}`}>{teacher.universityName}</Link>
+              <span className={styles.position}>{teacher.position}</span>
+            </div>
           </div>
         </div>
         <div className={styles.statusPanel} aria-label="Готовность преподавателя">
-          <div className={styles.statusPanelTop}><span className={styles.overline}>Готовность</span></div>
-          <ReadinessBadge readiness={teacher.readiness} reason={teacher.readinessReason} size="lg" showDetails />
-          <div className={styles.nextTraining}><TimeStroke size={18} fill="currentColor" aria-hidden="true" /><div><span>Следующее повышение квалификации</span>{!teacher.qualificationRequired ? <strong>Повышение не требуется</strong> : teacher.nextTrainingDate ? <><strong>{formatDateRu(teacher.nextTrainingDate)}</strong><StatusBadge intent={upcomingDateIntent[nextTrainingStatus]} variant="inline">{formatDaysUntilRu(teacher.nextTrainingDate)}</StatusBadge></> : <strong>Данные отсутствуют</strong>}</div></div>
+          <div className={styles.statusPanelTop}><span className={styles.overline}>Готовность</span><ReadinessBadge readiness={teacher.readiness} size="md" /></div>
+          {teacher.readinessReason ? <p className={styles.readinessReason}>{teacher.readinessReason}</p> : null}
+          <div className={styles.nextTraining}><TimeStroke size={18} fill="currentColor" aria-hidden="true" /><div><span>Следующее повышение квалификации</span>{!teacher.qualificationRequired ? <strong>Повышение не требуется</strong> : teacher.nextTrainingDate ? <><strong>{formatDateRu(teacher.nextTrainingDate)}</strong><small className={nextTrainingStatus === 'overdue' ? styles.expiredText : undefined}>{formatDaysUntilRu(teacher.nextTrainingDate)}</small></> : <strong>Данные отсутствуют</strong>}</div></div>
           <div className={styles.headerActions} aria-label="Действия с преподавателем">
             {canEdit ? <Button variant="secondary" size="s" type="button" disabled title="Редактирование подключится после появления API"><Edit size={16} fill="currentColor" />Редактировать</Button> : null}
             {canReport ? <Button variant="primary" size="s" type="button" disabled title="Формирование отчёта подключится после появления API"><Education size={16} fill="currentColor" />Отчёт</Button> : null}
           </div>
         </div>
       </div>
-      <p className={styles.routeHint}>Идентификатор преподавателя: <code>{id}</code></p>
     </header>
   );
 }
@@ -124,5 +127,5 @@ export function TeacherPassport({ id }: { id: string }) {
   const query = useQuery({ queryKey: teacherPassportQueryKey(id), queryFn: () => getTeacherPassport(id), staleTime: 30_000 });
   if (query.isPending) return <TeacherPassportSkeleton />;
   if (query.isError || !query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
-  return <div className={styles.page}><TeacherHeader id={id} teacher={query.data.teacher} /><div className={styles.sections}><QualificationsSection rows={query.data.qualifications} /><TrainingsSection rows={query.data.trainings} /><TeacherCertificatesSection rows={query.data.certificates} /><TeacherProgramsSection rows={query.data.allowedPrograms} /></div><Link className={styles.backLink} href="/teachers"><ArrowRight size={16} fill="currentColor" />Вернуться к списку преподавателей</Link></div>;
+  return <div className={styles.page}><TeacherHeader teacher={query.data.teacher} /><div className={styles.sections}><QualificationsSection rows={query.data.qualifications} /><TrainingsSection rows={query.data.trainings} /><TeacherCertificatesSection rows={query.data.certificates} /><TeacherProgramsSection rows={query.data.allowedPrograms} /></div><Link className={styles.backLink} href="/teachers"><ArrowRight size={16} fill="currentColor" />Вернуться к списку преподавателей</Link></div>;
 }

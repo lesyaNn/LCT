@@ -49,7 +49,7 @@ function SidebarContent({ role, pathname, collapsed, mobile = false, onToggleCol
       <div className={styles.brand}>
         <div className={styles.brandVisual}>
           <Image className={styles.brandLogo} src="/brand/rostelecom-horizontal.svg" alt="Ростелеком" width={174} height={46} priority unoptimized />
-          {collapsed && !mobile ? <Image className={styles.brandLogoCompact} src="/brand/rostelecom-vertical.svg" alt="" aria-hidden="true" width={38} height={38} unoptimized /> : null}
+          {collapsed && !mobile ? <Image className={styles.brandLogoCompact} src="/brand/rostelecom-vertical.svg" alt="" aria-hidden="true" width={46} height={46} unoptimized /> : null}
         </div>
       </div>
 

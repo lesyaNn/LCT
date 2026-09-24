@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Download from '@atomaro/icons/24/action/Download';
@@ -121,6 +122,9 @@ function ExternalUnavailableNotice({ source, error }: { source: 'LMS' | 'сай�
 }
 
 function ProgramsSection({ id }: { id: string }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [statusFilter, setStatusFilter] = useState<ProgramStatus | 'all'>('all');
   const [toast, setToast] = useState<{ intent: 'success' | 'error' | 'info'; title: string; message?: ReactNode } | null>(null);
   const queryClient = useQueryClient();
@@ -135,7 +139,11 @@ function ProgramsSection({ id }: { id: string }) {
         queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflow(result.instanceId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview }),
       ]);
-      setToast({ intent: result.existing ? 'info' : 'success', title: result.existing ? 'Workflow уже существует' : 'Workflow создан', message: <Link href={`/workflows/${result.instanceId}`}>Открыть Workflow</Link> });
+      const next = new URLSearchParams(searchParams.toString());
+      next.set('tab', 'workflow');
+      next.set('program', result.externalId);
+      next.set('workflow', result.instanceId);
+      router.push(`${pathname}?${next.toString()}`, { scroll: false });
     },
     onError: (error) => setToast({ intent: 'error', title: 'Workflow не создан', message: normalizeApiError(error).message }),
   });

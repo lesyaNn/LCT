@@ -2,6 +2,7 @@
 
 import type { ComponentType } from 'react';
 import { useEffect, useMemo, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import Attachment from '@atomaro/icons/24/action/Attachment';
 import CheckLarge from '@atomaro/icons/24/navigation/CheckLarge';
@@ -16,6 +17,9 @@ import { useAuth } from '@/shared/auth/AuthProvider';
 import { formatDateRu, formatDateTimeRu, getRelativeDueDateRu } from '@/shared/lib/formatters';
 import { workflowStageStatusSemantics, type WorkflowStageIcon } from '@/shared/lib/status-semantics';
 import { getUniversityWorkflow, workflowQueryKey, type UniversityWorkflow, type UniversityWorkflowStage, type UniversityWorkflowStageStatus } from '@/shared/lib/universities-repository';
+import { getUniversityPrograms, universityProgramsQueryKey } from '@/shared/lib/universities-repository';
+import { getUniversityExternalData, universityExternalDataQueryKey } from '@/shared/lib/external-integrations-repository';
+import { Select } from '@/shared/ui/rtk/form-controls';
 import { Avatar } from '@/shared/ui/rtk/avatar';
 import { Button } from '@/shared/ui/rtk/button';
 import { EmptyState } from '@/shared/ui/empty-state';
@@ -148,12 +152,12 @@ function WorkflowStageDetails({ stage, stages, instanceId, universityId, userId,
   const headingId = `${idPrefix}-stage-details-title`;
   return (
     <section className={`${styles.detailPanel} ${styles[`detail-${stage.status}`]}`} aria-labelledby={headingId} id={idPrefix}>
-      <div className={styles.detailHeader}><div><span className={styles.eyebrow}>Детали этапа {stage.orderIndex} из 14</span><h2 id={headingId}>{stage.name}</h2></div><StatusBadge intent={semantics.intent} icon={<StageStatusIcon status={stage.status} />}>{semantics.label}</StatusBadge></div>
+      <div className={styles.detailHeader}><div><h2 id={headingId}>{stage.name}</h2></div><StatusBadge intent={semantics.intent} icon={<StageStatusIcon status={stage.status} />}>{semantics.label}</StatusBadge></div>
       <CompletionSummary stage={stage} />
       <section className={styles.detailSection} aria-labelledby={`${idPrefix}-overview-title`}><div className={styles.detailSectionHeading}><h3 id={`${idPrefix}-overview-title`}><InformationStroke size={18} fill="currentColor" />Основная информация</h3></div><dl className={styles.detailFacts}><div><dt>{stage.status === 'completed' ? 'Дедлайн был' : 'Дедлайн'}</dt><dd className={stage.status === 'overdue' ? styles.overdue : undefined}><StageDeadline stage={stage} /></dd></div>{stage.startedAt ? <div><dt>Начат</dt><dd><time dateTime={stage.startedAt}>{formatDateTimeRu(stage.startedAt)}</time></dd></div> : null}{stage.completedAt && stage.status !== 'completed' ? <div><dt>Завершён</dt><dd><time dateTime={stage.completedAt}>{formatDateTimeRu(stage.completedAt)}</time></dd></div> : null}<div><dt>Ответственный</dt><dd><StageAssignee stage={stage} /></dd></div></dl></section>
       <section className={styles.detailSection} aria-labelledby={`${idPrefix}-tasks-title`}><div className={styles.detailSectionHeading}><h3 id={`${idPrefix}-tasks-title`}><Task size={18} fill="currentColor" />Задачи этапа</h3><span className={styles.taskCount}>Выполнено {completedTasks} из {stage.tasks.length}</span></div><div className={styles.taskProgress} role="progressbar" aria-label={`Задачи этапа: выполнено ${completedTasks} из ${stage.tasks.length}`} aria-valuemin={0} aria-valuemax={stage.tasks.length} aria-valuenow={completedTasks}><span style={{ width: `${taskProgress}%` }} /></div><ul className={styles.taskList}>{stage.tasks.map((task) => <li key={task.id}><label><input type="checkbox" checked={task.completed} disabled readOnly /><span className={task.completed ? styles.taskCompleted : undefined}>{task.label}</span></label></li>)}</ul></section>
-      <WorkflowComments instanceId={instanceId} stageId={stage.templateStageId ?? stage.id} comments={stage.comments} onNotify={onNotify} />
-      <WorkflowAttachments instanceId={instanceId} stageId={stage.id} attachments={stage.attachments} onNotify={onNotify} />
+      <WorkflowComments instanceId={instanceId} stageId={stage.templateStageId ?? stage.id} comments={stage.comments} readOnly={stage.status !== 'current'} onNotify={onNotify} />
+      <WorkflowAttachments instanceId={instanceId} stageId={stage.id} attachments={stage.attachments} readOnly={stage.status !== 'current'} onNotify={onNotify} />
       <section className={styles.detailSection} aria-labelledby={`${idPrefix}-transition-title`}><div className={styles.detailSectionHeading}><h3 id={`${idPrefix}-transition-title`}><History size={18} fill="currentColor" />История переходов</h3></div>{stage.transitions.length ? <ol className={styles.transitionList}>{stage.transitions.map((transition) => <li key={transition.id}><div><strong>{transition.actor}</strong><time dateTime={transition.occurredAt}>{formatDateTimeRu(transition.occurredAt)}</time></div><p>{workflowStageStatusSemantics[transition.fromStatus].label} → {workflowStageStatusSemantics[transition.toStatus].label}. {transition.comment}</p></li>)}</ol> : <EmptyState title="Переходов пока нет" description="История появится после первого изменения этапа." headingLevel={3} />}</section>
       <StageActionPanel stage={stage} stages={stages} instanceId={instanceId} universityId={universityId} userId={userId} canManage={canManage} canRestore={canRestore} onTransitionOpen={onTransitionOpen} onTransitionClose={onTransitionClose} onTransitionSuccess={onTransitionSuccess} onNotify={onNotify} />
     </section>
@@ -166,7 +170,7 @@ function WorkflowHeader({ workflow }: { workflow: UniversityWorkflow }) {
   const progress = workflow.totalSteps ? Math.round((workflow.completedSteps / workflow.totalSteps) * 100) : 0;
   return (
     <header className={styles.pageHeader}>
-      <div className={styles.headerMain}><div><p className={styles.eyebrow}>WORKFLOW</p><h1>Взаимодействие с вузом</h1><p className={styles.headerContext}>{workflow.universityName} · {workflow.universityCity} · {workflow.workflowName}</p></div>{currentStage && currentSemantics ? <div className={styles.headerCurrent}><span>Текущий этап</span><strong>{currentStage.name}</strong><StatusBadge intent={currentSemantics.intent} icon={<StageStatusIcon status={currentStage.status} />}>{currentSemantics.label}</StatusBadge></div> : null}</div>
+      <div className={styles.headerMain}><div><h1>Взаимодействие с вузом</h1><p className={styles.headerContext}>{[workflow.universityName, workflow.universityCity, workflow.workflowName].filter((part, index, parts) => part && parts.findIndex((other) => other.toLocaleLowerCase('ru-RU') === part.toLocaleLowerCase('ru-RU')) === index).join(' · ')}</p></div>{currentStage && currentSemantics ? <div className={styles.headerCurrent}><span>Текущий этап</span><strong>{currentStage.name}</strong><StatusBadge intent={currentSemantics.intent} icon={<StageStatusIcon status={currentStage.status} />}>{currentSemantics.label}</StatusBadge></div> : null}</div>
       <div className={styles.overallProgress}><div className={styles.progressLabel}><span>Прогресс Workflow</span><strong>{workflow.completedSteps} из {workflow.totalSteps} этапов завершено</strong></div><div className={styles.progressTrack} role="progressbar" aria-label={`Прогресс Workflow: завершено ${workflow.completedSteps} из ${workflow.totalSteps} этапов`} aria-valuemin={0} aria-valuemax={workflow.totalSteps} aria-valuenow={workflow.completedSteps}><span style={{ width: `${progress}%` }} /></div></div>
     </header>
   );
@@ -200,9 +204,46 @@ export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride 
   if (query.isError || !query.data) return <RouteErrorState compact={mode === 'embedded'} onRetry={() => void query.refetch()} />;
   if (!stages.length || !selectedStage) return <EmptyState presentation={mode === 'page' ? 'large' : 'compact'} icon={mode === 'embedded' ? <InformationStroke size={22} fill="currentColor" /> : undefined} title="Этапы Workflow пока не добавлены" description="Настроенные этапы появятся здесь после запуска процесса." />;
 
-  return <div className={`${styles.page} ${mode === 'embedded' ? styles.embedded : ''}`}>{mode === 'page' ? <WorkflowHeader workflow={query.data} /> : null}<div className={styles.layout}><section className={styles.stagesPanel} aria-labelledby={`${idPrefix}-stages-title`}><div className={styles.panelHeading}><div><span className={styles.eyebrow}>Жизненный цикл проекта</span><h2 id={`${idPrefix}-stages-title`}>Этапы Workflow</h2></div><span className={styles.totalLabel}>{stages.length} этапов</span></div><ol className={styles.stageList}>{stages.map((stage) => <WorkflowStageItem key={stage.id} stage={stage} selected={stage.id === selectedStage.id} detailsId={detailsId} onSelect={() => setSelectedId(stage.id)} />)}</ol></section><WorkflowStageDetails key={selectedStage.id} stage={selectedStage} stages={stages} instanceId={instanceId} universityId={query.data.universityId} userId={user?.id} canManage={canManage} canRestore={canRestore} idPrefix={detailsId} onTransitionOpen={() => setSelectedId(selectedStage.id)} onTransitionClose={() => setSelectedId(null)} onTransitionSuccess={() => setSelectedId(null)} onNotify={setNotification} /></div>{notification ? <div className={styles.toastViewport}><Toast intent={notification.intent} title={notification.title} message={notification.message} onClose={() => setNotification(null)} /></div> : null}</div>;
+  return <div className={`${styles.page} ${mode === 'embedded' ? styles.embedded : ''}`}>{mode === 'page' ? <WorkflowHeader workflow={query.data} /> : null}<div className={styles.layout}><section className={styles.stagesPanel} aria-labelledby={`${idPrefix}-stages-title`}><div className={styles.panelHeading}><div><h2 id={`${idPrefix}-stages-title`}>Этапы Workflow</h2></div><span className={styles.totalLabel}>{stages.length} этапов</span></div><ol className={styles.stageList}>{stages.map((stage) => <WorkflowStageItem key={stage.id} stage={stage} selected={stage.id === selectedStage.id} detailsId={detailsId} onSelect={() => setSelectedId(stage.id)} />)}</ol></section><WorkflowStageDetails key={selectedStage.id} stage={selectedStage} stages={stages} instanceId={instanceId} universityId={query.data.universityId} userId={user?.id} canManage={canManage} canRestore={canRestore} idPrefix={detailsId} onTransitionOpen={() => setSelectedId(selectedStage.id)} onTransitionClose={() => setSelectedId(null)} onTransitionSuccess={() => setSelectedId(null)} onNotify={setNotification} /></div>{notification ? <div className={styles.toastViewport}><Toast intent={notification.intent} title={notification.title} message={notification.message} onClose={() => setNotification(null)} /></div> : null}</div>;
 }
 
 export function UniversityWorkflow({ id, canAdvance }: { id: string; canAdvance: boolean }) {
-  return <WorkflowView instanceId={id} mode="embedded" canAdvance={canAdvance} />;
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const programsQuery = useQuery({ queryKey: universityProgramsQueryKey(id), queryFn: () => getUniversityPrograms(id), staleTime: 30_000 });
+  const externalQuery = useQuery({ queryKey: universityExternalDataQueryKey(id, 'website'), queryFn: () => getUniversityExternalData(id, 'website'), staleTime: 30_000 });
+  const programs = useMemo(() => {
+    const base = programsQuery.data ?? [];
+    const applications = externalQuery.data?.applications ?? [];
+    const result = new Map<string, { key: string; name: string; instanceId: string | null; externalIds: string[] }>();
+    for (const program of base) {
+      const nameKey = program.name.trim().toLocaleLowerCase('ru-RU');
+      if (!result.has(nameKey)) result.set(nameKey, { key: program.id, name: program.name, instanceId: null, externalIds: [] });
+    }
+    for (const application of applications) {
+      const nameKey = application.programName.trim().toLocaleLowerCase('ru-RU');
+      const program = result.get(nameKey) ?? { key: application.id, name: application.programName, instanceId: null, externalIds: [] };
+      program.externalIds.push(application.id);
+      if (application.workflowInstanceId) program.instanceId = application.workflowInstanceId;
+      result.set(nameKey, program);
+    }
+    return [...result.values()];
+  }, [programsQuery.data, externalQuery.data]);
+  const requestedProgram = searchParams.get('program');
+  const selected = programs.find((program) => program.key === requestedProgram || (requestedProgram && program.externalIds.includes(requestedProgram))) ?? programs[0];
+  const instanceId = selected && requestedProgram && (selected.key === requestedProgram || selected.externalIds.includes(requestedProgram)) ? searchParams.get('workflow') ?? selected.instanceId : selected?.instanceId;
+  const selectProgram = (key: string) => {
+    const next = new URLSearchParams(searchParams.toString());
+    next.set('program', key);
+    next.delete('workflow');
+    router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+  };
+  if (programsQuery.isPending || externalQuery.isPending) return <WorkflowSkeleton mode="embedded" />;
+  if (programsQuery.isError) return <RouteErrorState compact onRetry={() => void programsQuery.refetch()} />;
+  return <div className={styles.programWorkflow}>
+    {programs.length > 1 ? <label className={styles.programSelector}><span>Программа</span><Select value={selected?.key ?? ''} onChange={(event) => selectProgram(event.target.value)}>{programs.map((program) => <option key={program.key} value={program.key}>{program.name}</option>)}</Select></label> : selected ? <p className={styles.programName}>Программа: <strong>{selected.name}</strong></p> : null}
+    {instanceId ? <WorkflowView key={instanceId} instanceId={instanceId} mode="embedded" canAdvance={canAdvance} /> : <EmptyState title="Workflow для программы пока нет" description="Создать его можно из заявки с сайта в разделе «Программы»." primaryAction={{ label: 'Открыть программы', onClick: () => { const next = new URLSearchParams(searchParams.toString()); next.set('tab', 'programs'); router.push(`${pathname}?${next.toString()}`, { scroll: false }); } }} />}
+    {externalQuery.isError ? <p className={styles.externalHint}>Связь с заявками сайта сейчас недоступна; показаны программы ВУЗа.</p> : null}
+  </div>;
 }

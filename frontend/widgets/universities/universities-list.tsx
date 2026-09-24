@@ -546,7 +546,6 @@ export function UniversitiesList() {
     <div className={styles.page}>
       <header className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>РЕЕСТР</p>
           <h1>ВУЗы</h1>
           <p className={styles.description}>Учебные заведения, программы и задачи, требующие внимания команды.</p>
         </div>

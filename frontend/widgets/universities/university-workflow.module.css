@@ -6,7 +6,15 @@
 .breadcrumbs a:hover { text-decoration: underline; }
 .headerMain { align-items: start; display: grid; gap: var(--rtk-space-6); grid-template-columns: minmax(0, 1fr) minmax(260px, 360px); }
 .eyebrow { color: var(--rtk-color-brand); display: block; font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
-.headerMain h1 { font-size: clamp(26px, 3vw, 38px); letter-spacing: -.035em; line-height: 1.12; margin: var(--rtk-space-2) 0 0; }
+.programWorkflow { display: flex; flex-direction: column; gap: var(--rtk-space-4); min-width: 0; }
+.programSelector { display: flex; flex-direction: column; gap: var(--rtk-space-2); max-width: 440px; min-width: 0; }
+.programSelector > span, .programName { color: var(--rtk-color-text-secondary); font-size: 13px; font-weight: 600; }
+.programSelector select { width: 100%; }
+.programName { margin: 0; overflow-wrap: anywhere; }
+.programName strong { color: var(--rtk-color-text-primary); }
+.externalHint { color: var(--rtk-color-text-secondary); font-size: 12px; margin: 0; }
+@media (max-width: 480px) { .programSelector { max-width: none; width: 100%; } }
+.headerMain h1 { font-size: clamp(26px, 3vw, 38px); letter-spacing: -.035em; line-height: 1.12; margin: 0; }
 .headerContext { color: var(--rtk-color-text-secondary); font-size: 14px; margin: var(--rtk-space-3) 0 0; overflow-wrap: anywhere; }
 .headerCurrent { composes: surface from '../../shared/ui/rtk/section-surface.module.css'; display: flex; flex-direction: column; gap: var(--rtk-space-2); }
 .headerCurrent > span { color: var(--rtk-color-text-tertiary); font-size: 11px; }

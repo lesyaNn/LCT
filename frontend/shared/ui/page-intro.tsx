@@ -3,13 +3,11 @@ import styles from './page-intro.module.css';
 interface PageIntroProps {
   title: string;
   description?: string;
-  eyebrow?: string;
 }
 
-export function PageIntro({ title, description, eyebrow = 'Раздел CRM' }: PageIntroProps) {
+export function PageIntro({ title, description }: PageIntroProps) {
   return (
     <section className={styles.intro}>
-      <p className={styles.eyebrow}>{eyebrow}</p>
       <h1>{title}</h1>
       {description ? <p className={styles.description}>{description}</p> : null}
     </section>

@@ -33,13 +33,14 @@
 .backLink:hover { text-decoration: underline; }
 
 .headerGrid {
-  align-items: start;
+  align-items: center;
   display: grid;
-  gap: var(--rtk-space-6);
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 430px);
+  gap: var(--rtk-space-4);
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 400px);
 }
 
-.identity { min-width: 0; }
+.identity { align-items: flex-start; display: flex; gap: var(--rtk-space-4); min-width: 0; }
+.identityText { min-width: 0; }
 .eyebrow,
 .overline {
   color: var(--rtk-color-brand);
@@ -64,7 +65,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--rtk-space-1);
-  margin-top: var(--rtk-space-3);
+  margin-top: var(--rtk-space-2);
 }
 .position { color: var(--rtk-color-text-secondary); font-size: 13px; }
 
@@ -76,12 +77,13 @@
   background: var(--rtk-color-surface);
   border: 0;
   border-radius: var(--rtk-radius-medium);
-  box-shadow: var(--rtk-shadow-elevation-2);
+  box-shadow: var(--rtk-shadow-elevation-1);
   min-width: 0;
-  padding: var(--rtk-space-5);
+  padding: var(--rtk-space-4);
 }
 
 .statusPanelTop { align-items: center; display: flex; gap: var(--rtk-space-3); justify-content: space-between; }
+.readinessReason { color: var(--rtk-color-text-secondary); font-size: 12px; line-height: 1.4; margin: var(--rtk-space-2) 0 0; }
 .overline { color: var(--rtk-color-text-tertiary); letter-spacing: .04em; }
 .nextTraining {
   align-items: flex-start;
@@ -89,8 +91,8 @@
   color: var(--rtk-color-brand);
   display: flex;
   gap: var(--rtk-space-2);
-  margin-top: var(--rtk-space-4);
-  padding-top: var(--rtk-space-4);
+  margin-top: var(--rtk-space-3);
+  padding-top: var(--rtk-space-3);
 }
 
 .nextTraining > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -100,7 +102,7 @@
 .warningText { color: var(--rtk-color-warning); }
 .expiredText { color: var(--rtk-color-danger); }
 
-.headerActions { display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); margin-top: var(--rtk-space-5); }
+.headerActions { display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); margin-top: var(--rtk-space-3); }
 .headerActions button { align-items: center; display: inline-flex; gap: var(--rtk-space-2); }
 .routeHint { color: var(--rtk-color-text-tertiary); font-size: 11px; margin: 0; }
 .routeHint code { color: var(--rtk-color-text-secondary); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
