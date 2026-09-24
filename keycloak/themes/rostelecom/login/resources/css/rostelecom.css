@@ -82,7 +82,7 @@ html.login-pf,
   background: url("../img/rostelecom-horizontal.svg") center / contain no-repeat;
 }
 
-#kc-header-wrapper::after {
+/* #kc-header-wrapper::after {
   content: "ИТ Школа РТК · CRM Партнёрств";
   display: block;
   color: var(--rtk-muted);
@@ -90,7 +90,7 @@ html.login-pf,
   font-weight: 600;
   line-height: 1.3;
   white-space: nowrap;
-}
+} */
 
 .pf-v5-c-login__main {
   grid-area: main;
