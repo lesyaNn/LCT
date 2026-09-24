@@ -12,13 +12,18 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError, ResponseValidationError
 from fastapi.responses import JSONResponse
-from starlette.exceptions import HTTPException as StarletteHTTPException
 from sqlalchemy.exc import IntegrityError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.schemas.errors import ERROR_MESSAGES, ERROR_STATUS_MAP, ErrorCode, ErrorResponse
+from app.schemas.errors import (
+    ERROR_MESSAGES,
+    ERROR_STATUS_MAP,
+    ConflictDetails,
+    ErrorCode,
+    ErrorResponse,
+)
 
 logger = logging.getLogger("rtk")
-CONFLICT_DETAIL = "Conflict: duplicate or referenced resource"
 
 
 class BusinessException(HTTPException):
@@ -48,6 +53,14 @@ class SecurityError(BusinessException):
 
     def __init__(self, code: ErrorCode):
         super().__init__(code, details={})
+
+
+class ConflictError(BusinessException):
+    """A 409 with an optional, safe field identifier (never a DB value)."""
+
+    def __init__(self, *, field: str | None = None) -> None:
+        details = ConflictDetails(field=field).model_dump() if field else {}
+        super().__init__(ErrorCode.CONFLICT, details=details)
 
 
 def _request_id(request: Request) -> str:
@@ -91,48 +104,82 @@ def _response(request: Request, code: ErrorCode, *, details: Mapping[str, Any] |
                         content=body.model_dump(mode="json"), headers=out_headers)
 
 
+_DEFAULT_HTTP_CODES: dict[int, ErrorCode] = {
+    400: ErrorCode.HTTP_ERROR,
+    401: ErrorCode.AUTH_REQUIRED,
+    403: ErrorCode.FORBIDDEN,
+    404: ErrorCode.NOT_FOUND,
+    405: ErrorCode.METHOD_NOT_ALLOWED,
+    409: ErrorCode.CONFLICT,
+    410: ErrorCode.GONE,
+    413: ErrorCode.FILE_TOO_LARGE,
+    415: ErrorCode.FILE_TYPE_NOT_ALLOWED,
+    422: ErrorCode.VALIDATION_ERROR,
+    429: ErrorCode.RATE_LIMITED,
+    503: ErrorCode.EXTERNAL_SOURCE_UNAVAILABLE,
+}
+
+
+def _explicit_error_code(detail: Any) -> ErrorCode | None:
+    """Read a code only from a typed/exact value; never infer it from prose."""
+    raw = detail.get("code") if isinstance(detail, Mapping) else detail
+    if isinstance(raw, ErrorCode):
+        return raw
+    if isinstance(raw, str):
+        try:
+            return ErrorCode(raw)
+        except ValueError:
+            return None
+    return None
+
+
 def _code_for_http(status: int, detail: Any = None) -> ErrorCode:
-    text = str(detail or "").lower()
-    if status == 401:
-        if "expired" in text or "истек" in text:
-            return ErrorCode.TOKEN_EXPIRED
-        if "invalid" in text or "недейств" in text:
-            return ErrorCode.TOKEN_INVALID
-        return ErrorCode.AUTH_REQUIRED
-    if status == 403:
-        return ErrorCode.FORBIDDEN
-    if status == 404:
-        return ErrorCode.FILE_NOT_FOUND if any(x in text for x in ("file", "файл", "attachment")) else ErrorCode.NOT_FOUND
-    if status == 405:
-        return ErrorCode.METHOD_NOT_ALLOWED
-    if status == 409:
-        if "not ready" in text or "не готов" in text:
-            return ErrorCode.REPORT_NOT_READY
-        if "workflow" in text and "active" in text:
-            return ErrorCode.WORKFLOW_INSTANCE_NOT_ACTIVE
-        if "already" in text and ("stage" in text or "closed" in text):
-            return ErrorCode.STAGE_ALREADY_COMPLETED
-        return ErrorCode.CONFLICT
-    if status == 410:
-        return ErrorCode.GONE
-    if status == 413:
-        return ErrorCode.FILE_TOO_LARGE
-    if status == 415:
-        return ErrorCode.FILE_TYPE_NOT_ALLOWED
-    if status == 422:
-        return ErrorCode.VALIDATION_ERROR
-    if status == 429:
-        return ErrorCode.RATE_LIMITED
-    if status == 503:
-        return ErrorCode.EXTERNAL_SOURCE_UNAVAILABLE
+    explicit = _explicit_error_code(detail)
+    if explicit is not None:
+        return explicit
     if status >= 500:
         return ErrorCode.INTERNAL_ERROR
-    if status == 400:
-        if "transition" in text or "переход" in text:
-            return ErrorCode.WORKFLOW_INVALID_TRANSITION
-        if "import" in text or "импорт" in text:
-            return ErrorCode.IMPORT_VALIDATION_FAILED
-    return ErrorCode.HTTP_ERROR
+    return _DEFAULT_HTTP_CODES.get(status, ErrorCode.HTTP_ERROR)
+
+
+def _http_details(detail: Any) -> Mapping[str, Any] | None:
+    if not isinstance(detail, Mapping) or not isinstance(detail.get("details"), Mapping):
+        return None
+    return detail["details"]
+
+
+_CONSTRAINT_FIELDS = {
+    "uq_students_external_id": "external_id",
+    "students_external_id_key": "external_id",
+    "universities_name_key": "name",
+    "it_directions_code_key": "code",
+    "vendors_name_key": "name",
+    "responsibles_email_key": "email",
+    "responsibles_keycloak_sub_key": "keycloak_sub",
+    "uq_it_products_vendor_name_version": "vendor_id,name,version",
+    "uq_university_programs_uni_prog": "program_id",
+    "uq_university_responsibles_uni_resp": "responsible_id",
+}
+
+
+def _conflict_details(exc: IntegrityError) -> dict[str, str]:
+    """Extract column names from driver metadata without exposing SQL/values."""
+    original = getattr(exc, "orig", None)
+    diagnostic = getattr(original, "diag", None)
+    column = getattr(diagnostic, "column_name", None)
+    if isinstance(column, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", column):
+        return ConflictDetails(field=column).model_dump()
+    constraint = getattr(diagnostic, "constraint_name", None)
+    if isinstance(constraint, str) and constraint in _CONSTRAINT_FIELDS:
+        return ConflictDetails(field=_CONSTRAINT_FIELDS[constraint]).model_dump()
+    match = re.search(r"Key \(([^)]+)\)=", str(original or ""))
+    if match:
+        fields = [part.strip() for part in match.group(1).split(",")]
+        if fields and all(
+            re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", part) for part in fields
+        ):
+            return ConflictDetails(field=",".join(fields)).model_dump()
+    return {}
 
 
 def _validation_details(exc: RequestValidationError) -> dict[str, Any]:
@@ -167,7 +214,8 @@ def register_error_handlers(app: FastAPI) -> None:
 
     async def _http(request: Request, exc: HTTPException | StarletteHTTPException):
         return _response(request, _code_for_http(exc.status_code, exc.detail),
-                         status_code=exc.status_code, headers=exc.headers or {})
+                         details=_http_details(exc.detail), status_code=exc.status_code,
+                         headers=exc.headers or {})
 
     app.exception_handler(HTTPException)(_http)
     app.exception_handler(StarletteHTTPException)(_http)
@@ -175,7 +223,7 @@ def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(IntegrityError)
     async def _integrity(request: Request, exc: IntegrityError):
         logger.exception("integrity error request_id=%s", _request_id(request), exc_info=exc)
-        return _response(request, ErrorCode.CONFLICT)
+        return _response(request, ErrorCode.CONFLICT, details=_conflict_details(exc))
 
     @app.exception_handler(Exception)
     async def _unhandled(request: Request, exc: Exception):
@@ -184,4 +232,4 @@ def register_error_handlers(app: FastAPI) -> None:
         return _response(request, ErrorCode.INTERNAL_ERROR)
 
 
-__all__ = ["BusinessException", "SecurityError", "register_error_handlers"]
+__all__ = ["BusinessException", "ConflictError", "SecurityError", "register_error_handlers"]

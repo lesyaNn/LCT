@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.core.permissions import require_permission
 from app.core.security import CurrentUser
-from app.db.session import get_db
+from app.modules.audit.service import get_audit_db
 from app.modules.students import service
 from app.modules.students.schemas import StudentCreate, StudentRead, StudentUpdate
 from app.schemas.common import PaginatedResponse
@@ -35,7 +35,7 @@ WRITE = require_permission("university.edit")
 def create_student(
     university_id: uuid.UUID,
     data: StudentCreate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(WRITE),
 ) -> StudentRead:
     return service.create_student(db, university_id, data, user=user)
@@ -51,7 +51,7 @@ def list_students(
     university_id: uuid.UUID,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(READ),
 ) -> PaginatedResponse[StudentRead]:
     items, total = service.list_student_page(
@@ -68,7 +68,7 @@ def list_students(
 )
 def get_student(
     student_id: uuid.UUID,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(READ),
 ) -> StudentRead:
     return service.get_student(db, student_id, user=user)
@@ -83,7 +83,7 @@ def get_student(
 def patch_student(
     student_id: uuid.UUID,
     data: StudentUpdate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(WRITE),
 ) -> StudentRead:
     return service.patch_student(db, student_id, data, user=user)
@@ -98,7 +98,7 @@ def patch_student(
 )
 def delete_student(
     student_id: uuid.UUID,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(WRITE),
 ) -> None:
     service.delete_student(db, student_id, user=user)

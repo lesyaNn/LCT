@@ -127,3 +127,9 @@ class ErrorResponse(BaseModel):
     }
 
     error: ErrorDetail
+
+
+class ConflictDetails(BaseModel):
+    """Safe machine-readable location of a uniqueness/reference conflict."""
+
+    field: str

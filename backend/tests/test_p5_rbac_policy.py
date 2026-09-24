@@ -23,6 +23,7 @@ from app.core.policies import (
     ScopeKind,
     apply_university_scope,
     ensure_university_access,
+    ensure_university_visible,
     get_data_scope,
 )
 from app.core.security import CurrentUser, get_current_user
@@ -66,6 +67,9 @@ def test_registry_and_curator_compatibility():
         (("admin",), None, ScopeKind.ALL, set()),
         (("admin", "user"), (str(A),), ScopeKind.ALL, set()),
         (("manager", "user"), (str(B),), ScopeKind.GROUP, {B}),
+        (("curator",), (str(A),), ScopeKind.DENY, set()),
+        (("curator",), None, ScopeKind.DENY, set()),
+        (("curator", "user"), (str(A),), ScopeKind.OWN, {A}),
         (("unknown",), (str(A),), ScopeKind.DENY, set()),
     ],
 )
@@ -82,6 +86,13 @@ def test_object_guard_is_generic_and_fail_closed():
         with pytest.raises(SecurityError) as caught:
             ensure_university_access(B, user)
         assert caught.value.code == ErrorCode.FORBIDDEN
+
+
+def test_detail_guard_conceals_foreign_objects():
+    ensure_university_visible(A, actor("user", ids=(str(A),)))
+    with pytest.raises(Exception) as caught:
+        ensure_university_visible(B, actor("user", ids=(str(A),)))
+    assert caught.value.code == ErrorCode.NOT_FOUND
 
 
 def test_sql_scope_precedes_count_and_filter_intersection():

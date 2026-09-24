@@ -17,6 +17,22 @@ worker relay later materializes `audit_events` in one transaction. Delivery is
 eventually consistent and idempotent (the outbox UUID is the audit event UUID);
 an unavailable audit sink therefore never rolls back the workflow transition.
 
+### M9 decision (Dev-2 boundary)
+
+Dev-2 keeps the audit ledger in the **same database transaction** as the
+business mutation. This is the accepted M9 decision for the security/contract
+scope: a successful mutation cannot commit without its audit row, and a
+rollback removes both the mutation and its pending audit event. `AuditService`
+therefore deliberately never calls `commit()`; the request/service transaction
+is the single owner of commit and rollback.
+
+This gives atomicity, but it is not an asynchronous outbox guarantee. If the
+audit insert fails, the business mutation fails as well; that fail-closed
+behaviour is intentional for security-sensitive changes. Introducing an
+outbox worker would require coordinated changes to the workflow/import job
+boundaries and is outside the Dev-2 zone. No endpoint in this branch claims
+eventual outbox delivery.
+
 ## Current production paths
 
 | Operation | Audit action | Entity |
@@ -25,6 +41,9 @@ an unavailable audit sink therefore never rolls back the workflow transition.
 | Responsible create, update, delete | CREATE, UPDATE, DELETE | responsible |
 | University responsible assign/unassign | ASSIGN_RESPONSIBLE | responsible (assignment ID) |
 | Meeting create, update, delete | CREATE, UPDATE, DELETE | meeting |
+| Student create, update, delete | CREATE, UPDATE, DELETE | student |
+| Direction, program, vendor, product create/update/delete | CREATE, UPDATE, DELETE | direction, program, vendor, product |
+| Workflow comment create, update, delete | CREATE, UPDATE, DELETE | workflow_comment |
 | Workflow instance transition | WORKFLOW_TRANSITION | workflow_instance |
 | Report job creation | REPORT_GENERATE | report (job ID) |
 | XLSX import job creation | IMPORT | report (job ID) |

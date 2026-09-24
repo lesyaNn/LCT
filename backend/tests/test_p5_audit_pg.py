@@ -14,7 +14,10 @@ import app.models  # noqa: F401
 from app.core.security import CurrentUser, get_current_user
 from app.db.session import get_db
 from app.main import app
-from app.models.catalog import University
+from app.models.catalog import ITDirection, ITProgram, University
+from app.models.interactions import UniversityProgram
+from app.models.workflow_instances import WorkflowInstance
+from app.models.workflow_templates import WorkflowTemplate
 from app.modules.analytics import report_jobs
 from app.modules.audit.models import AuditEvent
 from app.modules.audit.service import AuditAction, AuditContext, AuditService
@@ -298,6 +301,81 @@ def test_required_production_hooks(audit_context):
             AuditEvent.entity_id == job.id,
             AuditEvent.action == "REPORT_GENERATE",
         )).all()) == 1
+
+
+def test_dev2_student_catalog_and_comment_audit(audit_context):
+    engine, client, current, own, _ = audit_context
+    current["user"] = CurrentUser(id="admin-sub", name="Admin", roles={"admin"})
+    with Session(engine) as db:
+        direction = ITDirection(code=f"AUD-{uuid.uuid4().hex[:8]}", name="Audit base")
+        db.add(direction)
+        db.flush()
+        program = ITProgram(direction_id=direction.id, name="Audit program", description="")
+        db.add(program)
+        db.flush()
+        db.add(UniversityProgram(university_id=own, program_id=program.id))
+        template = WorkflowTemplate(name=f"Audit template {uuid.uuid4()}")
+        db.add(template)
+        db.flush()
+        instance = WorkflowInstance(university_id=own, template_id=template.id)
+        db.add(instance)
+        db.commit()
+        program_id, instance_id = program.id, instance.id
+
+    direction = client.post(
+        "/api/v1/directions", json={"code": f"HTTP-{uuid.uuid4().hex[:8]}", "name": "HTTP direction"}
+    )
+    assert direction.status_code == 201, direction.text
+    direction_id = uuid.UUID(direction.json()["id"])
+    assert client.patch(
+        f"/api/v1/directions/{direction_id}", json={"name": "HTTP direction changed"}
+    ).status_code == 200
+    assert client.delete(f"/api/v1/directions/{direction_id}").status_code == 204
+
+    student = client.post(
+        f"/api/v1/universities/{own}/students",
+        json={
+            "external_id": f"AUD-{uuid.uuid4().hex}",
+            "program_id": str(program_id),
+            "full_name": "Audit Student",
+            "started_at": "2026-09-01",
+        },
+    )
+    assert student.status_code == 201, student.text
+    student_id = uuid.UUID(student.json()["id"])
+    assert client.patch(
+        f"/api/v1/students/{student_id}", json={"group_name": "AUD-2"}
+    ).status_code == 200
+    assert client.delete(f"/api/v1/students/{student_id}").status_code == 204
+
+    comment = client.post(
+        f"/api/v1/workflow/instances/{instance_id}/comments",
+        json={"content": "Audit comment"},
+    )
+    assert comment.status_code == 201, comment.text
+    comment_id = uuid.UUID(comment.json()["id"])
+    assert client.patch(
+        f"/api/v1/workflow/comments/{comment_id}", json={"content": "Changed comment"}
+    ).status_code == 200
+    assert client.delete(f"/api/v1/workflow/comments/{comment_id}").status_code == 204
+
+    with Session(engine) as db:
+        direction_events = db.scalars(
+            select(AuditEvent).where(AuditEvent.entity_id == direction_id)
+        ).all()
+        student_events = db.scalars(
+            select(AuditEvent).where(AuditEvent.entity_id == student_id)
+        ).all()
+        comment_events = db.scalars(
+            select(AuditEvent).where(AuditEvent.entity_id == comment_id)
+        ).all()
+        assert [event.action for event in direction_events] == ["CREATE", "UPDATE", "DELETE"]
+        assert [event.entity_type for event in direction_events] == ["direction"] * 3
+        assert [event.action for event in student_events] == ["CREATE", "UPDATE", "DELETE"]
+        assert [event.entity_type for event in student_events] == ["student"] * 3
+        assert [event.action for event in comment_events] == ["CREATE", "UPDATE", "DELETE"]
+        assert [event.entity_type for event in comment_events] == ["workflow_comment"] * 3
+        assert all(event.university_id == own for event in student_events + comment_events)
 
 
 def test_import_job_boundary_has_one_event(audit_context):
