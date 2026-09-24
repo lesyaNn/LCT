@@ -68,6 +68,7 @@ services:
       - "8081:8080"
     volumes:
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+      - ./keycloak/themes:/opt/keycloak/themes:ro
     healthcheck:
       # No curl in the Keycloak image: plain bash TCP probe + HTTP status check.
       test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080; printf \"GET /realms/rtk HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n\" >&3; grep -q \" 200 \" <&3'"]

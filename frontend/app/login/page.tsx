@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AuthError, AuthLoading, AuthRequired } from '@/shared/ui/access-state';
 import { useAuth } from '@/shared/auth/AuthProvider';
+import { authService } from '@/shared/lib/auth-service';
 import { getSafeReturnPath } from '@/shared/lib/keycloak-adapter';
 
 export default function LoginPage() {
@@ -25,9 +26,11 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (status === 'authenticated') router.replace(returnTo);
-  }, [returnTo, router, status]);
+    if (status === 'unauthenticated' && authService.mode() === 'keycloak') void login(returnTo);
+  }, [login, returnTo, router, status]);
 
-  if (status === 'loading' || status === 'authenticated') return <AuthLoading />;
+  if (status === 'loading' || status === 'authenticated'
+    || (status === 'unauthenticated' && authService.mode() === 'keycloak')) return <AuthLoading />;
   if (status === 'error') return <AuthError message={error ?? 'Не удалось проверить сессию.'} onRetry={retry} />;
 
   return <AuthRequired message={notice} onLogin={() => void login(returnTo)} />;
