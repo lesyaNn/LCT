@@ -93,10 +93,8 @@ function TeacherHeader({ id, teacher }: { id: string; teacher: TeacherPassportPr
   const nextTrainingStatus = getUpcomingDateStatus(teacher.nextTrainingDate);
   return (
     <header className={styles.header}>
-      <div className={styles.breadcrumbs}><Link href="/teachers">Преподаватели</Link><span aria-hidden="true">/</span><span>Паспорт преподавателя</span></div>
       <div className={styles.headerGrid}>
         <div className={styles.identity}>
-          <p className={styles.eyebrow}>ПАСПОРТ ПРЕПОДАВАТЕЛЯ</p>
           <h1>{teacher.name}</h1>
           <div className={styles.metaList}>
             <span><span className={styles.metaLabel}>ВУЗ</span><Link className={styles.universityLink} href={`/universities/${teacher.universityId}`}>{teacher.universityName}</Link></span>
