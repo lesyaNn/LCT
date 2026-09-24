@@ -4,6 +4,7 @@ import type { UserRole } from '@/shared/types/user';
 export const navigationItems: NavigationItem[] = [
   { label: 'Обзор', href: '/dashboard', icon: 'dashboard', allowedRoles: ['user', 'manager', 'admin'] },
   { label: 'ВУЗы', href: '/universities', icon: 'university', allowedRoles: ['user', 'manager', 'admin'] },
+  { label: 'Workflow', href: '/workflows', icon: 'workflow', allowedRoles: ['user', 'manager', 'admin'] },
   { label: 'Отчёты', href: '/reports', icon: 'report', allowedRoles: ['manager', 'admin'] },
   { label: 'Аудит', href: '/audit', icon: 'audit', allowedRoles: ['manager', 'admin'] },
   { label: 'Администрирование', href: '/admin', icon: 'admin', allowedRoles: ['admin'] },

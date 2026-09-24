@@ -10,6 +10,7 @@ export const queryKeys = {
     passports: ['university-passport'] as const,
     passport: (id: string) => ['university-passport', id] as const,
     workflow: (instanceId: string) => ['workflow', instanceId] as const,
+    workflowOverview: ['workflow-overview'] as const,
     workflowComments: (instanceId: string) => ['workflow', instanceId, 'comments'] as const,
     historyFamily: (id: string) => ['university-history', id] as const,
     history: <T>(id: string, filters: T) => ['university-history', id, filters] as const,

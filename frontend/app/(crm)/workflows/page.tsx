@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
+import { WorkflowOverviewPage } from '@/widgets/workflows/workflow-overview';
 
 export default function WorkflowsPage() {
-  redirect('/universities');
+  return <WorkflowOverviewPage />;
 }

@@ -401,6 +401,7 @@ function ResponsibleAssignmentDrawer({ id, currentName, onClose, onSuccess }: { 
       void queryClient.invalidateQueries({ queryKey: universityResponsiblesQueryKey(id) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.universities.historyFamily(id) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.universities.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowOverview });
       void queryClient.invalidateQueries({ queryKey: queryKeys.audit.all });
       onSuccess();
     },

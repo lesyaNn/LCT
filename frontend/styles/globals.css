@@ -1,14 +1,14 @@
 :root {
   /* Rostelecom brand and semantic tokens. Keep component styles on aliases. */
-  --rtk-brand-purple: #7700ff;
-  --rtk-brand-purple-hover: #6500d9;
-  --rtk-brand-orange: #ff4f12;
+  --rtk-brand-purple: #7700FF;
+  --rtk-brand-purple-hover: var(--rtk-brand-purple);
+  --rtk-brand-orange: #FF4F12;
   --rtk-brand-light-blue: #749fd6;
   --rtk-brand-lavender: #e8d2ed;
   --rtk-brand-cool-grey: #e3e8ec;
   --rtk-color-brand: var(--rtk-brand-purple);
   --rtk-color-brand-hover: var(--rtk-brand-purple-hover);
-  --rtk-color-brand-soft: rgba(119, 0, 255, .1);
+  --rtk-color-brand-soft: color-mix(in srgb, var(--rtk-brand-purple) 10%, transparent);
   --rtk-color-brand-secondary: var(--rtk-brand-orange);
   --rtk-color-brand-secondary-soft: rgba(255, 79, 18, .1);
   --rtk-color-text-primary: var(--atmr-fg-default, #101828);
@@ -56,13 +56,13 @@
   --atmr-bg-surface2: var(--atmr-neutral-10);
   --atmr-bg-surface3: var(--atmr-neutral-25);
   --atmr-fg-default: var(--atmr-neutral-990);
-  --atmr-base-accent: #7700ff;
-  --atmr-accent-700: #5300b3;
-  --atmr-accent-600: #6500d9;
+  --atmr-base-accent: var(--rtk-brand-purple);
+  --atmr-accent-700: var(--rtk-brand-purple);
+  --atmr-accent-600: var(--rtk-brand-purple);
   --atmr-accent-500: var(--atmr-base-accent);
-  --atmr-accent-400: #9233ff;
-  --atmr-accent-200: #bb80ff;
-  --atmr-accent-50: #f1e6ff;
+  --atmr-accent-400: var(--rtk-brand-purple);
+  --atmr-accent-200: color-mix(in srgb, var(--rtk-brand-purple) 50%, white);
+  --atmr-accent-50: color-mix(in srgb, var(--rtk-brand-purple) 10%, white);
   --atmr-accent-0: #fff;
   --atmr-accent-default: var(--atmr-accent-500);
   --atmr-accent-soft: var(--atmr-accent-400);
@@ -70,11 +70,11 @@
   --atmr-accent-hover: var(--atmr-accent-600);
   --atmr-accent-active: var(--atmr-accent-700);
   --atmr-accent-on-accent: var(--atmr-accent-0);
-  --atmr-accent-container-default: rgba(119, 0, 255, .1);
-  --atmr-accent-container-soft: rgba(119, 0, 255, .05);
-  --atmr-accent-container-muted: rgba(119, 0, 255, .03);
-  --atmr-accent-container-hover: rgba(119, 0, 255, .2);
-  --atmr-accent-container-active: rgba(119, 0, 255, .3);
+  --atmr-accent-container-default: color-mix(in srgb, var(--rtk-brand-purple) 10%, transparent);
+  --atmr-accent-container-soft: color-mix(in srgb, var(--rtk-brand-purple) 5%, transparent);
+  --atmr-accent-container-muted: color-mix(in srgb, var(--rtk-brand-purple) 3%, transparent);
+  --atmr-accent-container-hover: color-mix(in srgb, var(--rtk-brand-purple) 20%, transparent);
+  --atmr-accent-container-active: color-mix(in srgb, var(--rtk-brand-purple) 30%, transparent);
   --atmr-accent-on-container: var(--atmr-accent-500);
   --atmr-base-success: #00ac43;
   --atmr-success-500: var(--atmr-base-success);

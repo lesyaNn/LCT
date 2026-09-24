@@ -2,7 +2,7 @@
 .toolbar { align-items: center; display: flex; justify-content: space-between; }
 .eyebrow { color: var(--rtk-color-text-tertiary); display: none; font-size: 12px; margin: 0; }
 .mobileFilterButton { display: none; }
-.desktopFilters { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-medium); box-shadow: var(--rtk-shadow-elevation-1); display: block; padding: var(--rtk-space-4); }
+.desktopFilters { display: block; }
 .filterGrid { align-items: end; display: grid; gap: var(--rtk-space-3); grid-template-columns: repeat(5, minmax(0, 1fr)) auto; }
 .filterLabel, .dateRange label span { color: var(--rtk-color-text-secondary); display: block; font-size: 11px; font-weight: 700; margin-bottom: var(--rtk-space-1); }
 .dateRange { min-width: 0; }

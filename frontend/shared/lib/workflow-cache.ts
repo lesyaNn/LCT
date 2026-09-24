@@ -1,4 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
+import { queryKeys } from './query-keys';
 import { dashboardAnalyticsQueryKey, dashboardQueryKey } from './dashboard-repository';
 import {
   universityHealthScoreQueryKey,
@@ -39,6 +40,7 @@ export function removeWorkflowAttachmentFromCache(queryClient: QueryClient, inst
 export function invalidateWorkflowRelatedQueries(queryClient: QueryClient, instanceId: string, universityId?: string | null): Promise<unknown[]> {
   const invalidations = [
     invalidateWorkflowDetail(queryClient, instanceId),
+    queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowOverview }),
     queryClient.invalidateQueries({ queryKey: universitiesQueryKey }),
     queryClient.invalidateQueries({ queryKey: dashboardQueryKey }),
     queryClient.invalidateQueries({ queryKey: dashboardAnalyticsQueryKey }),

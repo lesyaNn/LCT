@@ -427,6 +427,7 @@ export interface UniversityWorkflowStage {
 }
 
 export interface UniversityWorkflow {
+  templateId?: string;
   universityId: string;
   universityName: string;
   universityCity: string;
@@ -614,6 +615,8 @@ function getWorkflowComments(id: string, index: number, responsible: UniversityR
 async function getMockUniversityWorkflow(id: string): Promise<UniversityWorkflow> {
   if (!universitiesWithRelationships.some((item) => item.id === id)) return getApiUniversityWorkflow(mockGetWorkflowInstance(id));
   const university = getUniversityOrThrow(id);
+  const assignedResponsible = assignedMockResponsible(id);
+  const currentResponsible = assignedResponsible === undefined ? university.responsible : assignedResponsible;
   const numericId = getUniversityNumericId(id);
   const storedStageId = getMockWorkflowCurrentStageId(id);
   const storedStageIndex = storedStageId ? workflowStageNames.findIndex((_name, index) => `${id}-workflow-stage-${index + 1}` === storedStageId) : -1;
@@ -636,8 +639,8 @@ async function getMockUniversityWorkflow(id: string): Promise<UniversityWorkflow
       status,
       deadline: getWorkflowDeadline(index, status),
       ...getWorkflowStageDates(index, status),
-      responsible: university.responsible,
-      comments: getWorkflowComments(id, index, university.responsible),
+      responsible: currentResponsible,
+      comments: getWorkflowComments(id, index, currentResponsible),
       attachments,
       tasks,
       transitions: index === 0 || status === 'pending' ? [] : [{
@@ -665,6 +668,7 @@ async function getMockUniversityWorkflow(id: string): Promise<UniversityWorkflow
     })),
   });
   return {
+    templateId: 'mock-university-workflow',
     universityId: university.id,
     universityName: university.name,
     universityCity: university.city,
@@ -711,6 +715,7 @@ function getApiUniversityWorkflow(instance: WorkflowInstanceApiRecord): Universi
   });
   const currentStage = stages.find((stage) => stage.status === 'current') ?? null;
   return {
+    templateId: instance.template_id,
     universityId: instance.university_id,
     universityName: 'Workflow',
     universityCity: '',
@@ -1388,7 +1393,14 @@ async function getMockUniversityResponsibles(id: string): Promise<UniversityResp
     { id: 'contact-elena', name: 'Елена Смирнова', role: 'Методист', email: 'elena.smirnova@example.ru', phone: '+7 (900) 345-67-89', isPrimary: false, initials: 'ЕС' },
   ];
   const primary = assignedResponsible === undefined ? university.responsible : assignedResponsible;
-  if (primary) contacts[0] = { ...contacts[0], id: primary.id, name: primary.name, role: primary.role ?? contacts[0].role, email: primary.email ?? contacts[0].email, initials: primary.name.split(' ').map((part) => part[0]).join('').slice(0, 2).toLocaleUpperCase('ru-RU') };
+  if (primary) {
+    const matchingIndex = contacts.findIndex((contact) => contact.email === primary.email || contact.name === primary.name);
+    if (matchingIndex >= 0) {
+      contacts.forEach((contact, index) => { contact.isPrimary = index === matchingIndex; });
+    } else {
+      contacts[0] = { ...contacts[0], id: primary.id, name: primary.name, role: primary.role ?? contacts[0].role, email: primary.email ?? contacts[0].email, initials: primary.name.split(' ').map((part) => part[0]).join('').slice(0, 2).toLocaleUpperCase('ru-RU') };
+    }
+  }
   return contacts;
 }
 

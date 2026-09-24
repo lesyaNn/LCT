@@ -26,6 +26,7 @@ import {
   type AuditListResult,
 } from '@/shared/lib/audit-repository';
 import { Button } from '@/shared/ui/rtk/button';
+import { FilterSurface } from '@/shared/ui/rtk/filter-surface';
 import { Drawer } from '@/shared/ui/rtk/drawer';
 import { EmptyState } from '@/shared/ui/empty-state';
 import { ErrorState } from '@/shared/ui/error-state';
@@ -119,7 +120,7 @@ function AuditFilters({ query, result, onPatch, onReset, open, onClose }: { quer
 
   return (
     <>
-      <div className={styles.desktopFilters} aria-label="Фильтры журнала аудита">{content}</div>
+      <FilterSurface className={styles.desktopFilters} label="Фильтры журнала аудита">{content}</FilterSurface>
       {open ? <Drawer title="Фильтры" onClose={onClose}><div className={styles.drawerContent}>{content}</div></Drawer> : null}
     </>
   );

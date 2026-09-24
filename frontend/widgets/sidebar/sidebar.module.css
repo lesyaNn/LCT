@@ -34,7 +34,7 @@
 .collapsed .brandVisual { justify-content: center; width: 100%; }
 .collapsed .brandLogoCompact { display: block; }
 .collapsed .activeMarker { left: 0; }
-.subnav { border-left: 1px solid rgba(119, 0, 255, .2); display: flex; flex-direction: column; gap: 2px; margin: 0 0 var(--rtk-space-2) var(--rtk-space-5); padding: var(--rtk-space-1) 0 var(--rtk-space-1) var(--rtk-space-2); }
+.subnav { border-left: 1px solid color-mix(in srgb, var(--rtk-color-brand) 20%, transparent); display: flex; flex-direction: column; gap: 2px; margin: 0 0 var(--rtk-space-2) var(--rtk-space-5); padding: var(--rtk-space-1) 0 var(--rtk-space-1) var(--rtk-space-2); }
 .subnavItem { border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-secondary); display: flex; font-size: 13px; min-height: 38px; padding: 0 var(--rtk-space-3); text-decoration: none; align-items: center; }
 .subnavItem:hover { background: var(--rtk-color-surface-hover); color: var(--rtk-color-text-primary); }
 .subnavActive { background: var(--rtk-color-brand-soft); color: var(--rtk-color-brand); font-weight: 700; }
