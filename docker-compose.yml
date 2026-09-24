@@ -146,6 +146,12 @@ services:
     volumes:
       - import-staging:/tmp/rtk-imports
       - reports-storage:/app/reports
+    healthcheck:
+      test: ["CMD", "python", "-c", "from pathlib import Path; assert b'app.modules.analytics.report_worker' in Path('/proc/1/cmdline').read_bytes()"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }

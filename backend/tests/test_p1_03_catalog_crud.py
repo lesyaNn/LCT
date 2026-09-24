@@ -827,16 +827,16 @@ def test_rbac_write_verbs_university(auth_client, db):
     curator = _auth(c, ("curator",))
     assert (
         c.patch(f"/api/v1/universities/{uid}", json={"city": "Y"}, headers=curator).status_code
-        == 200
+        == 404
     )
     assert c.post(
         f"/api/v1/universities/{uid}/responsibles/{r1.id}", json={}, headers=curator
-    ).status_code in (200, 201)
+    ).status_code == 404
     assert (
         c.delete(f"/api/v1/universities/{uid}/responsibles/{r1.id}", headers=curator).status_code
-        == 204
+        == 404
     )
-    assert c.delete(f"/api/v1/universities/{uid}", headers=curator).status_code == 204
+    assert c.delete(f"/api/v1/universities/{uid}", headers=curator).status_code == 404
 
 
 # ================================================================ openapi

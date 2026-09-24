@@ -639,7 +639,7 @@ def test_403_guest_without_permission(engine, real_client, monkeypatch):
     assert r.status_code == 403, r.text
 
 
-@pytest.mark.parametrize("role", ["admin", "manager", "curator", "user"])
+@pytest.mark.parametrize("role", ["admin", "manager", "user"])
 def test_200_allowed_roles(engine, real_client, monkeypatch, role):
     """Frozen contract: teacher passport reuses ``university.read`` (no new permission)."""
     with Session(engine) as s:

@@ -59,9 +59,22 @@ __all__ = [
     "build_worker_user",
     "generate_report_task",
     "main",
+    "run_audit_relay_once",
     "run_import_job",
     "run_worker_once",
 ]
+
+
+def run_audit_relay_once() -> int:
+    """Deliver pending workflow audit intents using a separate transaction."""
+    from app.db.session import SessionLocal
+    from app.modules.audit.relay import relay_audit_events
+
+    db = SessionLocal()
+    try:
+        return relay_audit_events(db)
+    finally:
+        db.close()
 
 
 def build_worker_user(job: ReportJob) -> CurrentUser:
@@ -227,6 +240,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     last_daily_day = None
     while True:
+        try:
+            run_audit_relay_once()
+        except Exception:
+            logger.exception("audit outbox relay iteration failed")
         try:
             now = datetime.now(timezone.utc)
             if now.hour == 0 and now.minute < 5 and last_daily_day != now.date():

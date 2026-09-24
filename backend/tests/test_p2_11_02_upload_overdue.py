@@ -385,14 +385,7 @@ def test_acceptance_auth_matrix(auth_client, db):
         files={"file": ("c.pdf", io.BytesIO(b"c"), "application/pdf")},
         headers=cur_h,
     )
-    assert up.status_code == 201, up.text
-    assert (
-        auth_client.delete(
-            f"/api/v1/workflow/instances/{iid}/attachments/{up.json()['id']}",
-            headers=cur_h,
-        ).status_code
-        == 204
-    )
+    assert up.status_code == 403, up.text
     assert auth_client.delete(meta_url, headers=admin_h).status_code == 204
 
 

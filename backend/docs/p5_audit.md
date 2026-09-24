@@ -17,21 +17,15 @@ worker relay later materializes `audit_events` in one transaction. Delivery is
 eventually consistent and idempotent (the outbox UUID is the audit event UUID);
 an unavailable audit sink therefore never rolls back the workflow transition.
 
-### M9 decision (Dev-2 boundary)
+### M9 integration decision
 
-Dev-2 keeps the audit ledger in the **same database transaction** as the
-business mutation. This is the accepted M9 decision for the security/contract
-scope: a successful mutation cannot commit without its audit row, and a
-rollback removes both the mutation and its pending audit event. `AuditService`
-therefore deliberately never calls `commit()`; the request/service transaction
-is the single owner of commit and rollback.
-
-This gives atomicity, but it is not an asynchronous outbox guarantee. If the
-audit insert fails, the business mutation fails as well; that fail-closed
-behaviour is intentional for security-sensitive changes. Introducing an
-outbox worker would require coordinated changes to the workflow/import job
-boundaries and is outside the Dev-2 zone. No endpoint in this branch claims
-eventual outbox delivery.
+Workflow transitions use the Dev-1 outbox: the business change, history, and
+sanitized audit intent commit in one transaction. The relay delivers to
+`audit_events` later and retries a failed sink without undoing the transition.
+Other mounted mutation paths, including Dev-2's student, catalog, and workflow
+comment coverage, currently call `AuditService.log_event` in the business
+transaction. `AuditService` never commits on its own. A failed direct audit
+insert therefore aborts that business mutation; a rollback removes both.
 
 ## Current production paths
 

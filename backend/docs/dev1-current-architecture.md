@@ -17,21 +17,16 @@
    remaining universities.
 3. Enable current-score readers and the daily snapshot worker. Re-running the backfill is idempotent.
 
-## Worker healthcheck infrastructure gap
+## Worker healthcheck
 
-The backend image declares an HTTP `/health` image healthcheck. Compose's
-`worker` service runs the same image with a non-HTTP process, so Docker reports
-that inherited probe as unhealthy even while the worker is alive and claiming
-jobs. The Compose owner should override or disable the worker healthcheck (or
-replace it with a process/queue probe); this branch deliberately does not add
-an HTTP server to the worker.
+Compose overrides the backend image's HTTP `/health` probe for `worker` with
+a process command check. The worker does not serve HTTP.
 
 ## P5 integration gate
 
-P5-07/08/09 remain `BLOCKED_BY_H1_H3`: current policy evidence still allows
-global curator visibility without an explicit university scope, and this
-checkout does not contain the required CI gate plus approved foreign-object
-403/404 policy. No LMS/Website adapter or Student external-reference schema is
+P5-07/08/09 require their own integration review. The Dev-2 policy denies
+curator data scope and uses the approved foreign-object 404 contract; this
+integration adds a PG16 CI gate. No LMS/Website adapter or Student external-reference schema is
 introduced until those prerequisites are proven on the active develop line.
 
 ## FILE_OWNERSHIP_CONFLICT
