@@ -100,7 +100,7 @@ html.login-pf,
   margin: 0;
   padding: 32px 36px 30px;
   background: #fff !important;
-  border: 1px solid #e5e1ee;
+  border: 0;
   border-radius: 24px;
   box-shadow: 0 18px 40px rgba(49, 37, 74, .08);
   color: var(--rtk-ink);
@@ -162,10 +162,10 @@ html.login-pf,
 .pf-v5-c-input-group {
   min-height: 54px;
   background: var(--rtk-field) !important;
-  border: 1px solid #eeebf4;
-  border-bottom-color: #92939b;
-  border-radius: 12px 12px 0 0;
+  border: 1px solid #e8e4ef;
+  border-radius: 12px;
   box-shadow: none !important;
+  overflow: hidden;
 }
 
 .pf-v5-c-form-control::before,
@@ -198,7 +198,8 @@ html.login-pf,
   flex: 1 1 auto;
   min-width: 0;
   border: 0;
-  border-radius: inherit;
+  border-radius: 0;
+  box-shadow: none !important;
 }
 
 .pf-v5-c-input-group__item:has(#password-show-password) {
@@ -218,6 +219,11 @@ html.login-pf,
   color: #626371;
   font-size: 17px;
   cursor: pointer;
+}
+
+#password-show-password::before,
+#password-show-password::after {
+  display: none !important;
 }
 
 #password-show-password:hover,
