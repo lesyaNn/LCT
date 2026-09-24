@@ -32,6 +32,7 @@ from sqlalchemy import create_engine, inspect, select
 from sqlalchemy.orm import Session, sessionmaker
 
 import app.models  # noqa: F401 (register ReportJob metadata)
+from app.core.errors import register_error_handlers
 from app.core.security import CurrentUser, get_current_user
 from app.models.catalog import ITProduct, License, University, Vendor
 from app.models.report_job import ReportJob
@@ -112,6 +113,7 @@ def _seed(s: Session) -> dict:
 
 def _client(user: CurrentUser | None) -> TestClient:
     app = FastAPI()
+    register_error_handlers(app)
     app.include_router(reports_router)
     if user is not None:
         app.dependency_overrides[get_current_user] = lambda: user
@@ -319,6 +321,8 @@ def test_failed_job_sanitized_and_denied(pg, monkeypatch):
     )
     with _session(eng) as s:
         job_id = create_report_job(s, ReportRequest(format="xlsx"), _admin()).job_id
+    assert generate_report_task(job_id) == "requeued"
+    assert generate_report_task(job_id) == "requeued"
     assert generate_report_task(job_id) == "failed"
     with _session(eng) as s:
         job = jobs.get_job(s, job_id)
@@ -329,7 +333,8 @@ def test_failed_job_sanitized_and_denied(pg, monkeypatch):
     client = _client(_admin())
     assert client.get(f"/reports/{job_id}").json()["status"] == "failed"
     dl = client.get(f"/reports/{job_id}/download")
-    assert dl.status_code == 409
+    assert dl.status_code == 400
+    assert dl.json()["error"]["code"] == "REPORT_NOT_READY"
 
 
 # ------------------------------------------------------- security snapshot
@@ -386,7 +391,7 @@ def test_empty_scope_fails_closed(pg):
     doc = json.loads(
         (tmp / "reports" / f"report_{job_id}.json").read_text(encoding="utf-8")
     )
-    assert doc["total"] == 0 and doc["items"] == []  # fail closed: zero rows
+    assert doc["totals"]["row_count"] == 0 and doc["rows"] == []  # P4 JSON contract
     # The unscoped baseline really has data (the scope did the filtering).
     from app.modules.analytics.dataset import ReportDatasetService
 
@@ -412,7 +417,9 @@ def test_own_job_access_matrix(pg):
     assert _client(_admin()).get(f"/reports/{job_id}").status_code == 200
     assert _client(owner).get(f"/reports/{uuid4()}").status_code == 404
     assert _client(owner).get("/reports/not-a-uuid").status_code == 404
-    assert _client(owner).get(f"/reports/{job_id}/download").status_code in (200, 409)
+    pending = _client(owner).get(f"/reports/{job_id}/download")
+    assert pending.status_code == 400
+    assert pending.json()["error"]["code"] == "REPORT_NOT_READY"
 
 
 # ------------------------------------------------------- download states
@@ -423,11 +430,15 @@ def test_download_not_ready_is_controlled(pg):
     with _session(eng) as s:
         job_id = create_report_job(s, ReportRequest(format="xlsx"), _admin()).job_id
     client = _client(_admin())
-    assert client.get(f"/reports/{job_id}/download").status_code == 409
+    queued = client.get(f"/reports/{job_id}/download")
+    assert queued.status_code == 400
+    assert queued.json()["error"]["code"] == "REPORT_NOT_READY"
     with _session(eng) as s:
         job = jobs.get_job(s, job_id)
         assert jobs.mark_building(s, job) is True
-    assert client.get(f"/reports/{job_id}/download").status_code == 409
+    building = client.get(f"/reports/{job_id}/download")
+    assert building.status_code == 400
+    assert building.json()["error"]["code"] == "REPORT_NOT_READY"
 
 
 def test_download_expired_is_gone(pg):
@@ -464,7 +475,8 @@ def test_download_path_tamper_denied(pg, tmp_path):
             s.add(job)
             s.commit()
             resp = client.get(f"/reports/{job_id}/download")
-            assert resp.status_code == 410, evil
+            assert resp.status_code == 404, evil
+            assert resp.json()["error"]["code"] == "FILE_NOT_FOUND"
             assert b"top-secret" not in resp.content
 
 
@@ -662,8 +674,8 @@ def test_migration_chain_latest_is_report_jobs():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     versions = [v for v, _, _ in module._discover()]
-    assert versions[-1] == "000020_job_attempts"
-    assert len(versions) == 20
+    assert versions[-1] == "000021_audit_p5"
+    assert len(versions) == 21
     assert "report_jobs" in module.EXPECTED_TABLES
     assert module.EXPECTED_TABLES[-1] == "report_jobs"
 

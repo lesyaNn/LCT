@@ -128,7 +128,10 @@ def build_job_payload(request: ReportRequest, user: Any) -> dict[str, Any]:
     for ``xlsx`` / ``pdf`` / ``json`` (only ``format`` differs).
     """
     roles = sorted(getattr(user, "roles", None) or [])
-    scope = getattr(user, "university_ids", None)
+    from app.core.policies import get_data_scope
+
+    policy = get_data_scope(user)
+    scope = None if policy.is_all else tuple(sorted(str(v) for v in policy.university_ids))
     return {
         "format": request.format.value,
         "filters": request.filters.model_dump(mode="json"),

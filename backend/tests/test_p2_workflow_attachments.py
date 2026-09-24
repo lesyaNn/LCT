@@ -243,7 +243,7 @@ def test_file_type_contract_blocked_not_invented(monkeypatch):
     monkeypatch.setattr(settings, "upload_allowed_extensions", "pdf")
     with pytest.raises(HTTPException) as ei:
         policy.check_file_type("run.exe", "application/octet-stream")
-    assert ei.value.status_code == 415
+    assert ei.value.status_code == 400
 
 
 @pytest.mark.parametrize(
@@ -586,7 +586,7 @@ def test_rbac_allowed_denied_and_admin(auth_client, db):
     meta_url = f"/api/v1/workflow/instances/{iid}/attachments/{aid}"
     dl_url = meta_url + "/download"
 
-    # role `user` (university.read/catalog.read only) -> 403 everywhere.
+    # No university assignment: the user has no visible data scope.
     user_h = _auth(auth_client, ["user"])
     assert auth_client.get(meta_url, headers=user_h).status_code == 403
     assert auth_client.get(dl_url, headers=user_h).status_code == 403
@@ -600,19 +600,20 @@ def test_rbac_allowed_denied_and_admin(auth_client, db):
     )
     assert auth_client.delete(meta_url, headers=user_h).status_code == 403
 
-    # manager (workflow.read, no change_status): read OK, mutations 403.
-    mgr_h = _auth(auth_client, ["manager"])
+    # Assigned manager has read/create/delete permissions in the P5 matrix.
+    mgr_h = _auth(auth_client, ["manager"], [str(g["ua"].id)])
     assert auth_client.get(meta_url, headers=mgr_h).status_code == 200
     assert auth_client.get(dl_url, headers=mgr_h).status_code == 200
-    assert (
-        auth_client.post(
-            f"/api/v1/workflow/instances/{iid}/attachments",
-            files={"file": ("m.pdf", io.BytesIO(b"x"), "application/pdf")},
-            headers=mgr_h,
-        ).status_code
-        == 403
+    mgr_upload = auth_client.post(
+        f"/api/v1/workflow/instances/{iid}/attachments",
+        files={"file": ("m.pdf", io.BytesIO(b"x"), "application/pdf")},
+        headers=mgr_h,
     )
-    assert auth_client.delete(meta_url, headers=mgr_h).status_code == 403
+    assert mgr_upload.status_code == 201, mgr_upload.text
+    assert auth_client.delete(
+        f"/api/v1/workflow/instances/{iid}/attachments/{mgr_upload.json()['id']}",
+        headers=mgr_h,
+    ).status_code == 204
 
     # curator (workflow.read + change_status): full access.
     cur_h = _auth(auth_client, ["curator"])

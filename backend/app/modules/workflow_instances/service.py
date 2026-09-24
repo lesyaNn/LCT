@@ -25,14 +25,12 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, timedelta
-from types import SimpleNamespace
 
-from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.exceptions import NotFound
-from app.core.permissions import user_permissions
+from app.core.policies import ensure_university_access
 from app.models.catalog import Responsible, University
 from app.models.workflow_instances import (
     InstanceStage,
@@ -46,23 +44,13 @@ from .schemas import InstanceDetail, InstanceStageRead
 
 
 def authorize_scope(user, instance) -> None:
-    """University-scope gate for one instance (permission checked by router).
-
-    Mirrors the P2-05 attachments gate: admins (``*``) skip scoping; other
-    roles are confined to ``user.university_ids`` when the token carries that
-    optional claim. Tokens without the claim keep the global RBAC behaviour.
-    """
-    perms = user_permissions(user)
-    if "*" in perms:
-        return
-    scope = getattr(user, "university_ids", None)
-    if scope is not None and str(instance.university_id) not in set(scope):
-        raise HTTPException(status_code=403, detail="Forbidden: other university")
+    """Compatibility adapter for existing P2 call sites."""
+    ensure_university_access(instance.university_id, user)
 
 
 def require_university_scope(user, university_id: uuid.UUID) -> None:
     """Scope gate for creation (no instance row exists yet)."""
-    authorize_scope(user, SimpleNamespace(university_id=university_id))
+    ensure_university_access(university_id, user)
 
 
 def get_instance_or_404(db: Session, instance_id: uuid.UUID) -> WorkflowInstance:

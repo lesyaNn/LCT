@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.security import CurrentUser, get_current_user
+from app.core.errors import BusinessException
+from app.schemas.errors import ErrorCode
 from app.db.session import get_db
 from app.modules.teachers.models import Teacher
 from app.modules.teachers.schemas import TeacherIn, TeacherOut
@@ -33,6 +35,5 @@ def get_teacher(teacher_id: int, db: Session = Depends(get_db),
                 _u: CurrentUser = Depends(get_current_user)):
     obj = db.get(Teacher, teacher_id)
     if not obj:
-        from fastapi import HTTPException
-        raise HTTPException(404, "Teacher not found")
+        raise BusinessException(ErrorCode.NOT_FOUND)
     return obj

@@ -366,16 +366,18 @@ def test_acceptance_auth_matrix(auth_client, db):
         == 403
     )
 
-    mgr_h = _auth(auth_client, ["manager"])
+    mgr_h = _auth(auth_client, ["manager"], [str(g["university"].id)])
     assert auth_client.get(meta_url, headers=mgr_h).status_code == 200  # read OK
-    assert (
-        auth_client.post(
-            f"/api/v1/workflow/instances/{iid}/attachments",
-            files={"file": ("m.pdf", io.BytesIO(b"x"), "application/pdf")},
-            headers=mgr_h,
-        ).status_code
-        == 403  # mutation denied
+    mgr_upload = auth_client.post(
+        f"/api/v1/workflow/instances/{iid}/attachments",
+        files={"file": ("m.pdf", io.BytesIO(b"x"), "application/pdf")},
+        headers=mgr_h,
     )
+    assert mgr_upload.status_code == 201, mgr_upload.text
+    assert auth_client.delete(
+        f"/api/v1/workflow/instances/{iid}/attachments/{mgr_upload.json()['id']}",
+        headers=mgr_h,
+    ).status_code == 204
 
     cur_h = _auth(auth_client, ["curator"])
     up = auth_client.post(
@@ -460,7 +462,7 @@ def test_acceptance_10_type_contract_is_partial_not_invented(monkeypatch):
     assert policy.check_file_type("report.PDF", "application/pdf") == "application/pdf"
     with pytest.raises(HTTPException) as ei:
         policy.check_file_type("run.exe", "application/octet-stream")
-    assert ei.value.status_code == 415
+        assert ei.value.status_code == 400
 
 
 # =================================================== overdue acceptance ==

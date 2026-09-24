@@ -606,7 +606,7 @@ def test_instances_rbac_matrix(auth_client, db):
         == 403
     )
 
-    mgr_h = _auth(auth_client, ["manager"])
+    mgr_h = _auth(auth_client, ["manager"], [str(g["university"].id)])
     assert auth_client.get(url, headers=mgr_h).status_code == 200
     assert (
         auth_client.post(
@@ -614,7 +614,7 @@ def test_instances_rbac_matrix(auth_client, db):
             json={"university_id": str(g["university"].id), "template_id": str(g["template"].id)},
             headers=mgr_h,
         ).status_code
-        == 403
+        == 201
     )
 
     cur_h = _auth(auth_client, ["curator"])

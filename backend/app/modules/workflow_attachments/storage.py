@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import BinaryIO
 
 from fastapi import HTTPException
+from app.core.errors import BusinessException
 
 from app.config import settings
 
@@ -224,7 +225,7 @@ class S3StorageBackend(StorageBackend):
         except Exception as exc:
             # HTTP control flow (e.g. 413 from the chunk generator) passes
             # through unwrapped; only real failures become StorageError.
-            if isinstance(exc, HTTPException):
+            if isinstance(exc, (HTTPException, BusinessException)):
                 raise
             raise StorageError(str(exc)) from exc
         finally:

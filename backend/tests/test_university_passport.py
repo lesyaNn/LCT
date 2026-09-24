@@ -900,6 +900,7 @@ def test_endpoint_403_for_role_without_permission(engine):
             assert denied.status_code == 403, denied.text
             ok_claims = dict(claims)
             ok_claims["realm_access"] = {"roles": ["manager"]}
+            ok_claims["university_ids"] = [uid]
             ok_token = _jwt.encode(ok_claims, priv, algorithm="RS256", headers={"kid": "t403"})
             ok = client.get(
                 f"/api/v1/universities/{uid}/passport",

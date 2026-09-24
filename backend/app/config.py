@@ -3,6 +3,7 @@
 MINIMAL AUTH STAGE: auth does NOT depend on PostgreSQL/Redis/MinIO.
 Domain DB settings stay for the next stage but are unused at runtime.
 """
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -28,8 +29,11 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./dev.db"
     redis_url: str = "redis://localhost:6379/0"
     s3_endpoint: str = "http://localhost:9000"
-    s3_access_key: str = "minioadmin"
-    s3_secret_key: str = "minioadmin"
+    # Credentials are intentionally empty by default.  They are required from
+    # the environment when S3/MinIO is selected; the old demo credential
+    # fallback was unsafe in a production process.
+    s3_access_key: str = ""
+    s3_secret_key: str = ""
     s3_bucket: str = "rtk-files"
     # P2-05 file storage: "local" (production default, persistent volume)
     # or "s3" (MinIO/S3 seam, same service code path).
@@ -56,6 +60,22 @@ class Settings(BaseSettings):
     # CSV обязательных типов документов для компонента D.
     # Дефолт ТЗ: contract,license,act,protocol.
     health_required_doc_types: str = "contract,license,act,protocol"
+
+    @model_validator(mode="after")
+    def validate_security_baseline(self) -> "Settings":
+        """Fail closed for settings that would weaken a production process."""
+        production = self.app_env.lower() in {"prod", "production"}
+        origins = {origin.strip() for origin in self.cors_origins.split(",") if origin.strip()}
+        if production:
+            if self.auth_dev_bypass:
+                raise ValueError("AUTH_DEV_BYPASS must be false in production")
+            if "*" in origins or "*" in self.cors_origin_list:
+                raise ValueError("CORS wildcard is not allowed in production")
+            if self.storage_backend.lower() in {"s3", "minio"} and (
+                not self.s3_access_key.strip() or not self.s3_secret_key.strip()
+            ):
+                raise ValueError("S3 credentials must be supplied through environment in production")
+        return self
 
     @property
     def cors_origin_list(self) -> list[str]:

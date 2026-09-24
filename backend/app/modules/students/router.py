@@ -92,6 +92,7 @@ def patch_student(
 @router.delete(
     "/students/{student_id}",
     status_code=204,
+    response_model=None,
     tags=["Universities"],
     summary="Delete student",
 )

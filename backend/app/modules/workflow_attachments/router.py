@@ -165,5 +165,10 @@ def delete_attachment(
     attachment = service.get_bound_attachment(
         db, instance_id=instance.id, attachment_id=attachment_id
     )
+    if "admin" not in user.roles and attachment.uploaded_by_keycloak_sub != user.id:
+        from app.core.errors import SecurityError
+        from app.schemas.errors import ErrorCode
+
+        raise SecurityError(ErrorCode.FORBIDDEN)
     service.delete_attachment(db, storage, attachment=attachment)
     return None

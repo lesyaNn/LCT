@@ -321,17 +321,18 @@ def test_json_default_14_types_and_unicode(fx):
     result = generate_json_report(s, UnifiedFilter(), None, tmp_path / "r.json")
     assert result.row_count == ds.total == 5
     doc = json.loads((tmp_path / "r.json").read_text(encoding="utf-8"))
-    assert doc["columns"] == list(DEFAULT_COLUMNS)
-    assert doc["total"] == 5
-    assert len(doc["items"]) == 5
-    lic1 = next(i for i in doc["items"] if i.get("contract_number") == "C-001")
+    assert [entry["key"] for entry in doc["columns"]] == list(DEFAULT_COLUMNS)
+    assert all(entry["title"] for entry in doc["columns"])
+    assert doc["totals"]["row_count"] == 5
+    assert len(doc["rows"]) == 5
+    lic1 = next(i for i in doc["rows"] if i.get("contract_number") == "C-001")
     assert lic1["university"] == "МГУ им. Ломоносова"
     assert lic1["product"] == "ПО Защита"
     assert lic1["health_score"] == 85 and isinstance(lic1["health_score"], int)
     assert lic1["license_signed"] == "2026-02-01"
     assert lic1["license_expires"] == "2027-02-01"
     assert lic1["comment"] == "Комментарий №1"
-    gamma = next(i for i in doc["items"] if i["university"] == "ВУЗ Гамма")
+    gamma = next(i for i in doc["rows"] if i["university"] == "ВУЗ Гамма")
     assert gamma["direction"] is None
     assert gamma["product"] is None
     assert gamma["health_score"] is None
@@ -346,8 +347,8 @@ def test_json_items_equal_dataset_rows(fx):
     ds = Dataset.fetch_rows(s, filters, SUBSET_6, today=TODAY)
     generate_json_report(s, filters, SUBSET_6, tmp_path / "s.json")
     doc = json.loads((tmp_path / "s.json").read_text(encoding="utf-8"))
-    assert doc["items"] == ds.rows  # SUBSET_6 values are str/int/None: identical
-    assert doc["total"] == ds.total == 3
+    assert doc["rows"] == ds.rows  # SUBSET_6 values are str/int/None: identical
+    assert doc["totals"]["row_count"] == ds.total == 3
 
 
 def test_json_scoped_user_matches_dataset_scope(fx):
@@ -356,8 +357,8 @@ def test_json_scoped_user_matches_dataset_scope(fx):
     ds = Dataset.fetch_rows(s, UnifiedFilter(), SUBSET_6, user=user, today=TODAY)
     generate_json_report(s, UnifiedFilter(), SUBSET_6, tmp_path / "g.json", user=user)
     doc = json.loads((tmp_path / "g.json").read_text(encoding="utf-8"))
-    assert doc["total"] == ds.total == 1
-    assert doc["items"][0]["university"] == "ВУЗ Гамма"
+    assert doc["totals"]["row_count"] == ds.total == 1
+    assert doc["rows"][0]["university"] == "ВУЗ Гамма"
 
 
 # ------------------------------------------------------- cross-format consistency
@@ -402,7 +403,7 @@ def test_cross_format_same_rows_columns_values(fx):
             expected = ds_row[key]
             assert ws_rows[idx][col] == expected, (idx, key)
         # JSON: identical items (SUBSET_6 is str/int/None).
-        assert doc["items"][idx] == ds_row
+        assert doc["rows"][idx] == ds_row
 
     pdf_text = _nospace(extract_pdf_text(pdf.path.read_bytes()))
     for probe in ("МГУ им. Ломоносова", "ВУЗ Бета", "ВУЗ Гамма", "ВУЗ Дельта"):
@@ -425,10 +426,10 @@ def test_cross_format_filtered_subset(fx):
     pdf = generate_pdf_report(s, filters, cols, tmp_path / "f.pdf")
     generate_json_report(s, filters, cols, tmp_path / "f.json")
     doc = json.loads((tmp_path / "f.json").read_text(encoding="utf-8"))
-    assert xlsx.row_count == pdf.row_count == doc["total"] == 2
-    products = sorted(i["product"] for i in doc["items"])
+    assert xlsx.row_count == pdf.row_count == doc["totals"]["row_count"] == 2
+    products = sorted(i["product"] for i in doc["rows"])
     assert products == ["ПО Второе", "ПО Защита"]
-    assert all(i["health_score"] == 85 for i in doc["items"])
+    assert all(i["health_score"] == 85 for i in doc["rows"])
 
 
 # ------------------------------------------------------- volume probes
@@ -471,7 +472,7 @@ def test_json_large_export_bounded(fx):
     result = generate_json_report(s, filters, SUBSET_6, tmp_path / "big.json")
     assert result.row_count == 1500
     doc = json.loads((tmp_path / "big.json").read_text(encoding="utf-8"))
-    assert doc["total"] == 1500 and len(doc["items"]) == 1500
+    assert doc["totals"]["row_count"] == 1500 and len(doc["rows"]) == 1500
 
 
 def test_pdf_multipage_volume(fx):

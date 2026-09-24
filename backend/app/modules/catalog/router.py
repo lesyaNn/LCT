@@ -18,9 +18,10 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.permissions import require_permission
+from app.core.permissions import require_permission, require_role
+from app.core.policies import apply_university_scope, ensure_university_access
 from app.core.security import CurrentUser
-from app.db.session import get_db
+from app.modules.audit.service import get_audit_db
 from app.modules.catalog import service
 from app.modules.catalog.schemas import (
     DirectionDetail,
@@ -60,6 +61,7 @@ router = APIRouter()
 
 READ = require_permission("university.read")
 WRITE = require_permission("university.edit")
+LEGACY_CATALOG_WRITE = require_role("admin", "curator")
 
 
 UniversitySortBy = Literal["name", "city", "created_at", "health_score"]
@@ -91,8 +93,8 @@ def _norm(search: str | None) -> str | None:
 )
 def create_university(
     data: UniversityCreate,
-    db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(WRITE),
+    db: Session = Depends(get_audit_db),
+    _user: CurrentUser = Depends(require_role("admin", "curator")),
 ) -> UniversityDetail:
     return service.create_university(db, name=data.name, city=data.city)
 
@@ -123,7 +125,7 @@ def list_universities(
         description="Filter by computed Health Score status (scores calculated per university, cached 5 min)",
     ),
     unified: UnifiedFilter = Depends(get_unified_filter),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(READ),
 ) -> PaginatedResponse[UniversityRead]:
     _ = region  # deprecated no-op, kept for backward compatibility (P1-11-03)
@@ -151,10 +153,12 @@ def list_universities(
 )
 def get_university(
     university_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(READ),
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(READ),
 ) -> UniversityDetail:
-    return service.get_university_detail(db, university_id)
+    detail = service.get_university_detail(db, university_id)
+    ensure_university_access(university_id, user)
+    return detail
 
 
 @router.patch(
@@ -166,9 +170,10 @@ def get_university(
 def patch_university(
     university_id: uuid.UUID,
     data: UniversityUpdate,
-    db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(WRITE),
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(WRITE),
 ) -> UniversityDetail:
+    ensure_university_access(university_id, user)
     fields = data.model_fields_set
     return service.patch_university(
         db,
@@ -189,9 +194,10 @@ def patch_university(
 )
 def delete_university(
     university_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(WRITE),
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(require_role("admin", "curator")),
 ) -> None:
+    ensure_university_access(university_id, user)
     service.delete_university(db, university_id)
 
 
@@ -205,9 +211,10 @@ def assign_responsible(
     university_id: uuid.UUID,
     responsible_id: uuid.UUID,
     data: ResponsibleAssign | None = Body(default=None),
-    db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(WRITE),
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(require_role("admin", "manager", "curator")),
 ):
+    ensure_university_access(university_id, user)
     link, created = service.assign_responsible(db, university_id, responsible_id, data)
     return JSONResponse(
         status_code=201 if created else 200,
@@ -225,9 +232,10 @@ def assign_responsible(
 def unassign_responsible(
     university_id: uuid.UUID,
     responsible_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(WRITE),
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(require_role("admin", "manager", "curator")),
 ) -> None:
+    ensure_university_access(university_id, user)
     service.unassign_responsible(db, university_id, responsible_id)
 
 
@@ -243,8 +251,8 @@ def unassign_responsible(
 )
 def create_direction(
     data: DirectionCreate,
-    db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(WRITE),
+    db: Session = Depends(get_audit_db),
+    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
 ) -> DirectionDetail:
     return service.create_direction(db, code=data.code, name=data.name)
 
@@ -261,7 +269,7 @@ def list_directions(
     search: str | None = Query(default=None, description="Case-insensitive match on code/name"),
     sort_by: DirectionSortBy = Query(default="code"),
     sort_order: SortOrder = Query(default="asc"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     _user: CurrentUser = Depends(READ),
 ) -> PaginatedResponse[DirectionRead]:
     items, total = service.list_direction_page(
@@ -283,7 +291,7 @@ def list_directions(
 )
 def get_direction(
     direction_id: uuid.UUID,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     _user: CurrentUser = Depends(READ),
 ) -> DirectionDetail:
     return service.get_direction_detail(db, direction_id)
@@ -298,8 +306,8 @@ def get_direction(
 def patch_direction(
     direction_id: uuid.UUID,
     data: DirectionUpdate,
-    db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(WRITE),
+    db: Session = Depends(get_audit_db),
+    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
 ) -> DirectionDetail:
     return service.patch_direction(db, direction_id, code=data.code, name=data.name)
 
@@ -313,8 +321,8 @@ def patch_direction(
 )
 def delete_direction(
     direction_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(WRITE),
+    db: Session = Depends(get_audit_db),
+    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
 ) -> None:
     service.delete_direction(db, direction_id)
 
@@ -331,8 +339,8 @@ def delete_direction(
 )
 def create_program(
     data: ProgramCreate,
-    db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(WRITE),
+    db: Session = Depends(get_audit_db),
+    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
 ) -> ProgramDetail:
     return service.create_program(
         db, direction_id=data.direction_id, name=data.name, description=data.description
@@ -352,7 +360,7 @@ def list_programs(
     direction_id: uuid.UUID | None = Query(default=None, description="Filter by direction"),
     sort_by: ProgramSortBy = Query(default="name"),
     sort_order: SortOrder = Query(default="asc"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     _user: CurrentUser = Depends(READ),
 ) -> PaginatedResponse[ProgramRead]:
     items, total = service.list_program_page(
@@ -375,7 +383,7 @@ def list_programs(
 )
 def get_program(
     program_id: uuid.UUID,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     _user: CurrentUser = Depends(READ),
 ) -> ProgramDetail:
     return service.get_program_detail(db, program_id)
@@ -390,8 +398,8 @@ def get_program(
 def patch_program(
     program_id: uuid.UUID,
     data: ProgramUpdate,
-    db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(WRITE),
+    db: Session = Depends(get_audit_db),
+    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
 ) -> ProgramDetail:
     return service.patch_program(
         db,
@@ -411,8 +419,8 @@ def patch_program(
 )
 def delete_program(
     program_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(WRITE),
+    db: Session = Depends(get_audit_db),
+    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
 ) -> None:
     service.delete_program(db, program_id)
 
@@ -429,8 +437,8 @@ def delete_program(
 )
 def create_product(
     data: ProductCreate,
-    db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(WRITE),
+    db: Session = Depends(get_audit_db),
+    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
 ) -> ProductDetail:
     return service.create_product(
         db, vendor_id=data.vendor_id, name=data.name, version=data.version
@@ -450,7 +458,7 @@ def list_products(
     vendor_id: uuid.UUID | None = Query(default=None, description="Filter by vendor"),
     sort_by: ProductSortBy = Query(default="name"),
     sort_order: SortOrder = Query(default="asc"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     _user: CurrentUser = Depends(READ),
 ) -> PaginatedResponse[ProductRead]:
     items, total = service.list_product_page(
@@ -473,7 +481,7 @@ def list_products(
 )
 def get_product(
     product_id: uuid.UUID,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     _user: CurrentUser = Depends(READ),
 ) -> ProductDetail:
     return service.get_product_detail(db, product_id)
@@ -488,8 +496,8 @@ def get_product(
 def patch_product(
     product_id: uuid.UUID,
     data: ProductUpdate,
-    db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(WRITE),
+    db: Session = Depends(get_audit_db),
+    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
 ) -> ProductDetail:
     return service.patch_product(
         db, product_id, vendor_id=data.vendor_id, name=data.name, version=data.version
@@ -505,8 +513,8 @@ def patch_product(
 )
 def delete_product(
     product_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(WRITE),
+    db: Session = Depends(get_audit_db),
+    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
 ) -> None:
     service.delete_product(db, product_id)
 
@@ -523,8 +531,8 @@ def delete_product(
 )
 def create_vendor(
     data: VendorCreate,
-    db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(WRITE),
+    db: Session = Depends(get_audit_db),
+    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
 ) -> VendorDetail:
     return service.create_vendor(db, name=data.name)
 
@@ -541,7 +549,7 @@ def list_vendors(
     search: str | None = Query(default=None, description="Case-insensitive match on name"),
     sort_by: VendorSortBy = Query(default="name"),
     sort_order: SortOrder = Query(default="asc"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     _user: CurrentUser = Depends(READ),
 ) -> PaginatedResponse[VendorRead]:
     items, total = service.list_vendor_page(
@@ -563,7 +571,7 @@ def list_vendors(
 )
 def get_vendor(
     vendor_id: uuid.UUID,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     _user: CurrentUser = Depends(READ),
 ) -> VendorDetail:
     return service.get_vendor_detail(db, vendor_id)
@@ -578,8 +586,8 @@ def get_vendor(
 def patch_vendor(
     vendor_id: uuid.UUID,
     data: VendorUpdate,
-    db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(WRITE),
+    db: Session = Depends(get_audit_db),
+    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
 ) -> VendorDetail:
     return service.patch_vendor(db, vendor_id, name=data.name)
 
@@ -593,8 +601,8 @@ def patch_vendor(
 )
 def delete_vendor(
     vendor_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(WRITE),
+    db: Session = Depends(get_audit_db),
+    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
 ) -> None:
     service.delete_vendor(db, vendor_id)
 
@@ -611,8 +619,8 @@ def delete_vendor(
 )
 def create_responsible(
     data: ResponsibleCreate,
-    db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(WRITE),
+    db: Session = Depends(get_audit_db),
+    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
 ) -> ResponsibleDetail:
     return service.create_responsible(
         db,
@@ -640,7 +648,7 @@ def list_responsibles(
     ),
     sort_by: ResponsibleSortBy = Query(default="full_name"),
     sort_order: SortOrder = Query(default="asc"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     _user: CurrentUser = Depends(READ),
 ) -> PaginatedResponse[ResponsibleRead]:
     items, total = service.list_responsible_page(
@@ -664,7 +672,7 @@ def list_responsibles(
 )
 def get_responsible(
     responsible_id: uuid.UUID,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     _user: CurrentUser = Depends(READ),
 ) -> ResponsibleDetail:
     return service.get_responsible_detail(db, responsible_id)
@@ -679,8 +687,8 @@ def get_responsible(
 def patch_responsible(
     responsible_id: uuid.UUID,
     data: ResponsibleUpdate,
-    db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(WRITE),
+    db: Session = Depends(get_audit_db),
+    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
 ) -> ResponsibleDetail:
     fields = data.model_fields_set
     return service.patch_responsible(
@@ -708,8 +716,8 @@ def patch_responsible(
 )
 def delete_responsible(
     responsible_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(WRITE),
+    db: Session = Depends(get_audit_db),
+    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
 ) -> None:
     service.delete_responsible(db, responsible_id)
 
@@ -735,21 +743,21 @@ def catalog_overview(
         None, ge=1, le=500,
         description="Deprecated: use page_size. Overrides page_size when set.",
     ),
-    db: Session = Depends(get_db),
-    _u: CurrentUser = Depends(require_permission("catalog.read")),
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(require_permission("catalog.read")),
 ):
     size = limit if limit is not None else page_size
     offset = (page - 1) * size
-    total_universities = db.execute(
-        select(func.count()).select_from(University)
-    ).scalar() or 0
-    total_licenses = db.execute(
-        select(func.count()).select_from(License)
-    ).scalar() or 0
+    total_universities = db.execute(apply_university_scope(
+        select(func.count()).select_from(University), University.id, user
+    )).scalar() or 0
+    total_licenses = db.execute(apply_university_scope(
+        select(func.count()).select_from(License), License.university_id, user
+    )).scalar() or 0
 
     licenses = (
         db.execute(
-            select(License)
+            apply_university_scope(select(License), License.university_id, user)
             .options(
                 selectinload(License.university).selectinload(
                     University.university_responsibles

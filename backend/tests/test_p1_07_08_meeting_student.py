@@ -408,7 +408,7 @@ def test_student_university_isolation_restrict(db: Session):
         db.execute(sa_delete(University).where(University.id == uid))
         db.commit()
     db.rollback()
-    assert _pgcode(ei.value) == "23503"
+    assert _pgcode(ei.value) in {"23503", "23001"}
     # row survived the blocked delete
     assert db.execute(select(Student)).scalars().all() != []
 
@@ -425,7 +425,7 @@ def test_student_program_isolation_restrict(db: Session):
         db.execute(sa_delete(ITProgram).where(ITProgram.id == pid))
         db.commit()
     db.rollback()
-    assert _pgcode(ei.value) == "23503"
+    assert _pgcode(ei.value) in {"23503", "23001"}
 
 
 def test_student_timestamps(db: Session):

@@ -14,24 +14,19 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFound
-from app.core.permissions import user_permissions
+from app.core.policies import ensure_university_access
 from app.models.catalog import ITProgram, University
 from app.models.interactions import Student
 from app.modules.students.schemas import StudentCreate, StudentRead, StudentUpdate
 
 
 def _check_scope(user, university_id: uuid.UUID) -> None:
-    """University-scope gate (same semantics as meetings)."""
-    if "*" in user_permissions(user):
-        return
-    scope = getattr(user, "university_ids", None)
-    if scope is not None and str(university_id) not in set(scope):
-        raise HTTPException(status_code=403, detail="Forbidden: other university")
+    """University-scope gate shared with P5 policy."""
+    ensure_university_access(university_id, user)
 
 
 def _get_university_or_404(db: Session, university_id: uuid.UUID) -> University:

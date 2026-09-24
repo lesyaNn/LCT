@@ -11,7 +11,7 @@ from __future__ import annotations
 import uuid
 
 from sqlalchemy import delete as sa_delete
-from sqlalchemy import exists, func, or_, select
+from sqlalchemy import exists, func, inspect, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.catalog import (
@@ -23,6 +23,32 @@ from app.models.catalog import (
     UniversityResponsible,
     Vendor,
 )
+from app.modules.audit.service import AuditAction, AuditService, context_for
+
+
+_AUDIT_FIELDS = {
+    University: ("name", "city"),
+    Responsible: ("full_name", "email", "role"),
+    UniversityResponsible: ("university_id", "responsible_id", "role_in_university", "is_primary"),
+}
+
+
+def _audit_snapshot(obj):
+    return {name: getattr(obj, name) for name in _AUDIT_FIELDS[type(obj)]}
+
+
+def _audit_write(db: Session, obj, action: AuditAction, *, old=None, new=None):
+    if "audit_context" not in db.info or type(obj) not in _AUDIT_FIELDS:
+        return
+    entity_type = "responsible" if isinstance(obj, (Responsible, UniversityResponsible)) else "university"
+    university_id = obj.university_id if isinstance(obj, UniversityResponsible) else (
+        obj.id if isinstance(obj, University) else None
+    )
+    AuditService(db).log_event(
+        context=context_for(db), action=action, entity_type=entity_type,
+        entity_id=obj.id, university_id=university_id,
+        old_value=old, new_value=new,
+    )
 
 # ------------------------------------------------------------- like escape
 
@@ -485,6 +511,11 @@ def get_link(
 def add_and_flush(db: Session, obj):
     """Persist a new row. IntegrityError bubbles to the central 409 handler."""
     db.add(obj)
+    if "audit_context" in db.info and type(obj) in _AUDIT_FIELDS:
+        db.flush()
+        action = (AuditAction.ASSIGN_RESPONSIBLE if isinstance(obj, UniversityResponsible)
+                  else AuditAction.CREATE)
+        _audit_write(db, obj, action, new=_audit_snapshot(obj))
     db.commit()
     db.refresh(obj)
     return obj
@@ -492,6 +523,16 @@ def add_and_flush(db: Session, obj):
 
 def save(db: Session, obj):
     """Persist in-place mutations. IntegrityError bubbles to the 409 handler."""
+    if "audit_context" in db.info and type(obj) in _AUDIT_FIELDS:
+        current = _audit_snapshot(obj)
+        old = dict(current)
+        state = inspect(obj)
+        for name in current:
+            history = state.attrs[name].history
+            if history.deleted:
+                old[name] = history.deleted[0]
+        if old != current:
+            _audit_write(db, obj, AuditAction.UPDATE, old=old, new=current)
     db.commit()
     db.refresh(obj)
     return obj
@@ -504,13 +545,20 @@ def delete_by_id(db: Session, model, pk: uuid.UUID) -> None:
     RESTRICT as a NOT NULL violation); Core DELETE probes the true
     RESTRICT/CASCADE/SET NULL contract. IntegrityError -> central 409.
     """
+    obj = db.get(model, pk) if "audit_context" in db.info and model in _AUDIT_FIELDS else None
+    old = _audit_snapshot(obj) if obj is not None else None
     db.expunge_all()
     db.execute(sa_delete(model).where(model.id == pk))
+    if obj is not None:
+        _audit_write(db, obj, AuditAction.DELETE, old=old)
     db.commit()
 
 
 def delete_link(db: Session, link: UniversityResponsible) -> None:
+    old = _audit_snapshot(link) if "audit_context" in db.info else None
     db.delete(link)
+    if old is not None:
+        _audit_write(db, link, AuditAction.ASSIGN_RESPONSIBLE, old=old)
     db.commit()
 
 

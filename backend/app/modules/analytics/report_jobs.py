@@ -182,6 +182,7 @@ def create_job(
         raise ValueError(f"unsupported report format: {format!r}")
     now = _utcnow()
     job = ReportJob(
+        id=uuid.uuid4(),
         job_type=job_type,
         payload=dict(payload or {}),
         idempotency_key=idempotency_key,
@@ -202,6 +203,22 @@ def create_job(
         expires_at=now + timedelta(hours=REPORT_EXPIRY_HOURS),
     )
     db.add(job)
+    if "audit_context" in db.info:
+        from app.modules.audit.service import AuditAction, AuditService, context_for
+
+        one_university = (
+            uuid.UUID(effective_university_ids[0])
+            if effective_university_ids and len(effective_university_ids) == 1 else None
+        )
+        AuditService(db).log_event(
+            context=context_for(db, actor_sub),
+            action=(AuditAction.IMPORT if job_type == "xlsx_import"
+                    else AuditAction.REPORT_GENERATE),
+            entity_type="report", entity_id=job.id,
+            university_id=one_university,
+            new_value={"format": format, "columns": columns, "status": "queued",
+                       "job_type": job_type},
+        )
     db.commit()
     db.refresh(job)
     logger.info("report job created id=%s format=%s actor=%s", job.id, format, actor_sub)

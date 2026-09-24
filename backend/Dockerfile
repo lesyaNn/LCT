@@ -6,7 +6,7 @@ COPY pyproject.toml ./
 RUN apt-get update \
   && apt-get install -y --no-install-recommends fonts-dejavu-core \
   && rm -rf /var/lib/apt/lists/* \
-  && pip install --no-cache-dir "fastapi" "uvicorn[standard]" sqlalchemy alembic "psycopg[binary]" pydantic pydantic-settings "python-jose[cryptography]" python-multipart redis minio httpx openpyxl xlrd reportlab python-dateutil pytest \
+  && pip install --no-cache-dir "fastapi==0.116.1" "uvicorn[standard]==0.35.0" "sqlalchemy==2.0.43" "alembic==1.16.5" "psycopg[binary]==3.3.4" "pydantic==2.11.7" "pydantic-settings==2.10.1" "python-jose[cryptography]==3.5.0" "python-multipart==0.0.32" "redis==6.4.0" "minio==7.2.18" "httpx==0.28.1" "openpyxl==3.1.5" "xlrd==2.0.2" "reportlab==4.4.9" "python-dateutil==2.9.0.post0" pytest==9.0.3 \
   && useradd -r -u 10001 appuser \
   && mkdir -p /code/var/files /tmp/rtk-imports /app/storage /app/reports \
   && chown -R appuser:appuser /code /tmp/rtk-imports /app/storage /app/reports

@@ -30,7 +30,6 @@ Overdue math is never local here: consumers use
 
 from __future__ import annotations
 
-import json
 import uuid
 from datetime import datetime, timezone
 
@@ -45,7 +44,7 @@ from app.models.workflow_instances import (
     WorkflowStageTransition,
 )
 from app.models.workflow_templates import WorkflowStage
-from app.modules.audit.models import AuditEvent
+from app.modules.audit.service import AuditAction, AuditService, context_for
 from app.modules.workflow_transitions.schemas import (
     WorkflowCommentCreate,
     WorkflowCommentUpdate,
@@ -173,28 +172,14 @@ def transition_instance(
             comment=text,
         )
     )
-    db.add(
-        AuditEvent(
-            user_id=actor,
-            entity_type="workflow_instance",
-            entity_id=str(instance.id),
-            action="WORKFLOW_TRANSITION",
-            before_data=json.dumps(
-                {
-                    "stage": current.name,
-                    "order_index": current.order_index,
-                },
-                ensure_ascii=False,
-            ),
-            after_data=json.dumps(
-                {
-                    "stage": target.name,
-                    "order_index": target.order_index,
-                },
-                ensure_ascii=False,
-            ),
-            university_id=instance.university_id,
-        )
+    AuditService(db).log_event(
+        context=context_for(db, actor),
+        action=AuditAction.WORKFLOW_TRANSITION,
+        entity_type="workflow_instance",
+        entity_id=instance.id,
+        university_id=instance.university_id,
+        old_value={"stage_id": current.template_stage_id, "stage_name": current.name},
+        new_value={"stage_id": target.template_stage_id, "stage_name": target.name, "comment": text},
     )
     db.commit()
     # P2-08-01 + P2-09-01: post-commit writers (best-effort — a writer
