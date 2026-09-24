@@ -240,7 +240,7 @@ export function UniversityPassport({ id }: { id: string }) {
     : tab === 'meetings'
       ? <MeetingsSection id={id} canAdd={canReport} />
     : tab === 'responsibles'
-      ? <ResponsiblesSection id={id} />
+      ? <ResponsiblesSection id={id} canEdit={canReport} />
     : tab === 'workflow'
       ? <UniversityWorkflow id={id} canAdvance={canAdvance} />
     : tab === 'history'

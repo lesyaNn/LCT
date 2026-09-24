@@ -48,4 +48,11 @@ export const queryKeys = {
     jobs: ['imports', 'jobs'] as const,
     job: (id: string) => ['imports', 'jobs', id] as const,
   },
+  users: {
+    all: ['users'] as const,
+    list: <T>(query: T) => ['users', 'list', query] as const,
+    detail: (id: string) => ['users', 'detail', id] as const,
+    responsibleCandidates: ['users', 'responsible-candidates'] as const,
+    access: ['users', 'access'] as const,
+  },
 } as const;

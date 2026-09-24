@@ -25,6 +25,12 @@ function getBreadcrumbs(pathname: string): BreadcrumbEntry[] {
       { label: 'Импорт каталогов' },
     ];
   }
+  if (segments[0] === 'admin' && segments[1] === 'users') {
+    return [
+      { label: 'Администрирование', href: '/admin' },
+      { label: 'Пользователи и права' },
+    ];
+  }
 
   return segments.map((segment, index) => ({
     label: routeLabels[segment]

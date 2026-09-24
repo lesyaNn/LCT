@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useMemo, useState, type ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Download from '@atomaro/icons/24/action/Download';
 import DocumentText from '@atomaro/icons/24/document/DocumentText';
 import Calendar from '@atomaro/icons/24/communication/Calendar';
@@ -10,10 +10,16 @@ import Mail from '@atomaro/icons/24/communication/Mail';
 import Phone from '@atomaro/icons/24/technology/Phone';
 import { Button } from '@/shared/ui/rtk/button';
 import { Avatar } from '@/shared/ui/rtk/avatar';
+import { Drawer } from '@/shared/ui/rtk/drawer';
 import { EmptyState } from '@/shared/ui/empty-state';
+import { Select, TextArea } from '@/shared/ui/rtk/form-controls';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { MetricCard } from '@/shared/ui/rtk/metric-card';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
+import { Toast } from '@/shared/ui/rtk/toast';
+import { normalizeApiError } from '@/shared/lib/api-errors';
+import { adminUsersQueryKeys, assignUniversityResponsible, listResponsibleCandidates } from '@/shared/lib/users-repository';
+import { queryKeys } from '@/shared/lib/query-keys';
 import { formatDateRu, formatDateTimeRu } from '@/shared/lib/formatters';
 import { documentStatusIntent, licenseStatusIntent, productStatusIntent, programStatusIntent, readinessSemantics } from '@/shared/lib/status-semantics';
 import {
@@ -31,6 +37,7 @@ import {
   universityLicensesQueryKey,
   universityDocumentsQueryKey,
   universityMeetingsQueryKey,
+  universityPassportQueryKey,
   universityResponsiblesQueryKey,
   universityStudentsQueryKey,
   universityTeachersQueryKey,
@@ -285,11 +292,37 @@ function MeetingsSection({ id, canAdd }: { id: string; canAdd: boolean }) {
   return <section className={`${styles.section} ${styles.meetingSurface}`} aria-label="Встречи">{canAdd ? <SectionToolbar title="Встречи"><Button variant="primary" size="s" type="button" disabled title="Создание встречи подключится после появления API"><Calendar size={16} fill="currentColor" />Добавить встречу</Button></SectionToolbar> : <h2 className={styles.meetingTitle}>Встречи</h2>}{query.data.length ? <ol className={styles.meetingTimeline}>{query.data.slice().sort((left, right) => right.occurredAt.localeCompare(left.occurredAt)).map((meeting) => <li className={styles.meetingItem} key={meeting.id}><div className={styles.meetingMarker} aria-hidden="true" /><article className={styles.meetingContent}><div className={styles.meetingMeta}><time dateTime={meeting.occurredAt}>{formatDateTimeRu(meeting.occurredAt)}</time><span className={styles.meetingType}>{meetingTypeLabels[meeting.type]}</span></div><h3>{meeting.subject}</h3><MeetingParticipants participants={meeting.participants} /><details className={styles.meetingDetails}><summary>Итог и следующее действие</summary><p><strong>Итог:</strong> {meeting.outcome}</p><p><strong>Следующее действие:</strong> {meeting.nextAction}{meeting.dueDate ? ` до ${formatDateRu(meeting.dueDate)}` : ''}</p></details><span className={styles.meetingAuthor}>Автор: {meeting.author}</span></article></li>)}</ol> : <EmptyState icon={<Calendar size={20} fill="currentColor" />} title="Встреч пока нет" description="Записи появятся здесь после первого взаимодействия." headingLevel={3} />}</section>;
 }
 
-function ResponsiblesSection({ id }: { id: string }) {
+function ResponsibleAssignmentDrawer({ id, onClose, onSuccess }: { id: string; onClose: () => void; onSuccess: () => void }) {
+  const queryClient = useQueryClient();
+  const candidatesQuery = useQuery({ queryKey: adminUsersQueryKeys.responsibleCandidates, queryFn: listResponsibleCandidates, staleTime: 30_000 });
+  const [candidateId, setCandidateId] = useState('');
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const candidates = candidatesQuery.data ?? [];
+  const selectedId = candidateId || candidates[0]?.id || '';
+  const mutation = useMutation({
+    mutationFn: () => assignUniversityResponsible({ universityId: id, responsibleId: selectedId, reason: reason.trim() }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: universityPassportQueryKey(id) });
+      void queryClient.invalidateQueries({ queryKey: universityResponsiblesQueryKey(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.universities.historyFamily(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.universities.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.audit.all });
+      onSuccess();
+    },
+    onError: (cause) => setError(normalizeApiError(cause, { fallbackMessage: 'Не удалось сменить ответственного.' }).message),
+  });
+
+  return <Drawer title="Сменить ответственного" onClose={() => { if (!mutation.isPending) onClose(); }}><div className={styles.assignmentForm}><p className={styles.assignmentIntro}>Выберите пользователя из допустимых кандидатов. Изменение попадёт в паспорт ВУЗа и журнал аудита после ответа сервера.</p>{candidatesQuery.isPending ? <p className={styles.emptySection}>Загрузка кандидатов…</p> : candidatesQuery.isError ? <RouteErrorState compact onRetry={() => void candidatesQuery.refetch()} /> : <label className={styles.filter}><span>Новый ответственный</span><Select value={selectedId} onChange={(event) => setCandidateId(event.target.value)}><option value="" disabled>Выберите пользователя</option>{candidates.map((candidate) => <option value={candidate.id} key={candidate.id}>{candidate.name} · {candidate.role}</option>)}</Select></label>}<label className={styles.filter}><span>Причина</span><TextArea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Например, перераспределение зоны ответственности" rows={4} /></label>{error ? <p className={styles.assignmentError} role="alert">{error}</p> : null}<div className={styles.assignmentActions}><Button variant="ghost" type="button" disabled={mutation.isPending} onClick={onClose}>Отмена</Button><Button variant="primary" type="button" loading={mutation.isPending} disabled={mutation.isPending || !selectedId || !reason.trim() || candidatesQuery.isError} onClick={() => { setError(null); mutation.mutate(); }}>Сохранить</Button></div></div></Drawer>;
+}
+
+function ResponsiblesSection({ id, canEdit }: { id: string; canEdit: boolean }) {
+  const [assignmentOpen, setAssignmentOpen] = useState(false);
+  const [toast, setToast] = useState(false);
   const query = useQuery({ queryKey: universityResponsiblesQueryKey(id), queryFn: () => getUniversityResponsibles(id), staleTime: 30_000 });
   if (query.isPending) return <section className={styles.section} aria-label="Ответственные"><PassportTableSkeleton /></section>;
   if (query.isError || !query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
-  return <section className={styles.section} aria-label="Ответственные">{query.data.length ? <div className={styles.responsiblesGrid}>{query.data.map((person) => <article className={styles.responsibleCard} key={person.id}><Avatar initials={person.initials} size="m" /><div className={styles.responsibleInfo}><h3>{person.name}</h3><p>{person.role}</p><a href={`mailto:${person.email}`}><Mail size={16} fill="currentColor" />{person.email}</a><a href={`tel:${person.phone.replace(/[^+\d]/g, '')}`}><Phone size={16} fill="currentColor" />{person.phone}</a></div>{person.isPrimary ? <StatusBadge intent="brand">Основной</StatusBadge> : null}</article>)}</div> : <EmptyState icon={<Mail size={20} fill="currentColor" />} title="Ответственные не назначены" description="Контактные лица появятся здесь после назначения." headingLevel={3} />}</section>;
+  return <><section className={styles.section} aria-label="Ответственные">{canEdit ? <SectionToolbar title="Ответственные"><Button variant="primary" size="s" type="button" onClick={() => setAssignmentOpen(true)}>Сменить ответственного</Button></SectionToolbar> : null}{query.data.length ? <div className={styles.responsiblesGrid}>{query.data.map((person) => <article className={styles.responsibleCard} key={person.id}><Avatar initials={person.initials} size="m" /><div className={styles.responsibleInfo}><h3>{person.name}</h3><p>{person.role}</p><a href={`mailto:${person.email}`}><Mail size={16} fill="currentColor" />{person.email}</a><a href={`tel:${person.phone.replace(/[^+\d]/g, '')}`}><Phone size={16} fill="currentColor" />{person.phone}</a></div>{person.isPrimary ? <StatusBadge intent="brand">Основной</StatusBadge> : null}</article>)}</div> : <EmptyState icon={<Mail size={20} fill="currentColor" />} title="Ответственные не назначены" description="Контактные лица появятся здесь после назначения." headingLevel={3} />}</section>{assignmentOpen ? <ResponsibleAssignmentDrawer id={id} onClose={() => setAssignmentOpen(false)} onSuccess={() => { setAssignmentOpen(false); setToast(true); }} /> : null}{toast ? <Toast intent="success" title="Ответственный изменён" message="Паспорт, история и связанные списки обновляются." onClose={() => setToast(false)} /> : null}</>;
 }
 
 export { LicensesSection, DocumentsSection, MeetingsSection, ResponsiblesSection };

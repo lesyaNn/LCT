@@ -1,5 +1,15 @@
 import type { AuditEvent, AuditListQuery, AuditListResult } from '@/shared/lib/audit-repository';
 import type { ImportCatalogType, ImportExecuteResponse, ImportJob, ImportOptions, ImportPreviewResponse } from '@/shared/lib/import-repository';
+import type {
+  AdminUser,
+  AdminUserListQuery,
+  AdminUserListResult,
+  AdminUserUpdateInput,
+  InviteAdminUserInput,
+  ResponsibleAssignmentInput,
+  ResponsibleCandidate,
+} from '@/shared/lib/users-repository';
+import { setMockResponsibleAssignment } from '@/shared/lib/responsible-assignments';
 import type { ReportJob, ReportRequest } from '@/shared/lib/reports-repository';
 import type {
   WorkflowCommentApiRecord,
@@ -497,4 +507,91 @@ export function mockListImportJobs(): unknown[] {
   return [...importJobs.values()]
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
     .map(visibleImportJob);
+}
+
+// --------------------------------------------------------------- users / RBAC
+
+const demoAdminUsers = new Map<string, AdminUser>([
+  ['1', {
+    id: '1', username: 'admin', name: 'Анна Иванова', email: 'anna.ivanova@example.ru', role: 'admin', status: 'active', scope: { kind: 'all' }, lastLoginAt: '2026-09-24T09:42:00+03:00',
+  }],
+  ['user-manager-boris', {
+    id: 'user-manager-boris', username: 'boris.petrov', name: 'Борис Петров', email: 'boris.petrov@example.ru', role: 'manager', status: 'active', scope: { kind: 'universities', universityIds: ['university-001', 'university-002', 'university-003', 'university-004'] }, lastLoginAt: '2026-09-23T18:20:00+03:00',
+  }],
+  ['user-elena', {
+    id: 'user-elena', username: 'elena.smirnova', name: 'Елена Смирнова', email: 'elena.smirnova@example.ru', role: 'user', status: 'active', scope: { kind: 'universities', universityIds: ['university-003', 'university-007'] }, lastLoginAt: '2026-09-21T11:05:00+03:00',
+  }],
+]);
+
+const demoResponsibleCandidates: ResponsibleCandidate[] = [
+  { id: 'responsible-anna', name: 'Анна Иванова', email: 'anna.ivanova@example.ru', role: 'Куратор проекта' },
+  { id: 'responsible-boris', name: 'Борис Петров', email: 'boris.petrov@example.ru', role: 'Менеджер' },
+  { id: 'responsible-elena', name: 'Елена Смирнова', email: 'elena.smirnova@example.ru', role: 'Координатор программы' },
+  { id: 'responsible-dmitry', name: 'Дмитрий Волков', email: 'dmitry.volkov@example.ru', role: 'Менеджер' },
+];
+
+function copyAdminUser(user: AdminUser): AdminUser {
+  return { ...user, scope: user.scope.kind === 'all' ? { kind: 'all' } : { kind: 'universities', universityIds: [...user.scope.universityIds] } };
+}
+
+function matchesUser(user: AdminUser, query: AdminUserListQuery): boolean {
+  if (query.role !== 'all' && user.role !== query.role) return false;
+  const search = query.search.trim().toLocaleLowerCase('ru-RU');
+  return !search || `${user.name} ${user.username} ${user.email}`.toLocaleLowerCase('ru-RU').includes(search);
+}
+
+export function mockListAdminUsers(query: AdminUserListQuery): AdminUserListResult {
+  const filtered = [...demoAdminUsers.values()].filter((user) => matchesUser(user, query)).sort((left, right) => left.name.localeCompare(right.name, 'ru'));
+  const start = (query.page - 1) * query.pageSize;
+  return { items: filtered.slice(start, start + query.pageSize).map(copyAdminUser), page: query.page, pageSize: query.pageSize, total: filtered.length };
+}
+
+function getAdminUser(id: string): AdminUser {
+  const user = demoAdminUsers.get(id);
+  if (!user) throw new Error('Пользователь не найден.');
+  return user;
+}
+
+export function mockUpdateAdminUser(id: string, input: AdminUserUpdateInput): AdminUser {
+  const user = getAdminUser(id);
+  const next: AdminUser = { ...user, role: input.role, scope: input.role === 'admin' ? { kind: 'all' } : copyAdminUser({ ...user, scope: input.scope }).scope };
+  demoAdminUsers.set(id, next);
+  return copyAdminUser(next);
+}
+
+export function mockBlockAdminUser(id: string, blocked: boolean): AdminUser {
+  const user = getAdminUser(id);
+  const next: AdminUser = { ...user, status: blocked ? 'blocked' : 'active' };
+  demoAdminUsers.set(id, next);
+  return copyAdminUser(next);
+}
+
+export function mockInviteAdminUser(input: InviteAdminUserInput): AdminUser {
+  const invited: AdminUser = {
+    id: id('user'),
+    username: input.username,
+    name: input.name,
+    email: input.email,
+    role: input.role,
+    status: 'active',
+    scope: input.role === 'admin' ? { kind: 'all' } : input.scope,
+    lastLoginAt: null,
+  };
+  demoAdminUsers.set(invited.id, invited);
+  return copyAdminUser(invited);
+}
+
+export function mockResetAdminUserPassword(id: string): { status: 'requested'; actionUrl?: string } {
+  getAdminUser(id);
+  return { status: 'requested', actionUrl: '/login?reset=demo' };
+}
+
+export function mockListResponsibleCandidates(): ResponsibleCandidate[] {
+  return demoResponsibleCandidates.map((candidate) => ({ ...candidate }));
+}
+
+export function mockAssignUniversityResponsible(input: ResponsibleAssignmentInput): void {
+  const candidate = demoResponsibleCandidates.find((item) => item.id === input.responsibleId);
+  if (!candidate) throw new Error('Ответственный не найден.');
+  setMockResponsibleAssignment(input.universityId, { responsibleId: candidate.id, reason: input.reason, assignedAt: new Date().toISOString() });
 }

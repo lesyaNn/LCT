@@ -55,6 +55,11 @@
 .responsibleInfo p { color: var(--rtk-color-text-secondary); font-size: 12px; margin: 0 0 var(--rtk-space-2); }
 .responsibleInfo a { align-items: center; color: var(--rtk-color-brand); display: flex; font-size: 12px; gap: var(--rtk-space-2); line-height: 1.35; overflow-wrap: anywhere; text-decoration: none; }
 .responsibleInfo a:hover { text-decoration: underline; }
+.assignmentForm { display: flex; flex-direction: column; gap: var(--rtk-space-4); }
+.assignmentIntro { color: var(--rtk-color-text-secondary); font-size: 13px; line-height: 1.45; margin: 0; }
+.assignmentError { color: var(--rtk-color-danger); font-size: 12px; margin: 0; }
+.assignmentActions { border-top: 1px solid var(--rtk-color-border); display: flex; gap: var(--rtk-space-2); justify-content: flex-end; padding-top: var(--rtk-space-4); }
+.assignmentActions button { min-width: 120px; }
 @media (max-width: 768px) {
   .sectionToolbar { align-items: stretch; flex-direction: column; }
   .toolbarControls { margin-left: 0; }
@@ -68,6 +73,8 @@
   .filtersRow { align-items: stretch; flex-direction: column; }
   .meetingDetails summary { align-items: center; display: flex; min-height: 44px; }
   .responsiblesGrid { grid-template-columns: 1fr; }
+  .assignmentActions { flex-direction: column-reverse; }
+  .assignmentActions button { width: 100%; }
   .meetingSurface { padding: var(--rtk-space-4); }
 }
 @media (max-width: 420px) {

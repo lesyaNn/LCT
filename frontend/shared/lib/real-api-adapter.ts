@@ -4,6 +4,15 @@ import { getExpirationStatus } from './formatters';
 import { getHealthStatus } from './health-score';
 import type { ImportExecuteResponse, ImportOptions, ImportPreviewResponse } from './import-repository';
 import type {
+  AdminUser,
+  AdminUserListQuery,
+  AdminUserListResult,
+  AdminUserUpdateInput,
+  InviteAdminUserInput,
+  ResponsibleAssignmentInput,
+  ResponsibleCandidate,
+} from './users-repository';
+import type {
   PaginatedResult,
   ProgramStatus,
   TeacherCertificate,
@@ -415,4 +424,102 @@ export async function realListImportJobs(): Promise<unknown[]> {
   const data = unwrap(result, 'Не удалось загрузить журнал импортов.');
   if (Array.isArray(data)) return data;
   return data && typeof data === 'object' && 'items' in data && Array.isArray(data.items) ? data.items : [];
+}
+
+// --------------------------------------------------------------- users / RBAC
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function stringValue(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value : fallback;
+}
+
+function userRole(value: unknown): AdminUser['role'] {
+  return value === 'admin' || value === 'manager' || value === 'user' ? value : 'user';
+}
+
+function mapRealAdminUser(value: unknown): AdminUser {
+  const item = isRecord(value) ? value : {};
+  const rawScope = item.university_ids ?? (isRecord(item.scope) ? item.scope.university_ids : undefined);
+  const universityIds = Array.isArray(rawScope) ? rawScope.filter((id): id is string => typeof id === 'string') : [];
+  const role = userRole(item.role ?? item.user_role ?? item.userRole);
+  return {
+    id: stringValue(item.id ?? item.user_id, crypto.randomUUID?.() ?? `user-${Date.now()}`),
+    username: stringValue(item.username ?? item.login ?? item.email),
+    name: stringValue(item.full_name ?? item.name ?? item.username, 'Пользователь'),
+    email: stringValue(item.email),
+    role,
+    status: item.is_active === false || item.status === 'blocked' ? 'blocked' : 'active',
+    scope: role === 'admin' ? { kind: 'all' } : { kind: 'universities', universityIds },
+    lastLoginAt: stringValue(item.last_login_at ?? item.last_login ?? item.lastLoginAt) || null,
+  };
+}
+
+function mapUserListPayload(value: unknown, query: AdminUserListQuery): AdminUserListResult {
+  const payload = isRecord(value) ? value : {};
+  const rows = Array.isArray(value) ? value : Array.isArray(payload.items) ? payload.items : [];
+  return {
+    items: rows.map(mapRealAdminUser),
+    page: typeof payload.page === 'number' ? payload.page : query.page,
+    pageSize: typeof payload.page_size === 'number' ? payload.page_size : query.pageSize,
+    total: typeof payload.total === 'number' ? payload.total : rows.length,
+  };
+}
+
+export async function realListAdminUsers(query: AdminUserListQuery): Promise<AdminUserListResult> {
+  const params = new URLSearchParams({ page: String(query.page), page_size: String(query.pageSize) });
+  if (query.search) params.set('search', query.search);
+  if (query.role !== 'all') params.set('role', query.role);
+  const data = unwrap(await apiFetch<unknown>(`/api/v1/users?${params}`), 'Не удалось загрузить список пользователей.');
+  return mapUserListPayload(data, query);
+}
+
+function usersAdminIntegrationBlocker(action: string): never {
+  throw new ApiRequestError(501, { code: 'USERS_ADMIN_API_UNAVAILABLE', action }, `Операция «${action}» пока не опубликована в текущем backend API.`);
+}
+
+export async function realUpdateAdminUser(_id: string, _input: AdminUserUpdateInput): Promise<AdminUser> {
+  void _id;
+  void _input;
+  return usersAdminIntegrationBlocker('изменение роли и скоупа');
+}
+
+export async function realBlockAdminUser(_id: string, _blocked: boolean): Promise<AdminUser> {
+  void _id;
+  void _blocked;
+  return usersAdminIntegrationBlocker('блокировка пользователя');
+}
+
+export async function realInviteAdminUser(_input: InviteAdminUserInput): Promise<AdminUser> {
+  void _input;
+  return usersAdminIntegrationBlocker('приглашение пользователя');
+}
+
+export async function realResetAdminUserPassword(_id: string): Promise<{ status: 'requested'; actionUrl?: string }> {
+  void _id;
+  return usersAdminIntegrationBlocker('сброс пароля через Keycloak');
+}
+
+export async function realListResponsibleCandidates(): Promise<ResponsibleCandidate[]> {
+  const data = unwrap(await apiFetch<unknown>('/api/v1/catalog/responsibles?page=1&page_size=100'), 'Не удалось загрузить список ответственных.');
+  const payload = isRecord(data) ? data : {};
+  const rows = Array.isArray(data) ? data : Array.isArray(payload.items) ? payload.items : [];
+  return rows.map((value): ResponsibleCandidate => {
+    const item = isRecord(value) ? value : {};
+    return {
+      id: stringValue(item.id),
+      name: stringValue(item.full_name ?? item.name, 'Пользователь'),
+      email: stringValue(item.email),
+      role: stringValue(item.role, 'Ответственный'),
+    };
+  }).filter((item) => item.id);
+}
+
+export async function realAssignUniversityResponsible(input: ResponsibleAssignmentInput): Promise<void> {
+  unwrap(await apiFetch<unknown>(`/api/v1/catalog/universities/${encodeURIComponent(input.universityId)}/responsibles/${encodeURIComponent(input.responsibleId)}`, {
+    method: 'POST',
+    body: { is_primary: true },
+  }), 'Не удалось назначить ответственного ВУЗа.');
 }

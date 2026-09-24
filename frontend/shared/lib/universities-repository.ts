@@ -5,6 +5,7 @@ import { apiFetch } from './api-client';
 import { ApiRequestError } from './api-errors';
 import { fromDataSource, isMockDataSource } from './data-source';
 import { queryKeys } from './query-keys';
+import { getMockResponsibleAssignment } from './responsible-assignments';
 import {
   getMockWorkflowCurrentStageId,
   mockCreateWorkflowComment,
@@ -119,6 +120,12 @@ const responsible = {
   dmitry: { id: 'responsible-dmitry', name: 'Дмитрий Волков', email: 'dmitry.volkov@example.ru', role: 'Менеджер' },
 } satisfies Record<string, UniversityResponsible>;
 
+function assignedMockResponsible(universityId: string): UniversityResponsible | null | undefined {
+  const assignment = getMockResponsibleAssignment(universityId);
+  if (!assignment) return undefined;
+  return Object.values(responsible).find((item) => item.id === assignment.responsibleId) ?? null;
+}
+
 const stage = {
   preparation: { id: 'preparation', name: 'Подготовка', tone: 'neutral' },
   launch: { id: 'launch', name: 'Запуск программы', tone: 'brand' },
@@ -184,7 +191,11 @@ function compareValues(left: string | number, right: string | number): number {
 async function getMockUniversities(params: UniversityListQuery): Promise<PaginatedResult<UniversityListItem>> {
   const { filters } = params;
   const search = filters.search.trim().toLocaleLowerCase('ru-RU');
-  let filtered = universitiesWithRelationships.filter((item) => {
+  const currentUniversities = universitiesWithRelationships.map((item) => {
+    const assigned = assignedMockResponsible(item.id);
+    return assigned === undefined ? item : { ...item, responsible: assigned };
+  });
+  let filtered = currentUniversities.filter((item) => {
     if (search && !item.name.toLocaleLowerCase('ru-RU').includes(search)) return false;
     if (filters.city && item.city !== filters.city) return false;
     if (filters.universityIds.length && !filters.universityIds.includes(item.id)) return false;
@@ -287,6 +298,9 @@ async function getMockUniversityPassport(id: string): Promise<UniversityPassport
   const university = universitiesWithRelationships.find((item) => item.id === id);
   if (!university) throw new Error('Университет не найден');
 
+  const assignedResponsible = assignedMockResponsible(id);
+  const currentResponsible = assignedResponsible === undefined ? university.responsible : assignedResponsible;
+
   const launchedPrograms = university.programStatusCounts.launched ?? 0;
   const activePrograms = launchedPrograms + (university.programStatusCounts.active ?? 0);
   const numericId = Number(id.split('-').at(-1)) || 1;
@@ -312,7 +326,7 @@ async function getMockUniversityPassport(id: string): Promise<UniversityPassport
       status: workflowStatus,
       deadline: university.attention ? '2026-09-18' : '2026-10-08',
       overdue: university.attention && university.currentStage.id !== stage.completed.id,
-      responsible: university.responsible,
+      responsible: currentResponsible,
       completedSteps: university.currentStage.id === stage.completed.id ? 6 : Math.max(1, workflowOrder.findIndex((item) => item.id === university.currentStage.id) + 2),
       totalSteps: 6,
       nextStage: getPassportNextStage(university.currentStage.id),
@@ -727,7 +741,10 @@ const historyEvents = (id: string, university: UniversityListItem): UniversityHi
   const anna = responsible.anna;
   const boris = responsible.boris;
   const currentStageName = university.currentStage.name;
+  const assignment = getMockResponsibleAssignment(id);
+  const assigned = assignedMockResponsible(id);
   return [
+    ...(assignment && assigned ? [{ id: `${id}-responsible-assignment-${assignment.assignedAt}`, occurredAt: assignment.assignedAt, type: 'audit' as const, user: anna, action: 'Изменён ответственный', details: assignment.reason ? `Новый ответственный: ${assigned.name}. Причина: ${assignment.reason}` : `Новый ответственный: ${assigned.name}.`, entity: { id: `${id}-responsible`, label: 'Ответственный ВУЗа' }, oldValues: { responsible: university.responsible?.name ?? null }, newValues: { responsible: assigned.name }, ip: 'mock', userAgent: 'CRM demo' }] : []),
     { id: `${id}-history-1`, occurredAt: '2026-09-20T11:30:00+03:00', type: 'meeting', user: anna, action: 'Проведена встреча', details: 'Рабочая встреча с координатором программы', entity: { id: `${id}-meeting-1`, label: 'Встреча с координатором' } },
     { id: `${id}-history-2`, occurredAt: '2026-09-19T15:20:00+03:00', type: 'audit', user: boris, action: 'Изменён срок этапа', details: `${currentStageName} → новый срок 30 сент. 2026 г.`, entity: { id: `${id}-workflow-stage-11`, label: currentStageName }, oldValues: { deadline: '2026-09-18', status: 'attention' }, newValues: { deadline: '2026-09-30', status: 'current' }, ip: '10.24.18.42', userAgent: 'Chrome 128 · macOS' },
     { id: `${id}-history-3`, occurredAt: '2026-09-18T16:10:00+03:00', type: 'document', user: boris, action: 'Подписан документ', details: 'Договор на обучение · contract-2026.pdf', entity: { id: `${id}-document-1`, label: 'Договор на обучение' } },
@@ -1347,12 +1364,14 @@ export async function getUniversityMeetings(id: string): Promise<UniversityMeeti
 /** Typed frontend adapter for the future university responsibles endpoint. */
 async function getMockUniversityResponsibles(id: string): Promise<UniversityResponsibleContact[]> {
   const university = getUniversityOrThrow(id);
+  const assignedResponsible = assignedMockResponsible(id);
   const contacts: UniversityResponsibleContact[] = [
     { id: 'contact-anna', name: 'Анна Иванова', role: 'Координатор проекта', email: 'anna.ivanova@example.ru', phone: '+7 (900) 123-45-67', isPrimary: true, initials: 'АИ' },
     { id: 'contact-boris', name: 'Борис Петров', role: 'Руководитель направления', email: 'boris.petrov@example.ru', phone: '+7 (900) 234-56-78', isPrimary: false, initials: 'БП' },
     { id: 'contact-elena', name: 'Елена Смирнова', role: 'Методист', email: 'elena.smirnova@example.ru', phone: '+7 (900) 345-67-89', isPrimary: false, initials: 'ЕС' },
   ];
-  if (university.responsible) contacts[0] = { ...contacts[0], name: university.responsible.name, initials: university.responsible.name.split(' ').map((part) => part[0]).join('').slice(0, 2).toLocaleUpperCase('ru-RU') };
+  const primary = assignedResponsible === undefined ? university.responsible : assignedResponsible;
+  if (primary) contacts[0] = { ...contacts[0], id: primary.id, name: primary.name, role: primary.role ?? contacts[0].role, email: primary.email ?? contacts[0].email, initials: primary.name.split(' ').map((part) => part[0]).join('').slice(0, 2).toLocaleUpperCase('ru-RU') };
   return contacts;
 }
 
