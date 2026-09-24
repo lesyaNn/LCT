@@ -1,5 +1,7 @@
 import type { AuditEvent, AuditListQuery, AuditListResult } from '@/shared/lib/audit-repository';
 import type { ImportCatalogType, ImportExecuteResponse, ImportJob, ImportOptions, ImportPreviewResponse } from '@/shared/lib/import-repository';
+import type { CatalogInput, CatalogItem, CatalogListQuery, CatalogListResult, CatalogReferenceData, CatalogType, ResponsibleCatalogItem } from '@/shared/lib/catalogs-repository';
+import { ApiRequestError } from '@/shared/lib/api-errors';
 import type {
   AdminUser,
   AdminUserListQuery,
@@ -523,13 +525,6 @@ const demoAdminUsers = new Map<string, AdminUser>([
   }],
 ]);
 
-const demoResponsibleCandidates: ResponsibleCandidate[] = [
-  { id: 'responsible-anna', name: 'Анна Иванова', email: 'anna.ivanova@example.ru', role: 'Куратор проекта' },
-  { id: 'responsible-boris', name: 'Борис Петров', email: 'boris.petrov@example.ru', role: 'Менеджер' },
-  { id: 'responsible-elena', name: 'Елена Смирнова', email: 'elena.smirnova@example.ru', role: 'Координатор программы' },
-  { id: 'responsible-dmitry', name: 'Дмитрий Волков', email: 'dmitry.volkov@example.ru', role: 'Менеджер' },
-];
-
 function copyAdminUser(user: AdminUser): AdminUser {
   return { ...user, scope: user.scope.kind === 'all' ? { kind: 'all' } : { kind: 'universities', universityIds: [...user.scope.universityIds] } };
 }
@@ -587,11 +582,129 @@ export function mockResetAdminUserPassword(id: string): { status: 'requested'; a
 }
 
 export function mockListResponsibleCandidates(): ResponsibleCandidate[] {
-  return demoResponsibleCandidates.map((candidate) => ({ ...candidate }));
+  return responsibleCatalogItems().filter((item) => item.isActive).map((item) => ({ id: item.id, name: item.name, email: item.email, role: item.role }));
 }
 
 export function mockAssignUniversityResponsible(input: ResponsibleAssignmentInput): void {
-  const candidate = demoResponsibleCandidates.find((item) => item.id === input.responsibleId);
+  const candidate = mockListResponsibleCandidates().find((item) => item.id === input.responsibleId);
   if (!candidate) throw new Error('Ответственный не найден.');
   setMockResponsibleAssignment(input.universityId, { responsibleId: candidate.id, reason: input.reason, assignedAt: new Date().toISOString() });
+}
+
+// -------------------------------------------------------------- catalog CRUD
+
+const catalogSeedTimestamp = '2026-09-20T09:00:00.000Z';
+const mockVendors = [
+  { id: 'vendor-rostelecom', name: 'Ростелеком' },
+  { id: 'vendor-red-soft', name: 'РЕД СОФТ' },
+  { id: 'vendor-kontur', name: 'Контур' },
+];
+
+const catalogSeeds: CatalogItem[] = [
+  { id: 'university-001', type: 'universities', name: 'Московский технический университет связи и информатики', city: 'Москва', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'university-002', type: 'universities', name: 'Санкт-Петербургский политехнический университет', city: 'Санкт-Петербург', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'university-003', type: 'universities', name: 'Уральский федеральный университет', city: 'Екатеринбург', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'university-004', type: 'universities', name: 'Казанский федеральный университет', city: 'Казань', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'university-005', type: 'universities', name: 'Новосибирский государственный университет', city: 'Новосибирск', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'university-archived', type: 'universities', name: 'Архивный демонстрационный ВУЗ', city: 'Москва', isActive: false, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'product-professional-retraining', type: 'products', name: 'Профессиональная переподготовка', vendorId: 'vendor-rostelecom', vendorName: 'Ростелеком', version: '2026', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'product-short-courses', type: 'products', name: 'Короткие курсы', vendorId: 'vendor-kontur', vendorName: 'Контур', version: '3.2', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'product-corporate-track', type: 'products', name: 'Корпоративный трек', vendorId: 'vendor-rostelecom', vendorName: 'Ростелеком', version: '2026.1', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'product-archived', type: 'products', name: 'Архивный продукт', vendorId: 'vendor-red-soft', vendorName: 'РЕД СОФТ', version: '1.0', isActive: false, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'direction-data', type: 'directions', name: 'Аналитика данных', code: 'data', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'direction-cybersecurity', type: 'directions', name: 'Информационная безопасность', code: 'cybersecurity', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'direction-management', type: 'directions', name: 'ИТ-менеджмент', code: 'it-management', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'direction-archived', type: 'directions', name: 'Архивное направление', code: 'archive', isActive: false, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'responsible-anna', type: 'responsibles', name: 'Анна Иванова', email: 'anna.ivanova@example.ru', phone: '+7 495 000-00-01', role: 'Куратор проекта', universityIds: ['university-001', 'university-005'], isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'responsible-boris', type: 'responsibles', name: 'Борис Петров', email: 'boris.petrov@example.ru', phone: '+7 495 000-00-02', role: 'Менеджер', universityIds: ['university-002', 'university-004'], isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'responsible-elena', type: 'responsibles', name: 'Елена Смирнова', email: 'elena.smirnova@example.ru', phone: '+7 495 000-00-03', role: 'Координатор программы', universityIds: ['university-003'], isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'responsible-dmitry', type: 'responsibles', name: 'Дмитрий Волков', email: 'dmitry.volkov@example.ru', phone: '', role: 'Менеджер', universityIds: ['university-004'], isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'responsible-archived', type: 'responsibles', name: 'Архивный ответственный', email: 'archive@example.ru', phone: '', role: 'Координатор', universityIds: [], isActive: false, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+];
+
+const mockCatalogs = new Map<CatalogType, Map<string, CatalogItem>>();
+for (const item of catalogSeeds) {
+  const group = mockCatalogs.get(item.type) ?? new Map<string, CatalogItem>();
+  group.set(item.id, item);
+  mockCatalogs.set(item.type, group);
+}
+
+function cloneCatalogItem(item: CatalogItem): CatalogItem {
+  return item.type === 'responsibles' ? { ...item, universityIds: [...item.universityIds] } : { ...item };
+}
+
+function catalogGroup(type: CatalogType): Map<string, CatalogItem> {
+  return mockCatalogs.get(type) ?? new Map<string, CatalogItem>();
+}
+
+function responsibleCatalogItems(): ResponsibleCatalogItem[] {
+  return [...catalogGroup('responsibles').values()].filter((item): item is ResponsibleCatalogItem => item.type === 'responsibles');
+}
+
+function catalogSearchText(item: CatalogItem): string {
+  if (item.type === 'universities') return `${item.name} ${item.city}`;
+  if (item.type === 'products') return `${item.name} ${item.vendorName} ${item.version}`;
+  if (item.type === 'directions') return `${item.name} ${item.code}`;
+  return `${item.name} ${item.email} ${item.role}`;
+}
+
+export function mockListCatalogItems(query: CatalogListQuery): CatalogListResult {
+  const search = query.search.trim().toLocaleLowerCase('ru-RU');
+  const filtered = [...catalogGroup(query.type).values()]
+    .filter((item) => (query.showInactive || item.isActive) && (!search || catalogSearchText(item).toLocaleLowerCase('ru-RU').includes(search)))
+    .sort((left, right) => left.name.localeCompare(right.name, 'ru'));
+  const start = (query.page - 1) * query.pageSize;
+  return { items: filtered.slice(start, start + query.pageSize).map(cloneCatalogItem), page: query.page, pageSize: query.pageSize, total: filtered.length };
+}
+
+export function mockGetCatalogItem(type: CatalogType, itemId: string): CatalogItem {
+  const item = catalogGroup(type).get(itemId);
+  if (!item) throw new ApiRequestError(404, { code: 'ENTITY_NOT_FOUND' }, 'Запись каталога не найдена.');
+  return cloneCatalogItem(item);
+}
+
+export function mockGetCatalogReferenceData(): CatalogReferenceData {
+  return {
+    vendors: mockVendors.map((item) => ({ ...item })),
+    universities: [...catalogGroup('universities').values()].filter((item) => item.type === 'universities' && item.isActive).map((item) => ({ id: item.id, name: item.name })),
+  };
+}
+
+function duplicateCatalogItem(input: CatalogInput, exceptId?: string): boolean {
+  const values = [...catalogGroup(input.type).values()].filter((item) => item.id !== exceptId);
+  if (input.type === 'universities') return values.some((item) => item.name.toLocaleLowerCase('ru-RU') === input.name.toLocaleLowerCase('ru-RU'));
+  if (input.type === 'directions') return values.some((item) => item.type === 'directions' && item.code.toLocaleLowerCase('ru-RU') === input.code.toLocaleLowerCase('ru-RU'));
+  if (input.type === 'products') return values.some((item) => item.type === 'products' && item.vendorId === input.vendorId && item.name.toLocaleLowerCase('ru-RU') === input.name.toLocaleLowerCase('ru-RU') && item.version === input.version);
+  return values.some((item) => item.type === 'responsibles' && item.email.toLocaleLowerCase('ru-RU') === input.email.toLocaleLowerCase('ru-RU'));
+}
+
+function catalogItemFromInput(input: CatalogInput, current?: CatalogItem): CatalogItem {
+  const timestamp = now();
+  const base = { id: current?.id ?? id(input.type.slice(0, -1)), name: input.name, isActive: current?.isActive ?? true, createdAt: current?.createdAt ?? timestamp, updatedAt: timestamp };
+  if (input.type === 'universities') return { ...base, type: input.type, city: input.city };
+  if (input.type === 'products') return { ...base, type: input.type, vendorId: input.vendorId, vendorName: mockVendors.find((item) => item.id === input.vendorId)?.name ?? '—', version: input.version };
+  if (input.type === 'directions') return { ...base, type: input.type, code: input.code };
+  return { ...base, type: input.type, email: input.email, phone: input.phone, role: input.role, universityIds: [...input.universityIds] };
+}
+
+export function mockCreateCatalogItem(input: CatalogInput): CatalogItem {
+  if (duplicateCatalogItem(input)) throw new ApiRequestError(409, { code: 'DUPLICATE_ENTITY' }, 'Такая запись уже существует.');
+  const item = catalogItemFromInput(input);
+  catalogGroup(input.type).set(item.id, item);
+  return cloneCatalogItem(item);
+}
+
+export function mockUpdateCatalogItem(itemId: string, input: CatalogInput): CatalogItem {
+  const current = mockGetCatalogItem(input.type, itemId);
+  if (duplicateCatalogItem(input, itemId)) throw new ApiRequestError(409, { code: 'DUPLICATE_ENTITY' }, 'Такая запись уже существует.');
+  const item = catalogItemFromInput(input, current);
+  catalogGroup(input.type).set(item.id, item);
+  return cloneCatalogItem(item);
+}
+
+export function mockSetCatalogItemActive(type: CatalogType, itemId: string, active: boolean): CatalogItem {
+  const current = mockGetCatalogItem(type, itemId);
+  const item = { ...current, isActive: active, updatedAt: now() } as CatalogItem;
+  catalogGroup(type).set(item.id, item);
+  return cloneCatalogItem(item);
 }

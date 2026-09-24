@@ -3,6 +3,7 @@ import { ApiRequestError } from './api-errors';
 import { getExpirationStatus } from './formatters';
 import { getHealthStatus } from './health-score';
 import type { ImportExecuteResponse, ImportOptions, ImportPreviewResponse } from './import-repository';
+import type { CatalogInput, CatalogItem, CatalogListQuery, CatalogListResult, CatalogReferenceData, CatalogType, ResponsibleCatalogItem } from './catalogs-repository';
 import type {
   AdminUser,
   AdminUserListQuery,
@@ -503,7 +504,7 @@ export async function realResetAdminUserPassword(_id: string): Promise<{ status:
 }
 
 export async function realListResponsibleCandidates(): Promise<ResponsibleCandidate[]> {
-  const data = unwrap(await apiFetch<unknown>('/api/v1/catalog/responsibles?page=1&page_size=100'), 'Не удалось загрузить список ответственных.');
+  const data = unwrap(await apiFetch<unknown>('/api/v1/responsibles?page=1&page_size=100'), 'Не удалось загрузить список ответственных.');
   const payload = isRecord(data) ? data : {};
   const rows = Array.isArray(data) ? data : Array.isArray(payload.items) ? payload.items : [];
   return rows.map((value): ResponsibleCandidate => {
@@ -518,8 +519,133 @@ export async function realListResponsibleCandidates(): Promise<ResponsibleCandid
 }
 
 export async function realAssignUniversityResponsible(input: ResponsibleAssignmentInput): Promise<void> {
-  unwrap(await apiFetch<unknown>(`/api/v1/catalog/universities/${encodeURIComponent(input.universityId)}/responsibles/${encodeURIComponent(input.responsibleId)}`, {
+  unwrap(await apiFetch<unknown>(`/api/v1/universities/${encodeURIComponent(input.universityId)}/responsibles/${encodeURIComponent(input.responsibleId)}`, {
     method: 'POST',
     body: { is_primary: true },
   }), 'Не удалось назначить ответственного ВУЗа.');
+}
+
+// -------------------------------------------------------------- catalog CRUD
+
+function catalogTimestamp(value: unknown): string {
+  return stringValue(value) || new Date().toISOString();
+}
+
+function catalogItem(type: CatalogType, value: unknown): CatalogItem {
+  const item = isRecord(value) ? value : {};
+  const base = {
+    id: stringValue(item.id),
+    name: stringValue(item.name ?? item.full_name),
+    isActive: item.is_active !== false,
+    createdAt: catalogTimestamp(item.created_at),
+    updatedAt: catalogTimestamp(item.updated_at),
+  };
+  if (type === 'universities') return { ...base, type, city: stringValue(item.city) };
+  if (type === 'products') {
+    const vendor = isRecord(item.vendor) ? item.vendor : {};
+    return { ...base, type, version: stringValue(item.version), vendorId: stringValue(item.vendor_id ?? vendor.id), vendorName: stringValue(item.vendor_name ?? vendor.name) };
+  }
+  if (type === 'directions') return { ...base, type, code: stringValue(item.code) };
+  const universities = Array.isArray(item.universities) ? item.universities : [];
+  return {
+    ...base,
+    type,
+    email: stringValue(item.email),
+    phone: stringValue(item.phone),
+    role: stringValue(item.role),
+    universityIds: universities.flatMap((university) => isRecord(university) && stringValue(university.id) ? [stringValue(university.id)] : []),
+  };
+}
+
+function catalogPayloadPage(value: unknown, query: CatalogListQuery): CatalogListResult {
+  const payload = isRecord(value) ? value : {};
+  const rows = Array.isArray(value) ? value : Array.isArray(payload.items) ? payload.items : [];
+  return {
+    items: rows.map((item) => catalogItem(query.type, item)),
+    page: typeof payload.page === 'number' ? payload.page : query.page,
+    pageSize: typeof payload.page_size === 'number' ? payload.page_size : query.pageSize,
+    total: typeof payload.total === 'number' ? payload.total : rows.length,
+  };
+}
+
+export async function realListCatalogItems(query: CatalogListQuery): Promise<CatalogListResult> {
+  const params = new URLSearchParams({ page: String(query.page), page_size: String(query.pageSize) });
+  if (query.search.trim()) params.set('search', query.search.trim());
+  const data = unwrap(await apiFetch<unknown>(`/api/v1/${query.type}?${params}`), 'Не удалось загрузить каталог.');
+  return catalogPayloadPage(data, query);
+}
+
+export async function realGetCatalogItem(type: CatalogType, id: string): Promise<CatalogItem> {
+  const data = unwrap(await apiFetch<unknown>(`/api/v1/${type}/${encodeURIComponent(id)}`), 'Не удалось загрузить запись каталога.');
+  return catalogItem(type, data);
+}
+
+function referenceItems(value: unknown): Array<{ id: string; name: string }> {
+  const payload = isRecord(value) ? value : {};
+  const rows = Array.isArray(value) ? value : Array.isArray(payload.items) ? payload.items : [];
+  return rows.flatMap((value) => {
+    const item = isRecord(value) ? value : {};
+    const id = stringValue(item.id);
+    const name = stringValue(item.name);
+    return id && name ? [{ id, name }] : [];
+  });
+}
+
+export async function realGetCatalogReferenceData(): Promise<CatalogReferenceData> {
+  const [vendorsResult, universitiesResult] = await Promise.all([
+    apiFetch<unknown>('/api/v1/vendors?page=1&page_size=100'),
+    apiFetch<unknown>('/api/v1/universities?page=1&page_size=100'),
+  ]);
+  return {
+    vendors: referenceItems(unwrap(vendorsResult, 'Не удалось загрузить список вендоров.')),
+    universities: referenceItems(unwrap(universitiesResult, 'Не удалось загрузить список ВУЗов.')),
+  };
+}
+
+function catalogWriteBody(input: CatalogInput): Record<string, unknown> {
+  if (input.type === 'universities') return { name: input.name, city: input.city || null };
+  if (input.type === 'products') return { name: input.name, vendor_id: input.vendorId, version: input.version };
+  if (input.type === 'directions') return { name: input.name, code: input.code };
+  return { full_name: input.name, email: input.email, phone: input.phone || null, role: input.role };
+}
+
+async function syncResponsibleUniversities(responsibleId: string, currentIds: string[], nextIds: string[]): Promise<void> {
+  const current = new Set(currentIds);
+  const next = new Set(nextIds);
+  const additions = [...next].filter((id) => !current.has(id));
+  const removals = [...current].filter((id) => !next.has(id));
+  await Promise.all(additions.map(async (universityId) => {
+    unwrap(await apiFetch<unknown>(`/api/v1/universities/${encodeURIComponent(universityId)}/responsibles/${encodeURIComponent(responsibleId)}`, { method: 'POST', body: { is_primary: false } }), 'Не удалось связать ответственного с ВУЗом.');
+  }));
+  await Promise.all(removals.map(async (universityId) => {
+    unwrap(await apiFetch<unknown>(`/api/v1/universities/${encodeURIComponent(universityId)}/responsibles/${encodeURIComponent(responsibleId)}`, { method: 'DELETE' }), 'Не удалось убрать связь ответственного с ВУЗом.');
+  }));
+}
+
+export async function realCreateCatalogItem(input: CatalogInput): Promise<CatalogItem> {
+  const data = unwrap(await apiFetch<unknown>(`/api/v1/${input.type}`, { method: 'POST', body: catalogWriteBody(input) }), 'Не удалось добавить запись каталога.');
+  const created = catalogItem(input.type, data);
+  if (input.type === 'responsibles' && input.universityIds.length) {
+    await syncResponsibleUniversities(created.id, [], input.universityIds);
+    return { ...(created as ResponsibleCatalogItem), universityIds: [...input.universityIds] };
+  }
+  return created;
+}
+
+export async function realUpdateCatalogItem(id: string, input: CatalogInput): Promise<CatalogItem> {
+  const current = input.type === 'responsibles' ? await realGetCatalogItem(input.type, id) as ResponsibleCatalogItem : null;
+  const data = unwrap(await apiFetch<unknown>(`/api/v1/${input.type}/${encodeURIComponent(id)}`, { method: 'PATCH', body: catalogWriteBody(input) }), 'Не удалось сохранить запись каталога.');
+  const updated = catalogItem(input.type, data);
+  if (input.type === 'responsibles') {
+    await syncResponsibleUniversities(id, current?.universityIds ?? [], input.universityIds);
+    return { ...(updated as ResponsibleCatalogItem), universityIds: [...input.universityIds] };
+  }
+  return updated;
+}
+
+export function realSetCatalogItemActive(_type: CatalogType, _id: string, _active: boolean): never {
+  void _type;
+  void _id;
+  void _active;
+  throw new ApiRequestError(501, { code: 'CATALOG_SOFT_DELETE_UNAVAILABLE' }, 'Текущий backend не публикует soft activate/deactivate contract.');
 }

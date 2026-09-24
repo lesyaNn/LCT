@@ -31,6 +31,10 @@ export const importCatalogOptions: ImportCatalogOption[] = [
   { id: 'licenses', label: 'Лицензии', description: 'Лицензии, договоры и сроки действия' },
 ];
 
+export function isImportCatalogType(value: unknown): value is ImportCatalogType {
+  return importCatalogOptions.some((option) => option.id === value);
+}
+
 export interface ImportTargetField {
   id: string;
   label: string;

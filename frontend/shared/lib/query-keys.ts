@@ -7,6 +7,7 @@ export const queryKeys = {
   universities: {
     all: ['universities'] as const,
     list: <T>(query: T) => ['universities', query] as const,
+    passports: ['university-passport'] as const,
     passport: (id: string) => ['university-passport', id] as const,
     workflow: (instanceId: string) => ['workflow', instanceId] as const,
     workflowComments: (instanceId: string) => ['workflow', instanceId, 'comments'] as const,
@@ -15,13 +16,16 @@ export const queryKeys = {
     healthScore: (id: string) => ['university-health-score', id] as const,
     healthScoreBatch: (ids: readonly string[]) => ['university-health-score-batch', [...ids].sort()] as const,
     programs: (id: string) => ['university-programs', id] as const,
+    programsAll: ['university-programs'] as const,
     teachers: (id: string) => ['university-teachers', id] as const,
     students: (id: string) => ['university-students', id] as const,
     products: (id: string) => ['university-products', id] as const,
+    productsAll: ['university-products'] as const,
     licenses: (id: string) => ['university-licenses', id] as const,
     documents: (id: string) => ['university-documents', id] as const,
     meetings: (id: string) => ['university-meetings', id] as const,
     responsibles: (id: string) => ['university-responsibles', id] as const,
+    responsiblesAll: ['university-responsibles'] as const,
   },
   teachers: {
     passport: (id: string) => ['teacher-passport', id] as const,
@@ -54,5 +58,12 @@ export const queryKeys = {
     detail: (id: string) => ['users', 'detail', id] as const,
     responsibleCandidates: ['users', 'responsible-candidates'] as const,
     access: ['users', 'access'] as const,
+  },
+  catalogs: {
+    all: ['catalogs'] as const,
+    family: (type: string) => ['catalogs', type] as const,
+    list: <T>(type: string, query: T) => ['catalogs', type, 'list', query] as const,
+    detail: (type: string, id: string) => ['catalogs', type, 'detail', id] as const,
+    references: ['catalogs', 'references'] as const,
   },
 } as const;

@@ -198,10 +198,10 @@ function JobsJournal({ jobs, loading, error, onRetry, onSelect }: { jobs: Import
   return <TableShell ariaLabel="Журнал импортов"><div className={styles.jobsDesktop}><table><caption className={styles.visuallyHidden}>Журнал импортов</caption><thead><tr><th>Когда</th><th>Кто</th><th>Тип</th><th>Файл</th><th>Статус</th><th>Итоги</th><th>Действия</th></tr></thead><tbody>{jobs.map((job) => <tr data-testid="import-job-row" key={job.id}><td><time dateTime={job.createdAt}>{formatDateTimeRu(job.createdAt)}</time></td><td>{job.createdBy ?? '—'}</td><td>{importCatalogOptions.find((item) => item.id === job.catalogType)?.label ?? 'Каталог'}</td><td>{job.filename ?? '—'}</td><td><StatusBadge intent={jobStatusMeta[job.status].intent}>{jobStatusMeta[job.status].label}</StatusBadge></td><td>{job.result ? `${job.result.inserted} доб. · ${job.result.updated} обн. · ${job.result.errors.length} ошибок` : '—'}</td><td><Button type="button" variant="ghost" size="s" onClick={() => onSelect(job)}>Подробнее</Button></td></tr>)}</tbody></table></div><div className={styles.jobsMobile}>{jobs.map((job) => <article data-testid="import-job-row" className={styles.jobCard} key={job.id} role="button" tabIndex={0} onClick={() => onSelect(job)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect(job); } }}><div className={styles.jobCardHeader}><strong>{job.filename ?? 'Файл импорта'}</strong><StatusBadge intent={jobStatusMeta[job.status].intent}>{jobStatusMeta[job.status].label}</StatusBadge></div><small>{formatDateTimeRu(job.createdAt)} · {job.createdBy ?? '—'}</small><span>{job.result ? `${job.result.inserted} добавлено · ${job.result.updated} обновлено` : 'Результат обрабатывается'}</span></article>)}</div></TableShell>;
 }
 
-export function ImportPage() {
+export function ImportPage({ initialCatalogType = '' }: { initialCatalogType?: ImportCatalogType | '' }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [catalogType, setCatalogType] = useState<ImportCatalogType | ''>('');
+  const [catalogType, setCatalogType] = useState<ImportCatalogType | ''>(initialCatalogType);
   const [preview, setPreview] = useState<ImportPreviewResponse | null>(null);
   const [fileName, setFileName] = useState('');
   const [mapping, setMapping] = useState<Record<string, string>>({});
