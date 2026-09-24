@@ -1,6 +1,7 @@
 import type { AuthUser } from '@/shared/types/user';
 import { apiUploadFormData } from './api-client';
 import { ApiRequestError, ERROR_MESSAGES } from './api-errors';
+import { isMockDataSource, waitForMockDelay } from './data-source';
 import { isWorkflowApiInstanceId, workflowAttachmentDownloadUrl, type UniversityWorkflowAttachment } from './universities-repository';
 
 export type WorkflowAttachmentCategory = 'pdf' | 'image' | 'archive' | 'document' | 'spreadsheet' | 'other';
@@ -113,6 +114,23 @@ export class WorkflowAttachmentUploadError extends ApiRequestError {
 
 export async function uploadWorkflowAttachment(instanceId: string, file: File, options: { signal: AbortSignal; onProgress: (progress: number) => void }): Promise<WorkflowAttachmentApiRecord> {
   if (!isWorkflowApiInstanceId(instanceId)) throw new WorkflowAttachmentUploadError(0, undefined, 'Загрузка недоступна для этого Workflow.');
+  if (isMockDataSource) {
+    options.onProgress(15);
+    await waitForMockDelay(options.signal);
+    options.onProgress(100);
+    const timestamp = new Date().toISOString();
+    const suffix = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}`;
+    return {
+      id: `mock-attachment-${suffix}`,
+      instance_id: instanceId,
+      original_filename: file.name,
+      mime_type: file.type || 'application/octet-stream',
+      file_size: file.size,
+      uploaded_by_keycloak_sub: 'mock-user',
+      created_at: timestamp,
+      updated_at: timestamp,
+    };
+  }
   const body = new FormData();
   body.append('file', file, file.name);
   const result = await apiUploadFormData<WorkflowAttachmentApiRecord>(`/api/v1/workflow/instances/${instanceId}/attachments`, body, options);

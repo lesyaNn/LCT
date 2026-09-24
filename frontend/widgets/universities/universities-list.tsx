@@ -37,7 +37,7 @@ import {
   getUniversities,
   programStatusLabels,
   universityFilterOptions,
-  universitiesQueryKey,
+  universitiesListQueryKey,
   type UniversityListItem,
   type UniversityListQuery,
   type UniversityFilters,
@@ -539,7 +539,7 @@ export function UniversitiesList() {
   }, [state.filters]);
 
   const query = useQuery({
-    queryKey: [...universitiesQueryKey, state],
+    queryKey: universitiesListQueryKey(state),
     queryFn: () => getUniversities(state),
     placeholderData: keepPreviousData,
   });

@@ -122,7 +122,7 @@ function JobStateDetails({ job, timedOut, pollingError, retryError }: { job: Rep
 
 function JobActions({ job, timedOut, retrying, onRetry }: { job: ReportJob; timedOut: boolean; retrying: boolean; onRetry: (job: ReportJob) => void }) {
   if (job.status === 'ready') {
-    if (job.downloadUrl) return <a className={styles.actionLink} href={job.downloadUrl} download aria-label={`Скачать ${job.name}`}><CloudDownload size={16} fill="currentColor" />Скачать</a>;
+    if (job.downloadUrl) return <a className={styles.actionLink} href={job.downloadUrl} download={`${job.name}.${job.format}`} aria-label={`Скачать ${job.name}`}><CloudDownload size={16} fill="currentColor" />Скачать</a>;
     return <span className={styles.actionUnavailable} title="Сервер не вернул download_url">Файл недоступен</span>;
   }
   if ((job.status === 'failed' || timedOut) && REPORTS_API_CAPABILITIES.retry && job.request) {

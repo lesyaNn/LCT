@@ -1,5 +1,14 @@
 import { apiFetch } from './api-client';
 import { ApiRequestError } from './api-errors';
+import { fromDataSource } from './data-source';
+import { queryKeys } from './query-keys';
+import {
+  mockAddWorkflowStage,
+  mockCreateWorkflowTemplate,
+  mockGetWorkflowTemplate,
+  mockListWorkflowTemplates,
+  mockUpdateWorkflowStage,
+} from '@/shared/mocks/api-adapter';
 
 interface WorkflowTemplateStageApiRecord {
   id: string;
@@ -96,10 +105,10 @@ export class WorkflowTemplateApiError extends ApiRequestError {
   }
 }
 
-export const workflowTemplatesQueryKey = ['workflow-templates'] as const;
-export const workflowTemplateListsQueryKey = [...workflowTemplatesQueryKey, 'list'] as const;
-export const workflowTemplateListQueryKey = (page = 1, pageSize = 100) => [...workflowTemplatesQueryKey, 'list', page, pageSize] as const;
-export const workflowTemplateDetailQueryKey = (templateId: string) => [...workflowTemplatesQueryKey, 'detail', templateId] as const;
+export const workflowTemplatesQueryKey = queryKeys.workflowTemplates.all;
+export const workflowTemplateListsQueryKey = queryKeys.workflowTemplates.lists;
+export const workflowTemplateListQueryKey = queryKeys.workflowTemplates.list;
+export const workflowTemplateDetailQueryKey = queryKeys.workflowTemplates.detail;
 
 function templateSummaryFromApi(item: WorkflowTemplateApiRecord): WorkflowTemplateSummary {
   return {
@@ -138,19 +147,19 @@ function fail(status: number, body: unknown, error: string, fallback: string): n
   throw new WorkflowTemplateApiError(status, body, fallback, error);
 }
 
-export async function listWorkflowTemplates(page = 1, pageSize = 100, signal?: AbortSignal): Promise<WorkflowTemplatePage> {
+async function listRealWorkflowTemplates(page = 1, pageSize = 100, signal?: AbortSignal): Promise<WorkflowTemplatePage> {
   const result = await apiFetch<PaginatedApiResponse<WorkflowTemplateApiRecord>>(`/api/v1/workflow/templates?page=${page}&page_size=${pageSize}`, { signal });
   if (!result.ok) return fail(result.status, result.body, result.error, 'Не удалось загрузить шаблоны Workflow.');
   return { items: result.data.items.map(templateSummaryFromApi), page: result.data.page, pageSize: result.data.page_size, total: result.data.total };
 }
 
-export async function getWorkflowTemplate(templateId: string, signal?: AbortSignal): Promise<WorkflowTemplate> {
+async function getRealWorkflowTemplate(templateId: string, signal?: AbortSignal): Promise<WorkflowTemplate> {
   const result = await apiFetch<WorkflowTemplateDetailApiRecord>(`/api/v1/workflow/templates/${encodeURIComponent(templateId)}`, { signal });
   if (!result.ok) return fail(result.status, result.body, result.error, 'Не удалось загрузить шаблон Workflow.');
   return templateFromApi(result.data);
 }
 
-export async function createWorkflowTemplate(input: CreateWorkflowTemplateInput): Promise<WorkflowTemplate> {
+async function createRealWorkflowTemplate(input: CreateWorkflowTemplateInput): Promise<WorkflowTemplate> {
   const result = await apiFetch<WorkflowTemplateDetailApiRecord>('/api/v1/workflow/templates', {
     method: 'POST',
     body: { name: input.name, description: input.description },
@@ -159,7 +168,7 @@ export async function createWorkflowTemplate(input: CreateWorkflowTemplateInput)
   return templateFromApi(result.data);
 }
 
-export async function addWorkflowStage(templateId: string, input: CreateWorkflowStageInput): Promise<WorkflowTemplateStage> {
+async function addRealWorkflowStage(templateId: string, input: CreateWorkflowStageInput): Promise<WorkflowTemplateStage> {
   const result = await apiFetch<WorkflowTemplateStageApiRecord>(`/api/v1/workflow/templates/${encodeURIComponent(templateId)}/stages`, {
     method: 'POST',
     body: {
@@ -174,7 +183,7 @@ export async function addWorkflowStage(templateId: string, input: CreateWorkflow
   return stageFromApi(result.data);
 }
 
-export async function updateWorkflowStage(templateId: string, stageId: string, input: UpdateWorkflowStageInput): Promise<WorkflowTemplateStage> {
+async function updateRealWorkflowStage(templateId: string, stageId: string, input: UpdateWorkflowStageInput): Promise<WorkflowTemplateStage> {
   const body: Record<string, unknown> = {};
   if (input.name !== undefined) body.name = input.name;
   if (input.description !== undefined) body.description = input.description;
@@ -185,4 +194,32 @@ export async function updateWorkflowStage(templateId: string, stageId: string, i
   const result = await apiFetch<WorkflowTemplateStageApiRecord>(`/api/v1/workflow/templates/${encodeURIComponent(templateId)}/stages/${encodeURIComponent(stageId)}`, { method: 'PATCH', body });
   if (!result.ok) return fail(result.status, result.body, result.error, 'Не удалось сохранить этап.');
   return stageFromApi(result.data);
+}
+
+export async function listWorkflowTemplates(page = 1, pageSize = 100, signal?: AbortSignal): Promise<WorkflowTemplatePage> {
+  return fromDataSource({
+    mock: () => mockListWorkflowTemplates(page, pageSize),
+    real: () => listRealWorkflowTemplates(page, pageSize, signal),
+    signal,
+  });
+}
+
+export async function getWorkflowTemplate(templateId: string, signal?: AbortSignal): Promise<WorkflowTemplate> {
+  return fromDataSource({
+    mock: () => mockGetWorkflowTemplate(templateId),
+    real: () => getRealWorkflowTemplate(templateId, signal),
+    signal,
+  });
+}
+
+export async function createWorkflowTemplate(input: CreateWorkflowTemplateInput): Promise<WorkflowTemplate> {
+  return fromDataSource({ mock: () => mockCreateWorkflowTemplate(input), real: () => createRealWorkflowTemplate(input) });
+}
+
+export async function addWorkflowStage(templateId: string, input: CreateWorkflowStageInput): Promise<WorkflowTemplateStage> {
+  return fromDataSource({ mock: () => mockAddWorkflowStage(templateId, input), real: () => addRealWorkflowStage(templateId, input) });
+}
+
+export async function updateWorkflowStage(templateId: string, stageId: string, input: UpdateWorkflowStageInput): Promise<WorkflowTemplateStage> {
+  return fromDataSource({ mock: () => mockUpdateWorkflowStage(templateId, stageId, input), real: () => updateRealWorkflowStage(templateId, stageId, input) });
 }
