@@ -18,14 +18,16 @@ import hashlib
 import json
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.permissions import require_permission, user_permissions
 from app.core.security import CurrentUser
-from app.db.session import get_db
+from app.core.errors import BusinessException, SecurityError
+from app.schemas.errors import ErrorCode
+from app.modules.audit.service import get_audit_db
 from app.models.report_job import (
     JOB_TYPE_XLSX_IMPORT,
     STATUS_BUILDING,
@@ -64,9 +66,9 @@ def _is_admin(user: CurrentUser) -> bool:
 def _get_visible_job(db: Session, job_id: str, user: CurrentUser) -> ReportJob:
     job = ledger.get_job(db, job_id)
     if job is None or job.job_type != JOB_TYPE_XLSX_IMPORT:
-        raise HTTPException(status_code=404, detail="Job not found")
+        raise BusinessException(ErrorCode.NOT_FOUND)
     if not ledger.job_visible_to(job, user, is_admin=_is_admin(user)):
-        raise HTTPException(status_code=403, detail="Forbidden: чужой import job")
+        raise SecurityError(ErrorCode.FORBIDDEN)
     return job
 
 
@@ -134,7 +136,7 @@ def import_preview(
         file_id = service.stage_upload(file.filename or "", content)
         parsed = service.parse_preview(file_id)
     except service.ImportValidationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise BusinessException(ErrorCode.IMPORT_VALIDATION_FAILED) from exc
     return ImportPreview(
         file_id=file_id,
         filename=file.filename or "",
@@ -164,7 +166,7 @@ def import_preview(
 )
 def import_execute(
     req: ImportExecuteRequest,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(require_permission("import.write")),
 ):
     key = _idempotency_key(
@@ -190,7 +192,7 @@ def import_execute(
         )
     except service.ImportValidationError as exc:
         ledger.mark_failed(db, job, exc)
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise BusinessException(ErrorCode.IMPORT_VALIDATION_FAILED) from exc
     except Exception as exc:
         ledger.mark_failed(db, job, exc)
         raise
@@ -223,7 +225,7 @@ def import_execute(
 def import_job_status(
     job_id: str,
     user: CurrentUser = Depends(require_permission("import.read")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
 ):
     job = _get_visible_job(db, job_id, user)
     return ImportJobStatus(
@@ -243,7 +245,8 @@ def import_job_status(
     responses={
         401: ERROR_RESPONSES[401],
         403: {"model": ErrorResponse, "description": "Чужой job"},
-        404: {"model": ErrorResponse, "description": "Отчёт не готов/не найден"},
+        400: {"model": ErrorResponse, "description": "REPORT_NOT_READY — отчёт ещё формируется"},
+        404: {"model": ErrorResponse, "description": "Файл отчёта не найден"},
         410: {"model": ErrorResponse, "description": "Срок скачивания истёк"},
         422: ERROR_RESPONSES[422],
     },
@@ -251,20 +254,20 @@ def import_job_status(
 def import_job_report(
     job_id: str,
     user: CurrentUser = Depends(require_permission("import.read")),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
 ):
     job = _get_visible_job(db, job_id, user)
     if job.status != STATUS_READY or not job.file_path:
-        raise HTTPException(status_code=404, detail="Отчёт не готов")
+        raise BusinessException(ErrorCode.REPORT_NOT_READY)
     expires_at = job.expires_at
     if expires_at is not None:
         if expires_at.tzinfo is None:  # sqlite-тесты отдают naive
             expires_at = expires_at.replace(tzinfo=timezone.utc)
         if expires_at < datetime.now(timezone.utc):
-            raise HTTPException(status_code=410, detail="Срок скачивания истёк")
+            raise BusinessException(ErrorCode.GONE)
     path = ledger.contained_job_path(job.file_path)
     if path is None or not path.is_file():
-        raise HTTPException(status_code=404, detail="Файл отчёта не найден")
+        raise BusinessException(ErrorCode.FILE_NOT_FOUND)
     return FileResponse(
         path,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

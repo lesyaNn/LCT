@@ -32,12 +32,13 @@ from datetime import date
 from typing import Any
 from uuid import UUID
 
-from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models.catalog import ITProgram, License
+from app.core.errors import BusinessException
+from app.schemas.errors import ErrorCode
 from app.models.workflow_instances import InstanceStage, WorkflowInstance
 from app.modules.analytics.analytics import AnalyticsService
 from app.modules.analytics.filters import UnifiedFilter
@@ -70,23 +71,21 @@ class Dev1FilterProvider:
 
         unknown = set(raw or {}) - FILTER_KEYS
         if unknown:
-            raise HTTPException(
-                status_code=422,
-                detail="Unknown filter fields: " + ", ".join(sorted(unknown)),
-            )
+            raise BusinessException(ErrorCode.VALIDATION_ERROR)
         try:
             filters = UnifiedFilter.model_validate(raw or {})
         except ValidationError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
+            raise BusinessException(ErrorCode.VALIDATION_ERROR) from exc
         return filters.model_dump(mode="json")
 
     def select(
-        self, db: Session, filters: dict[str, Any], *, today: date | None = None
+        self, db: Session, filters: dict[str, Any], *, today: date | None = None,
+        user=None,
     ) -> Selection:
         """Select IDs with Dev-1 semantics (same university set as list/dataset)."""
         dto = UnifiedFilter.model_validate(filters or {})
         day = today or date.today()
-        uni_ids = AnalyticsService.filtered_university_ids(db, dto, today=day)
+        uni_ids = AnalyticsService.filtered_university_ids(db, dto, today=day, user=user)
 
         if dto.program_ids:
             program_ids = _sorted_ids(dto.program_ids)
@@ -130,6 +129,9 @@ class Dev1FilterProvider:
             license_ids=license_ids,
             workflow_instance_ids=instance_ids,
         )
+
+    def select_scoped(self, db: Session, filters: dict[str, Any], user) -> Selection:
+        return self.select(db, filters, user=user)
 
     @staticmethod
     def _instance_branches(statuses: list[WorkflowStageStatus], day: date):

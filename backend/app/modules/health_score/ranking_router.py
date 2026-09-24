@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.permissions import require_permission
+from app.core.policies import apply_university_scope, get_data_scope
 from app.core.security import CurrentUser
 from app.db.session import get_db
 from app.infrastructure import redis as redis_infra
@@ -55,17 +56,21 @@ def get_health_score_ranking(
     offset: int = Query(default=0, ge=0, description="Сдвиг для пагинации"),
     status: HealthScoreStatus | None = Query(default=None, description="Фильтр статуса"),
     db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(require_permission("university.read")),
+    user: CurrentUser = Depends(require_permission("university.read")),
 ) -> HealthScoreRankingResponse:
+    global_scope = get_data_scope(user).is_all
     key = _ranking_key(status, limit, offset)
-    raw = redis_infra.cache_get(key)
+    raw = redis_infra.cache_get(key) if global_scope else None
     if raw:
         try:
             return HealthScoreRankingResponse.model_validate_json(raw)
         except ValueError:
             pass
     universities = list(
-        db.execute(select(University.id, University.name).order_by(University.name)).all()
+        db.execute(apply_university_scope(
+            select(University.id, University.name).order_by(University.name),
+            University.id, user,
+        )).all()
     )
     scored: list[tuple[uuid.UUID, str, HealthScoreShort]] = []
     for university_id, name in universities:
@@ -89,5 +94,6 @@ def get_health_score_ranking(
         )
     ]
     result = HealthScoreRankingResponse(items=items, total=total)
-    redis_infra.cache_set(key, result.model_dump_json(), RANKING_TTL)
+    if global_scope:
+        redis_infra.cache_set(key, result.model_dump_json(), RANKING_TTL)
     return result

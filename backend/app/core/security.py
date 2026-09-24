@@ -12,12 +12,14 @@ import urllib.request
 from dataclasses import dataclass, field
 from typing import Any
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import ExpiredSignatureError, JWTError, jwt
-from jose.exceptions import JWTClaimsError
+from jose.exceptions import JOSEError, JWKError
 
 from app.config import settings
+from app.core.errors import SecurityError
+from app.schemas.errors import ErrorCode
 
 bearer_scheme = HTTPBearer(auto_error=False, description="Keycloak JWT (rtk-frontend)")
 
@@ -37,10 +39,8 @@ class CurrentUser:
     When PostgreSQL arrives, this `sub` maps to users.external_id
     (users.keycloak_id) — auth code will not need a rewrite.
 
-    ``university_ids`` is an OPTIONAL additive scope claim (``university_ids``
-    list or single ``university_id`` string in the JWT). P2-05 workflow file
-    storage enforces it when present (cross-university isolation); tokens
-    without it keep the pre-existing global RBAC behaviour. ``None`` = all.
+    ``university_ids`` is an explicit assignment claim. Missing and empty
+    claims are zero scope for non-admin roles; admin alone has implicit ALL.
     """
 
     id: str = ""
@@ -65,24 +65,37 @@ def _get_jwks(force_refresh: bool = False) -> dict:
         return {"keys": _jwks_cache["keys"]}
     try:
         doc = _fetch_jwks()
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"JWKS unavailable: {exc}")
-    _jwks_cache["keys"] = doc.get("keys", [])
+        if not isinstance(doc, dict) or not isinstance(doc.get("keys"), list):
+            raise ValueError("Malformed JWKS")
+        keys = doc["keys"]
+        if not keys or not all(isinstance(key, dict) for key in keys):
+            raise ValueError("Malformed JWKS key")
+        if any(key.get("kty") == "RSA" and
+               (not isinstance(key.get("n"), str) or not isinstance(key.get("e"), str))
+               for key in keys):
+            raise ValueError("Malformed RSA key")
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        raise SecurityError(ErrorCode.EXTERNAL_SOURCE_UNAVAILABLE) from exc
+    _jwks_cache["keys"] = keys
     _jwks_cache["fetched_at"] = now
-    return doc
+    return {"keys": keys}
 
 
 def _key_for_kid(kid: str) -> dict:
     doc = _get_jwks()
     for key in doc.get("keys", []):
-        if key.get("kid") == kid:
+        if (key.get("kid") == kid and key.get("kty") == "RSA"
+                and key.get("alg", "RS256") == "RS256"
+                and key.get("use", "sig") == "sig"):
             return key
     # Unknown kid: keys may have rotated — refresh once, then fail closed.
     doc = _get_jwks(force_refresh=True)
     for key in doc.get("keys", []):
-        if key.get("kid") == kid:
+        if (key.get("kid") == kid and key.get("kty") == "RSA"
+                and key.get("alg", "RS256") == "RS256"
+                and key.get("use", "sig") == "sig"):
             return key
-    raise HTTPException(status_code=401, detail="Unknown token key (kid)")
+    raise SecurityError(ErrorCode.TOKEN_INVALID)
 
 
 def validate_token(token: str) -> CurrentUser:
@@ -90,10 +103,12 @@ def validate_token(token: str) -> CurrentUser:
     try:
         header = jwt.get_unverified_header(token)
     except JWTError:
-        raise HTTPException(status_code=401, detail="Malformed token")
+        raise SecurityError(ErrorCode.TOKEN_INVALID) from None
+    if header.get("alg") != "RS256":
+        raise SecurityError(ErrorCode.TOKEN_INVALID)
     kid = header.get("kid")
-    if not kid:
-        raise HTTPException(status_code=401, detail="Token has no kid")
+    if not isinstance(kid, str) or not kid:
+        raise SecurityError(ErrorCode.TOKEN_INVALID)
     key = _key_for_kid(kid)
     try:
         claims = jwt.decode(
@@ -102,26 +117,32 @@ def validate_token(token: str) -> CurrentUser:
             algorithms=["RS256"],
             audience=settings.keycloak_audience,
             issuer=settings.keycloak_issuer,
+            options={"require_exp": True},
         )
     except ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
-    except JWTClaimsError as exc:
-        raise HTTPException(status_code=401, detail=f"Invalid claims: {exc}")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid signature")
+        raise SecurityError(ErrorCode.TOKEN_EXPIRED) from None
+    except JWKError:
+        raise SecurityError(ErrorCode.EXTERNAL_SOURCE_UNAVAILABLE) from None
+    except (JOSEError, ValueError, TypeError):
+        raise SecurityError(ErrorCode.TOKEN_INVALID) from None
     # python-jose skips audience validation when the claim is absent —
     # require it explicitly (fail closed).
     aud = claims.get("aud")
-    auds = [aud] if isinstance(aud, str) else list(aud or [])
+    auds = [aud] if isinstance(aud, str) else aud if isinstance(aud, list) else []
     if settings.keycloak_audience not in auds:
-        raise HTTPException(status_code=401, detail="Invalid audience")
-    roles = set((claims.get("realm_access") or {}).get("roles", [])) & KNOWN_ROLES
+        raise SecurityError(ErrorCode.TOKEN_INVALID)
+    if not isinstance(claims.get("sub"), str) or not claims["sub"]:
+        raise SecurityError(ErrorCode.TOKEN_INVALID)
+    realm_access = claims.get("realm_access")
+    raw_roles = realm_access.get("roles", []) if isinstance(realm_access, dict) else []
+    roles = ({role for role in raw_roles if isinstance(role, str)} & KNOWN_ROLES
+             if isinstance(raw_roles, list) else set())
     scope: tuple[str, ...] | None = None
     raw_scope = claims.get("university_ids", claims.get("university_id"))
     if isinstance(raw_scope, str) and raw_scope:
         scope = (raw_scope,)
     elif isinstance(raw_scope, (list, tuple)):
-        scope = tuple(str(v) for v in raw_scope if str(v)) or None
+        scope = tuple(str(v) for v in raw_scope if str(v))
     return CurrentUser(
         id=claims.get("sub", ""),
         username=claims.get("preferred_username"),
@@ -142,9 +163,9 @@ def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> CurrentUser:
     if credentials is None or not credentials.credentials:
-        if settings.auth_dev_bypass:
+        if settings.auth_dev_bypass and settings.app_env.lower() not in {"prod", "production"}:
             return _dev_user()
-        raise HTTPException(status_code=401, detail="Missing bearer token")
+        raise SecurityError(ErrorCode.AUTH_REQUIRED)
     return validate_token(credentials.credentials)
 
 

@@ -157,8 +157,7 @@ def test_scope_does_not_broaden_and_cache_is_isolated():
         restrict_selection(Selection(university_ids=[uid(2)]), data_scope(user)).university_ids
         == []
     )
-    with pytest.raises(HTTPException):
-        data_scope(CurrentUser(id="a", roles={"user"}))
+    assert data_scope(CurrentUser(id="a", roles={"user"})) == ()
     provider = UnfilteredProvider()
     key = router.cache_key("overview", {}, user, data_scope(user), provider, TODAY)
     assert key != router.cache_key("overview", {}, user, None, provider, TODAY)

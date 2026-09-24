@@ -775,12 +775,12 @@ def test_referenced_stage_not_deletable_disable_is_retire_path(client, db):
     t = _template(client)
     _stage(client, t["id"], name="A")
     u = _university(db)
-    first = _post_instance(client, u.id, t["id"])  # creation transition references stage A
+    _post_instance(client, u.id, t["id"])  # creation transition references stage A
     sid = _stage_ids_by_name(client.get(f"/api/v1/workflow/templates/{t['id']}").json(), "A")[0]
     with pytest.raises(IntegrityError) as exc:
         db.delete(db.get(WorkflowStage, uuid.UUID(sid)))
         db.commit()
-    assert getattr(exc.value.orig, "sqlstate", None) == "23503"  # RESTRICT (000014)
+    assert getattr(exc.value.orig, "sqlstate", None) in {"23503", "23001"}  # RESTRICT (PG16/PG18)
     db.rollback()
 
     r = client.patch(

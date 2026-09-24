@@ -22,6 +22,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.core.security import CurrentUser, get_current_user
+from app.core.errors import register_error_handlers
+from app.schemas.errors import ErrorCode, ErrorResponse
 from app.modules.analytics.report_request import ReportRequest
 from app.modules.analytics.report_service import (
     FORMAT_GENERATORS,
@@ -51,6 +53,7 @@ def _scoped() -> tuple[CurrentUser, object]:
 
 def _app(user: CurrentUser | None) -> TestClient:
     app = FastAPI()
+    register_error_handlers(app)
     app.include_router(router)
     if user is not None:
         app.dependency_overrides[get_current_user] = lambda: user
@@ -187,18 +190,20 @@ def test_router_401_without_token():
     client = _app(None)
     resp = client.post("/reports", json={"format": "xlsx"})
     assert resp.status_code == 401
+    assert ErrorResponse.model_validate(resp.json()).error.code == ErrorCode.AUTH_REQUIRED
 
 
-def test_router_403_without_reports_read():
-    user = CurrentUser(id="u-1", roles={"user"})  # no reports.read
-    resp = _app(user).post("/reports", json={"format": "xlsx"})
-    assert resp.status_code == 403
+def test_router_user_report_permission_reaches_validation():
+    user = CurrentUser(id="u-1", roles={"user"})
+    resp = _app(user).post("/reports", json={"format": "xlsx", "columns": ["bogus"]})
+    assert resp.status_code == 422
 
 
 def test_router_403_for_curator_without_reports_read():
     user = CurrentUser(id="c-1", roles={"curator"})  # no reports.read in canon
     resp = _app(user).post("/reports", json={"format": "xlsx"})
     assert resp.status_code == 403
+    assert ErrorResponse.model_validate(resp.json()).error.code == ErrorCode.FORBIDDEN
 
 
 def test_router_422_unknown_column():

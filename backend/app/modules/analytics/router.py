@@ -6,11 +6,13 @@ import logging
 from datetime import date, datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.core.permissions import require_permission
+from app.core.errors import BusinessException
+from app.schemas.errors import ErrorCode
 from app.core.security import CurrentUser
 from app.db.session import get_db
 from app.infrastructure import redis as cache
@@ -19,7 +21,6 @@ from app.modules.analytics.integration import (
     FilterProvider,
     data_scope,
     get_filter_provider,
-    restrict_selection,
 )
 from app.modules.analytics.repository import load_data
 from app.modules.analytics.schemas import Matrix, Overview
@@ -43,7 +44,7 @@ def filter_input(
 ) -> dict:
     """Query transport only; validation/semantics belong to UnifiedFilter."""
     if set(request.query_params) - FILTER_KEYS:
-        raise HTTPException(422, "Unknown filter parameter")
+        raise BusinessException(ErrorCode.VALIDATION_ERROR)
     return {
         "date_from": date_from.isoformat() if date_from else None,
         "date_to": date_to.isoformat() if date_to else None,
@@ -75,7 +76,7 @@ def get_analytics(kind, db, raw, user, provider):
     try:
         filters = provider.normalize(raw)
     except ValidationError:
-        raise HTTPException(422, "Invalid UnifiedFilter") from None
+        raise BusinessException(ErrorCode.VALIDATION_ERROR) from None
     today = datetime.now(timezone.utc).date()
     key = cache_key(kind, filters, user, scope, provider, today)
     model = Overview if kind == "overview" else Matrix
@@ -86,9 +87,14 @@ def get_analytics(kind, db, raw, user, provider):
     except Exception:
         # Cache outage/corrupt entry must not make the authoritative DB unavailable.
         logger.warning("Analytics cache read failed")
-    selection = restrict_selection(provider.select(db, filters), scope)
+    if scope is None:
+        selection = provider.select(db, filters)
+    elif hasattr(provider, "select_scoped"):
+        selection = provider.select_scoped(db, filters, user)
+    else:
+        raise BusinessException(ErrorCode.EXTERNAL_SOURCE_UNAVAILABLE)
     if kind == "matrix" and len(selection.university_ids) * len(selection.program_ids) > 50_000:
-        raise HTTPException(422, "Matrix is too large; narrow the shared filter")
+        raise BusinessException(ErrorCode.VALIDATION_ERROR)
     data = load_data(db, selection, today=today, filters=filters)
     result = (build_overview if kind == "overview" else build_matrix)(data, today=today)
     try:
@@ -102,7 +108,7 @@ def get_analytics(kind, db, raw, user, provider):
 def overview(
     filters: dict = Depends(filter_input),
     db: Session = Depends(get_db),
-    user: CurrentUser = Depends(require_permission("university.read")),
+    user: CurrentUser = Depends(require_permission("analytics.read")),
     provider: FilterProvider = Depends(get_filter_provider),
 ):
     return get_analytics("overview", db, filters, user, provider)
@@ -112,7 +118,7 @@ def overview(
 def matrix(
     filters: dict = Depends(filter_input),
     db: Session = Depends(get_db),
-    user: CurrentUser = Depends(require_permission("university.read")),
+    user: CurrentUser = Depends(require_permission("analytics.read")),
     provider: FilterProvider = Depends(get_filter_provider),
 ):
     return get_analytics("matrix", db, filters, user, provider)

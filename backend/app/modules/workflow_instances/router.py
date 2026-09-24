@@ -17,7 +17,9 @@ import uuid
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.core.permissions import require_permission
+from app.core.permissions import require_permission, user_permissions
+from app.core.errors import SecurityError
+from app.schemas.errors import ErrorCode
 from app.core.security import CurrentUser
 from app.db.session import get_db
 from app.modules.workflow_instances import service
@@ -44,6 +46,12 @@ def create_workflow_instance(
     user: CurrentUser = Depends(WRITE),
 ) -> InstanceDetail:
     service.require_university_scope(user, data.university_id)
+    if (
+        data.responsible_id is not None
+        and "university_responsible.manage" not in user_permissions(user)
+        and not (user.roles or set()).intersection({"admin", "curator"})
+    ):
+        raise SecurityError(ErrorCode.FORBIDDEN)
     return service.create_instance(
         db,
         university_id=data.university_id,

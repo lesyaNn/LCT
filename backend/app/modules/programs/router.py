@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.security import CurrentUser, get_current_user
+from app.core.errors import BusinessException
+from app.schemas.errors import ErrorCode
 from app.db.session import get_db
 from app.modules.programs.models import Program
 from app.modules.programs.schemas import ProgramIn, ProgramOut
@@ -33,7 +35,7 @@ def update_program(program_id: int, data: ProgramIn, db: Session = Depends(get_d
                    _u: CurrentUser = Depends(get_current_user)):
     obj = db.get(Program, program_id)
     if not obj:
-        raise HTTPException(404, "Program not found")
+        raise BusinessException(ErrorCode.NOT_FOUND)
     for k, v in data.model_dump(exclude_unset=True).items():
         setattr(obj, k, v)
     db.commit()

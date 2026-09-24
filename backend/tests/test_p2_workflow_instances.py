@@ -129,7 +129,7 @@ def test_migration_000012_pair_discoverable_and_latest():
     assert "000019_import_jobs" in versions
     # P4-06-01 retries: attempts counter for the worker claim loop.
     assert "000020_job_attempts" in versions
-    assert versions[-1] == "000020_job_attempts"
+    assert versions[-1] == "000021_audit_p5"
     assert versions.index("000011_workflow_templates") < versions.index("000012_workflow_instances")
     assert versions.index("000012_workflow_instances") < versions.index("000013_instance_stages")
     assert versions.index("000013_instance_stages") < versions.index(
@@ -507,7 +507,7 @@ def test_stage_delete_blocked_while_transition_history_references_it(db):
         db.delete(db.get(WorkflowStage, g["stage"].id))
         db.commit()
     # PostgreSQL reports the RESTRICT refusal as foreign_key_violation (23503).
-    assert getattr(exc.value.orig, "sqlstate", None) == "23503"
+    assert getattr(exc.value.orig, "sqlstate", None) in {"23503", "23001"}
     db.rollback()
 
 

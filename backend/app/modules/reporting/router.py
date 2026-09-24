@@ -4,6 +4,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.security import CurrentUser, get_current_user
+from app.core.errors import BusinessException
+from app.schemas.errors import ErrorCode
 from app.db.session import get_db
 from app.infrastructure import task_queue
 from app.modules.universities.models import University
@@ -32,7 +34,8 @@ def export(req: ExportReq, db: Session = Depends(get_db),
         job_id = task_queue.enqueue("export_xlsx", {"format": "xlsx", "rows": rows})
         task_queue.job_done(job_id, {"rows": len(rows), "format": "xlsx"})
         return {"status": "done", "job_id": job_id, "rows": len(rows)}
-    import csv, io
+    import csv
+    import io
     buf = io.StringIO()
     w = csv.DictWriter(buf, fieldnames=["id", "name", "region", "city", "status"])
     w.writeheader()
@@ -44,6 +47,5 @@ def export(req: ExportReq, db: Session = Depends(get_db),
 def job_status(job_id: str, _u: CurrentUser = Depends(get_current_user)):
     job = task_queue.job_status(job_id)
     if not job:
-        from fastapi import HTTPException
-        raise HTTPException(404, "Job not found")
+        raise BusinessException(ErrorCode.NOT_FOUND)
     return job

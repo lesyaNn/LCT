@@ -34,14 +34,16 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.permissions import require_permission, user_permissions
 from app.core.security import CurrentUser
-from app.db.session import get_db
+from app.core.errors import BusinessException, SecurityError
+from app.schemas.errors import ErrorCode
+from app.modules.audit.service import get_audit_db
 from app.models.report_job import ReportJob
 from app.modules.analytics import report_jobs as jobs
 from app.modules.analytics.report_request import ReportRequest
@@ -58,9 +60,9 @@ router = APIRouter(prefix="/reports", tags=["Reports"])
 
 ERROR_RESPONSES: dict[int, dict[str, Any]] = {
     401: {"model": ErrorResponse, "description": "AUTH_REQUIRED — нет Bearer токена"},
-    403: {"model": ErrorResponse, "description": "Forbidden: need reports.read / чужой job"},
+    403: {"model": ErrorResponse, "description": "FORBIDDEN"},
     404: {"model": ErrorResponse, "description": "Job not found"},
-    409: {"model": ErrorResponse, "description": "Conflict: job is not ready for download"},
+    400: {"model": ErrorResponse, "description": "REPORT_NOT_READY — отчёт ещё формируется"},
     410: {"model": ErrorResponse, "description": "Gone: report expired or file removed"},
     422: {"model": ErrorResponse, "description": "Ошибка валидации ReportRequest"},
 }
@@ -103,9 +105,9 @@ def _is_admin(user: CurrentUser) -> bool:
 def _get_visible_job(db: Session, job_id: str, user: CurrentUser) -> ReportJob:
     job = jobs.get_job(db, job_id)
     if job is None:
-        raise HTTPException(status_code=404, detail="Job not found")
+        raise BusinessException(ErrorCode.NOT_FOUND)
     if not jobs.job_visible_to(job, user, is_admin=_is_admin(user)):
-        raise HTTPException(status_code=403, detail="Forbidden: other report job")
+        raise SecurityError(ErrorCode.FORBIDDEN)
     return job
 
 
@@ -141,19 +143,15 @@ def _read_model(job: ReportJob) -> ReportJobRead:
 )
 def create_report(
     request: ReportRequest,
-    db: Session = Depends(get_db),
-    user: CurrentUser = Depends(require_permission(REPORTS_READ_PERMISSION)),
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(require_permission("reports.create")),
 ) -> ReportQueuedResponse:
     if request.format not in SUPPORTED_FORMATS:
-        raise HTTPException(
-            status_code=422,
-            detail=f"unsupported report format: {request.format.value!r} "
-            "(expected one of 'xlsx', 'pdf', 'json')",
-        )
+        raise BusinessException(ErrorCode.VALIDATION_ERROR)
     try:
         queued = create_report_job(db, request, user)
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise BusinessException(ErrorCode.VALIDATION_ERROR) from exc
     return queued
 
 
@@ -167,7 +165,7 @@ def create_report(
 )
 def get_report_job(
     job_id: str,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(require_permission(REPORTS_READ_PERMISSION)),
 ) -> ReportJobRead:
     return _read_model(_get_visible_job(db, job_id, user))
@@ -181,28 +179,23 @@ def get_report_job(
         "существующем файле внутри reports root и доступе к job."
     ),
     responses={401: ERROR_RESPONSES[401], 403: ERROR_RESPONSES[403],
-               404: ERROR_RESPONSES[404], 409: ERROR_RESPONSES[409],
+               404: ERROR_RESPONSES[404], 400: ERROR_RESPONSES[400],
                410: ERROR_RESPONSES[410]},
 )
 def download_report_job(
     job_id: str,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(require_permission(REPORTS_READ_PERMISSION)),
 ) -> FileResponse:
     job = _get_visible_job(db, job_id, user)
     now = datetime.now(timezone.utc)
     if job.expires_at is not None and now >= job.expires_at:
-        raise HTTPException(status_code=410, detail="Report expired")
+        raise BusinessException(ErrorCode.GONE)
     if job.status != jobs.STATUS_READY:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Report is not ready (status={job.status})",
-        )
+        raise BusinessException(ErrorCode.REPORT_NOT_READY)
     path = jobs.contained_job_path(job.file_path)
     if path is None or not path.is_file():
-        raise HTTPException(
-            status_code=410, detail="Report file is no longer available"
-        )
+        raise BusinessException(ErrorCode.FILE_NOT_FOUND)
     filename = f"report_{job.id}.{job.format}"
     return FileResponse(
         path,

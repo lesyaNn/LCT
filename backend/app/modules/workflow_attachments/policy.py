@@ -61,7 +61,8 @@ def check_file_type(filename: str, declared_mime: str | None) -> str:
     are rejected with 415. MIME types are never allowlisted (no MIME
     contract) — only recorded.
     """
-    from fastapi import HTTPException
+    from app.core.errors import BusinessException
+    from app.schemas.errors import ErrorCode
 
     mime = normalize_mime_type(declared_mime)
     allowed = get_allowed_extensions()
@@ -69,7 +70,7 @@ def check_file_type(filename: str, declared_mime: str | None) -> str:
         return mime
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if ext not in allowed:
-        raise HTTPException(status_code=415, detail=f"File extension not allowed: .{ext}")
+        raise BusinessException(ErrorCode.FILE_TYPE_NOT_ALLOWED)
     return mime
 
 

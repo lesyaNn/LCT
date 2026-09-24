@@ -12,12 +12,13 @@ import os
 from typing import Any, Protocol
 from uuid import UUID
 
-from fastapi import HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.security import CurrentUser
+from app.core.errors import BusinessException
+from app.schemas.errors import ErrorCode
 from app.models.catalog import ITProgram, University
 
 FILTER_KEYS = frozenset(
@@ -76,20 +77,23 @@ class UnfilteredProvider:
     def normalize(self, raw: dict[str, Any]) -> dict[str, Any]:
         unknown = set(raw) - FILTER_KEYS
         if unknown:
-            raise HTTPException(422, "Unknown filter fields: " + ", ".join(sorted(unknown)))
+            raise BusinessException(ErrorCode.VALIDATION_ERROR)
         if any(value not in (None, [], "") for value in raw.values()):
-            raise HTTPException(
-                503,
-                {
-                    "code": "FILTER_PROVIDER_NOT_CONFIGURED",
-                    "message": "Connect Dev-1 UnifiedFilter via P4_FILTER_PROVIDER",
-                },
-            )
+            raise BusinessException(ErrorCode.EXTERNAL_SOURCE_UNAVAILABLE)
         return {}
 
     def select(self, db: Session, filters: dict[str, Any]) -> Selection:
         return Selection(
             university_ids=list(db.scalars(select(University.id))),
+            program_ids=list(db.scalars(select(ITProgram.id))),
+        )
+
+    def select_scoped(self, db: Session, filters: dict[str, Any], user: CurrentUser) -> Selection:
+        from app.core.policies import apply_university_scope
+
+        stmt = apply_university_scope(select(University.id), University.id, user)
+        return Selection(
+            university_ids=list(db.scalars(stmt)),
             program_ids=list(db.scalars(select(ITProgram.id))),
         )
 
@@ -99,17 +103,11 @@ def get_filter_provider() -> FilterProvider:
 
 
 def data_scope(user: CurrentUser) -> tuple[UUID, ...] | None:
-    """Authorization only, never business filtering. No unscoped user access."""
-    if not user.id or not user.roles.intersection({"admin", "manager", "curator", "user"}):
-        raise HTTPException(403, "Analytics/report access denied")
-    if user.university_ids is None:
-        if user.roles.intersection({"admin", "manager"}):
-            return None
-        raise HTTPException(403, "University scope is required")
-    try:
-        return tuple(sorted({UUID(value) for value in user.university_ids}))
-    except (TypeError, ValueError):
-        raise HTTPException(403, "Invalid university scope") from None
+    """Adapter to P5 scope for the existing P4 provider boundary."""
+    from app.core.policies import get_data_scope
+
+    scope = get_data_scope(user)
+    return None if scope.is_all else tuple(sorted(scope.university_ids))
 
 
 def restrict_selection(selection: Selection, allowed: tuple[UUID, ...] | None) -> Selection:

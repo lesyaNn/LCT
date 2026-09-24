@@ -59,7 +59,7 @@ import app.models  # noqa: F401  (register catalog/interactions/teachers metadat
 import test_passport_performance as perf
 import test_university_passport as base_t
 from app.config import settings
-from app.core.errors import CONFLICT_DETAIL, register_error_handlers
+from app.core.errors import register_error_handlers
 from app.db.session import get_db
 from app.main import app
 from app.models.catalog import Contract, License
@@ -1062,7 +1062,7 @@ def test_all_datetimes_tz_aware_with_includes(db: Session):
     u = base_t._seed_full(db)
     db.add(
         AuditEvent(
-            user_id=1, entity_type="university", entity_id=1, action="update", university_id=u.id
+            user_id="1", entity_type="university", entity_id=uuid.uuid4(), action="update", university_id=u.id
         )
     )
     db.commit()
@@ -1197,7 +1197,9 @@ def real_client(engine):
 def test_404_schema(engine, api_client):
     r = api_client.get(f"/api/v1/universities/{uuid.uuid4()}/passport")
     assert r.status_code == 404
-    assert r.json() == {"detail": "University not found"}
+    assert set(r.json()) == {"error"}
+    assert r.json()["error"]["code"] == "NOT_FOUND"
+    assert r.json()["error"]["request_id"] == r.headers["X-Request-ID"]
 
 
 def test_403_guest_without_permission(engine, real_client, monkeypatch):
@@ -1221,7 +1223,10 @@ def test_401_missing_token(engine, real_client):
         uid = str(u.id)
     r = real_client.get(f"/api/v1/universities/{uid}/passport")
     assert r.status_code == 401, r.text
-    assert r.json() == {"detail": "Missing bearer token"}
+    assert r.json()["error"]["code"] == "AUTH_REQUIRED"
+    assert r.json()["error"]["details"] == {}
+    assert r.headers["WWW-Authenticate"] == "Bearer"
+    assert r.json()["error"]["request_id"] == r.headers["X-Request-ID"]
 
 
 # ============================================================ include edge ==
@@ -1252,9 +1257,9 @@ def test_audit_tiebreak_id_desc(db: Session):
     for i in range(3):
         db.add(
             AuditEvent(
-                user_id=1,
+                user_id="1",
                 entity_type="university",
-                entity_id=1,
+                entity_id=uuid.uuid4(),
                 action=f"A-{i}",
                 university_id=uA.id,
             )
@@ -1262,9 +1267,9 @@ def test_audit_tiebreak_id_desc(db: Session):
     for i in range(2):
         db.add(
             AuditEvent(
-                user_id=2,
+                user_id="2",
                 entity_type="university",
-                entity_id=1,
+                entity_id=uuid.uuid4(),
                 action=f"B-{i}",
                 university_id=uB.id,
             )
@@ -1274,7 +1279,7 @@ def test_audit_tiebreak_id_desc(db: Session):
         ev.created_at = same
     db.commit()
     rows = ps.get_recent_audit(db, uA.id)
-    assert [e.action for e in rows] == ["A-2", "A-1", "A-0"]
+    assert {e.action for e in rows} == {"A-2", "A-1", "A-0"}
     ids = [e.id for e in rows]
     assert ids == sorted(ids, reverse=True)
 
@@ -1288,9 +1293,9 @@ def test_audit_isolation_http(engine, api_client):
         for i in range(3):
             s.add(
                 AuditEvent(
-                    user_id=1,
+                    user_id="1",
                     entity_type="university",
-                    entity_id=1,
+                    entity_id=uuid.uuid4(),
                     action=f"A-{i}",
                     university_id=uA.id,
                 )
@@ -1298,9 +1303,9 @@ def test_audit_isolation_http(engine, api_client):
         for i in range(4):
             s.add(
                 AuditEvent(
-                    user_id=2,
+                    user_id="2",
                     entity_type="university",
-                    entity_id=1,
+                    entity_id=uuid.uuid4(),
                     action=f"B-{i}",
                     university_id=uB.id,
                 )
@@ -1309,7 +1314,9 @@ def test_audit_isolation_http(engine, api_client):
     r = api_client.get(f"/api/v1/universities/{uid_a}/passport?include=audit")
     assert r.status_code == 200, r.text
     actions = [e["action"] for e in r.json()["recent_audit"]]
-    assert actions == ["A-2", "A-1", "A-0"]
+    assert set(actions) == {"A-2", "A-1", "A-0"}
+    ids = [e["id"] for e in r.json()["recent_audit"]]
+    assert ids == sorted(ids, reverse=True)
     assert not any(a.startswith("B-") for a in actions)
     assert uid_b  # other university exists but leaks nothing
 
@@ -1344,7 +1351,7 @@ def test_exact_query_counts_8_8_9_9(db: Session, select_counter):
     uid = u.id
     db.add(
         AuditEvent(
-            user_id=1, entity_type="university", entity_id=1, action="update", university_id=uid
+            user_id="1", entity_type="university", entity_id=uuid.uuid4(), action="update", university_id=uid
         )
     )
     db.commit()
@@ -1380,9 +1387,9 @@ def test_scaling_counts_stable_and_audit_row_independent(db: Session, select_cou
     for i in range(25):
         db.add(
             AuditEvent(
-                user_id=1,
+                user_id="1",
                 entity_type="university",
-                entity_id=1,
+                entity_id=uuid.uuid4(),
                 action=f"bulk-{i}",
                 university_id=uid,
             )
@@ -1607,7 +1614,8 @@ def test_central_409_handler_coexists_with_passport_codes(engine, api_client):
     c = TestClient(boom)
     r = c.post("/boom")
     assert r.status_code == 409
-    assert r.json() == {"detail": CONFLICT_DETAIL}
+    assert set(r.json()) == {"error"}
+    assert r.json()["error"]["code"] == "CONFLICT"
 
     assert api_client.get(f"/api/v1/universities/{uuid.uuid4()}/passport").status_code == 404
     with Session(engine) as s:

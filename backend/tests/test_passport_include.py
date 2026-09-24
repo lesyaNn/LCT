@@ -80,9 +80,9 @@ def _seed_audit(db: Session, university_id, n: int, base: datetime | None = None
     for i in range(n):
         db.add(
             AuditEvent(
-                user_id=100 + i,
+                user_id=str(100 + i),
                 entity_type="university",
-                entity_id=1,
+                entity_id=uuid.uuid4(),
                 action=f"update-{i:02d}",
                 university_id=university_id,
             )
@@ -97,8 +97,9 @@ def _seed_audit(db: Session, university_id, n: int, base: datetime | None = None
         .scalars()
         .all()
     )
-    for i, ev in enumerate(rows):
-        ev.created_at = base - timedelta(days=n - i)
+    for ev in rows:
+        index = int(ev.action.rsplit("-", 1)[1])
+        ev.created_at = base - timedelta(days=n - index)
     db.commit()
 
 
