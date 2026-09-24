@@ -10,11 +10,9 @@ from fastapi.testclient import TestClient
 from app.config import Settings
 from app.core.errors import register_error_handlers
 from app.core.logging import SensitiveFilter
-from app.core.middleware import SecurityHeadersMiddleware
+from app.core.middleware import REQUEST_BODY_LIMIT_BYTES, SecurityHeadersMiddleware
 from app.main import app
-from app.core.middleware import REQUEST_BODY_LIMIT_BYTES
 from app.modules.catalog.repository import like_pattern
-
 
 client = TestClient(app, raise_server_exceptions=False)
 
@@ -119,11 +117,29 @@ def test_sensitive_log_filter_redacts_exception_traceback():
     assert "[REDACTED]" in rendered
 
 
+def test_sensitive_log_filter_redacts_nested_structured_extras():
+    record = logging.LogRecord(
+        "security-test", logging.INFO, __file__, 1, "structured", (), None
+    )
+    record.payload = {
+        "profile": {"password": "hunter2", "note": "token=abc123"},
+        "Authorization": "Bearer secret.jwt.value",
+    }
+    assert SensitiveFilter().filter(record)
+    assert record.payload == {
+        "profile": {"password": "[REDACTED]", "note": "token=[REDACTED]"},
+        "Authorization": "[REDACTED]",
+    }
+
+
 def test_production_settings_fail_closed_for_wildcard_and_missing_s3_secret():
     with pytest.raises(ValueError):
         Settings(app_env="production", cors_origins="*")
     with pytest.raises(ValueError):
         Settings(app_env="production", storage_backend="s3", cors_origins="https://crm.example")
+    with pytest.raises(ValueError, match="explicit local"):
+        Settings(app_env="staging", auth_dev_bypass=True)
+    assert Settings(app_env="test", auth_dev_bypass=True).auth_dev_bypass is True
 
 
 def test_dependency_manifest_is_exactly_pinned_and_no_unsafe_fallback():

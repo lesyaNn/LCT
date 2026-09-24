@@ -7,6 +7,8 @@ we NEVER fall back to trusting the payload. The only exception is the
 explicit opt-in AUTH_DEV_BYPASS (used by unit tests, never in compose).
 """
 import json
+import logging
+import re
 import time
 import urllib.request
 from dataclasses import dataclass, field
@@ -17,7 +19,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import ExpiredSignatureError, JWTError, jwt
 from jose.exceptions import JOSEError, JWKError
 
-from app.config import settings
+from app.config import DEV_BYPASS_ENVIRONMENTS, settings
 from app.core.errors import SecurityError
 from app.schemas.errors import ErrorCode
 
@@ -28,8 +30,16 @@ JWKS_TTL_SECONDS = 600
 # Realm roles of the rtk realm (§8). Technical roles (offline_access,
 # uma_authorization, ...) are ignored so /auth/me matches the spec.
 KNOWN_ROLES = {"admin", "manager", "curator", "user"}
+IGNORED_TECHNICAL_ROLES = {"offline_access", "uma_authorization", "default-roles-rtk"}
+
+logger = logging.getLogger("rtk.security")
 
 _jwks_cache: dict[str, Any] = {"keys": [], "fetched_at": 0.0}
+
+
+def _safe_role_for_log(value: str) -> str:
+    """Bound attacker-controlled role text before it reaches the log record."""
+    return re.sub(r"[^A-Za-z0-9_.:@/-]", "?", value)[:64]
 
 
 @dataclass
@@ -135,8 +145,14 @@ def validate_token(token: str) -> CurrentUser:
         raise SecurityError(ErrorCode.TOKEN_INVALID)
     realm_access = claims.get("realm_access")
     raw_roles = realm_access.get("roles", []) if isinstance(realm_access, dict) else []
-    roles = ({role for role in raw_roles if isinstance(role, str)} & KNOWN_ROLES
-             if isinstance(raw_roles, list) else set())
+    role_names = {role for role in raw_roles if isinstance(role, str)} if isinstance(raw_roles, list) else set()
+    unknown_roles = role_names - KNOWN_ROLES - IGNORED_TECHNICAL_ROLES
+    if unknown_roles:
+        logger.warning(
+            "Ignoring unknown Keycloak realm roles roles=%s",
+            sorted(_safe_role_for_log(role) for role in unknown_roles),
+        )
+    roles = role_names & KNOWN_ROLES
     scope: tuple[str, ...] | None = None
     raw_scope = claims.get("university_ids", claims.get("university_id"))
     if isinstance(raw_scope, str) and raw_scope:
@@ -163,7 +179,9 @@ def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> CurrentUser:
     if credentials is None or not credentials.credentials:
-        if settings.auth_dev_bypass and settings.app_env.lower() not in {"prod", "production"}:
+        environment = settings.app_env.strip().lower()
+        if settings.auth_dev_bypass and environment in DEV_BYPASS_ENVIRONMENTS:
+            logger.warning("AUTH_DEV_BYPASS supplied a local development identity")
             return _dev_user()
         raise SecurityError(ErrorCode.AUTH_REQUIRED)
     return validate_token(credentials.credentials)

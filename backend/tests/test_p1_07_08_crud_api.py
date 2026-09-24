@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401 (register metadata on Base)
 from app.models.catalog import ITDirection, ITProgram, University
+from app.models.interactions import UniversityProgram
 
 TEST_URL = os.getenv("TEST_DATABASE_URL", "sqlite://")
 
@@ -83,6 +84,10 @@ def _make_program(db: Session) -> ITProgram:
     db.add(p)
     db.flush()
     return p
+
+
+def _link_program(db: Session, university: University, program: ITProgram) -> None:
+    db.add(UniversityProgram(university_id=university.id, program_id=program.id))
 
 
 def _meeting_body(**over) -> dict:
@@ -189,6 +194,7 @@ def test_meetings_validation(db: Session, client: TestClient):
 def test_students_crud_lifecycle(db: Session, client: TestClient):
     u = _make_university(db)
     p = _make_program(db)
+    _link_program(db, u, p)
     db.commit()
 
     created = client.post(
@@ -218,6 +224,7 @@ def test_students_crud_lifecycle(db: Session, client: TestClient):
 def test_students_unique_and_fk(db: Session, client: TestClient):
     u = _make_university(db)
     p = _make_program(db)
+    _link_program(db, u, p)
     db.commit()
     body = _student_body(p.id, external_id="DUP-1")
     assert client.post(f"/api/v1/universities/{u.id}/students", json=body).status_code == 201
@@ -242,6 +249,7 @@ def test_students_unique_and_fk(db: Session, client: TestClient):
 def test_students_rbac_and_validation(db: Session, client: TestClient):
     u = _make_university(db)
     p = _make_program(db)
+    _link_program(db, u, p)
     db.commit()
     # unauthenticated (bypass off for one call) -> 401
     from app.config import settings
@@ -259,6 +267,26 @@ def test_students_rbac_and_validation(db: Session, client: TestClient):
         json=_student_body(p.id, status="flying"),
     )
     assert bad.status_code == 422, bad.text
+
+
+def test_student_program_must_belong_to_university(db: Session, client: TestClient):
+    own = _make_university(db)
+    other = _make_university(db)
+    program = _make_program(db)
+    _link_program(db, other, program)
+    db.commit()
+
+    response = client.post(
+        f"/api/v1/universities/{own.id}/students", json=_student_body(program.id)
+    )
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["details"]["field_errors"] == [
+        {
+            "field": "program_id",
+            "message": "Программа не закреплена за указанным вузом.",
+            "type": "value_error.program_university_mismatch",
+        }
+    ]
 
 
 # ============================================================ pure-unit ==

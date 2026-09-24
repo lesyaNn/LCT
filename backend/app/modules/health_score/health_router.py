@@ -12,10 +12,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.permissions import require_permission
 from app.core.errors import BusinessException
-from app.schemas.errors import ErrorCode
-from app.core.policies import apply_university_scope, ensure_university_access
+from app.core.permissions import require_permission
+from app.core.policies import apply_university_scope, ensure_university_visible
 from app.core.security import CurrentUser
 from app.db.session import get_db
 from app.infrastructure import redis as redis_infra
@@ -33,6 +32,7 @@ from app.modules.health_score.snapshot_schemas import (
     HealthScoreSnapshotOut,
     SnapshotTrigger,
 )
+from app.schemas.errors import ErrorCode
 
 router = APIRouter(prefix="/universities", tags=["health-score"])
 
@@ -130,7 +130,7 @@ def get_university_health_score(
     ).first()
     if exists is None:
         raise BusinessException(ErrorCode.NOT_FOUND)
-    ensure_university_access(university_id, user)
+    ensure_university_visible(university_id, user)
     cached = health_cache.get_cached(university_id)
     if cached is not None:
         return cached
@@ -164,7 +164,7 @@ def get_university_attention_items(
     ).first()
     if exists is None:
         raise BusinessException(ErrorCode.NOT_FOUND)
-    ensure_university_access(university_id, user)
+    ensure_university_visible(university_id, user)
     cache_key = f"attention_items:{university_id}"
     raw = redis_infra.cache_get(cache_key)
     if raw:
@@ -207,7 +207,7 @@ def get_university_health_score_history(
     ).first()
     if exists is None:
         raise BusinessException(ErrorCode.NOT_FOUND)
-    ensure_university_access(university_id, user)
+    ensure_university_visible(university_id, user)
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     stmt = (
         select(HealthScoreSnapshot)

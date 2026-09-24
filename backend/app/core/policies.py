@@ -6,7 +6,7 @@ from uuid import UUID
 
 from sqlalchemy import false
 
-from app.core.errors import SecurityError
+from app.core.errors import BusinessException, SecurityError
 from app.core.security import CurrentUser
 from app.schemas.errors import ErrorCode
 
@@ -39,12 +39,11 @@ def get_data_scope(user: CurrentUser) -> DataScope:
     roles = user.roles or set()
     if "admin" in roles:
         return DataScope(ScopeKind.ALL, frozenset())
-    # Legacy curator routes historically had global visibility. Preserve that
-    # compatibility without making curator a public admin/manager role.
-    if "curator" in roles and "manager" not in roles and user.university_ids is None:
-        return DataScope(ScopeKind.ALL, frozenset())
+    # ``curator`` is a legacy authorization role, not a data-scope role.  It
+    # must never turn an absent university assignment into global visibility.
+    # A mixed token still follows the stronger public role deterministically.
     kind = (ScopeKind.GROUP if "manager" in roles else
-            ScopeKind.OWN if roles & {"user", "curator"} else ScopeKind.DENY)
+            ScopeKind.OWN if "user" in roles else ScopeKind.DENY)
     if kind is ScopeKind.DENY:
         return DataScope(kind, frozenset())
     ids: set[UUID] = set()
@@ -69,3 +68,14 @@ def apply_university_scope(stmt, university_column, user: CurrentUser):
 def ensure_university_access(university_id: UUID | str, user: CurrentUser) -> None:
     if not get_data_scope(user).allows(university_id):
         raise SecurityError(ErrorCode.FORBIDDEN)
+
+
+def ensure_university_visible(university_id: UUID | str, user: CurrentUser) -> None:
+    """Conceal an existing out-of-scope object behind the public 404 contract.
+
+    Callers that intentionally expose authorization use
+    :func:`ensure_university_access`; detail and scoped subresource paths use
+    this guard to avoid confirming that another university's object exists.
+    """
+    if not get_data_scope(user).allows(university_id):
+        raise BusinessException(ErrorCode.NOT_FOUND)

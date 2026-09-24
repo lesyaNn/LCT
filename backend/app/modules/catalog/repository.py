@@ -25,11 +25,24 @@ from app.models.catalog import (
 )
 from app.modules.audit.service import AuditAction, AuditService, context_for
 
-
 _AUDIT_FIELDS = {
     University: ("name", "city"),
-    Responsible: ("full_name", "email", "role"),
+    ITDirection: ("code", "name"),
+    ITProgram: ("direction_id", "name", "description"),
+    Vendor: ("name",),
+    ITProduct: ("vendor_id", "name", "version"),
+    Responsible: ("full_name", "email", "phone", "role", "keycloak_sub"),
     UniversityResponsible: ("university_id", "responsible_id", "role_in_university", "is_primary"),
+}
+
+_AUDIT_ENTITY_TYPES = {
+    University: "university",
+    ITDirection: "direction",
+    ITProgram: "program",
+    Vendor: "vendor",
+    ITProduct: "product",
+    Responsible: "responsible",
+    UniversityResponsible: "responsible",
 }
 
 
@@ -40,7 +53,7 @@ def _audit_snapshot(obj):
 def _audit_write(db: Session, obj, action: AuditAction, *, old=None, new=None):
     if "audit_context" not in db.info or type(obj) not in _AUDIT_FIELDS:
         return
-    entity_type = "responsible" if isinstance(obj, (Responsible, UniversityResponsible)) else "university"
+    entity_type = _AUDIT_ENTITY_TYPES[type(obj)]
     university_id = obj.university_id if isinstance(obj, UniversityResponsible) else (
         obj.id if isinstance(obj, University) else None
     )

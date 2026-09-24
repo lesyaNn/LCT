@@ -8,6 +8,7 @@ from enum import StrEnum
 from typing import Any
 
 from fastapi import Depends, Request
+from sqlalchemy import event, inspect
 from sqlalchemy.orm import Session
 
 from app.core.permissions import effective_role
@@ -38,7 +39,13 @@ class AuditEntityType(StrEnum):
     CONTRACT = "contract"
     DOCUMENT = "document"
     MEETING = "meeting"
+    STUDENT = "student"
     RESPONSIBLE = "responsible"
+    DIRECTION = "direction"
+    PROGRAM = "program"
+    VENDOR = "vendor"
+    PRODUCT = "product"
+    WORKFLOW_COMMENT = "workflow_comment"
     REPORT = "report"
     CONFIG = "config"
 
@@ -162,3 +169,68 @@ def get_audit_db(
 
 def context_for(db: Session, actor: str = "system") -> AuditContext:
     return db.info.get("audit_context") or AuditContext(actor, actor, "user")
+
+
+def _comment_snapshot(comment) -> dict[str, Any]:
+    return {
+        "instance_id": comment.instance_id,
+        "stage_id": comment.stage_id,
+        "author_keycloak_sub": comment.author_keycloak_sub,
+        "content": comment.content,
+        "is_internal": comment.is_internal,
+    }
+
+
+def _comment_university_id(session: Session, comment) -> uuid.UUID | None:
+    from app.models.workflow_instances import WorkflowInstance
+
+    instance = session.get(WorkflowInstance, comment.instance_id)
+    return instance.university_id if instance is not None else None
+
+
+@event.listens_for(Session, "before_flush")
+def _audit_workflow_comments(session: Session, _flush_context, _instances) -> None:
+    """Audit comments centrally without coupling workflow services to P5."""
+    if "audit_context" not in session.info or session.info.get("_auditing_comments"):
+        return
+    from app.models.workflow_instances import WorkflowComment
+
+    changes: list[tuple[Any, AuditAction, Any, Any]] = []
+    for comment in session.new:
+        if isinstance(comment, WorkflowComment):
+            if comment.id is None:
+                comment.id = uuid.uuid4()
+            changes.append((comment, AuditAction.CREATE, None, _comment_snapshot(comment)))
+    for comment in session.dirty:
+        if not isinstance(comment, WorkflowComment) or not session.is_modified(
+            comment, include_collections=False
+        ):
+            continue
+        current = _comment_snapshot(comment)
+        old = dict(current)
+        state = inspect(comment)
+        for field in current:
+            history = state.attrs[field].history
+            if history.deleted:
+                old[field] = history.deleted[0]
+        changes.append((comment, AuditAction.UPDATE, old, current))
+    for comment in session.deleted:
+        if isinstance(comment, WorkflowComment):
+            changes.append((comment, AuditAction.DELETE, _comment_snapshot(comment), None))
+    if not changes:
+        return
+    session.info["_auditing_comments"] = True
+    try:
+        writer = AuditService(session)
+        for comment, action, old, new in changes:
+            writer.log_event(
+                context=context_for(session),
+                action=action,
+                entity_type=AuditEntityType.WORKFLOW_COMMENT,
+                entity_id=comment.id,
+                university_id=_comment_university_id(session, comment),
+                old_value=old,
+                new_value=new,
+            )
+    finally:
+        session.info.pop("_auditing_comments", None)

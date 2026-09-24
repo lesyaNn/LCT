@@ -4,9 +4,10 @@ import json
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
 
 from app.core.errors import BusinessException, register_error_handlers
 from app.main import app
@@ -62,3 +63,45 @@ def test_validation_fields_are_stable_and_safe():
 def test_business_exception_uses_registry_status():
     assert BusinessException(ErrorCode.REPORT_NOT_READY).status_code == 400
     assert BusinessException(ErrorCode.GONE).status_code == 410
+
+
+def test_http_error_code_is_explicit_not_guessed_from_message():
+    api = FastAPI()
+    register_error_handlers(api)
+
+    @api.get("/typed")
+    def typed():
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "WORKFLOW_INVALID_TRANSITION", "details": {}},
+        )
+
+    @api.get("/prose")
+    def prose():
+        raise HTTPException(status_code=400, detail="invalid workflow transition")
+
+    client = TestClient(api)
+    assert client.get("/typed").json()["error"]["code"] == "WORKFLOW_INVALID_TRANSITION"
+    assert client.get("/prose").json()["error"]["code"] == "HTTP_ERROR"
+
+
+def test_integrity_conflict_exposes_only_safe_field():
+    class Diagnostic:
+        constraint_name = "uq_students_external_id"
+        column_name = None
+
+    class DriverError(Exception):
+        diag = Diagnostic()
+
+    api = FastAPI()
+    register_error_handlers(api)
+
+    @api.get("/duplicate")
+    def duplicate():
+        raise IntegrityError("private sql", {"external_id": "secret"}, DriverError())
+
+    response = TestClient(api, raise_server_exceptions=False).get("/duplicate")
+    assert response.status_code == 409
+    assert response.json()["error"]["details"] == {"field": "external_id"}
+    assert "private sql" not in response.text
+    assert "secret" not in response.text
