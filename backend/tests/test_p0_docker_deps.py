@@ -46,6 +46,11 @@ def _installed() -> set[str]:
 
 
 def test_dockerfile_covers_pyproject_deps():
+    dockerfile = DOCKERFILE.read_text(encoding="utf-8")
+    if re.search(r"(?m)^COPY\s+pyproject\.toml\s+\./?\s*$", dockerfile) and re.search(
+        r"(?m)^RUN\s+pip install --no-cache-dir \.\s*$", dockerfile
+    ):
+        return  # The package metadata is the dependency source for the image.
     missing = _wanted() - _installed() - {"uvicorn"}  # uvicorn[standard] extra form
     # uvicorn standard extra installs as dist "uvicorn"; accept either token.
     if "uvicorn" in _wanted():
