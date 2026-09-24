@@ -87,6 +87,7 @@ EXPECTED_TABLES = [
     "workflow_tasks",
     "instance_stages",
     "health_score_snapshots",
+    "health_score_current",
     "report_jobs",
     "audit_outbox",
 ]
