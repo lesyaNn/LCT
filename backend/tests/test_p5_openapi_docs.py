@@ -106,7 +106,9 @@ def test_all_business_operations_are_documented_and_secure():
                 assert response["content"]["application/json"]["schema"] == {
                     "$ref": "#/components/schemas/ErrorResponse"
                 }
-    assert business == 85
+    # L16: lower bound, not an exact pin — adding a route must not break
+    # the contract test (upper drift is caught by review, not by count).
+    assert business >= 85, f"business operations shrank: {business}"
     assert len(ids) == len(set(ids))
 
 

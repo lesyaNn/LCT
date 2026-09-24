@@ -117,7 +117,8 @@ def seed_performance(session: Session) -> dict:
     # --- extra catalog programs (deterministic names) ---
     for i in range(N_EXTRA_PROGRAMS):
         name = f"PERF Программа {i:03d}"
-        session.execute(select(ITProgram).filter_by(name=name)).scalar_one_or_none()
+        # L14: убран выброшенный SELECT (результат нигде не использовался);
+        # существование проверяет _get_or_create ниже.
         _get_or_create(
             session,
             ITProgram,

@@ -552,11 +552,19 @@ def test_parallel_submit_does_not_wait_for_generation(pg, monkeypatch):
 
     eng, _ = pg
 
+    import socket as _socket
+
+    # L16: ephemeral port instead of fixed 18001 (parallel runs / CI
+    # workers must not collide on a hardcoded port).
+    with _socket.socket() as _s:
+        _s.bind(("127.0.0.1", 0))
+        _port = _s.getsockname()[1]
+    _base = f"http://127.0.0.1:{_port}"
     app = FastAPI()
     app.include_router(reports_router)
     app.dependency_overrides[get_current_user] = _admin
     server = uvicorn.Server(
-        uvicorn.Config(app, host="127.0.0.1", port=18001, log_level="error")
+        uvicorn.Config(app, host="127.0.0.1", port=_port, log_level="error")
     )
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
@@ -564,7 +572,7 @@ def test_parallel_submit_does_not_wait_for_generation(pg, monkeypatch):
         deadline = time.monotonic() + 30
         while time.monotonic() < deadline:
             try:
-                httpx.get("http://127.0.0.1:18001/openapi.json", timeout=1)
+                httpx.get(f"{_base}/openapi.json", timeout=1)
                 break
             except Exception:
                 time.sleep(0.2)
@@ -575,7 +583,7 @@ def test_parallel_submit_does_not_wait_for_generation(pg, monkeypatch):
         def _one() -> None:
             started = time.monotonic()
             resp = httpx.post(
-                "http://127.0.0.1:18001/reports",
+                f"{_base}/reports",
                 json={"format": "xlsx", "columns": ["university"]},
                 timeout=20,
             )

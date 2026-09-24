@@ -36,6 +36,21 @@ docker compose up -d --build
   `import-staging`.
 - БД: `docker compose exec postgres pg_dump -U rtk -d rtk > backup.sql`.
 
+## Секреты (L5)
+
+Значения `change-me` в `.env.example` / `docker-compose.yml` (`:-change-me`) —
+**только для локального хакатон-стенда**. Для любого общего/прод-стенда:
+
+```bash
+# 32+ символов энтропии на каждый секрет:
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+Замените `POSTGRES_PASSWORD`, `KEYCLOAK_DB_PASSWORD`,
+`KEYCLOAK_ADMIN_PASSWORD` (и при наличии — `MINIO`/`S3` ключи) в `.env`;
+`.env` не коммитится (`.gitignore`). `validate_security_baseline`
+слабые пароли не проверяет — это ручной шаг чеклиста выше.
+
 ## Troubleshooting
 - Keycloak не healthy: ждите 60–90с (первый старт + импорт realm).
 - Повторный импорт realm пропускается (`Realm already exists. Import skipped`);

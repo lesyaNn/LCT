@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- P5-16-01: ArchiMate-модель (Open Exchange Format), Dev-3.
+     Источник слоёв: docs/ARCHITECTURE.md (8 слоёв P5-16-01 + контекст Mermaid).
+     Открывается в Archi (https://www.archimatetool.com).
+     PNG-экспорт: Archi → Export Model As Image, или mermaid-cli по блоку
+     ```mermaid в docs/ARCHITECTURE.md (см. README в этом каталоге). -->
+<model xmlns="http://www.opengroup.org/xsd/archimate/3.1/" identifier="rtk-crm-v1">
+  <name>CRM ИТ-Школа Ростелеком — architecture (P5-16-01)</name>
+  <elements>
+    <element identifier="user" type="BusinessActor"><name>User / Manager / Admin (browser)</name></element>
+    <element identifier="fe" type="ApplicationComponent"><name>Frontend (React SPA :3000, nginx)</name></element>
+    <element identifier="be" type="ApplicationComponent"><name>Backend API (FastAPI :8000, /api/v1)</name></element>
+    <element identifier="worker" type="ApplicationComponent"><name>Worker (reports/imports, claim SKIP LOCKED)</name></element>
+    <element identifier="db" type="DataObject"><name>PostgreSQL (rtk + keycloak)</name></element>
+    <element identifier="kc" type="ApplicationComponent"><name>Keycloak 26 (realm rtk, aud rtk-api)</name></element>
+    <element identifier="redis" type="TechnologyService"><name>Redis 7 (cache/jobs)</name></element>
+    <element identifier="storage" type="TechnologyService"><name>Storage (S3/MinIO seam, local volumes)</name></element>
+  </elements>
+  <relationships>
+    <relationship identifier="r1" type="Serving"><source>fe</source><target>user</target></relationship>
+    <relationship identifier="r2" type="Serving"><source>be</source><target>fe</target></relationship>
+    <relationship identifier="r3" type="Access"><source>be</source><target>db</target></relationship>
+    <relationship identifier="r4" type="Access"><source>worker</source><target>db</target></relationship>
+    <relationship identifier="r5" type="Association"><source>be</source><target>kc</target></relationship>
+    <relationship identifier="r6" type="Access"><source>be</source><target>redis</target></relationship>
+    <relationship identifier="r7" type="Triggering"><source>be</source><target>worker</target></relationship>
+    <relationship identifier="r8" type="Access"><source>be</source><target>storage</target></relationship>
+  </relationships>
+  <views>
+    <view identifier="context"><name>C4-context (mirrors Mermaid in ARCHITECTURE.md)</name></view>
+  </views>
+</model>

@@ -41,5 +41,7 @@ flowchart LR
 демо работает на seed без внешней сети (см. `scripts/demo-setup.sh`).
 
 ## ArchiMate
-8 слоёв P5-16-01 отражены выше; `.archimate`-модель и PNG-экспорт —
-следующий шаг (нужен Archi-инструмент у исполнителя).
+8 слоёв P5-16-01 отражены выше; `.archimate`-модель — в
+`docs/archimate/architecture.archimate` (Dev-3, открывается в Archi),
+PNG-экспорт — `docs/archimate/README.md` (Archi Export As Image или
+mermaid-cli по Mermaid-блоку выше).

@@ -1,4 +1,10 @@
-"""Dashboard (§16): read-only aggregations for manager's main panel."""
+"""Dashboard (§16): read-only aggregations for manager's main panel.
+
+LEGACY QUARANTINE (M7) — DO NOT MOUNT in ``app/api/router.py`` (direct
+``db.query`` aggregations in the handler; superseded by
+``analytics/overview``). Reactivation requires the checklist in
+``docs/AUDIT.md`` (§0). See ``scripts/check_legacy_quarantine.py``.
+"""
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
