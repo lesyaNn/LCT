@@ -46,6 +46,8 @@
 .drawerIntro span { color: var(--rtk-color-text-secondary); font-size: 12px; overflow-wrap: anywhere; }
 .field { display: flex; flex-direction: column; gap: var(--rtk-space-1); min-width: 0; }
 .field > span { color: var(--rtk-color-text-secondary); font-size: 12px; font-weight: 650; }
+.controlTooltip > span, .controlTooltip > span > span { display: flex; width: 100%; }
+.scopeEditor { display: flex; flex-direction: column; gap: var(--rtk-space-2); }
 .roleDescription { color: var(--rtk-color-text-secondary); font-size: 12px; margin: calc(var(--rtk-space-1) * -1) 0 0; }
 .warning { background: var(--atmr-warning-container-soft); border-radius: var(--rtk-radius-small); color: var(--atmr-warning-on-container); font-size: 12px; line-height: 1.45; padding: var(--rtk-space-3); }
 .integrationBlocker { background: var(--rtk-color-surface-subtle); border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-secondary); font-size: 12px; line-height: 1.45; padding: var(--rtk-space-3); }

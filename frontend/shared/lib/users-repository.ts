@@ -129,7 +129,9 @@ export function scopeDescription(scope: AdminUserScope): string {
 }
 
 export function normalizeScopeForRole(role: UserRole, scope: AdminUserScope): AdminUserScope {
-  return role === 'admin' ? { kind: 'all' } : scope;
+  if (role === 'admin') return { kind: 'all' };
+  if (role === 'user' && scope.kind === 'all') return { kind: 'universities', universityIds: [] };
+  return scope;
 }
 
 export function getUserById(result: AdminUserListResult | undefined, id: string): AdminUser | undefined {
