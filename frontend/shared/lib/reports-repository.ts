@@ -1,7 +1,10 @@
 import { apiFetch } from './api-client';
 import { ApiRequestError, ERROR_MESSAGES } from './api-errors';
+import { fromDataSource, isMockDataSource } from './data-source';
+import { queryKeys } from './query-keys';
 import { universityFilterOptions, universityProgramDirectionOptions, type UniversityWorkflowStageStatus } from './universities-repository';
 import { workflowStageStatusSemantics } from './status-semantics';
+import { mockCreateReportJob, mockGetReportJob, mockListReportJobs } from '@/shared/mocks/api-adapter';
 
 export type ReportFormat = 'xlsx' | 'pdf' | 'json';
 export type ReportPeriodPreset = 'current_month' | 'current_quarter' | 'current_year' | 'previous_year' | null;
@@ -71,7 +74,7 @@ export interface ReportsApiCapabilities {
 }
 
 /** The only current reporting router accepts format, region and columns. */
-export const REPORTS_API_CAPABILITIES: ReportsApiCapabilities = {
+const realReportsApiCapabilities: ReportsApiCapabilities = {
   createJob: true,
   jobStatus: true,
   jobList: false,
@@ -85,10 +88,22 @@ export const REPORTS_API_CAPABILITIES: ReportsApiCapabilities = {
   progress: false,
 };
 
+export const REPORTS_API_CAPABILITIES: ReportsApiCapabilities = isMockDataSource ? {
+  createJob: true,
+  jobStatus: true,
+  jobList: true,
+  retry: true,
+  download: true,
+  formats: { xlsx: true, pdf: false, json: false },
+  filters: true,
+  columns: true,
+  progress: true,
+} : realReportsApiCapabilities;
+
 export const reportQueryKeys = {
-  jobs: ['reports', 'jobs'] as const,
-  job: (id: string) => ['reports', 'jobs', id] as const,
-  filterOptions: ['reports', 'filter-options'] as const,
+  jobs: queryKeys.reports.jobs,
+  job: queryKeys.reports.job,
+  filterOptions: queryKeys.reports.filterOptions,
 };
 
 export const reportFilterOptions: ReportFilterOptions = {
@@ -241,16 +256,24 @@ function unwrap<T>(result: Awaited<ReturnType<typeof apiFetch<T>>>, message: str
   throw new ApiRequestError(result.status, result.body, message, result.error);
 }
 
-export async function createReportJob(request: ReportRequest): Promise<ReportJob> {
+async function createRealReportJob(request: ReportRequest): Promise<ReportJob> {
   // Only format/columns exist in the current reporting router. Filters stay in
   // the normalized form model and are not silently sent as invented DTO keys.
   const result = await apiFetch<unknown>('/api/v1/reports/export', { method: 'POST', body: { format: request.format, columns: request.columns } });
   return { ...adaptReportJob(unwrap(result, 'Не удалось создать задачу отчёта.')), request };
 }
 
-export async function getReportJob(jobId: string): Promise<ReportJob> {
+async function getRealReportJob(jobId: string): Promise<ReportJob> {
   const result = await apiFetch<unknown>(`/api/v1/reports/jobs/${encodeURIComponent(jobId)}`);
   return adaptReportJob(unwrap(result, 'Не удалось обновить статус отчёта.'), jobId);
+}
+
+export async function createReportJob(request: ReportRequest): Promise<ReportJob> {
+  return fromDataSource({ mock: () => mockCreateReportJob(request), real: () => createRealReportJob(request) });
+}
+
+export async function getReportJob(jobId: string): Promise<ReportJob> {
+  return fromDataSource({ mock: () => mockGetReportJob(jobId), real: () => getRealReportJob(jobId) });
 }
 
 /** Retry uses the supported create contract because no retry endpoint exists. */
@@ -261,5 +284,5 @@ export async function retryReportJob(job: ReportJob): Promise<ReportJob> {
 
 /** No list endpoint exists in the current reporting API. */
 export async function listReportJobs(): Promise<ReportJob[]> {
-  return [];
+  return fromDataSource({ mock: mockListReportJobs, real: () => [] });
 }

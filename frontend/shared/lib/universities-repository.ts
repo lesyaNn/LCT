@@ -3,6 +3,32 @@ import { programStatusLabels, type ProgramStatus } from './dashboard-repository'
 import { getExpirationStatus, type ExpirationStatus } from './formatters';
 import { apiFetch } from './api-client';
 import { ApiRequestError } from './api-errors';
+import { fromDataSource, isMockDataSource } from './data-source';
+import { queryKeys } from './query-keys';
+import {
+  getMockWorkflowCurrentStageId,
+  mockCreateWorkflowComment,
+  mockEditWorkflowComment,
+  mockGetWorkflowInstance,
+  mockListWorkflowComments,
+  mockTransitionWorkflow,
+  registerMockWorkflow,
+} from '@/shared/mocks/api-adapter';
+import {
+  realGetTeacherPassport,
+  realGetUniversities,
+  realGetUniversityDocuments,
+  realGetUniversityHealthScore,
+  realGetUniversityHistory,
+  realGetUniversityLicenses,
+  realGetUniversityMeetings,
+  realGetUniversityPassport,
+  realGetUniversityProducts,
+  realGetUniversityPrograms,
+  realGetUniversityResponsibles,
+  realGetUniversityStudentsSummary,
+  realGetUniversityTeachers,
+} from './real-api-adapter';
 
 export type { ProgramStatus };
 
@@ -121,7 +147,8 @@ const universitiesMock: UniversityListItem[] = [
   { id: 'university-018', name: 'Саратовский государственный университет', city: 'Саратов', responsible: responsible.dmitry, programsCount: 7, programStatusCounts: programCounts(1, 3, 3), currentStage: stage.launch, healthScore: 82, lastInteractionAt: '2026-09-16T10:20:00+03:00', attention: false },
 ];
 
-export const universitiesQueryKey = ['universities'] as const;
+export const universitiesQueryKey = queryKeys.universities.all;
+export const universitiesListQueryKey = queryKeys.universities.list;
 
 export const universityFilterOptions: UniversityFilterOptions = {
   cities: [...new Set(universitiesMock.map((item) => item.city))].sort((a, b) => a.localeCompare(b, 'ru')),
@@ -154,7 +181,7 @@ function compareValues(left: string | number, right: string | number): number {
   return String(left).localeCompare(String(right), 'ru', { sensitivity: 'base' });
 }
 
-export async function getUniversities(params: UniversityListQuery): Promise<PaginatedResult<UniversityListItem>> {
+async function getMockUniversities(params: UniversityListQuery): Promise<PaginatedResult<UniversityListItem>> {
   const { filters } = params;
   const search = filters.search.trim().toLocaleLowerCase('ru-RU');
   let filtered = universitiesWithRelationships.filter((item) => {
@@ -201,6 +228,10 @@ export async function getUniversities(params: UniversityListQuery): Promise<Pagi
     pageSize: params.pageSize,
     total,
   };
+}
+
+export async function getUniversities(params: UniversityListQuery): Promise<PaginatedResult<UniversityListItem>> {
+  return fromDataSource({ mock: () => getMockUniversities(params), real: () => realGetUniversities(params) });
 }
 
 export type UniversityPassportEventType = 'meeting' | 'document' | 'workflow' | 'note';
@@ -252,7 +283,7 @@ function getPassportNextStage(currentStageId: string): UniversityStage | null {
  * Keeping this mapper next to the existing university repository lets the UI
  * switch to a real source without changing passport components.
  */
-export async function getUniversityPassport(id: string): Promise<UniversityPassport> {
+async function getMockUniversityPassport(id: string): Promise<UniversityPassport> {
   const university = universitiesWithRelationships.find((item) => item.id === id);
   if (!university) throw new Error('Университет не найден');
 
@@ -294,6 +325,10 @@ export async function getUniversityPassport(id: string): Promise<UniversityPassp
       { id: `${id}-event-5`, type: 'meeting', occurredAt: '2026-09-12T15:00:00+03:00', description: 'Согласовали план ближайших запусков.' },
     ],
   };
+}
+
+export async function getUniversityPassport(id: string): Promise<UniversityPassport> {
+  return fromDataSource({ mock: () => getMockUniversityPassport(id), real: () => realGetUniversityPassport(id) });
 }
 
 export type UniversityWorkflowStageStatus = 'completed' | 'current' | 'pending' | 'skipped' | 'overdue';
@@ -371,10 +406,10 @@ export interface UniversityWorkflow {
   stages: UniversityWorkflowStage[];
 }
 
-export const workflowQueryKey = (instanceId: string) => ['workflow', instanceId] as const;
+export const workflowQueryKey = queryKeys.universities.workflow;
 export const universityWorkflowQueryKey = workflowQueryKey;
-export const workflowCommentsQueryKey = (instanceId: string) => [...workflowQueryKey(instanceId), 'comments'] as const;
-export const universityPassportQueryKey = (id: string) => ['university-passport', id] as const;
+export const workflowCommentsQueryKey = queryKeys.universities.workflowComments;
+export const universityPassportQueryKey = queryKeys.universities.passport;
 
 export class WorkflowApiError extends ApiRequestError {
   constructor(status: number, message: string, body?: unknown, transportMessage?: string) {
@@ -397,7 +432,7 @@ export interface WorkflowCommentApiRecord {
 }
 
 export function isWorkflowApiInstanceId(instanceId: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(instanceId);
+  return isMockDataSource || /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(instanceId);
 }
 
 function unwrapApiResult<T>(result: Awaited<ReturnType<typeof apiFetch<T>>>): T {
@@ -407,12 +442,18 @@ function unwrapApiResult<T>(result: Awaited<ReturnType<typeof apiFetch<T>>>): T 
 
 export async function listWorkflowComments(instanceId: string): Promise<WorkflowCommentApiRecord[]> {
   if (!isWorkflowApiInstanceId(instanceId)) return [];
-  return unwrapApiResult(await apiFetch<WorkflowCommentApiRecord[]>(`/api/v1/workflow/instances/${instanceId}/comments`));
+  return fromDataSource({
+    mock: () => mockListWorkflowComments(instanceId),
+    real: async () => unwrapApiResult(await apiFetch<WorkflowCommentApiRecord[]>(`/api/v1/workflow/instances/${instanceId}/comments`)),
+  });
 }
 
 export async function createWorkflowComment(instanceId: string, content: string, stageId?: string): Promise<WorkflowCommentApiRecord> {
   if (!isWorkflowApiInstanceId(instanceId)) throw new Error('Добавление комментариев недоступно для этого Workflow-источника.');
-  return unwrapApiResult(await apiFetch<WorkflowCommentApiRecord>(`/api/v1/workflow/instances/${instanceId}/comments`, { method: 'POST', body: { content, stage_id: stageId ?? null } }));
+  return fromDataSource({
+    mock: () => mockCreateWorkflowComment(instanceId, content, stageId),
+    real: async () => unwrapApiResult(await apiFetch<WorkflowCommentApiRecord>(`/api/v1/workflow/instances/${instanceId}/comments`, { method: 'POST', body: { content, stage_id: stageId ?? null } })),
+  });
 }
 
 export interface WorkflowInstanceApiStage {
@@ -446,25 +487,38 @@ export interface WorkflowInstanceApiRecord {
 
 export async function getWorkflowInstance(instanceId: string): Promise<WorkflowInstanceApiRecord> {
   if (!isWorkflowApiInstanceId(instanceId)) throw new WorkflowApiError(0, 'Workflow instance имеет неверный идентификатор.');
-  return unwrapApiResult(await apiFetch<WorkflowInstanceApiRecord>(`/api/v1/workflow/instances/${instanceId}`));
+  return fromDataSource({
+    mock: () => mockGetWorkflowInstance(instanceId),
+    real: async () => unwrapApiResult(await apiFetch<WorkflowInstanceApiRecord>(`/api/v1/workflow/instances/${instanceId}`)),
+  });
 }
 
 export async function transitionWorkflowInstance(instanceId: string, targetInstanceStageId: string, comment: string, dueDate?: string): Promise<WorkflowInstanceApiRecord> {
   if (!isWorkflowApiInstanceId(instanceId)) throw new WorkflowApiError(0, 'Переход недоступен для этого Workflow-источника.');
-  return unwrapApiResult(await apiFetch<WorkflowInstanceApiRecord>(`/api/v1/workflow/instances/${instanceId}/transition`, { method: 'POST', body: { target_instance_stage_id: targetInstanceStageId, comment, ...(dueDate ? { due_date: dueDate } : {}) } }));
+  return fromDataSource({
+    mock: () => mockTransitionWorkflow(instanceId, targetInstanceStageId, comment),
+    real: async () => unwrapApiResult(await apiFetch<WorkflowInstanceApiRecord>(`/api/v1/workflow/instances/${instanceId}/transition`, { method: 'POST', body: { target_instance_stage_id: targetInstanceStageId, comment, ...(dueDate ? { due_date: dueDate } : {}) } })),
+  });
 }
 
 export async function editWorkflowComment(commentId: string, content: string): Promise<WorkflowCommentApiRecord> {
-  return unwrapApiResult(await apiFetch<WorkflowCommentApiRecord>(`/api/v1/workflow/comments/${commentId}`, { method: 'PATCH', body: { content } }));
+  return fromDataSource({
+    mock: () => mockEditWorkflowComment(commentId, content),
+    real: async () => unwrapApiResult(await apiFetch<WorkflowCommentApiRecord>(`/api/v1/workflow/comments/${commentId}`, { method: 'PATCH', body: { content } })),
+  });
 }
 
 export function workflowAttachmentDownloadUrl(instanceId: string, attachmentId: string): string | null {
+  if (isMockDataSource) return `data:text/plain;charset=utf-8,Mock%20attachment%20${encodeURIComponent(attachmentId)}`;
   return isWorkflowApiInstanceId(instanceId) ? `/api/v1/workflow/instances/${instanceId}/attachments/${attachmentId}/download` : null;
 }
 
 export async function deleteWorkflowAttachment(instanceId: string, attachmentId: string): Promise<void> {
   if (!isWorkflowApiInstanceId(instanceId)) throw new Error('Удаление вложений недоступно для этого Workflow-источника.');
-  unwrapApiResult(await apiFetch<undefined>(`/api/v1/workflow/instances/${instanceId}/attachments/${attachmentId}`, { method: 'DELETE' }));
+  await fromDataSource({
+    mock: () => undefined,
+    real: async () => unwrapApiResult(await apiFetch<undefined>(`/api/v1/workflow/instances/${instanceId}/attachments/${attachmentId}`, { method: 'DELETE' })),
+  });
 }
 
 const workflowStageNames = [
@@ -526,11 +580,13 @@ function getWorkflowComments(id: string, index: number, responsible: UniversityR
 }
 
 /** Typed frontend adapter for the future GET /universities/{id}/workflow endpoint. */
-export async function getUniversityWorkflow(id: string): Promise<UniversityWorkflow> {
-  if (isWorkflowApiInstanceId(id)) return getApiUniversityWorkflow(await getWorkflowInstance(id));
+async function getMockUniversityWorkflow(id: string): Promise<UniversityWorkflow> {
+  if (!universitiesWithRelationships.some((item) => item.id === id)) return getApiUniversityWorkflow(mockGetWorkflowInstance(id));
   const university = getUniversityOrThrow(id);
   const numericId = getUniversityNumericId(id);
-  const currentIndex = workflowStageIndex[university.currentStage.id] ?? 3;
+  const storedStageId = getMockWorkflowCurrentStageId(id);
+  const storedStageIndex = storedStageId ? workflowStageNames.findIndex((_name, index) => `${id}-workflow-stage-${index + 1}` === storedStageId) : -1;
+  const currentIndex = storedStageIndex >= 0 ? storedStageIndex : workflowStageIndex[university.currentStage.id] ?? 3;
   const stages = workflowStageNames.map((name, index) => {
     const status = getWorkflowStageStatus(index, currentIndex, university.attention, numericId);
     const previousStatus = index === 0 ? 'pending' : getWorkflowStageStatus(index - 1, currentIndex, university.attention, numericId);
@@ -565,6 +621,18 @@ export async function getUniversityWorkflow(id: string): Promise<UniversityWorkf
   });
 
   const currentStage = stages.find((stage) => stage.status === 'current') ?? stages.find((stage) => stage.orderIndex === currentIndex + 1) ?? null;
+  registerMockWorkflow({
+    instanceId: id,
+    universityId: university.id,
+    universityName: university.name,
+    currentStageId: currentStage?.id ?? stages[0].id,
+    stages: stages.map((workflowStage) => ({
+      id: workflowStage.id,
+      name: workflowStage.name,
+      orderIndex: workflowStage.orderIndex,
+      isRequired: true,
+    })),
+  });
   return {
     universityId: university.id,
     universityName: university.name,
@@ -575,6 +643,13 @@ export async function getUniversityWorkflow(id: string): Promise<UniversityWorkf
     totalSteps: stages.length,
     stages,
   };
+}
+
+export async function getUniversityWorkflow(id: string): Promise<UniversityWorkflow> {
+  return fromDataSource({
+    mock: () => getMockUniversityWorkflow(id),
+    real: async () => getApiUniversityWorkflow(await getWorkflowInstance(id)),
+  });
 }
 
 function getApiUniversityWorkflow(instance: WorkflowInstanceApiRecord): UniversityWorkflow {
@@ -645,8 +720,8 @@ export interface UniversityHistoryFilterOptions {
   entities: Array<{ id: string; label: string }>;
 }
 
-export const universityHistoryFamilyQueryKey = (id: string) => ['university-history', id] as const;
-export const universityHistoryQueryKey = (id: string, filters: UniversityHistoryFilters) => [...universityHistoryFamilyQueryKey(id), filters] as const;
+export const universityHistoryFamilyQueryKey = queryKeys.universities.historyFamily;
+export const universityHistoryQueryKey = queryKeys.universities.history;
 
 const historyEvents = (id: string, university: UniversityListItem): UniversityHistoryEvent[] => {
   const anna = responsible.anna;
@@ -667,6 +742,7 @@ const historyEvents = (id: string, university: UniversityListItem): UniversityHi
 };
 
 export function getUniversityHistoryFilterOptions(id: string): UniversityHistoryFilterOptions {
+  if (!isMockDataSource) return { users: [], entities: [] };
   const university = getUniversityOrThrow(id);
   const events = historyEvents(id, university);
   return {
@@ -676,7 +752,7 @@ export function getUniversityHistoryFilterOptions(id: string): UniversityHistory
 }
 
 /** Typed frontend adapter for the future GET /universities/{id}/history endpoint. */
-export async function getUniversityHistory(id: string, filters: UniversityHistoryFilters): Promise<UniversityHistoryEvent[]> {
+async function getMockUniversityHistory(id: string, filters: UniversityHistoryFilters): Promise<UniversityHistoryEvent[]> {
   const university = getUniversityOrThrow(id);
   return historyEvents(id, university).filter((event) => {
     const date = event.occurredAt.slice(0, 10);
@@ -687,6 +763,10 @@ export async function getUniversityHistory(id: string, filters: UniversityHistor
     if (filters.entityId && event.entity.id !== filters.entityId) return false;
     return true;
   });
+}
+
+export async function getUniversityHistory(id: string, filters: UniversityHistoryFilters): Promise<UniversityHistoryEvent[]> {
+  return fromDataSource({ mock: () => getMockUniversityHistory(id, filters), real: () => realGetUniversityHistory(id, filters) });
 }
 
 export type HealthScoreReasonSeverity = 'high' | 'medium' | 'low';
@@ -723,7 +803,7 @@ export interface UniversityHealthScore {
   previousSnapshot: UniversityHealthScoreHistoryPoint;
 }
 
-export const universityHealthScoreQueryKey = (id: string) => ['university-health-score', id] as const;
+export const universityHealthScoreQueryKey = queryKeys.universities.healthScore;
 
 function clampScore(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
@@ -741,7 +821,7 @@ function createHealthHistory(currentScore: number, numericId: number): Universit
 }
 
 /** Temporary typed adapter for the future GET /universities/{id}/health-score endpoints. */
-export async function getUniversityHealthScore(id: string): Promise<UniversityHealthScore> {
+async function getMockUniversityHealthScore(id: string): Promise<UniversityHealthScore> {
   const university = universitiesWithRelationships.find((item) => item.id === id);
   if (!university) throw new Error('Университет не найден');
 
@@ -779,6 +859,10 @@ export async function getUniversityHealthScore(id: string): Promise<UniversityHe
     history,
     previousSnapshot,
   };
+}
+
+export async function getUniversityHealthScore(id: string): Promise<UniversityHealthScore> {
+  return fromDataSource({ mock: () => getMockUniversityHealthScore(id), real: () => realGetUniversityHealthScore(id) });
 }
 
 export interface UniversityProgramRow {
@@ -889,11 +973,11 @@ export interface UniversityProductRow {
   expiresAt: string;
 }
 
-export const universityProgramsQueryKey = (id: string) => ['university-programs', id] as const;
-export const universityTeachersQueryKey = (id: string) => ['university-teachers', id] as const;
-export const teacherPassportQueryKey = (id: string) => ['teacher-passport', id] as const;
-export const universityStudentsQueryKey = (id: string) => ['university-students', id] as const;
-export const universityProductsQueryKey = (id: string) => ['university-products', id] as const;
+export const universityProgramsQueryKey = queryKeys.universities.programs;
+export const universityTeachersQueryKey = queryKeys.universities.teachers;
+export const teacherPassportQueryKey = queryKeys.teachers.passport;
+export const universityStudentsQueryKey = queryKeys.universities.students;
+export const universityProductsQueryKey = queryKeys.universities.products;
 
 const programDirections = ['Аналитика и данные', 'Цифровая трансформация', 'Информационная безопасность', 'Управление проектами'];
 /** Shared catalog dictionary used by university passport and report filters. */
@@ -913,7 +997,7 @@ function getUniversityOrThrow(id: string): UniversityListItem {
 }
 
 /** Typed frontend adapter for the future university programs endpoint. */
-export async function getUniversityPrograms(id: string): Promise<UniversityProgramRow[]> {
+async function getMockUniversityPrograms(id: string): Promise<UniversityProgramRow[]> {
   const university = getUniversityOrThrow(id);
   const numericId = getUniversityNumericId(id);
   const statuses: ProgramStatus[] = ['active', 'launched', 'planned', 'archived', 'active', 'launched'];
@@ -931,10 +1015,18 @@ export async function getUniversityPrograms(id: string): Promise<UniversityProgr
   }));
 }
 
+export async function getUniversityPrograms(id: string): Promise<UniversityProgramRow[]> {
+  return fromDataSource({ mock: () => getMockUniversityPrograms(id), real: () => realGetUniversityPrograms(id) });
+}
+
 /** Typed frontend adapter for the future university teachers endpoint. */
-export async function getUniversityTeachers(id: string): Promise<UniversityTeacherRow[]> {
+async function getMockUniversityTeachers(id: string): Promise<UniversityTeacherRow[]> {
   getUniversityOrThrow(id);
   return universityTeachersFixture(id);
+}
+
+export async function getUniversityTeachers(id: string): Promise<UniversityTeacherRow[]> {
+  return fromDataSource({ mock: () => getMockUniversityTeachers(id), real: () => realGetUniversityTeachers(id) });
 }
 
 function getTeacherPassportContext(id: string): { teacher: UniversityTeacherRow; university: UniversityListItem } {
@@ -976,7 +1068,7 @@ function getReadinessReason(readiness: TeacherReadiness, certificates: TeacherCe
 }
 
 /** Typed frontend adapter for the future GET /teachers/{id}/passport endpoint. */
-export async function getTeacherPassport(id: string): Promise<TeacherPassport> {
+async function getMockTeacherPassport(id: string): Promise<TeacherPassport> {
   const { teacher, university } = getTeacherPassportContext(id);
   const numericId = getUniversityNumericId(university.id);
   const certificateDates: Array<string | null> = teacher.readiness === 'expired'
@@ -1048,8 +1140,12 @@ export async function getTeacherPassport(id: string): Promise<TeacherPassport> {
   };
 }
 
+export async function getTeacherPassport(id: string): Promise<TeacherPassport> {
+  return fromDataSource({ mock: () => getMockTeacherPassport(id), real: () => realGetTeacherPassport(id) });
+}
+
 /** Typed frontend adapter for the future aggregate students endpoint. */
-export async function getUniversityStudentsSummary(id: string): Promise<UniversityStudentsSummary> {
+async function getMockUniversityStudentsSummary(id: string): Promise<UniversityStudentsSummary> {
   const university = getUniversityOrThrow(id);
   const numericId = getUniversityNumericId(id);
   const byProgram = programNames.map((programName, index) => {
@@ -1071,8 +1167,12 @@ export async function getUniversityStudentsSummary(id: string): Promise<Universi
   };
 }
 
+export async function getUniversityStudentsSummary(id: string): Promise<UniversityStudentsSummary> {
+  return fromDataSource({ mock: () => getMockUniversityStudentsSummary(id), real: () => realGetUniversityStudentsSummary(id) });
+}
+
 /** Typed frontend adapter for the future university products/licenses endpoint. */
-export async function getUniversityProducts(id: string): Promise<UniversityProductRow[]> {
+async function getMockUniversityProducts(id: string): Promise<UniversityProductRow[]> {
   const university = getUniversityOrThrow(id);
   const numericId = getUniversityNumericId(id);
   const statuses: UniversityProductStatus[] = ['active', 'expiring', 'active', 'expired', 'active'];
@@ -1088,6 +1188,10 @@ export async function getUniversityProducts(id: string): Promise<UniversityProdu
     licenseNumber: `LIC-${String(numericId).padStart(3, '0')}-${String(index + 1).padStart(3, '0')}`,
     expiresAt: `202${index % 2 === 0 ? '7' : '6'}-${String(((index + numericId) % 9) + 1).padStart(2, '0')}-15`,
   })).filter((_, index) => university.productIds ? index < 3 + (numericId % 3) : index < 2);
+}
+
+export async function getUniversityProducts(id: string): Promise<UniversityProductRow[]> {
+  return fromDataSource({ mock: () => getMockUniversityProducts(id), real: () => realGetUniversityProducts(id) });
 }
 
 export type UniversityLicenseStatus = 'active' | 'expires_soon' | 'expired';
@@ -1150,13 +1254,13 @@ export interface UniversityResponsibleContact {
   initials: string;
 }
 
-export const universityLicensesQueryKey = (id: string) => ['university-licenses', id] as const;
-export const universityDocumentsQueryKey = (id: string) => ['university-documents', id] as const;
-export const universityMeetingsQueryKey = (id: string) => ['university-meetings', id] as const;
-export const universityResponsiblesQueryKey = (id: string) => ['university-responsibles', id] as const;
+export const universityLicensesQueryKey = queryKeys.universities.licenses;
+export const universityDocumentsQueryKey = queryKeys.universities.documents;
+export const universityMeetingsQueryKey = queryKeys.universities.meetings;
+export const universityResponsiblesQueryKey = queryKeys.universities.responsibles;
 
 /** Typed frontend adapter for the future university licenses endpoint. */
-export async function getUniversityLicenses(id: string): Promise<UniversityLicenseRow[]> {
+async function getMockUniversityLicenses(id: string): Promise<UniversityLicenseRow[]> {
   const university = getUniversityOrThrow(id);
   const numericId = getUniversityNumericId(id);
   const statuses: UniversityLicenseStatus[] = ['expires_soon', 'active', 'expired', 'active', 'expires_soon'];
@@ -1178,8 +1282,12 @@ export async function getUniversityLicenses(id: string): Promise<UniversityLicen
   }).filter((_, index) => university.productIds ? index < 3 + (numericId % 3) : index < 2);
 }
 
+export async function getUniversityLicenses(id: string): Promise<UniversityLicenseRow[]> {
+  return fromDataSource({ mock: () => getMockUniversityLicenses(id), real: () => realGetUniversityLicenses(id) });
+}
+
 /** Typed frontend adapter for the future university documents endpoint. */
-export async function getUniversityDocuments(id: string): Promise<UniversityDocumentRow[]> {
+async function getMockUniversityDocuments(id: string): Promise<UniversityDocumentRow[]> {
   const university = getUniversityOrThrow(id);
   const numericId = getUniversityNumericId(id);
   const documents = [
@@ -1204,8 +1312,12 @@ export async function getUniversityDocuments(id: string): Promise<UniversityDocu
   }));
 }
 
+export async function getUniversityDocuments(id: string): Promise<UniversityDocumentRow[]> {
+  return fromDataSource({ mock: () => getMockUniversityDocuments(id), real: () => realGetUniversityDocuments(id) });
+}
+
 /** Typed frontend adapter for the future university meetings endpoint. */
-export async function getUniversityMeetings(id: string): Promise<UniversityMeetingRow[]> {
+async function getMockUniversityMeetings(id: string): Promise<UniversityMeetingRow[]> {
   const university = getUniversityOrThrow(id);
   const numericId = getUniversityNumericId(id);
   const types: UniversityMeetingType[] = ['online', 'offline', 'phone', 'email', 'online'];
@@ -1228,8 +1340,12 @@ export async function getUniversityMeetings(id: string): Promise<UniversityMeeti
   }));
 }
 
+export async function getUniversityMeetings(id: string): Promise<UniversityMeetingRow[]> {
+  return fromDataSource({ mock: () => getMockUniversityMeetings(id), real: () => realGetUniversityMeetings(id) });
+}
+
 /** Typed frontend adapter for the future university responsibles endpoint. */
-export async function getUniversityResponsibles(id: string): Promise<UniversityResponsibleContact[]> {
+async function getMockUniversityResponsibles(id: string): Promise<UniversityResponsibleContact[]> {
   const university = getUniversityOrThrow(id);
   const contacts: UniversityResponsibleContact[] = [
     { id: 'contact-anna', name: 'Анна Иванова', role: 'Координатор проекта', email: 'anna.ivanova@example.ru', phone: '+7 (900) 123-45-67', isPrimary: true, initials: 'АИ' },
@@ -1238,4 +1354,8 @@ export async function getUniversityResponsibles(id: string): Promise<UniversityR
   ];
   if (university.responsible) contacts[0] = { ...contacts[0], name: university.responsible.name, initials: university.responsible.name.split(' ').map((part) => part[0]).join('').slice(0, 2).toLocaleUpperCase('ru-RU') };
   return contacts;
+}
+
+export async function getUniversityResponsibles(id: string): Promise<UniversityResponsibleContact[]> {
+  return fromDataSource({ mock: () => getMockUniversityResponsibles(id), real: () => realGetUniversityResponsibles(id) });
 }

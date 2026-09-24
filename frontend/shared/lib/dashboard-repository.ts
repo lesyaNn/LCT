@@ -1,3 +1,8 @@
+import { apiFetch } from './api-client';
+import { ApiRequestError } from './api-errors';
+import { fromDataSource } from './data-source';
+import { queryKeys } from './query-keys';
+
 export interface DashboardOverview {
   universitiesTotal: number | null;
   averageHealthScore: number | null;
@@ -58,8 +63,8 @@ export interface DashboardAnalytics {
   attentionItems: AttentionItem[];
 }
 
-export const dashboardQueryKey = ['dashboard-overview'] as const;
-export const dashboardAnalyticsQueryKey = ['dashboard-analytics'] as const;
+export const dashboardQueryKey = queryKeys.dashboard.overview;
+export const dashboardAnalyticsQueryKey = queryKeys.dashboard.analytics;
 
 /**
  * Temporary fixture for the first frontend slice. The function is the single
@@ -76,8 +81,40 @@ const dashboardOverviewMock: DashboardOverview = {
   teachersNeedUpgrade: 17,
 };
 
+type CatalogOverviewApi = {
+  total_universities?: number;
+  rows?: Array<{ expires_at?: string | null }>;
+  directions?: Array<{ programs?: number }>;
+};
+
+async function getCatalogOverview(): Promise<CatalogOverviewApi> {
+  const result = await apiFetch<CatalogOverviewApi>('/api/v1/catalog/overview?page=1&page_size=100');
+  if (!result.ok) throw new ApiRequestError(result.status, result.body, 'Не удалось загрузить обзор Dashboard.', result.error);
+  return result.data;
+}
+
+async function getRealDashboardOverview(): Promise<DashboardOverview> {
+  const overview = await getCatalogOverview();
+  const expiryThreshold = new Date();
+  expiryThreshold.setDate(expiryThreshold.getDate() + 30);
+  const expiringLicenses = (overview.rows ?? []).filter((row) => {
+    if (!row.expires_at) return false;
+    const expiresAt = new Date(row.expires_at);
+    return Number.isFinite(expiresAt.getTime()) && expiresAt >= new Date() && expiresAt <= expiryThreshold;
+  }).length;
+  return {
+    universitiesTotal: overview.total_universities ?? 0,
+    averageHealthScore: null,
+    redUniversities: null,
+    overdueStages: null,
+    expiringLicenses,
+    activePrograms: (overview.directions ?? []).reduce((sum, direction) => sum + (direction.programs ?? 0), 0),
+    teachersNeedUpgrade: null,
+  };
+}
+
 export async function getDashboardOverview(): Promise<DashboardOverview> {
-  return dashboardOverviewMock;
+  return fromDataSource({ mock: () => dashboardOverviewMock, real: getRealDashboardOverview });
 }
 
 const monthFormatter = new Intl.DateTimeFormat('ru-RU', { month: 'short' });
@@ -124,6 +161,17 @@ const dashboardAnalyticsMock: DashboardAnalytics = {
   ],
 };
 
+async function getRealDashboardAnalytics(): Promise<DashboardAnalytics> {
+  const overview = await getCatalogOverview();
+  const activePrograms = (overview.directions ?? []).reduce((sum, direction) => sum + (direction.programs ?? 0), 0);
+  return {
+    healthScoreDistribution: [],
+    programStatuses: activePrograms ? [{ status: 'active', label: programStatusLabels.active, count: activePrograms, tone: 'brand' }] : [],
+    launchDynamics: [],
+    attentionItems: [],
+  };
+}
+
 export async function getDashboardAnalytics(): Promise<DashboardAnalytics> {
-  return dashboardAnalyticsMock;
+  return fromDataSource({ mock: () => dashboardAnalyticsMock, real: getRealDashboardAnalytics });
 }

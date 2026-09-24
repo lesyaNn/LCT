@@ -1,6 +1,9 @@
 import { apiFetch } from './api-client';
 import { ApiRequestError } from './api-errors';
+import { fromDataSource } from './data-source';
+import { queryKeys } from './query-keys';
 import type { SemanticIntent } from './status-semantics';
+import { mockGetAuditEvents } from '@/shared/mocks/api-adapter';
 
 export type AuditJsonValue = string | number | boolean | null | AuditJsonValue[] | { [key: string]: AuditJsonValue };
 
@@ -70,7 +73,7 @@ export const EMPTY_AUDIT_FILTERS: AuditFilters = {
 
 export const AUDIT_PAGE_SIZES = [20, 50, 100] as const;
 
-export const auditQueryKey = (query: AuditListQuery) => ['audit', query] as const;
+export const auditQueryKey = queryKeys.audit.list;
 
 export const auditActionMeta: Record<string, { label: string; intent: SemanticIntent }> = {
   CREATE: { label: 'Создание', intent: 'success' },
@@ -209,7 +212,7 @@ function queryPath(query: AuditListQuery): string {
   return queryString ? `/api/v1/audit?${queryString}` : '/api/v1/audit';
 }
 
-export async function getAuditEvents(query: AuditListQuery): Promise<AuditListResult> {
+async function getRealAuditEvents(query: AuditListQuery): Promise<AuditListResult> {
   const result = await apiFetch<unknown>(queryPath(query));
   if (!result.ok) throw new ApiRequestError(result.status, result.body, 'Не удалось загрузить журнал аудита.', result.error);
 
@@ -230,4 +233,8 @@ export async function getAuditEvents(query: AuditListQuery): Promise<AuditListRe
     filterOptions: { users: [], universities: [], actions: Object.keys(auditActionMeta), entityTypes: Object.keys(auditEntityLabels) },
     capabilities: CURRENT_AUDIT_API_CAPABILITIES,
   };
+}
+
+export async function getAuditEvents(query: AuditListQuery): Promise<AuditListResult> {
+  return fromDataSource({ mock: () => mockGetAuditEvents(query), real: () => getRealAuditEvents(query) });
 }
