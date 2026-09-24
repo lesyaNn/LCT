@@ -17,6 +17,16 @@ worker relay later materializes `audit_events` in one transaction. Delivery is
 eventually consistent and idempotent (the outbox UUID is the audit event UUID);
 an unavailable audit sink therefore never rolls back the workflow transition.
 
+### M9 integration decision
+
+Workflow transitions use the Dev-1 outbox: the business change, history, and
+sanitized audit intent commit in one transaction. The relay delivers to
+`audit_events` later and retries a failed sink without undoing the transition.
+Other mounted mutation paths, including Dev-2's student, catalog, and workflow
+comment coverage, currently call `AuditService.log_event` in the business
+transaction. `AuditService` never commits on its own. A failed direct audit
+insert therefore aborts that business mutation; a rollback removes both.
+
 ## Current production paths
 
 | Operation | Audit action | Entity |
@@ -25,6 +35,9 @@ an unavailable audit sink therefore never rolls back the workflow transition.
 | Responsible create, update, delete | CREATE, UPDATE, DELETE | responsible |
 | University responsible assign/unassign | ASSIGN_RESPONSIBLE | responsible (assignment ID) |
 | Meeting create, update, delete | CREATE, UPDATE, DELETE | meeting |
+| Student create, update, delete | CREATE, UPDATE, DELETE | student |
+| Direction, program, vendor, product create/update/delete | CREATE, UPDATE, DELETE | direction, program, vendor, product |
+| Workflow comment create, update, delete | CREATE, UPDATE, DELETE | workflow_comment |
 | Workflow instance transition | WORKFLOW_TRANSITION | workflow_instance |
 | Report job creation | REPORT_GENERATE | report (job ID) |
 | XLSX import job creation | IMPORT | report (job ID) |

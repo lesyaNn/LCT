@@ -31,18 +31,39 @@ def _load_migrate_module():
     return module
 
 
+def assert_dedicated_test_db(url: str) -> str:
+    """Guard the destructive ``DROP SCHEMA public CASCADE`` path (M6).
+
+    Refuses to reset unless ``url`` points at an explicit PostgreSQL
+    *test* database: the database name must contain ``"test"``
+    (e.g. ``.../rtk_test``). Prevents wiping a dev/prod database on a
+    mistyped ``TEST_DATABASE_URL``. Raises ``SystemExit`` on violation
+    (fail-closed, same as the SQLite refusal below).
+    """
+    dbname = url.rsplit("/", 1)[-1].split("?", 1)[0]
+    if "test" not in dbname.lower():
+        raise SystemExit(
+            f"refusing to reset non-test database {dbname!r}: "
+            "TEST_DATABASE_URL must point at a dedicated test database "
+            "(name must contain 'test', e.g. .../rtk_test)."
+        )
+    return dbname
+
+
 def reset_test_db(engine, url: str) -> None:
     """Reset a PostgreSQL test engine to a clean canonical schema.
 
     Drops ``public`` (test-only, dedicated test database), recreates it,
     then applies ALL SQL migrations via the canonical runner (fresh-DB path).
     Refuses non-PostgreSQL URLs: there is no second schema path.
+    Refuses non-test database names (see :func:`assert_dedicated_test_db`).
     """
     if engine.dialect.name != "postgresql":
         raise SystemExit(
             "reset_test_db supports PostgreSQL only — SQL migrations are "
             "PostgreSQL-native and the sole schema source."
         )
+    assert_dedicated_test_db(url)
     with engine.begin() as conn:
         conn.execute(text("DROP SCHEMA public CASCADE"))
         conn.execute(text("CREATE SCHEMA public"))

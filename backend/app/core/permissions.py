@@ -1,5 +1,7 @@
 """Canonical action permissions for public roles and legacy curator."""
+
 from types import MappingProxyType
+
 from fastapi import Depends
 
 from app.core.errors import SecurityError

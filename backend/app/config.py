@@ -6,6 +6,8 @@ Domain DB settings stay for the next stage but are unused at runtime.
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+DEV_BYPASS_ENVIRONMENTS = frozenset({"dev", "development", "local", "test", "testing"})
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -64,11 +66,14 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_security_baseline(self) -> "Settings":
         """Fail closed for settings that would weaken a production process."""
-        production = self.app_env.lower() in {"prod", "production"}
+        environment = self.app_env.strip().lower()
+        production = environment in {"prod", "production"}
         origins = {origin.strip() for origin in self.cors_origins.split(",") if origin.strip()}
+        if self.auth_dev_bypass and environment not in DEV_BYPASS_ENVIRONMENTS:
+            raise ValueError(
+                "AUTH_DEV_BYPASS is allowed only in explicit local development/test environments"
+            )
         if production:
-            if self.auth_dev_bypass:
-                raise ValueError("AUTH_DEV_BYPASS must be false in production")
             if "*" in origins or "*" in self.cors_origin_list:
                 raise ValueError("CORS wildcard is not allowed in production")
             if self.storage_backend.lower() in {"s3", "minio"} and (

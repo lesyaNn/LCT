@@ -19,8 +19,11 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.permissions import require_permission, require_role
-from app.core.policies import apply_university_scope, ensure_university_access
+from app.core.policies import apply_university_scope, ensure_university_visible
 from app.core.security import CurrentUser
+from app.models.catalog import ITDirection, ITProgram, License, University
+from app.models.interactions import UniversityProgram
+from app.modules.analytics.filters import UnifiedFilter, get_unified_filter
 from app.modules.audit.service import get_audit_db
 from app.modules.catalog import service
 from app.modules.catalog.schemas import (
@@ -51,9 +54,6 @@ from app.schemas.catalog import (
     VendorCreate,
     VendorUpdate,
 )
-from app.models.catalog import ITDirection, ITProgram, License, University
-from app.models.interactions import UniversityProgram
-from app.modules.analytics.filters import UnifiedFilter, get_unified_filter
 from app.schemas.common import ErrorResponse, PaginatedResponse
 from app.schemas.university import UniversityCreate, UniversityUpdate
 
@@ -157,7 +157,7 @@ def get_university(
     user: CurrentUser = Depends(READ),
 ) -> UniversityDetail:
     detail = service.get_university_detail(db, university_id)
-    ensure_university_access(university_id, user)
+    ensure_university_visible(university_id, user)
     return detail
 
 
@@ -173,7 +173,7 @@ def patch_university(
     db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(WRITE),
 ) -> UniversityDetail:
-    ensure_university_access(university_id, user)
+    ensure_university_visible(university_id, user)
     fields = data.model_fields_set
     return service.patch_university(
         db,
@@ -197,7 +197,7 @@ def delete_university(
     db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(require_role("admin", "curator")),
 ) -> None:
-    ensure_university_access(university_id, user)
+    ensure_university_visible(university_id, user)
     service.delete_university(db, university_id)
 
 
@@ -214,7 +214,7 @@ def assign_responsible(
     db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(require_role("admin", "manager", "curator")),
 ):
-    ensure_university_access(university_id, user)
+    ensure_university_visible(university_id, user)
     link, created = service.assign_responsible(db, university_id, responsible_id, data)
     return JSONResponse(
         status_code=201 if created else 200,
@@ -235,7 +235,7 @@ def unassign_responsible(
     db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(require_role("admin", "manager", "curator")),
 ) -> None:
-    ensure_university_access(university_id, user)
+    ensure_university_visible(university_id, user)
     service.unassign_responsible(db, university_id, responsible_id)
 
 

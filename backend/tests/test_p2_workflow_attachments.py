@@ -615,22 +615,15 @@ def test_rbac_allowed_denied_and_admin(auth_client, db):
         headers=mgr_h,
     ).status_code == 204
 
-    # curator (workflow.read + change_status): full access.
+    # Curator has no data scope, even where legacy permissions allow a verb.
     cur_h = _auth(auth_client, ["curator"])
-    assert auth_client.get(meta_url, headers=cur_h).status_code == 200
+    assert auth_client.get(meta_url, headers=cur_h).status_code == 403
     up = auth_client.post(
         f"/api/v1/workflow/instances/{iid}/attachments",
         files={"file": ("c.pdf", io.BytesIO(b"c"), "application/pdf")},
         headers=cur_h,
     )
-    assert up.status_code == 201, up.text
-    assert (
-        auth_client.delete(
-            f"/api/v1/workflow/instances/{iid}/attachments/{up.json()['id']}",
-            headers=cur_h,
-        ).status_code
-        == 204
-    )
+    assert up.status_code == 403, up.text
 
     # admin: full access (already demonstrated by the seed upload above).
     assert auth_client.delete(meta_url, headers=admin_headers).status_code == 204
@@ -638,8 +631,8 @@ def test_rbac_allowed_denied_and_admin(auth_client, db):
 
 def test_cross_university_isolation(auth_client, db):
     g = _seed_universe(db)
-    a_headers = _auth(auth_client, ["curator"], [str(g["ua"].id)])
-    b_headers = _auth(auth_client, ["curator"], [str(g["ub"].id)])
+    a_headers = _auth(auth_client, ["manager"], [str(g["ua"].id)])
+    b_headers = _auth(auth_client, ["manager"], [str(g["ub"].id)])
 
     ra = auth_client.post(
         f"/api/v1/workflow/instances/{g['ia'].id}/attachments",

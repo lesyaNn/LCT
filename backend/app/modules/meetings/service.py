@@ -13,7 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFound
-from app.core.policies import ensure_university_access
+from app.core.policies import ensure_university_visible
 from app.models.catalog import University
 from app.models.interactions import Meeting
 from app.modules.audit.service import AuditAction, AuditService, context_for
@@ -21,7 +21,7 @@ from app.modules.meetings.schemas import MeetingCreate, MeetingRead, MeetingUpda
 
 
 def _check_scope(user, university_id: uuid.UUID) -> None:
-    ensure_university_access(university_id, user)
+    ensure_university_visible(university_id, user)
 
 
 def _get_university_or_404(db: Session, university_id: uuid.UUID) -> University:

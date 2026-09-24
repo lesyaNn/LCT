@@ -101,6 +101,17 @@ def test_valid_roles_audience_list_and_optional_email(auth_fixture):
     assert client.get("/admin", headers=bearer(mint(priv, roles=("admin",)))).status_code == 200
 
 
+def test_unknown_roles_are_ignored_and_logged(auth_fixture, caplog):
+    client, priv, _ = auth_fixture
+    with caplog.at_level("WARNING", logger="rtk.security"):
+        response = client.get(
+            "/me", headers=bearer(mint(priv, roles=("user", "surprise-role")))
+        )
+    assert response.status_code == 200
+    assert response.json()["roles"] == ["user"]
+    assert "surprise-role" in caplog.text
+
+
 def test_missing_token_and_403_contract(auth_fixture):
     client, priv, _ = auth_fixture
     assert_error(client.get("/me"), 401, ErrorCode.AUTH_REQUIRED)

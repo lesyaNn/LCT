@@ -640,8 +640,8 @@ def test_403_guest_without_permission(engine, real_client, monkeypatch):
 
 
 @pytest.mark.parametrize("role", ["admin", "manager", "curator", "user"])
-def test_200_allowed_roles(engine, real_client, monkeypatch, role):
-    """Frozen contract: teacher passport reuses ``university.read`` (no new permission)."""
+def test_passport_role_scope(engine, real_client, monkeypatch, role):
+    """A curator remains denied even with an explicit university claim."""
     with Session(engine) as s:
         u = _university(s, f"Uni TP5 200 {role}")
         t = _teacher(s, u, f"t200-{role}@example.local")
@@ -653,8 +653,9 @@ def test_200_allowed_roles(engine, real_client, monkeypatch, role):
     r = real_client.get(
         f"/api/v1/teachers/{tid}/passport", headers={"Authorization": f"Bearer {token}"}
     )
-    assert r.status_code == 200, (role, r.text)
-    TeacherPassport.model_validate(r.json())
+    assert r.status_code == (403 if role == "curator" else 200), (role, r.text)
+    if role != "curator":
+        TeacherPassport.model_validate(r.json())
 
 
 # ============================================================ openapi ===
