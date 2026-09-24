@@ -13,6 +13,7 @@ export const queryKeys = {
     historyFamily: (id: string) => ['university-history', id] as const,
     history: <T>(id: string, filters: T) => ['university-history', id, filters] as const,
     healthScore: (id: string) => ['university-health-score', id] as const,
+    healthScoreBatch: (ids: readonly string[]) => ['university-health-score-batch', [...ids].sort()] as const,
     programs: (id: string) => ['university-programs', id] as const,
     teachers: (id: string) => ['university-teachers', id] as const,
     students: (id: string) => ['university-students', id] as const,
@@ -40,5 +41,11 @@ export const queryKeys = {
     lists: ['workflow-templates', 'list'] as const,
     list: (page = 1, pageSize = 100) => ['workflow-templates', 'list', page, pageSize] as const,
     detail: (templateId: string) => ['workflow-templates', 'detail', templateId] as const,
+  },
+  imports: {
+    all: ['imports'] as const,
+    preview: (fileId: string) => ['imports', 'preview', fileId] as const,
+    jobs: ['imports', 'jobs'] as const,
+    job: (id: string) => ['imports', 'jobs', id] as const,
   },
 } as const;

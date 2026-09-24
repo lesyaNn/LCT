@@ -1,7 +1,8 @@
-import { apiFetch } from './api-client';
+import { apiFetch, apiUploadFormData } from './api-client';
 import { ApiRequestError } from './api-errors';
 import { getExpirationStatus } from './formatters';
 import { getHealthStatus } from './health-score';
+import type { ImportExecuteResponse, ImportOptions, ImportPreviewResponse } from './import-repository';
 import type {
   PaginatedResult,
   ProgramStatus,
@@ -385,4 +386,33 @@ export async function realGetTeacherPassport(id: string): Promise<TeacherPasspor
       status: 'active',
     })),
   };
+}
+
+// --------------------------------------------------------------------- import
+
+export async function realUploadImportPreview(file: File, signal?: AbortSignal, onProgress?: (value: number) => void): Promise<ImportPreviewResponse> {
+  const formData = new FormData();
+  formData.append('file', file, file.name);
+  const result = await apiUploadFormData<ImportPreviewResponse>('/api/v1/import/preview', formData, { signal, onProgress });
+  if (result.ok) return result.data;
+  throw new ApiRequestError(result.status, result.body, 'Не удалось загрузить файл и построить предпросмотр.', result.error);
+}
+
+export async function realExecuteImport(fileId: string, mapping: Record<string, string>, options: ImportOptions): Promise<ImportExecuteResponse> {
+  return unwrap(await apiFetch<ImportExecuteResponse>('/api/v1/import/execute', {
+    method: 'POST',
+    body: { file_id: fileId, mapping, options },
+  }), 'Не удалось запустить импорт.');
+}
+
+export async function realGetImportJob(jobId: string): Promise<unknown> {
+  return unwrap(await apiFetch<unknown>(`/api/v1/import/jobs/${encodeURIComponent(jobId)}`), 'Не удалось обновить статус импорта.');
+}
+
+export async function realListImportJobs(): Promise<unknown[]> {
+  const result = await apiFetch<unknown>('/api/v1/import/jobs');
+  if (!result.ok && result.status === 404) return [];
+  const data = unwrap(result, 'Не удалось загрузить журнал импортов.');
+  if (Array.isArray(data)) return data;
+  return data && typeof data === 'object' && 'items' in data && Array.isArray(data.items) ? data.items : [];
 }

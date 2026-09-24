@@ -1,5 +1,18 @@
-import { apiFetch, apiUploadFormData } from './api-client';
 import { ApiRequestError } from './api-errors';
+import { fromDataSource } from './data-source';
+import { queryKeys } from './query-keys';
+import {
+  mockExecuteImport,
+  mockGetImportJob,
+  mockListImportJobs,
+  mockUploadImportPreview,
+} from '@/shared/mocks/api-adapter';
+import {
+  realExecuteImport,
+  realGetImportJob,
+  realListImportJobs,
+  realUploadImportPreview,
+} from './real-api-adapter';
 
 export type ImportCatalogType = 'universities' | 'products' | 'directions' | 'responsibles' | 'licenses';
 export type ImportJobStatus = 'queued' | 'processing' | 'done' | 'failed';
@@ -99,8 +112,9 @@ export interface ImportJob {
 export interface ImportExecuteResponse { job_id: string; }
 
 export const importQueryKeys = {
-  jobs: ['imports', 'jobs'] as const,
-  job: (id: string) => ['imports', 'jobs', id] as const,
+  preview: queryKeys.imports.preview,
+  jobs: queryKeys.imports.jobs,
+  job: queryKeys.imports.job,
 };
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -175,11 +189,6 @@ export function adaptImportJob(raw: unknown, fallbackId?: string): ImportJob {
   };
 }
 
-function unwrap<T>(result: Awaited<ReturnType<typeof apiFetch<T>>>, message: string): T {
-  if (result.ok) return result.data;
-  throw new ApiRequestError(result.status, result.body, message, result.error);
-}
-
 export function validateImportFile(file: File): string | null {
   const extension = `.${file.name.split('.').pop()?.toLowerCase() ?? ''}`;
   if (!supportedExtensions.includes(extension as (typeof supportedExtensions)[number])) return 'Загрузите файл в формате .xlsx или .xls.';
@@ -191,31 +200,30 @@ export function validateImportFile(file: File): string | null {
 export async function uploadImportPreview(file: File, signal?: AbortSignal, onProgress?: (value: number) => void): Promise<ImportPreviewResponse> {
   const validationError = validateImportFile(file);
   if (validationError) throw new ApiRequestError(400, { detail: validationError }, validationError);
-  const formData = new FormData();
-  formData.append('file', file, file.name);
-  const result = await apiUploadFormData<ImportPreviewResponse>('/api/v1/import/preview', formData, { signal, onProgress });
-  return unwrap(result, 'Не удалось загрузить файл и построить предпросмотр.');
+  onProgress?.(0);
+  const result = await fromDataSource({
+    mock: () => mockUploadImportPreview(file),
+    real: () => realUploadImportPreview(file, signal, onProgress),
+    signal,
+  });
+  onProgress?.(100);
+  return result;
 }
 
 export async function executeImport(fileId: string, mapping: Record<string, string>, options: ImportOptions): Promise<ImportExecuteResponse> {
-  const result = await apiFetch<ImportExecuteResponse>('/api/v1/import/execute', {
-    method: 'POST',
-    body: { file_id: fileId, mapping, options },
+  return fromDataSource({
+    mock: () => mockExecuteImport(fileId, mapping, options),
+    real: () => realExecuteImport(fileId, mapping, options),
   });
-  return unwrap(result, 'Не удалось запустить импорт.');
 }
 
 export async function getImportJob(jobId: string): Promise<ImportJob> {
-  const result = await apiFetch<unknown>(`/api/v1/import/jobs/${encodeURIComponent(jobId)}`);
-  return adaptImportJob(unwrap(result, 'Не удалось обновить статус импорта.'), jobId);
+  const raw = await fromDataSource({ mock: () => mockGetImportJob(jobId), real: () => realGetImportJob(jobId) });
+  return adaptImportJob(raw, jobId);
 }
 
-/** GET /import/jobs is not published by the current backend; a 404 is an empty history, not a page error. */
 export async function listImportJobs(): Promise<ImportJob[]> {
-  const result = await apiFetch<unknown>('/api/v1/import/jobs');
-  if (!result.ok && result.status === 404) return [];
-  const data = unwrap(result, 'Не удалось загрузить журнал импортов.');
-  const items = Array.isArray(data) ? data : isRecord(data) && Array.isArray(data.items) ? data.items : [];
+  const items = await fromDataSource({ mock: mockListImportJobs, real: realListImportJobs });
   return items.map((item) => adaptImportJob(item));
 }
 

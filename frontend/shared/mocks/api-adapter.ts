@@ -1,4 +1,5 @@
 import type { AuditEvent, AuditListQuery, AuditListResult } from '@/shared/lib/audit-repository';
+import type { ImportCatalogType, ImportExecuteResponse, ImportJob, ImportOptions, ImportPreviewResponse } from '@/shared/lib/import-repository';
 import type { ReportJob, ReportRequest } from '@/shared/lib/reports-repository';
 import type {
   WorkflowCommentApiRecord,
@@ -420,4 +421,80 @@ export function mockUpdateWorkflowStage(templateId: string, stageId: string, inp
   }
   template.updatedAt = now();
   return { ...(template.stages.find((item) => item.id === stageId) ?? stage) };
+}
+
+// --------------------------------------------------------------------- import
+
+type StoredImportFile = { filename: string; catalogType?: ImportCatalogType };
+type StoredImportJob = ImportJob & { processingAt: number; doneAt: number; options: ImportOptions };
+
+const importFiles = new Map<string, StoredImportFile>();
+const importJobs = new Map<string, StoredImportJob>();
+
+const importPreviewHeaders = ['Название ВУЗа', 'Номер договора', 'Срок действия лицензии (год)', 'Вендор', 'ПО'];
+const importPreviewRows = [
+  { 'Название ВУЗа': 'МТУСИ', 'Номер договора': 'ДОГ-2026-001', 'Срок действия лицензии (год)': 2027, Вендор: 'Ростелеком', ПО: 'Профессиональная переподготовка' },
+  { 'Название ВУЗа': 'Уральский федеральный университет', 'Номер договора': 'ДОГ-2026-002', 'Срок действия лицензии (год)': 2028, Вендор: 'Контур', ПО: 'Короткие курсы' },
+  { 'Название ВУЗа': 'Казанский федеральный университет', 'Номер договора': 'ДОГ-2026-003', 'Срок действия лицензии (год)': 2027, Вендор: 'Ростелеком', ПО: 'Корпоративный трек' },
+];
+
+export function mockUploadImportPreview(file: File): ImportPreviewResponse {
+  const fileId = id('import-file');
+  importFiles.set(fileId, { filename: file.name });
+  return {
+    file_id: fileId,
+    filename: file.name,
+    headers: [...importPreviewHeaders],
+    preview: importPreviewRows.map((row) => ({ ...row })),
+    row_count: 20,
+    detected_sheet: 'Лист1',
+  };
+}
+
+function visibleImportJob(stored: StoredImportJob): Record<string, unknown> {
+  const timestamp = Date.now();
+  const status = timestamp >= stored.doneAt ? 'done' : timestamp >= stored.processingAt ? 'processing' : 'queued';
+  return {
+    id: stored.id,
+    type: stored.type,
+    status,
+    created_at: stored.createdAt,
+    filename: stored.filename,
+    catalog_type: stored.catalogType,
+    created_by: stored.createdBy,
+    result: status === 'done' ? stored.result : undefined,
+  };
+}
+
+export function mockExecuteImport(fileId: string, _mapping: Record<string, string>, options: ImportOptions): ImportExecuteResponse {
+  const file = importFiles.get(fileId);
+  if (!file) throw new Error('Файл импорта не найден. Загрузите его заново.');
+  const created = Date.now();
+  const job: StoredImportJob = {
+    id: id('import-job'),
+    type: 'xlsx_import',
+    status: 'queued',
+    createdAt: now(),
+    filename: file.filename,
+    catalogType: file.catalogType,
+    createdBy: 'Мария Менеджер',
+    processingAt: created + 700,
+    doneAt: created + 2_400,
+    options,
+    result: { total_rows: 20, inserted: options.dry_run ? 20 : 18, updated: options.dry_run ? 0 : 2, skipped: 0, errors: [], dry_run: options.dry_run },
+  };
+  importJobs.set(job.id, job);
+  return { job_id: job.id };
+}
+
+export function mockGetImportJob(jobId: string): unknown {
+  const job = importJobs.get(jobId);
+  if (!job) throw new Error('Задача импорта не найдена.');
+  return visibleImportJob(job);
+}
+
+export function mockListImportJobs(): unknown[] {
+  return [...importJobs.values()]
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+    .map(visibleImportJob);
 }
