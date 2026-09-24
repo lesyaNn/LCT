@@ -17,8 +17,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSel
   return <select ref={ref} className={`${styles.input} ${styles.select} ${className}`} {...props} />;
 });
 
-export function Switch({ checked, onChange, label, disabled = false }: { checked: boolean; onChange: (checked: boolean) => void; label: string; disabled?: boolean }) {
-  return <label className={`${styles.switchLabel} ${disabled ? styles.disabled : ''}`}><input className={styles.switchInput} type="checkbox" role="switch" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} /><span className={styles.switchTrack} aria-hidden="true"><span /></span><span className={styles.srOnly}>{label}</span></label>;
+export function Switch({ checked, onChange, label, disabled = false, testId }: { checked: boolean; onChange: (checked: boolean) => void; label: string; disabled?: boolean; testId?: string }) {
+  return <label className={`${styles.switchLabel} ${disabled ? styles.disabled : ''}`}><input data-testid={testId} className={styles.switchInput} type="checkbox" role="switch" checked={checked} disabled={disabled} aria-label={label} onChange={(event) => onChange(event.target.checked)} /><span className={styles.switchTrack} aria-hidden="true"><span /></span><span className={styles.srOnly}>{label}</span></label>;
 }
 
 export function NumberStepper({ value, onChange, onCommit, label, disabled = false, min = 0, inputRef, ariaInvalid, ariaDescribedBy }: { value: number | null; onChange: (value: number | null) => void; onCommit: (value: number | null) => void; label: string; disabled?: boolean; min?: number; inputRef?: Ref<HTMLInputElement>; ariaInvalid?: boolean; ariaDescribedBy?: string }) {

@@ -35,6 +35,9 @@ export function Sidebar({ role, pathname, collapsed, mobileOpen = false, onToggl
 
 function SidebarContent({ role, pathname, collapsed, mobile = false, onToggleCollapse, onCloseMobile }: SidebarProps & { mobile?: boolean }) {
   const items = getVisibleNavigationItems(role);
+  const activeHref = items
+    .filter((item) => pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(`${item.href}/`)))
+    .sort((left, right) => right.href.length - left.href.length)[0]?.href;
 
   return (
     <div className={mobile ? styles.mobileDrawerContent : undefined}>
@@ -46,7 +49,7 @@ function SidebarContent({ role, pathname, collapsed, mobile = false, onToggleCol
       <nav className={styles.nav}>
         <p className={styles.sectionLabel}>{(!collapsed || mobile) && 'Рабочая область'}</p>
         {items.map((item) => {
-          const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(`${item.href}/`));
+          const active = activeHref === item.href;
           return (
             <Link
               className={`${styles.navItem} ${active ? styles.active : ''}`}

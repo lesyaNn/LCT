@@ -9,6 +9,7 @@ export const navigationItems: NavigationItem[] = [
   { label: 'Отчёты', href: '/reports', icon: 'report', allowedRoles: ['manager', 'admin'] },
   { label: 'Аудит', href: '/audit', icon: 'audit', allowedRoles: ['manager', 'admin'] },
   { label: 'Администрирование', href: '/admin', icon: 'admin', allowedRoles: ['admin'] },
+  { label: 'Импорт каталогов', href: '/admin/import', icon: 'admin', allowedRoles: ['manager', 'admin'] },
   { label: 'Документация', href: '/docs', icon: 'docs', allowedRoles: ['user', 'manager', 'admin'] },
 ];
 
