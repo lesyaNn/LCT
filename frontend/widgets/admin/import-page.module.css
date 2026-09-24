@@ -1,5 +1,5 @@
 .page { display: flex; flex-direction: column; gap: var(--rtk-space-5); min-width: 0; }
-.section { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-medium); display: flex; flex-direction: column; gap: var(--rtk-space-4); min-width: 0; padding: clamp(var(--rtk-space-4), 2vw, var(--rtk-space-6)); }
+.section { background: var(--rtk-color-surface-elevated); border: 0; border-radius: var(--rtk-radius-medium); box-shadow: var(--rtk-shadow-elevation-1); display: flex; flex-direction: column; gap: var(--rtk-space-4); min-width: 0; padding: clamp(var(--rtk-space-4), 2vw, var(--rtk-space-6)); }
 .sectionHeader { align-items: flex-start; display: flex; gap: var(--rtk-space-4); justify-content: space-between; }
 .sectionHeader h2 { font-size: 20px; letter-spacing: -.02em; margin: 0; }
 .sectionHeader p:not(.eyebrow) { color: var(--rtk-color-text-secondary); font-size: 13px; margin: var(--rtk-space-1) 0 0; max-width: 720px; }

@@ -1,5 +1,9 @@
 .page { display: flex; flex-direction: column; gap: clamp(var(--rtk-space-6), 5vw, var(--rtk-space-8)); }
 .cards { display: grid; gap: var(--rtk-space-4); grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 980px; }
+.adminOverview { background: var(--rtk-color-surface-elevated); border-radius: var(--rtk-radius-medium); box-shadow: var(--rtk-shadow-elevation-1); display: grid; max-width: 720px; overflow: hidden; }
+.adminLink { align-items: center; border-bottom: 1px solid var(--rtk-color-border); color: var(--rtk-color-text-primary); display: flex; font-weight: 650; justify-content: space-between; min-height: 58px; padding: 0 var(--rtk-space-5); text-decoration: none; transition: background-color 160ms ease, color 160ms ease; }
+.adminLink:last-child { border-bottom: 0; }
+.adminLink:hover { background: var(--rtk-color-brand-soft); color: var(--rtk-color-brand); }
 .card { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-medium); display: flex; flex-direction: column; gap: var(--rtk-space-2); min-height: 150px; padding: var(--rtk-space-5); text-decoration: none; transition: border-color 140ms ease, transform 140ms ease; }
 .card:hover { border-color: color-mix(in srgb, var(--rtk-color-brand) 35%, var(--rtk-color-border)); transform: translateY(-1px); }
 .card span { color: var(--rtk-color-text-secondary); font-size: 13px; }

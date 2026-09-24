@@ -16,8 +16,11 @@
 .button:disabled { cursor: not-allowed; opacity: .48; }
 .primary { background: var(--rtk-color-brand); color: var(--rtk-color-text-inverse); }
 .primary:hover:not(:disabled) { background: var(--rtk-color-brand-hover); }
+.orange { background: var(--rtk-color-brand-secondary); color: #fff; }
+.orange:hover:not(:disabled) { background: #d9430f; }
 .secondary { background: var(--rtk-color-surface); border-color: var(--rtk-color-border-strong); color: var(--rtk-color-text-primary); }
 .secondary:hover:not(:disabled) { background: var(--rtk-color-surface-hover); }
+.secondary:active:not(:disabled) { border-color: var(--rtk-color-brand-secondary); }
 .ghost { background: transparent; color: var(--rtk-color-text-secondary); }
 .ghost:hover:not(:disabled) { background: var(--rtk-color-surface-hover); color: var(--rtk-color-text-primary); }
 .danger { background: var(--rtk-color-danger); color: var(--rtk-color-text-inverse); }

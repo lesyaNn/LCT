@@ -1,7 +1,8 @@
 .surface {
-  background: var(--rtk-color-surface);
-  border: 1px solid var(--rtk-color-border);
+  background: var(--rtk-color-surface-elevated);
+  border: 0;
   border-radius: var(--rtk-radius-medium);
+  box-shadow: var(--rtk-shadow-elevation-1);
   min-width: 0;
   padding: var(--rtk-space-5);
 }

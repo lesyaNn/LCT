@@ -1,26 +1,35 @@
 :root {
-  /* Local aliases consume the selected official Rostelecom Accent family. */
-  --rtk-color-brand: var(--atmr-accent-default);
-  --rtk-color-brand-hover: var(--atmr-accent-hover);
-  --rtk-color-brand-soft: var(--atmr-accent-container-default);
-  /* Official Rostelecom Default Light Accent 500, used as a restrained secondary brand accent. */
-  --rtk-color-brand-secondary: #ff4f12;
+  /* Rostelecom brand and semantic tokens. Keep component styles on aliases. */
+  --rtk-brand-purple: #7700ff;
+  --rtk-brand-purple-hover: #6500d9;
+  --rtk-brand-orange: #ff4f12;
+  --rtk-brand-light-blue: #749fd6;
+  --rtk-brand-lavender: #e8d2ed;
+  --rtk-brand-cool-grey: #e3e8ec;
+  --rtk-color-brand: var(--rtk-brand-purple);
+  --rtk-color-brand-hover: var(--rtk-brand-purple-hover);
+  --rtk-color-brand-soft: rgba(119, 0, 255, .1);
+  --rtk-color-brand-secondary: var(--rtk-brand-orange);
   --rtk-color-brand-secondary-soft: rgba(255, 79, 18, .1);
   --rtk-color-text-primary: var(--atmr-fg-default, #101828);
   --rtk-color-text-secondary: var(--atmr-fg-soft, rgba(16,24,40,.75));
   --rtk-color-text-tertiary: var(--atmr-fg-muted, rgba(16,24,40,.55));
   --rtk-color-text-inverse: var(--atmr-accent-on-accent, #FFFFFF);
   --rtk-color-surface: var(--atmr-bg-surface1, #FFFFFF);
-  --rtk-color-surface-subtle: var(--atmr-bg-surface2, #F9F9FA);
-  --rtk-color-surface-hover: var(--atmr-bg-surface3, #F4F4F5);
-  --rtk-color-border: var(--atmr-border-muted, rgba(88,93,105,.15));
-  --rtk-color-border-strong: var(--atmr-border-soft, rgba(88,93,105,.25));
+  --rtk-color-page: #f4f4f7;
+  --rtk-color-surface-subtle: #f8f8fb;
+  --rtk-color-surface-hover: #f0eff8;
+  --rtk-color-surface-elevated: #ffffff;
+  --rtk-color-border: rgba(16, 24, 40, .08);
+  --rtk-color-border-strong: rgba(16, 24, 40, .16);
   --rtk-color-success: var(--atmr-success-default, #00AC43);
   --rtk-color-warning: var(--atmr-warning-default, #FDA610);
   --rtk-color-danger: var(--atmr-error-default, #FF2626);
-  --rtk-shadow-elevation-2: var(--atmr-shadow-bottom, none);
-  --rtk-radius-small: 8px;
-  --rtk-radius-medium: 12px;
+  --rtk-shadow-elevation-1: 0 2px 12px rgba(42, 27, 74, .06);
+  --rtk-shadow-elevation-2: 0 12px 32px rgba(42, 27, 74, .08);
+  --rtk-radius-small: 10px;
+  --rtk-radius-medium: 18px;
+  --rtk-radius-large: 24px;
   --rtk-space-1: 4px;
   --rtk-space-2: 8px;
   --rtk-space-3: 12px;
@@ -116,7 +125,7 @@
 html { min-width: 320px; }
 body {
   margin: 0;
-  background: var(--atmr-bg-page-filled, var(--rtk-color-surface-subtle));
+  background: var(--rtk-color-page);
   color: var(--rtk-color-text-primary);
   font-family: var(--rtk-font-family);
   font-size: 14px;

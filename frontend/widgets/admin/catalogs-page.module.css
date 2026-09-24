@@ -1,9 +1,10 @@
 .page { display: flex; flex-direction: column; gap: var(--rtk-space-5); min-width: 0; }
-.localBreadcrumbs { align-items: center; color: var(--rtk-color-text-tertiary); display: flex; flex-wrap: wrap; font-size: 12px; gap: var(--rtk-space-2); }
+.localBreadcrumbs { display: none; }
 .localBreadcrumbs a { text-decoration: none; }
 .localBreadcrumbs a:hover { color: var(--rtk-color-brand); text-decoration: underline; }
 .pageHeader { align-items: flex-start; display: flex; justify-content: space-between; }
 .pageHeader h1 { font-size: clamp(26px, 4vw, 36px); letter-spacing: -.035em; line-height: 1.12; margin: 0; }
+.pageHeader > div > p:last-child { display: none; }
 .pageHeader p:last-child { color: var(--rtk-color-text-secondary); margin: var(--rtk-space-2) 0 0; }
 .eyebrow { color: var(--rtk-color-brand); font-size: 12px; font-weight: 700; letter-spacing: .08em; margin: 0 0 var(--rtk-space-1); text-transform: uppercase; }
 .tabScroller { max-width: 100%; overflow-x: auto; scrollbar-width: thin; }

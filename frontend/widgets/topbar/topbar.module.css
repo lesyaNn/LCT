@@ -1,4 +1,4 @@
-.topbar { align-items: center; background: var(--rtk-color-surface); border-bottom: 1px solid var(--rtk-color-border); display: flex; height: var(--topbar-height); justify-content: space-between; padding: 0 var(--rtk-space-6); position: sticky; top: 0; z-index: 20; }
+.topbar { align-items: center; background: rgba(255, 255, 255, .86); backdrop-filter: blur(14px); border-bottom: 1px solid rgba(16, 24, 40, .05); display: flex; height: var(--topbar-height); justify-content: space-between; padding: 0 clamp(var(--rtk-space-4), 4vw, 56px); position: sticky; top: 0; z-index: 20; }
 .left, .actions { align-items: center; display: flex; min-width: 0; }
 .left { gap: var(--rtk-space-3); }
 .actions { gap: var(--rtk-space-3); }

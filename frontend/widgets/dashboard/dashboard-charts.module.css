@@ -24,7 +24,7 @@
 
 .card,
 .skeletonCard {
-  background: var(--rtk-color-surface);
+  background: var(--rtk-color-surface-elevated);
   border: 0;
   border-radius: var(--rtk-radius-medium);
   box-shadow: var(--rtk-shadow-elevation-2);

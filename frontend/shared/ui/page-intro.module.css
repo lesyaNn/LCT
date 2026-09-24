@@ -1,4 +1,4 @@
-.intro { max-width: 760px; }
-.eyebrow { color: var(--rtk-color-brand); font-size: 12px; font-weight: 700; letter-spacing: .08em; margin: 0 0 var(--rtk-space-2); text-transform: uppercase; }
-.intro h1 { font-size: clamp(28px, 4vw, 40px); letter-spacing: -.035em; line-height: 1.1; margin: 0 0 var(--rtk-space-3); }
-.description { color: var(--rtk-color-text-secondary); font-size: 16px; margin: 0; max-width: 640px; }
+.intro { max-width: 920px; }
+.eyebrow { color: var(--rtk-color-brand); font-size: 11px; font-weight: 700; letter-spacing: .1em; margin: 0 0 var(--rtk-space-2); text-transform: uppercase; }
+.intro h1 { font-size: clamp(30px, 4vw, 42px); letter-spacing: -.04em; line-height: 1.08; margin: 0 0 var(--rtk-space-3); }
+.description { color: var(--rtk-color-text-secondary); font-size: 16px; margin: 0; max-width: 700px; }

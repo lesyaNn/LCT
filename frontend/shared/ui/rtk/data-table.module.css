@@ -6,9 +6,10 @@
 }
 
 .shell {
-  background: var(--rtk-color-surface);
-  border: 1px solid var(--rtk-color-border);
+  background: var(--rtk-color-surface-elevated);
+  border: 0;
   border-radius: var(--rtk-radius-medium);
+  box-shadow: var(--rtk-shadow-elevation-1);
   min-width: 0;
   overflow: hidden;
 }
@@ -19,7 +20,7 @@
 }
 
 .table th {
-  background: var(--atmr-bg-surface3, var(--rtk-color-surface-hover));
+  background: var(--rtk-color-surface-subtle);
   border-bottom: 1px solid var(--rtk-color-border);
   color: var(--rtk-color-text-secondary);
   font-size: 12px;
@@ -61,7 +62,8 @@
 .empty {
   align-items: center;
   background: var(--rtk-color-surface);
-  border: 1px solid var(--rtk-color-border);
+  border: 0;
+  box-shadow: var(--rtk-shadow-elevation-1);
   border-radius: var(--rtk-radius-medium);
   color: var(--rtk-color-text-secondary);
   display: flex;

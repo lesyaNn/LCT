@@ -1,5 +1,5 @@
 .page { display: flex; flex-direction: column; gap: var(--rtk-space-5); min-width: 0; }
-.localBreadcrumbs { align-items: center; color: var(--rtk-color-text-tertiary); display: flex; flex-wrap: wrap; font-size: 12px; gap: var(--rtk-space-2); }
+.localBreadcrumbs { display: none; }
 .localBreadcrumbs a { text-decoration: none; }
 .localBreadcrumbs a:hover { color: var(--rtk-color-brand); text-decoration: underline; }
 .editorHeader { align-items: flex-start; display: flex; gap: var(--rtk-space-5); justify-content: space-between; }
@@ -91,7 +91,7 @@
   .editorHeader { align-items: stretch; flex-direction: column; }
   .headerActions { justify-content: flex-start; }
   .columnHeader { display: none; }
-  .stageRow { align-items: start; column-gap: var(--rtk-space-2); grid-template-areas: "drag order name name" "blank required active days" "blank actions actions actions"; grid-template-columns: 44px 32px minmax(0, 1fr) minmax(0, 1fr); padding: var(--rtk-space-3); row-gap: var(--rtk-space-2); }
+  .stageRow { align-items: start; background: var(--rtk-color-surface-elevated); border-bottom: 1px solid var(--rtk-color-border); column-gap: var(--rtk-space-2); grid-template-areas: "drag order name name" "blank required active days" "blank actions actions actions"; grid-template-columns: 44px 32px minmax(0, 1fr) minmax(0, 1fr); padding: var(--rtk-space-3); row-gap: var(--rtk-space-2); }
   .stageRow > * { padding: 0; }
   .dragCell { grid-area: drag; }
   .dragHandle { height: 44px; width: 44px; }
@@ -102,6 +102,7 @@
   .daysCell { grid-area: days; }
   .actionsCell { grid-area: actions; }
   .stageRow [data-label] { align-items: flex-start; flex-direction: column; gap: var(--rtk-space-1); justify-content: flex-start; }
+  .stageRow .controlCell { min-height: 62px; }
   .stageRow [data-label]::before { color: var(--rtk-color-text-tertiary); content: attr(data-label); font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
   .orderCell::before, .nameCell::before, .actionsCell::before { display: none; }
   .nameDisplay { width: 100%; }
@@ -123,7 +124,8 @@
 @media (max-width: 420px) {
   .headerActions { align-items: stretch; flex-direction: column; }
   .headerActions > button { width: 100%; }
-  .stageRow { grid-template-areas: "order name" "required active" "days days" "actions actions"; grid-template-columns: 30px minmax(0, 1fr); }
+  .stageRow { grid-template-areas: "order name" "required active" "days days" "actions actions"; grid-template-columns: 30px minmax(0, 1fr); padding: var(--rtk-space-3) var(--rtk-space-2); }
+  .stageRow .controlCell { min-height: 68px; }
   .daysCell { align-items: flex-start; }
   .nameDisplay { grid-template-columns: minmax(0, auto) 44px; }
   .nameEditor { grid-template-columns: minmax(0, 1fr) 44px 44px; }
