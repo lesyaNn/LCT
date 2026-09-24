@@ -68,6 +68,11 @@
   padding: 0 var(--rtk-space-5) var(--rtk-space-5);
 }
 
+.card[data-chart-exporting='true'] .cardHeader,
+.card[data-chart-exporting='true'] .cardBody { padding-inline: var(--rtk-space-5); }
+.card[data-chart-exporting='true'] .chartCanvas { height: 270px; }
+.card[data-chart-exporting='true'] .donutCanvas { height: 224px; }
+
 .chartStack,
 .donutLayout {
   display: flex;

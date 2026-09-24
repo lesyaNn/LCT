@@ -85,6 +85,10 @@ test('manager completes the critical ten-step demo flow', async ({ page }, testI
     await expect(page.getByRole('img', { name: 'Распределение вузов по диапазонам Health Score' })).toBeVisible();
     await expect(page.getByRole('img', { name: 'Распределение программ по статусам' })).toBeVisible();
     await expect(page.getByRole('img', { name: 'Динамика фактических и планируемых запусков программ за 12 месяцев' })).toBeVisible();
+    await expect(page.getByTestId('chart-export-health-distribution')).toBeVisible();
+    await expect(page.getByTestId('chart-export-programs')).toBeVisible();
+    await expect(page.getByTestId('chart-export-dynamics')).toBeVisible();
+    await expect(page.getByTestId('chart-export-attention')).toBeVisible();
     await checkpoint(page, testInfo, '01-dashboard');
   });
 
@@ -104,6 +108,7 @@ test('manager completes the critical ten-step demo flow', async ({ page }, testI
     await expect(page.getByRole('img', { name: /Health Score \d+ из 100/ })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Состав оценки', level: 2 })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Причины', level: 2 })).toBeVisible();
+    await expect(page.getByTestId('chart-export-health-score-dynamics')).toBeVisible();
     await checkpoint(page, testInfo, '02-health-score');
   });
 

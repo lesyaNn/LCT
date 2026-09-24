@@ -30,6 +30,7 @@
 .scoreRingValue strong { font-size: 36px; letter-spacing: -.06em; line-height: 1; }
 .scoreRingValue span { color: var(--rtk-color-text-tertiary); font-size: 12px; margin-top: var(--rtk-space-2); }
 .section { composes: surface from '../../shared/ui/rtk/section-surface.module.css'; display: flex; flex-direction: column; gap: var(--rtk-space-4); }
+.sectionHeading { align-items: flex-start; display: flex; gap: var(--rtk-space-3); justify-content: space-between; }
 .sectionHeading h2 { font-size: 20px; letter-spacing: -.02em; margin: 0; }
 .breakdownList,
 .reasonsList { list-style: none; margin: 0; padding: 0; }
@@ -68,6 +69,8 @@
 .reasonDetails dt { color: var(--rtk-color-text-tertiary); font-size: 11px; }
 .reasonDetails dd { font-size: 14px; font-weight: 700; margin: 0; }
 .historyChart { height: 270px; min-width: 0; width: 100%; }
+.section[data-chart-exporting='true'] { padding: var(--rtk-space-5); }
+.section[data-chart-exporting='true'] .historyChart { height: 270px; }
 .tooltip { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border-strong); border-radius: var(--rtk-radius-small); box-shadow: var(--rtk-shadow-elevation-2); display: flex; flex-direction: column; font-size: 12px; gap: var(--rtk-space-1); min-width: 150px; padding: var(--rtk-space-3); }
 .tooltip span { color: var(--rtk-color-text-secondary); }
 .historyLegend { align-items: center; color: var(--rtk-color-text-secondary); display: flex; font-size: 12px; gap: var(--rtk-space-2); margin-top: var(--rtk-space-2); }

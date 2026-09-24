@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type CSSProperties } from 'react';
+import { useRef, useState, type CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   CartesianGrid,
@@ -32,6 +32,7 @@ import { Button } from '@/shared/ui/rtk/button';
 import { EmptyState } from '@/shared/ui/empty-state';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { Skeleton, SkeletonGroup } from '@/shared/ui/skeleton';
+import { ChartExportMenu } from '@/shared/ui/chart-export-menu';
 import styles from './university-health-score.module.css';
 
 const statusDescriptions: Record<HealthStatus, string> = {
@@ -144,9 +145,10 @@ function HistoryTooltip({ active, payload }: TooltipContentProps) {
 }
 
 function History({ history }: { history: UniversityHealthScoreHistoryPoint[] }) {
+  const sectionRef = useRef<HTMLElement>(null);
   return (
-    <section className={styles.section} aria-labelledby="health-score-history-title">
-      <div className={styles.sectionHeading}><h2 id="health-score-history-title">Динамика за 30 дней</h2></div>
+    <section className={styles.section} aria-labelledby="health-score-history-title" ref={sectionRef}>
+      <div className={styles.sectionHeading}><h2 id="health-score-history-title">Динамика за 30 дней</h2><ChartExportMenu filenameSlug="health-score-dynamics" targetRef={sectionRef} testId="chart-export-health-score-dynamics" /></div>
       {history.length ? <div className={styles.historyChart} role="img" aria-label="Динамика Health Score за последние 30 дней"><ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={230}><LineChart data={history} margin={{ top: 12, right: 12, bottom: 4, left: 4 }}><CartesianGrid stroke="var(--rtk-color-border)" strokeDasharray="3 3" vertical={false} /><XAxis dataKey="date" tickFormatter={formatHistoryDate} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} interval="preserveStartEnd" /><YAxis domain={[0, 100]} ticks={[0, 50, 100]} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} width={34} /><Tooltip content={HistoryTooltip} cursor={{ stroke: 'var(--rtk-color-border-strong)' }} /><Line type="monotone" dataKey="score" name="Health Score" stroke="var(--health-score-line)" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} isAnimationActive={false} /></LineChart></ResponsiveContainer></div> : <EmptyState icon={<StatisticsBoard size={20} fill="currentColor" />} title="Нет данных о динамике" description="График появится после накопления истории." headingLevel={3} />}
       {history.length ? <div className={styles.historyLegend}><span className={styles.historyLegendLine} aria-hidden="true" />Health Score</div> : null}
     </section>

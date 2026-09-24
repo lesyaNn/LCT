@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useId, type ReactNode } from 'react';
+import { useId, useRef, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Bar,
@@ -31,6 +31,7 @@ import { EmptyState } from '@/shared/ui/empty-state';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { ChartSkeleton } from '@/shared/ui/skeleton';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
+import { ChartExportMenu } from '@/shared/ui/chart-export-menu';
 import { attentionSeverityIntent } from '@/shared/lib/status-semantics';
 import styles from './dashboard-charts.module.css';
 
@@ -64,20 +65,22 @@ interface ChartCardProps {
   title: string;
   description?: string;
   children: ReactNode;
-  action?: ReactNode;
+  exportSlug: string;
+  exportTestId: string;
 }
 
-function ChartCard({ title, description, children, action }: ChartCardProps) {
+function ChartCard({ title, description, children, exportSlug, exportTestId }: ChartCardProps) {
   const headingId = useId();
+  const cardRef = useRef<HTMLElement>(null);
 
   return (
-    <article className={styles.card} aria-labelledby={headingId}>
+    <article className={styles.card} aria-labelledby={headingId} ref={cardRef}>
       <header className={styles.cardHeader}>
         <div>
           <h3 className={styles.cardTitle} id={headingId}>{title}</h3>
           {description ? <p className={styles.cardDescription}>{description}</p> : null}
         </div>
-        {action}
+        <ChartExportMenu filenameSlug={exportSlug} targetRef={cardRef} testId={exportTestId} />
       </header>
       <div className={styles.cardBody}>{children}</div>
     </article>
@@ -262,16 +265,16 @@ export function DashboardAnalytics() {
 function AnalyticsGrid({ data }: { data: DashboardAnalytics }) {
   return (
     <div className={styles.grid}>
-      <ChartCard title="Распределение Health Score" description="Количество вузов по диапазонам показателя.">
+      <ChartCard title="Распределение Health Score" description="Количество вузов по диапазонам показателя." exportSlug="health-distribution" exportTestId="chart-export-health-distribution">
         {data.healthScoreDistribution.length ? <HealthScoreChart data={data.healthScoreDistribution} /> : <EmptyChart />}
       </ChartCard>
-      <ChartCard title="Программы по статусам" description="Текущее распределение программ в реестре.">
+      <ChartCard title="Программы по статусам" description="Текущее распределение программ в реестре." exportSlug="programs" exportTestId="chart-export-programs">
         {data.programStatuses.length ? <ProgramStatusChart data={data.programStatuses} /> : <EmptyChart />}
       </ChartCard>
-      <ChartCard title="Динамика запусков" description="Фактические и планируемые запуски за последние 12 месяцев.">
+      <ChartCard title="Динамика запусков" description="Фактические и планируемые запуски за последние 12 месяцев." exportSlug="dynamics" exportTestId="chart-export-dynamics">
         {data.launchDynamics.length ? <LaunchDynamicsChart data={data.launchDynamics} /> : <EmptyChart />}
       </ChartCard>
-      <ChartCard title="Приоритетные задачи" description="Пять элементов, требующих первоочередного внимания.">
+      <ChartCard title="Приоритетные задачи" description="Пять элементов, требующих первоочередного внимания." exportSlug="attention" exportTestId="chart-export-attention">
         {data.attentionItems.length ? <AttentionList data={data.attentionItems} /> : <EmptyChart />}
       </ChartCard>
     </div>
