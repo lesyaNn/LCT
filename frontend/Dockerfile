@@ -10,7 +10,7 @@ WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-ARG NEXT_PUBLIC_AUTH_MODE=keycloak
+ARG NEXT_PUBLIC_AUTH_MODE=mock
 ARG NEXT_PUBLIC_KEYCLOAK_URL=http://localhost:8081
 ARG NEXT_PUBLIC_KEYCLOAK_REALM=rtk
 ARG NEXT_PUBLIC_KEYCLOAK_CLIENT_ID=rtk-frontend
@@ -39,6 +39,7 @@ RUN addgroup --system --gid 1001 nodejs \
 
 COPY --from=build --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=build --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=build --chown=nextjs:nodejs /app/public ./public
 
 USER nextjs
 EXPOSE 3000

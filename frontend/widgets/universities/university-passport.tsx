@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useSyncExternalStore } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -28,6 +27,7 @@ import {
 } from '@/shared/lib/universities-repository';
 import { Avatar } from '@/shared/ui/rtk/avatar';
 import { Button } from '@/shared/ui/rtk/button';
+import { Tabs } from '@/shared/ui/rtk/tabs';
 import { EmptyState } from '@/shared/ui/empty-state';
 import { MetricCard } from '@/shared/ui/rtk/metric-card';
 import { StatusBadge as SemanticStatusBadge } from '@/shared/ui/rtk/status-badge';
@@ -105,10 +105,8 @@ function HeaderHealth({ score, onDetails }: { score: number; onDetails: () => vo
 function PassportHeader({ passport, canEdit, canReport, onTabChange }: { passport: UniversityPassport; canEdit: boolean; canReport: boolean; onTabChange: (tab: PassportTabId) => void }) {
   return (
     <header className={styles.header}>
-      <div className={styles.breadcrumbs}><Link href="/universities">Вузы</Link><span aria-hidden="true">/</span><span>{passport.city}</span></div>
       <div className={styles.headerMain}>
         <div className={styles.titleBlock}>
-          <p className={styles.eyebrow}>ПАСПОРТ ВУЗА</p>
           <h1>{passport.name}</h1>
           <p className={styles.city}>{passport.city}</p>
         </div>
@@ -250,11 +248,7 @@ export function UniversityPassport({ id }: { id: string }) {
   return (
     <div className={styles.page}>
       <PassportHeader passport={passport} canEdit={canEdit} canReport={canReport} onTabChange={selectTab} />
-      {!mobileLayout ? <nav className={styles.desktopTabs} aria-label="Разделы паспорта вуза">
-        <div className={styles.tabList} role="tablist">
-          {tabDefinitions.map((tab) => <button className={activeTab === tab.id ? styles.tabActive : styles.tab} id={`passport-tab-${tab.id}`} type="button" role="tab" aria-selected={activeTab === tab.id} aria-controls="passport-panel" key={tab.id} onClick={() => selectTab(tab.id)}>{tab.label}</button>)}
-        </div>
-      </nav> : null}
+      {!mobileLayout ? <Tabs items={tabDefinitions} activeId={activeTab} onChange={(id) => selectTab(id as PassportTabId)} label="Разделы паспорта вуза" prefix="passport-tab" /> : null}
       {!mobileLayout ? <div className={styles.desktopPanel} id="passport-panel" role="tabpanel" aria-labelledby={`passport-tab-${activeTab}`}>{renderContent(activeTab)}</div> : null}
       {mobileLayout ? <div className={styles.mobileAccordion} aria-label="Разделы паспорта вуза">
         {tabDefinitions.map((tab) => {

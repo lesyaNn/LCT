@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { Button } from '@/shared/ui/rtk/button';
 import { ErrorState } from './error-state';
 import { LoadingState } from './loading-state';
@@ -12,11 +13,15 @@ export function AuthLoading() {
 
 export function AuthRequired({ onLogin, message }: { onLogin: () => void; message?: string }) {
   return (
-    <main className={styles.state} aria-live="polite">
-      <p className={styles.eyebrow}>Требуется вход</p>
-      <h1>Войдите в CRM</h1>
-      <p>{message ?? 'Для продолжения используйте корпоративную учётную запись.'}</p>
-      <Button variant="primary" size="m" onClick={onLogin}>Войти через Keycloak</Button>
+    <main className={styles.authPage} aria-live="polite">
+      <div className={styles.authBrand}><Image src="/brand/rostelecom-horizontal.svg" alt="Ростелеком" width={238} height={62} priority unoptimized /></div>
+      <section className={styles.authCard} aria-labelledby="auth-title">
+        <span className={styles.authAccent} aria-hidden="true" />
+        <p className={styles.eyebrow}>CRM ИТ-Школа</p>
+        <h1 id="auth-title">Войдите в CRM</h1>
+        <p>{message ?? 'Используйте корпоративную учётную запись Ростелекома.'}</p>
+        <Button variant="primary" size="l" onClick={onLogin}>Войти через Ростелеком</Button>
+      </section>
     </main>
   );
 }

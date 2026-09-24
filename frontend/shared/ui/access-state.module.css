@@ -8,9 +8,19 @@
   padding: var(--rtk-space-8) var(--rtk-space-4);
   text-align: center;
 }
+.authPage { align-items: center; background: var(--rtk-color-page); display: flex; flex-direction: column; gap: var(--rtk-space-6); justify-content: center; min-height: 100dvh; padding: var(--rtk-space-6) var(--rtk-space-4); }
+.authBrand { align-items: center; display: flex; justify-content: center; max-width: min(300px, 80vw); }
+.authBrand img { display: block; height: auto; max-width: 100%; }
+.authCard { background: var(--rtk-color-surface-elevated); border-radius: var(--rtk-radius-medium); box-shadow: var(--rtk-shadow-elevation-2); display: flex; flex-direction: column; gap: var(--rtk-space-3); max-width: 480px; overflow: hidden; padding: var(--rtk-space-8); position: relative; width: 100%; }
+.authCard h1, .authCard p { margin: 0; }
+.authCard h1 { font-size: clamp(26px, 5vw, 36px); letter-spacing: -.035em; }
+.authCard p:not(.eyebrow) { color: var(--rtk-color-text-secondary); }
+.authCard button { margin-top: var(--rtk-space-3); width: 100%; }
+.authAccent { background: var(--rtk-color-brand-secondary); height: 5px; inset: 0 0 auto; position: absolute; }
 .state h1, .state p { margin: 0; }
 .state h1 { font-size: clamp(24px, 4vw, 32px); letter-spacing: -.03em; }
 .state p:not(.eyebrow) { color: var(--rtk-color-text-secondary); max-width: 480px; }
 .eyebrow { color: var(--rtk-color-brand); font-size: 12px; font-weight: 700; letter-spacing: .08em; margin: 0; text-transform: uppercase; }
 .spinner { animation: spin 800ms linear infinite; border: 3px solid var(--rtk-color-brand-soft); border-radius: 50%; border-top-color: var(--rtk-color-brand); height: 32px; width: 32px; }
 @keyframes spin { to { transform: rotate(360deg); } }
+@media (max-width: 480px) { .authCard { padding: var(--rtk-space-6) var(--rtk-space-4); } }
