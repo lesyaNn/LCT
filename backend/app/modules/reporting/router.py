@@ -1,4 +1,11 @@
-"""Reporting (§15): small exports inline, heavy ones via job queue (§3/§18)."""
+"""Reporting (§15): small exports inline, heavy ones via job queue (§3/§18).
+
+LEGACY QUARANTINE (M7) — DO NOT MOUNT in ``app/api/router.py`` (prefix
+``/reports`` collides with the canonical async ``analytics/reports_router``;
+``app.modules.universities.models`` import below is dangling).
+Reactivation requires the checklist in ``docs/AUDIT.md`` (§0).
+See ``scripts/check_legacy_quarantine.py``.
+"""
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session

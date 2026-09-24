@@ -37,11 +37,15 @@ async def benchmark():
 
         for name in ("overview", "matrix"):
             _, first = await timed("GET", f"/api/v1/analytics/{name}")
-            samples = [(await timed("GET", f"/api/v1/analytics/{name}"))[1] for _ in range(10)]
+            # L14: n=20 + interpolated p95. sorted(samples)[9] at n=10 was the
+            # max by the nearest-rank definition, not a real p95 estimate.
+            samples = [(await timed("GET", f"/api/v1/analytics/{name}"))[1] for _ in range(20)]
+            (p95,) = statistics.quantiles(sorted(samples), n=100, method="inclusive")[94:95]
             results[name] = {
                 "first_ms": round(first, 2),
-                "warm_p95_ms": round(sorted(samples)[9], 2),
+                "warm_p95_ms": round(p95, 2),
                 "warm_median_ms": round(statistics.median(samples), 2),
+                "samples": round(len(samples)),
             }
         submitted = await asyncio.gather(
             *[
@@ -76,7 +80,17 @@ async def benchmark():
             "max_submit_ms": round(max(t for _, t in submitted), 2),
             "max_health_ms": round(max(health_samples), 2),
         }
-    print(json.dumps(results, indent=2))
+    # P4-13-01: persist results as an artifact (previously stdout-only).
+    out_path = os.getenv("P4_BENCHMARK_OUT", "docs/performance/p4-13-01-benchmark.json")
+    payload = {"results": results, "thresholds": {"overview_warm_p95_ms": 100,
+               "overview_first_ms": 500, "matrix_first_ms": 1000, "jobs_max_health_ms": 1000}}
+    print(json.dumps(payload, indent=2))
+    try:
+        with open(out_path, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, indent=2)
+        print(f"artifact written to {out_path}")
+    except OSError as exc:
+        print(f"WARNING: could not persist artifact to {out_path}: {exc}")
     assert results["overview"]["warm_p95_ms"] < 100
     assert results["overview"]["first_ms"] < 500
     assert results["matrix"]["first_ms"] < 1000

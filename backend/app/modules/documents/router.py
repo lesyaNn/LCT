@@ -1,5 +1,14 @@
-from fastapi import APIRouter, Depends, File, UploadFile
+"""LEGACY QUARANTINE (M7) — DO NOT MOUNT in ``app/api/router.py``.
+
+Reactivation requires the checklist in ``docs/AUDIT.md`` (§0): service
+layer, UUID identities, ``PaginatedResponse``, RBAC + data-scope, audit.
+Direct ``db.query``/``db.commit`` in handlers below is the reason this
+router stays unmounted (see ``scripts/check_legacy_quarantine.py``).
+"""
+
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -49,14 +58,35 @@ async def upload(entity_type: str = "university", entity_id: int = 0,
     return meta
 
 
-@router.get("", response_model=list[FileOut])
+class PaginatedFileOut(BaseModel):
+    """Local pagination envelope (M8): legacy router must not depend on the
+    canonical ``PaginatedResponse`` until it passes the reactivation
+    checklist — the shape mirrors it (``items/total/page/page_size``)."""
+
+    items: list[FileOut]
+    total: int
+    page: int
+    page_size: int
+
+
+@router.get("", response_model=PaginatedFileOut)
 def list_files(entity_type: str | None = None, entity_id: int | None = None,
+               page: int = Query(default=1, ge=1),
+               page_size: int = Query(default=50, ge=1, le=100),
                db: Session = Depends(get_db),
                _u: CurrentUser = Depends(get_current_user)):
-    q = db.query(FileMeta).order_by(FileMeta.id.desc()).limit(200)
-    rows = q.all()
+    # M8: фильтры применяются в SQL ДО limit/offset (раньше был
+    # limit(200).all() + Python-фильтр — молча неверные выборки).
+    q = db.query(FileMeta)
     if entity_type:
-        rows = [r for r in rows if r.entity_type == entity_type]
-    if entity_id:
-        rows = [r for r in rows if r.entity_id == entity_id]
-    return rows
+        q = q.filter(FileMeta.entity_type == entity_type)
+    if entity_id is not None:
+        q = q.filter(FileMeta.entity_id == entity_id)
+    total = q.with_entities(func.count()).scalar() or 0
+    rows = (
+        q.order_by(FileMeta.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    return PaginatedFileOut(items=rows, total=total, page=page, page_size=page_size)

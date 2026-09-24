@@ -58,13 +58,35 @@ QUERIES = {
     """,
 }
 
-print(f"EXPLAIN on {url.split('@')[-1]}")
+def _redacted_url(raw: str) -> str:
+    """Redact credentials for logs (L14): never print a full URL with password."""
+    try:
+        from urllib.parse import urlsplit, urlunsplit
+
+        parts = urlsplit(raw)
+        if "@" in raw and parts.hostname:
+            netloc = parts.hostname
+            if parts.port:
+                netloc += f":{parts.port}"
+            if parts.username:
+                netloc = f"{parts.username}:***@{netloc}"
+            return urlunsplit((parts.scheme, netloc, parts.path, "", ""))
+    except Exception:
+        pass
+    return raw.split("@")[-1] if "@" in raw else "(url redacted)"
+
+
+# L14: Bitmap Heap/Index Scan are index usage too (previously only
+# "Index Scan"/"Index Only Scan" were counted, undercounting indexed plans).
+INDEX_TOKENS = ("Index Scan", "Index Only Scan", "Bitmap Heap Scan", "Bitmap Index Scan")
+
+print(f"EXPLAIN on {_redacted_url(url)}")
 index_used_total = 0
 for name, sql in QUERIES.items():
     with engine.connect() as conn:
         rows = conn.execute(text(f"EXPLAIN {sql}")).fetchall()
     plan = "\n".join(r[0] for r in rows)
-    uses_index = "Index Scan" in plan or "Index Only Scan" in plan
+    uses_index = any(tok in plan for tok in INDEX_TOKENS)
     index_used_total += uses_index
     print(f"\n=== {name}: {'INDEX SCAN' if uses_index else 'Seq Scan (small table OK)'}")
     for line in plan.splitlines()[:8]:
@@ -72,3 +94,6 @@ for name, sql in QUERIES.items():
 
 print(f"\nSUMMARY: index used in {index_used_total}/{len(QUERIES)} queries "
       "(Seq Scan on tiny tables is expected PostgreSQL behaviour).")
+# Exit code for gates: 0 when every plan is explainable; informational
+# (Seq Scan on tiny tables is NOT a failure — see module docstring).
+sys.exit(0)
