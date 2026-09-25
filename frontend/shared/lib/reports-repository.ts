@@ -1,9 +1,10 @@
-import { apiFetch } from './api-client';
+import { apiDownload, apiFetch } from './api-client';
 import { ApiRequestError, ERROR_MESSAGES } from './api-errors';
 import { fromDataSource, isMockDataSource } from './data-source';
 import { periodPresetRange, type PeriodPreset } from './date-period';
 import { queryKeys } from './query-keys';
-import { universityFilterOptions, universityProgramDirectionOptions, type UniversityWorkflowStageStatus } from './universities-repository';
+import { getCatalogReferenceData } from './catalogs-repository';
+import { type UniversityWorkflowStageStatus } from './universities-repository';
 import { workflowStageStatusSemantics } from './status-semantics';
 import { mockCreateReportJob, mockGetReportJob, mockListReportJobs } from '@/shared/mocks/api-adapter';
 
@@ -75,19 +76,19 @@ export interface ReportsApiCapabilities {
   progress: boolean;
 }
 
-/** The only current reporting router accepts format, region and columns. */
+/** Capabilities of the real report-job API. */
 const realReportsApiCapabilities: ReportsApiCapabilities = {
   createJob: true,
   jobStatus: true,
-  jobList: false,
+  jobList: true,
   // The current API has no dedicated retry route. The UI retries by creating
   // another job with the original request payload.
   retry: true,
-  download: false,
-  formats: { xlsx: true, pdf: false, json: false },
-  filters: false,
+  download: true,
+  formats: { xlsx: true, pdf: true, json: true },
+  filters: true,
   columns: true,
-  progress: false,
+  progress: true,
 };
 
 export const REPORTS_API_CAPABILITIES: ReportsApiCapabilities = isMockDataSource ? {
@@ -109,34 +110,50 @@ export const reportQueryKeys = {
 };
 
 export const reportFilterOptions: ReportFilterOptions = {
-  universities: universityFilterOptions.universities,
-  directions: universityProgramDirectionOptions,
-  products: universityFilterOptions.products,
-  responsibles: universityFilterOptions.responsibles.map((item) => ({ id: item.id, name: item.name, description: item.role })),
+  universities: [],
+  directions: [],
+  products: [],
+  responsibles: [],
   workflowStatuses: (Object.keys(workflowStageStatusSemantics) as UniversityWorkflowStageStatus[]).map((id) => ({ id, name: workflowStageStatusSemantics[id].label })),
 };
 
-/** Column identifiers are kept separate from UI labels until P4-02-01 publishes its config. */
+export async function getReportFilterOptions(): Promise<ReportFilterOptions> {
+  const refs = await getCatalogReferenceData();
+  return { ...reportFilterOptions, universities: refs.universities, directions: refs.directions, products: refs.products, responsibles: refs.responsibles };
+}
+
+/** Backend column identifiers with UI labels; keys mirror analytics/columns.py. */
 export const reportColumnDefinitions: ReportColumnDefinition[] = [
-  { id: 'university_name', label: 'Наименование ВУЗа' },
-  { id: 'it_direction', label: 'ИТ-направление' },
-  { id: 'it_program', label: 'ИТ-программа' },
-  { id: 'it_product', label: 'ИТ-продукт' },
+  { id: 'university', label: 'Наименование ВУЗа' },
+  { id: 'direction', label: 'ИТ-направление' },
+  { id: 'program', label: 'ИТ-программа' },
+  { id: 'product', label: 'ИТ-продукт' },
   { id: 'workflow_status', label: 'Статус работы' },
   { id: 'responsible', label: 'Ответственный' },
   { id: 'vendor', label: 'Вендор' },
   { id: 'software', label: 'ПО' },
   { id: 'contract_number', label: 'Номер договора' },
-  { id: 'license_signed_at', label: 'Подписание лицензии' },
-  { id: 'license_expires_at', label: 'Срок действия' },
+  { id: 'license_signed', label: 'Подписание лицензии' },
+  { id: 'license_expires', label: 'Срок действия' },
   { id: 'transfer_status', label: 'Статус передачи' },
   { id: 'comment', label: 'Комментарий' },
   { id: 'health_score', label: 'Health Score' },
+  { id: 'city', label: 'Город' },
+  { id: 'current_stage', label: 'Текущий этап' },
+  { id: 'last_interaction', label: 'Последнее взаимодействие' },
+  { id: 'workflow_progress', label: 'Прогресс workflow, %' },
+  { id: 'teacher_readiness', label: 'Готовность преподавателей, %' },
+  { id: 'overdue_tasks', label: 'Просроченные задачи' },
 ];
 
-/** Exact preset compositions are intentionally unavailable until P4-02-01. */
-export const reportColumnPresetNames = ['Минимум', 'Стандарт', 'Полный', 'Для руководителя'] as const;
-export const DEFAULT_REPORT_COLUMNS = ['university_name', 'workflow_status', 'responsible'];
+/** Existing UI presets built from the supported backend columns. */
+export const reportColumnPresetNames = ['Минимум', 'Стандарт', 'Полный'] as const;
+export const DEFAULT_REPORT_COLUMNS = reportColumnDefinitions.slice(0, 14).map((column) => column.id);
+export const reportColumnPresets: Record<(typeof reportColumnPresetNames)[number], string[]> = {
+  Минимум: DEFAULT_REPORT_COLUMNS,
+  Стандарт: reportColumnDefinitions.slice(0, 16).map((column) => column.id),
+  Полный: reportColumnDefinitions.map((column) => column.id),
+};
 export const REPORT_FORMATS: Array<{ id: ReportFormat; label: string }> = [
   { id: 'xlsx', label: 'XLSX' },
   { id: 'pdf', label: 'PDF' },
@@ -206,7 +223,7 @@ function reportErrorCode(item: Record<string, unknown>, result: Record<string, u
 
 function reportErrorMessage(item: Record<string, unknown>, result: Record<string, unknown>, code?: string): string | undefined {
   if (code === 'REPORT_FAILED') return ERROR_MESSAGES.REPORT_FAILED;
-  const raw = item.error ?? result.error ?? item.message ?? result.message;
+  const raw = item.error_message ?? item.error ?? result.error ?? item.message ?? result.message;
   if (isRecord(raw)) return safeJobError(raw.message ?? raw.detail);
   return safeJobError(raw);
 }
@@ -237,7 +254,7 @@ export function adaptReportJob(raw: unknown, fallbackId?: string): ReportJob {
     createdAt,
     error: reportErrorMessage(item, result, errorCode),
     errorCode,
-    downloadUrl: stringValue(item.download_url ?? item.downloadUrl ?? result.download_url ?? result.downloadUrl),
+    downloadUrl: item.status === 'ready' ? `/api/v1/reports/${encodeURIComponent(id)}/download` : undefined,
   };
 }
 
@@ -247,14 +264,16 @@ function unwrap<T>(result: Awaited<ReturnType<typeof apiFetch<T>>>, message: str
 }
 
 async function createRealReportJob(request: ReportRequest): Promise<ReportJob> {
-  // Only format/columns exist in the current reporting router. Filters stay in
-  // the normalized form model and are not silently sent as invented DTO keys.
-  const result = await apiFetch<unknown>('/api/v1/reports/export', { method: 'POST', body: { format: request.format, columns: request.columns } });
-  return { ...adaptReportJob(unwrap(result, 'Не удалось создать задачу отчёта.')), request };
+  const result = await apiFetch<unknown>('/api/v1/reports', { method: 'POST', body: {
+    format: request.format,
+    filters: { date_from: request.date_from || null, date_to: request.date_to || null, university_ids: request.university_ids, direction_ids: request.direction_ids, product_ids: request.product_ids, responsible_ids: request.responsible_ids, workflow_statuses: request.workflow_statuses },
+    columns: request.columns,
+  } });
+  return { ...adaptReportJob(unwrap(result, 'Не удалось создать задачу отчёта.')), format: request.format, request };
 }
 
 async function getRealReportJob(jobId: string): Promise<ReportJob> {
-  const result = await apiFetch<unknown>(`/api/v1/reports/jobs/${encodeURIComponent(jobId)}`);
+  const result = await apiFetch<unknown>(`/api/v1/reports/${encodeURIComponent(jobId)}`);
   return adaptReportJob(unwrap(result, 'Не удалось обновить статус отчёта.'), jobId);
 }
 
@@ -272,7 +291,15 @@ export async function retryReportJob(job: ReportJob): Promise<ReportJob> {
   return createReportJob(job.request);
 }
 
-/** No list endpoint exists in the current reporting API. */
 export async function listReportJobs(): Promise<ReportJob[]> {
-  return fromDataSource({ mock: mockListReportJobs, real: () => [] });
+  return fromDataSource({ mock: mockListReportJobs, real: async () => {
+    const result = await apiFetch<{ items: unknown[]; total: number; page: number; page_size: number }>('/api/v1/reports?page=1&page_size=100');
+    return unwrap(result, 'Не удалось загрузить задачи отчётов.').items.map((item) => adaptReportJob(item));
+  } });
+}
+
+export async function downloadReportJob(jobId: string): Promise<Blob> {
+  const result = await apiDownload(`/api/v1/reports/${encodeURIComponent(jobId)}/download`);
+  if (!result.ok) throw new ApiRequestError(result.status, result.body, 'Не удалось скачать отчёт.', result.error);
+  return result.data;
 }
