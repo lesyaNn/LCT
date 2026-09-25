@@ -35,7 +35,27 @@ COPY scripts ./scripts
 COPY migrations ./migrations
 COPY app ./app
 COPY entrypoint.sh ./entrypoint.sh
-RUN chmod +x ./entrypoint.sh && chown -R appuser:appuser /code
+# H8: quarantine/dead endpoint modules stay in the repo (test stage needs
+# them: test_p0_deferred_registry, check_legacy_quarantine) but must NOT ship
+# in the runtime image — unmounted routers with known issues (storage_key
+# leak in documents, Region/status crash in reporting, fake identity) and
+# the legacy int-PK routers superseded by passport/canonical ones.
+RUN rm -rf \
+    app/modules/documents/router.py \
+    app/modules/programs/router.py \
+    app/modules/reporting/router.py \
+    app/modules/identity/router.py \
+    app/modules/dashboard/router.py \
+    app/modules/notifications/router.py \
+    app/modules/integrations/router.py \
+    app/modules/workflow/router.py \
+    app/modules/workflow/service.py \
+    app/modules/universities/router.py \
+    app/modules/universities/service.py \
+    app/modules/universities/repository.py \
+    app/modules/teachers/router.py \
+    app/modules/health_score/router.py \
+  && chmod +x ./entrypoint.sh && chown -R appuser:appuser /code
 ENV PYTHONPATH=/code
 EXPOSE 8000
 USER appuser

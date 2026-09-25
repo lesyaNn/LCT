@@ -59,7 +59,7 @@ class ImportExecuteRequest(BaseModel):
         }
     )
 
-    file_id: str
+    file_id: str = Field(pattern=r"^[0-9a-f]{32}$")
     mapping: dict[str, str] = Field(examples=[EXAMPLE_MAPPING])
     options: ImportOptions = Field(default_factory=ImportOptions)
 
@@ -88,6 +88,8 @@ class ImportSummary(BaseModel):
     skipped: int = 0
     errors: list[RowError] = Field(default_factory=list)
     dry_run: bool = False
+    truncated: bool = False
+    errors_total: int = 0
 
 
 class ImportJobStatus(BaseModel):

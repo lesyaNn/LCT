@@ -61,18 +61,8 @@ def cached(ttl_key: str, prefix: str):
 
 
 def _delete_pattern(pattern: str) -> None:
-    client = redis_infra.get_client()
-    if client is not None:
-        try:
-            keys = list(client.scan_iter(match=f"{pattern}*"))
-            if keys:
-                client.delete(*keys)
-        except Exception:
-            logger.warning("cache invalidation failed for %s", pattern)
-        return
-    # in-memory fallback: префиксное удаление
-    for key in [k for k in list(redis_infra._memory) if k.startswith(pattern)]:
-        redis_infra._memory.pop(key, None)
+    # H6: удаление — через публичный хелпер инфраструктуры (не бросает).
+    redis_infra.cache_delete_pattern(pattern)
 
 
 async def invalidate_catalogs() -> None:
@@ -81,15 +71,7 @@ async def invalidate_catalogs() -> None:
 
 async def invalidate_health_score(university_id: uuid.UUID | None = None) -> None:
     if university_id is not None:
-        client = redis_infra.get_client()
-        key = f"health_score:{university_id}"
-        if client is not None:
-            try:
-                client.delete(key)
-            except Exception:
-                pass
-        else:
-            redis_infra._memory.pop(key, None)
+        redis_infra.cache_delete(f"health_score:{university_id}")
         _delete_pattern("health_score:batch:")
         return
     _delete_pattern("health_score:")

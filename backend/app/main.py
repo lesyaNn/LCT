@@ -13,7 +13,11 @@ from app.api.router import v1
 from app.config import settings
 from app.core.errors import register_error_handlers
 from app.core.logging import request_log_middleware
-from app.core.middleware import RequestSizeLimitMiddleware, SecurityHeadersMiddleware
+from app.core.middleware import (
+    RateLimitMiddleware,
+    RequestSizeLimitMiddleware,
+    SecurityHeadersMiddleware,
+)
 from app.schemas.errors import ERROR_MESSAGES, ErrorCode
 
 app = FastAPI(
@@ -57,6 +61,12 @@ app.add_middleware(
 )
 app.add_middleware(RequestSizeLimitMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
+# M10 last: runs first (innermost registration executes first) so abusive
+# heavy-endpoint traffic is shed before auth/DB work. Fail-open by design.
+app.add_middleware(
+    RateLimitMiddleware,
+    limit_per_minute=settings.rate_limit_per_minute,
+)
 app.include_router(v1)
 
 

@@ -15,14 +15,11 @@ from typing import Literal
 
 from fastapi import APIRouter, Body, Depends, Query
 from fastapi.responses import JSONResponse
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
 from app.core.permissions import require_permission, require_role
-from app.core.policies import apply_university_scope, ensure_university_visible
+from app.core.policies import ensure_university_visible
 from app.core.security import CurrentUser
-from app.models.catalog import ITDirection, ITProgram, License, University
-from app.models.interactions import UniversityProgram
 from app.modules.analytics.filters import UnifiedFilter, get_unified_filter
 from app.modules.audit.service import get_audit_db
 from app.modules.catalog import service
@@ -156,9 +153,9 @@ def get_university(
     db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(READ),
 ) -> UniversityDetail:
-    detail = service.get_university_detail(db, university_id)
-    ensure_university_visible(university_id, user)
-    return detail
+    # H5: scope is enforced inside the SELECT (404 for missing and foreign
+    # alike) — no unscoped load followed by a second check query.
+    return service.get_university_detail(db, university_id, user=user)
 
 
 @router.patch(
@@ -190,7 +187,7 @@ def patch_university(
     response_model=None,
     status_code=204,
     tags=["Universities"],
-    summary="Hard-delete university (RESTRICT when referenced)",
+    summary="Hard-delete university (409 while referenced, M4 policy)",
 )
 def delete_university(
     university_id: uuid.UUID,
@@ -747,102 +744,4 @@ def catalog_overview(
     user: CurrentUser = Depends(require_permission("catalog.read")),
 ):
     size = limit if limit is not None else page_size
-    offset = (page - 1) * size
-    total_universities = db.execute(apply_university_scope(
-        select(func.count()).select_from(University), University.id, user
-    )).scalar() or 0
-    total_licenses = db.execute(apply_university_scope(
-        select(func.count()).select_from(License), License.university_id, user
-    )).scalar() or 0
-
-    licenses = (
-        db.execute(
-            apply_university_scope(select(License), License.university_id, user)
-            .options(
-                selectinload(License.university).selectinload(
-                    University.university_responsibles
-                ),
-                selectinload(License.university).selectinload(
-                    University.university_programs
-                ).selectinload(UniversityProgram.program).selectinload(
-                    ITProgram.direction
-                ),
-                selectinload(License.product),
-                selectinload(License.contract),
-                selectinload(License.program).selectinload(ITProgram.direction),
-                selectinload(License.direction),
-            )
-            .order_by(License.expires_at)
-            .limit(size)
-            .offset(offset)
-        )
-        .scalars()
-        .all()
-    )
-
-    rows = []
-    for lic in licenses:
-        uni = lic.university
-        managers: list[str] = []
-        contacts: list[str] = []
-        # Направление именно этой строки (одна строка = один договор/лицензия).
-        # Fallback — направления вуза (старые строки без direction_id).
-        if lic.direction is not None:
-            directions = [lic.direction.name]
-        elif lic.program is not None and lic.program.direction is not None:
-            directions = [lic.program.direction.name]
-        else:
-            directions = []
-            if uni is not None:
-                for upl in uni.university_programs:
-                    if upl.program is not None and upl.program.direction is not None:
-                        name = upl.program.direction.name
-                        if name not in directions:
-                            directions.append(name)
-        if uni is not None:
-            for link in uni.university_responsibles:
-                if link.responsible is None:
-                    continue
-                if link.role_in_university == "our_manager":
-                    managers.append(link.responsible.full_name)
-                else:
-                    contacts.append(link.responsible.full_name)
-        product = lic.product
-        rows.append({
-            "university": uni.name if uni else None,
-            "vendor": product.vendor.name if product and product.vendor else None,
-            "product": product.name if product else None,
-            "contract_number": lic.contract.contract_number if lic.contract else lic.license_number,
-            "signed_at": lic.signed_at.isoformat() if lic.signed_at else None,
-            "expires_at": lic.expires_at.isoformat() if lic.expires_at else None,
-            "transfer_status": lic.transfer_status_raw,
-            "manager": "; ".join(managers) or None,
-            "responsibles": contacts,
-            "comment": lic.comment,
-            "direction": "; ".join(directions) or None,
-        })
-
-    directions = (
-        db.execute(select(ITDirection).order_by(ITDirection.code)).scalars().all()
-    )
-    programs = db.execute(select(ITProgram)).scalars().all()
-    prog_by_dir: dict[str, int] = {}
-    for p in programs:
-        key = str(p.direction_id)
-        prog_by_dir[key] = prog_by_dir.get(key, 0) + 1
-
-    return {
-        "total_universities": total_universities,
-        "total_licenses": total_licenses,
-        "page": page,
-        "page_size": size,
-        "rows": rows,
-        "directions": [
-            {
-                "code": d.code,
-                "name": d.name,
-                "programs": prog_by_dir.get(str(d.id), 0),
-            }
-            for d in directions
-        ],
-    }
+    return service.get_catalog_overview(db, user, page=page, size=size)

@@ -22,6 +22,7 @@ from app.core.errors import SecurityError
 from app.schemas.errors import ErrorCode
 from app.core.security import CurrentUser
 from app.db.session import get_db
+from app.modules.audit.service import get_audit_db
 from app.modules.workflow_instances import service
 from app.modules.workflow_instances.schemas import (
     InstanceCreate,
@@ -42,7 +43,7 @@ WRITE = require_permission("workflow.change_status")
 )
 def create_workflow_instance(
     data: InstanceCreate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(WRITE),
 ) -> InstanceDetail:
     service.require_university_scope(user, data.university_id)

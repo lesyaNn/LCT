@@ -35,7 +35,13 @@ def _sink_insert(db: Session, payload: dict, event_id: UUID) -> None:
             index_elements=[AuditEvent.id]
         ))
     else:
-        db.execute(insert(AuditEvent).values(**values))
+        # L6: test-dialect path without ON CONFLICT — check-then-insert keeps
+        # the relay idempotent here too (single-threaded test relay only).
+        exists = db.execute(
+            select(AuditEvent.id).where(AuditEvent.id == event_id)
+        ).scalar_one_or_none()
+        if exists is None:
+            db.execute(insert(AuditEvent).values(**values))
 
 
 def relay_audit_events(db: Session, *, limit: int = 100) -> int:

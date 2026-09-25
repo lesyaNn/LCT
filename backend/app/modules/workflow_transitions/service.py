@@ -30,6 +30,7 @@ Overdue math is never local here: consumers use
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -37,6 +38,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import BadTransition, Conflict, NotFound
+from app.schemas.errors import ErrorCode
 from app.models.workflow_instances import (
     InstanceStage,
     WorkflowComment,
@@ -45,6 +47,7 @@ from app.models.workflow_instances import (
 )
 from app.models.workflow_templates import WorkflowStage
 from app.modules.audit.service import AuditAction, AuditService, context_for
+from app.modules.workflow_instances.service import get_instance_or_404
 from app.modules.workflow_transitions.schemas import (
     WorkflowCommentCreate,
     WorkflowCommentUpdate,
@@ -56,6 +59,8 @@ CLOSED_STAGE_STATUSES = frozenset({"completed", "skipped"})
 
 #: Author edit window for comments (admins bypass it, P2-04-01).
 COMMENT_EDIT_WINDOW_SECONDS = 15 * 60
+
+logger = logging.getLogger(__name__)
 
 
 def utcnow() -> datetime:
@@ -70,13 +75,6 @@ def _ordered_stages(instance_id: uuid.UUID, db: Session) -> list[InstanceStage]:
             .order_by(InstanceStage.order_index.asc())
         ).scalars()
     )
-
-
-def get_instance_or_404(db: Session, instance_id: uuid.UUID) -> WorkflowInstance:
-    instance = db.get(WorkflowInstance, instance_id)
-    if instance is None:
-        raise NotFound("Workflow instance not found")
-    return instance
 
 
 def _current_stage(
@@ -102,7 +100,10 @@ def validate_transition(
     Pure policy (no SQL): reusable by HTTP handlers, jobs and unit tests.
     """
     if instance.status != "active":
-        raise BadTransition("Only active workflow instances can transition")
+        raise BadTransition(
+            "Only active workflow instances can transition",
+            code=ErrorCode.WORKFLOW_INSTANCE_NOT_ACTIVE,
+        )
     if not (comment or "").strip():
         raise BadTransition("Transition comment is required")
 
@@ -113,7 +114,10 @@ def validate_transition(
     if target.order_index <= current.order_index:
         raise BadTransition("Workflow transitions can only move forward")
     if (target.status or "") in CLOSED_STAGE_STATUSES:
-        raise BadTransition("Target workflow stage is already closed")
+        raise BadTransition(
+            "Target workflow stage is already closed",
+            code=ErrorCode.STAGE_ALREADY_COMPLETED,
+        )
 
     between = [
         s
@@ -184,18 +188,28 @@ def transition_instance(
     db.commit()
     # P2-08-01 + P2-09-01: post-commit writers (best-effort — a writer
     # failure must never roll back the committed transition).
+    # H2: failures are LOGGED with exc_info (never bare pass) so a stale
+    # health_score_current/snapshot drift is visible; full outbox retry is
+    # a follow-up (see BACKEND_REVIEW.md H2).
     try:
         from app.modules.health_score.cache import invalidate_health_score
 
         invalidate_health_score(instance.university_id)
     except Exception:
-        pass
+        logger.exception(
+            "health-score cache invalidation failed after transition",
+            extra={"instance_id": str(instance.id)},
+        )
     try:
         from app.modules.health_score.materialization import refresh_health_score
         refresh_health_score(db, instance.university_id, "transition", create_snapshot=True)
         db.commit()
     except Exception:
-        pass
+        db.rollback()
+        logger.exception(
+            "health-score materialization failed after transition",
+            extra={"instance_id": str(instance.id)},
+        )
     return get_instance_or_404(db, instance.id)
 
 

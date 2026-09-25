@@ -9,6 +9,7 @@ explicit opt-in AUTH_DEV_BYPASS (used by unit tests, never in compose).
 import json
 import logging
 import re
+import threading
 import time
 import urllib.request
 from dataclasses import dataclass, field
@@ -35,6 +36,9 @@ IGNORED_TECHNICAL_ROLES = {"offline_access", "uma_authorization", "default-roles
 logger = logging.getLogger("rtk.security")
 
 _jwks_cache: dict[str, Any] = {"keys": [], "fetched_at": 0.0}
+# M7: sync auth dependencies run in a threadpool — guard the shared JWKS
+# cache so two concurrent refreshes cannot interleave a partial write.
+_jwks_lock = threading.Lock()
 
 
 def _safe_role_for_log(value: str) -> str:
@@ -69,26 +73,33 @@ def _fetch_jwks() -> dict:
 
 
 def _get_jwks(force_refresh: bool = False) -> dict:
+    # Fast path without the lock; refresh path serializes on _jwks_lock and
+    # re-checks freshness inside (another thread may have refreshed already).
     now = time.time()
     if (not force_refresh and _jwks_cache["keys"]
             and now - _jwks_cache["fetched_at"] < JWKS_TTL_SECONDS):
         return {"keys": _jwks_cache["keys"]}
-    try:
-        doc = _fetch_jwks()
-        if not isinstance(doc, dict) or not isinstance(doc.get("keys"), list):
-            raise ValueError("Malformed JWKS")
-        keys = doc["keys"]
-        if not keys or not all(isinstance(key, dict) for key in keys):
-            raise ValueError("Malformed JWKS key")
-        if any(key.get("kty") == "RSA" and
-               (not isinstance(key.get("n"), str) or not isinstance(key.get("e"), str))
-               for key in keys):
-            raise ValueError("Malformed RSA key")
-    except (OSError, ValueError, TypeError, KeyError) as exc:
-        raise SecurityError(ErrorCode.EXTERNAL_SOURCE_UNAVAILABLE) from exc
-    _jwks_cache["keys"] = keys
-    _jwks_cache["fetched_at"] = now
-    return {"keys": keys}
+    with _jwks_lock:
+        now = time.time()
+        if (not force_refresh and _jwks_cache["keys"]
+                and now - _jwks_cache["fetched_at"] < JWKS_TTL_SECONDS):
+            return {"keys": _jwks_cache["keys"]}
+        try:
+            doc = _fetch_jwks()
+            if not isinstance(doc, dict) or not isinstance(doc.get("keys"), list):
+                raise ValueError("Malformed JWKS")
+            keys = doc["keys"]
+            if not keys or not all(isinstance(key, dict) for key in keys):
+                raise ValueError("Malformed JWKS key")
+            if any(key.get("kty") == "RSA" and
+                   (not isinstance(key.get("n"), str) or not isinstance(key.get("e"), str))
+                   for key in keys):
+                raise ValueError("Malformed RSA key")
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            raise SecurityError(ErrorCode.EXTERNAL_SOURCE_UNAVAILABLE) from exc
+        _jwks_cache["keys"] = keys
+        _jwks_cache["fetched_at"] = now
+        return {"keys": keys}
 
 
 def _key_for_kid(kid: str) -> dict:

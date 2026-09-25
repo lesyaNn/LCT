@@ -17,6 +17,7 @@ Health Score ARE seeded exactly per spec. The P2-01-04 standard
 (idempotent, runs after ``migrate``).
 """
 
+import logging
 import os
 import sys
 from datetime import date, datetime, timedelta, timezone
@@ -619,9 +620,7 @@ def main() -> None:
     engine = create_engine(url)
     with Session(engine) as session:
         stats = seed_demo(session)
-    print("SEED OK:")
-    for key, value in stats.items():
-        print(f"  {key}: {value}")
+    logging.getLogger("rtk.seed").info("SEED OK: %s", stats)
 
 
 if __name__ == "__main__":
