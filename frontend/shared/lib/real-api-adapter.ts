@@ -3,7 +3,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import { queryKeys } from './query-keys';
 import { ApiRequestError } from './api-errors';
 import { getExpirationStatus } from './formatters';
-import type { ImportExecuteResponse, ImportOptions, ImportPreviewResponse } from './import-repository';
+import type { ImportCatalogType, ImportExecuteResponse, ImportOptions, ImportPreviewResponse } from './import-repository';
 import type { CatalogInput, CatalogItem, CatalogListQuery, CatalogListResult, CatalogReferenceData, CatalogType, ResponsibleCatalogItem } from './catalogs-repository';
 import type {
   AdminUser,
@@ -578,9 +578,10 @@ export async function realGetTeacherPassport(id: string): Promise<TeacherPasspor
 
 // --------------------------------------------------------------------- import
 
-export async function realUploadImportPreview(file: File, signal?: AbortSignal, onProgress?: (value: number) => void): Promise<ImportPreviewResponse> {
+export async function realUploadImportPreview(file: File, catalogType: ImportCatalogType, signal?: AbortSignal, onProgress?: (value: number) => void): Promise<ImportPreviewResponse> {
   const formData = new FormData();
   formData.append('file', file, file.name);
+  formData.append('catalog_type', catalogType);
   const result = await apiUploadFormData<ImportPreviewResponse>('/api/v1/import/preview', formData, { signal, onProgress });
   if (result.ok) return result.data;
   throw new ApiRequestError(result.status, result.body, 'Не удалось загрузить файл и построить предпросмотр.', result.error);
@@ -599,7 +600,6 @@ export async function realGetImportJob(jobId: string): Promise<unknown> {
 
 export async function realListImportJobs(): Promise<unknown[]> {
   const result = await apiFetch<unknown>('/api/v1/import/jobs');
-  if (!result.ok && result.status === 404) return [];
   const data = unwrap(result, 'Не удалось загрузить журнал импортов.');
   if (Array.isArray(data)) return data;
   return data && typeof data === 'object' && 'items' in data && Array.isArray(data.items) ? data.items : [];

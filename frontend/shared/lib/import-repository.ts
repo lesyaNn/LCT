@@ -1,6 +1,7 @@
 import { ApiRequestError } from './api-errors';
+import type { QueryClient } from '@tanstack/react-query';
 import { apiDownload } from './api-client';
-import { fromDataSource } from './data-source';
+import { fromDataSource, isMockDataSource } from './data-source';
 import { queryKeys } from './query-keys';
 import {
   mockExecuteImport,
@@ -43,10 +44,7 @@ export interface ImportTargetField {
   description?: string;
 }
 
-/**
- * These identifiers mirror the backend TARGET_FIELDS contract. Labels stay
- * human-readable in the UI; only the id is sent to POST /import/execute.
- */
+/** Demo-only field definitions. Real previews carry the server-owned contract. */
 export const importTargetFields: ImportTargetField[] = [
   { id: 'university.name', label: 'Название ВУЗа' },
   { id: 'university.city', label: 'Город ВУЗа' },
@@ -103,6 +101,22 @@ export interface ImportPreviewResponse {
   preview: Array<Record<string, string | number | boolean | null>>;
   row_count: number;
   detected_sheet?: string;
+  target_fields?: Array<ImportTargetField & { required?: boolean }>;
+  required_fields?: string[];
+  suggested_mapping?: Record<string, string>;
+  warnings?: string[];
+}
+
+export function previewTargetFields(preview: ImportPreviewResponse, type: ImportCatalogType): ImportTargetField[] {
+  return preview.target_fields ?? (isMockDataSource ? targetFieldsForCatalog(type) : []);
+}
+
+export function previewRequiredFields(preview: ImportPreviewResponse, type: ImportCatalogType): readonly string[] {
+  return preview.required_fields ?? (isMockDataSource ? requiredImportFields[type] : []);
+}
+
+export function previewSuggestedMapping(preview: ImportPreviewResponse, type: ImportCatalogType): Record<string, string> {
+  return preview.suggested_mapping ?? (isMockDataSource ? autoMapImportHeaders(preview.headers, type) : {});
 }
 
 export interface ImportOptions {
@@ -116,6 +130,8 @@ export interface ImportOptions {
 export interface ImportRowError {
   row: number;
   field: string;
+  sourceField?: string;
+  code?: string;
   error: string;
 }
 
@@ -126,12 +142,16 @@ export interface ImportSummary {
   skipped: number;
   errors: ImportRowError[];
   dry_run: boolean;
+  errors_total?: number;
+  truncated?: boolean;
 }
 
 export interface ImportJob {
   id: string;
   type: string;
   status: ImportJobStatus;
+  progress: number | null;
+  dryRun: boolean;
   createdAt: string;
   createdBy?: string;
   filename?: string;
@@ -170,7 +190,7 @@ function rowErrors(value: unknown): ImportRowError[] {
     if (!isRecord(item)) return [];
     const row = typeof item.row === 'number' ? item.row : Number(item.row);
     if (!Number.isFinite(row)) return [];
-    return [{ row, field: stringValue(item.field) ?? 'row', error: stringValue(item.error ?? item.message) ?? 'Ошибка строки' }];
+    return [{ row, field: stringValue(item.field) ?? 'row', sourceField: stringValue(item.source_field), code: stringValue(item.code), error: stringValue(item.error ?? item.message) ?? 'Ошибка строки' }];
   });
 }
 
@@ -185,6 +205,8 @@ export function adaptImportSummary(raw: unknown): ImportSummary | undefined {
     skipped: numberValue(source.skipped),
     errors: rowErrors(source.errors),
     dry_run: Boolean(source.dry_run ?? source.dryRun),
+    errors_total: numberValue(source.errors_total),
+    truncated: Boolean(source.truncated),
   };
 }
 
@@ -211,6 +233,8 @@ export function adaptImportJob(raw: unknown, fallbackId?: string): ImportJob {
     id: stringValue(item.id ?? item.job_id) ?? fallbackId ?? 'unknown',
     type: stringValue(item.type) ?? 'xlsx_import',
     status: statusValue(item.status),
+    progress: typeof item.progress === 'number' ? item.progress : null,
+    dryRun: Boolean(item.dry_run ?? item.dryRun),
     createdAt,
     createdBy: stringValue(item.created_by ?? item.createdBy ?? item.user_name ?? item.userName),
     filename: stringValue(item.filename ?? item.file_name ?? item.fileName),
@@ -224,18 +248,20 @@ export function adaptImportJob(raw: unknown, fallbackId?: string): ImportJob {
 export function validateImportFile(file: File): string | null {
   const extension = `.${file.name.split('.').pop()?.toLowerCase() ?? ''}`;
   if (!supportedExtensions.includes(extension as (typeof supportedExtensions)[number])) return 'Загрузите файл в формате .xlsx или .xls.';
+  const acceptedMime = extension === '.xlsx' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/vnd.ms-excel';
+  if (file.type && file.type !== acceptedMime && file.type !== 'application/octet-stream') return 'Тип файла не соответствует расширению Excel.';
   if (file.size === 0) return 'Файл пустой. Выберите файл с данными.';
   if (file.size > MAX_FILE_BYTES) return 'Файл больше лимита 10 МБ.';
   return null;
 }
 
-export async function uploadImportPreview(file: File, signal?: AbortSignal, onProgress?: (value: number) => void): Promise<ImportPreviewResponse> {
+export async function uploadImportPreview(file: File, catalogType: ImportCatalogType, signal?: AbortSignal, onProgress?: (value: number) => void): Promise<ImportPreviewResponse> {
   const validationError = validateImportFile(file);
   if (validationError) throw new ApiRequestError(400, { detail: validationError }, validationError);
   onProgress?.(0);
   const result = await fromDataSource({
     mock: () => mockUploadImportPreview(file),
-    real: () => realUploadImportPreview(file, signal, onProgress),
+    real: () => realUploadImportPreview(file, catalogType, signal, onProgress),
     signal,
   });
   onProgress?.(100);
@@ -265,8 +291,10 @@ export async function downloadImportReport(jobId: string): Promise<Blob> {
   return result.data;
 }
 
-export function importTargetLabel(id: string): string {
-  return importTargetFields.find((field) => field.id === id)?.label ?? id;
+export function importTargetLabel(id: string, preview?: ImportPreviewResponse): string {
+  return preview?.target_fields?.find((field) => field.id === id)?.label
+    ?? (isMockDataSource ? importTargetFields.find((field) => field.id === id)?.label : undefined)
+    ?? id;
 }
 
 export function normalizeImportHeader(value: string): string {
@@ -332,6 +360,31 @@ export function autoMapImportHeaders(headers: string[], catalogType: ImportCatal
 
 export function isImportJobActive(job: ImportJob): boolean {
   return job.status === 'queued' || job.status === 'processing';
+}
+
+/** Refresh only server-state families affected by a completed real import. */
+export async function invalidateImportedDomains(queryClient: QueryClient, type: ImportCatalogType | undefined): Promise<void> {
+  const affected = [
+    queryKeys.catalogs.references,
+    queryKeys.reports.filterOptions,
+    queryKeys.audit.all,
+  ] as readonly (readonly unknown[])[];
+  const keys: Array<readonly unknown[]> = [...affected];
+  if (type === 'universities' || type === 'licenses') {
+    keys.push(queryKeys.universities.all, queryKeys.universities.passports, queryKeys.dashboard.overview, queryKeys.dashboard.analytics);
+  }
+  if (type === 'products' || type === 'vendor_contacts' || type === 'licenses') {
+    keys.push(queryKeys.catalogs.family('products'), queryKeys.universities.productsAll, queryKeys.universities.passports);
+  }
+  if (type === 'directions' || type === 'licenses') {
+    keys.push(queryKeys.catalogs.family('directions'), queryKeys.universities.programsAll, queryKeys.universities.passports, queryKeys.dashboard.overview, queryKeys.dashboard.analytics);
+  }
+  if (type === 'responsibles' || type === 'licenses') {
+    keys.push(queryKeys.catalogs.family('responsibles'), queryKeys.universities.responsiblesAll, queryKeys.universities.passports);
+  }
+  if (type === 'universities') keys.push(queryKeys.catalogs.family('universities'));
+  if (type === 'licenses') keys.push(queryKeys.universities.licensesAll, queryKeys.universities.documentsAll);
+  await Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
 }
 
 export { MAX_FILE_BYTES };

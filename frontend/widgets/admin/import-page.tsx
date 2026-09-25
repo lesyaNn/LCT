@@ -7,7 +7,6 @@ import { formatDateTimeRu } from '@/shared/lib/formatters';
 import { ApiRequestError, normalizeApiError } from '@/shared/lib/api-errors';
 import {
   adaptImportJob,
-  autoMapImportHeaders,
   downloadImportReport,
   executeImport,
   getImportJob,
@@ -16,8 +15,10 @@ import {
   importTargetLabel,
   isImportJobActive,
   listImportJobs,
-  requiredImportFields,
-  targetFieldsForCatalog,
+  invalidateImportedDomains,
+  previewRequiredFields,
+  previewSuggestedMapping,
+  previewTargetFields,
   uploadImportPreview,
   type ImportCatalogType,
   type ImportJob,
@@ -71,10 +72,11 @@ function importActionError(cause: unknown, fallbackMessage: string): string {
 
 function Summary({ summary }: { summary: ImportSummary }) {
   return <div className={styles.summary} aria-label="Итоги запуска">
+    <div><strong>{summary.total_rows}</strong><span>Всего</span></div>
     <div><strong>{summary.inserted}</strong><span>Добавлено</span></div>
     <div><strong>{summary.updated}</strong><span>Обновлено</span></div>
     <div><strong>{summary.skipped}</strong><span>Пропущено</span></div>
-    <div className={summary.errors.length ? styles.summaryError : ''}><strong>{summary.errors.length}</strong><span>Ошибок</span></div>
+    <div className={summary.errors.length ? styles.summaryError : ''}><strong>{summary.errors_total ?? summary.errors.length}</strong><span>Ошибок</span></div>
   </div>;
 }
 
@@ -114,17 +116,18 @@ function MappingEditor({
   onAutoMap: () => void;
   onReset: () => void;
 }) {
-  const missing = requiredImportFields[catalogType].filter((field) => !Object.values(mapping).includes(field));
+  const missing = previewRequiredFields(preview, catalogType).filter((field) => !Object.values(mapping).includes(field));
   const usedByOther = (target: string, source: string) => Object.entries(mapping).some(([key, value]) => key !== source && value === target);
   return <section className={styles.section} aria-labelledby="mapping-heading">
     <div className={styles.sectionHeader}><div><p className={styles.eyebrow}>Шаг 3</p><h2 id="mapping-heading">Сопоставление колонок</h2><p>Проверьте, какое поле системы соответствует каждой колонке файла. Для каждой колонки доступны первые три значения.</p></div><div className={styles.mappingActions}><Button type="button" size="s" variant="secondary" onClick={onAutoMap}>Автомаппинг</Button><Button type="button" size="s" variant="ghost" onClick={onReset}>Сбросить</Button></div></div>
-    {missing.length ? <FormErrorBanner>Не выбраны обязательные поля: {missing.map(importTargetLabel).join(', ')}. Заполните их, чтобы продолжить.</FormErrorBanner> : <p className={styles.mappingReady} role="status">Обязательные поля сопоставлены. Можно проверить первые строки.</p>}
+    {missing.length ? <FormErrorBanner>Не выбраны обязательные поля: {missing.map((field) => importTargetLabel(field, preview)).join(', ')}. Заполните их, чтобы продолжить.</FormErrorBanner> : <p className={styles.mappingReady} role="status">Обязательные поля сопоставлены. Можно проверить первые строки.</p>}
+    {preview.warnings?.map((warning) => <p className={styles.hint} key={warning}>{warning}</p>)}
     <div className={styles.mappingList}>{preview.headers.map((source, index) => <div className={styles.mappingRow} key={source}>
       <div className={styles.sourceColumn}><strong>{source || `Колонка ${index + 1}`}</strong><div className={styles.examples}>{preview.preview.slice(0, 3).map((row, exampleIndex) => <span key={`${source}-${exampleIndex}`}>{valueText(row[source])}</span>)}</div></div>
       <span className={styles.mappingArrow} aria-hidden="true">→</span>
       <Select aria-label={`Поле системы для ${source}`} data-testid={`mapping-select-${index}`} value={mapping[source] ?? ''} onChange={(event) => onChange(source, event.target.value)}>
         <option value="">Не сопоставлять</option>
-        {targetFieldsForCatalog(catalogType).map((field) => <option key={field.id} value={field.id} disabled={usedByOther(field.id, source)}>{field.label}</option>)}
+        {previewTargetFields(preview, catalogType).map((field) => <option key={field.id} value={field.id} disabled={usedByOther(field.id, source)}>{field.label}</option>)}
       </Select>
     </div>)}</div>
   </section>;
@@ -135,7 +138,7 @@ function MappedPreview({ preview, mapping, summary }: { preview: ImportPreviewRe
   const errors = new Map((summary?.errors ?? []).map((item) => [errorKey(item.row, item.field), item.error]));
   return <section className={styles.section} aria-labelledby="preview-heading">
     <div className={styles.sectionHeader}><div><p className={styles.eyebrow}>Шаг 4</p><h2 id="preview-heading">Preview данных</h2><p>Первые {Math.min(10, preview.preview.length)} строк с применённым сопоставлением из {preview.row_count}.</p></div></div>
-    <TableShell className={styles.previewShell} ariaLabel="Предпросмотр импорта"><div className={styles.previewDesktop}><table data-testid="preview-table"><caption className={styles.visuallyHidden}>Первые строки файла после сопоставления</caption><thead><tr><th scope="col">Строка</th>{mappedColumns.map((header) => <th scope="col" key={header}>{importTargetLabel(mapping[header])}</th>)}</tr></thead><tbody>{preview.preview.slice(0, 10).map((row, index) => <tr key={index}>{<td>{index + 2}</td>}{mappedColumns.map((header) => { const field = mapping[header]; const error = errors.get(errorKey(index + 2, field)); return <td className={error ? styles.cellError : undefined} title={error} key={`${index}-${header}`}>{valueText(row[header])}</td>; })}</tr>)}</tbody></table></div><div className={styles.previewMobile}>{preview.preview.slice(0, 10).map((row, index) => <article key={index}><strong>Строка {index + 2}</strong><dl>{mappedColumns.map((header) => <div key={header}><dt>{importTargetLabel(mapping[header])}</dt><dd>{valueText(row[header])}</dd></div>)}</dl></article>)}</div></TableShell>
+    <TableShell className={styles.previewShell} ariaLabel="Предпросмотр импорта"><div className={styles.previewDesktop}><table data-testid="preview-table"><caption className={styles.visuallyHidden}>Первые строки файла после сопоставления</caption><thead><tr><th scope="col">Строка</th>{mappedColumns.map((header) => <th scope="col" key={header}>{importTargetLabel(mapping[header], preview)}</th>)}</tr></thead><tbody>{preview.preview.slice(0, 10).map((row, index) => <tr key={index}>{<td>{index + 2}</td>}{mappedColumns.map((header) => { const field = mapping[header]; const error = errors.get(errorKey(index + 2, field)); return <td className={error ? styles.cellError : undefined} title={error} key={`${index}-${header}`}>{valueText(row[header])}</td>; })}</tr>)}</tbody></table></div><div className={styles.previewMobile}>{preview.preview.slice(0, 10).map((row, index) => <article key={index}><strong>Строка {index + 2}</strong><dl>{mappedColumns.map((header) => <div key={header}><dt>{importTargetLabel(mapping[header], preview)}</dt><dd>{valueText(row[header])}</dd></div>)}</dl></article>)}</div></TableShell>
   </section>;
 }
 
@@ -174,8 +177,8 @@ function OptionsAndRun({
     <div className={styles.sectionHeader}><div><p className={styles.eyebrow}>Шаг 5</p><h2 id="dry-run-heading">Проверочный запуск</h2><p>Сначала проверяем строки без записи в каталог. После проверки можно запустить итоговый импорт.</p></div></div>
     <div className={styles.options}>
       <div><Switch checked={updateExisting} onChange={setUpdateExisting} label="Обновлять существующие записи" /><span><strong>Обновлять существующие записи</strong><small>Изменять найденные записи выбранного типа по ключу сопоставления</small></span></div>
-      <div><Switch checked={skipHeader} onChange={setSkipHeader} label="Пропустить строку заголовков" /><span><strong>Пропустить строку заголовков</strong><small>Первая строка используется как названия колонок</small></span></div>
-      <div><Switch checked={dryRun} onChange={setDryRun} label="Проверочный запуск" testId="dry-run-toggle" /><span><strong>Проверочный запуск</strong><small>Не сохранять изменения при первой проверке</small></span></div>
+      <div><Switch checked={skipHeader} onChange={setSkipHeader} disabled label="Пропустить строку заголовков" /><span><strong>Пропустить строку заголовков</strong><small>Первая строка всегда используется как названия колонок</small></span></div>
+      <div><Switch checked={dryRun} onChange={setDryRun} disabled label="Проверочный запуск" testId="dry-run-toggle" /><span><strong>Проверочный запуск</strong><small>Проверка всегда выполняется до записи данных</small></span></div>
     </div>
     {dryRunSummary ? <><Summary summary={dryRunSummary} />{hasErrors ? <label className={styles.skipErrors}><input type="checkbox" checked={allowSkipErrors} onChange={(event) => setAllowSkipErrors(event.target.checked)} />Пропустить строки с ошибками при итоговом импорте</label> : <p className={styles.successMessage} role="status">Критических ошибок не найдено. Импорт готов к подтверждению.</p>}</> : null}
     <div className={styles.runActions}><Button type="button" variant="orange" loading={dryRunLoading} disabled={dryRunLoading || importLoading} onClick={onDryRun}>Запустить dry-run</Button><Button type="button" variant="primary" data-testid="import-confirm" loading={importLoading} disabled={!canImport || dryRunLoading} onClick={onImport}>Импортировать</Button></div>
@@ -203,11 +206,12 @@ function JobDetails({ job, onClose }: { job: ImportJob; onClose: () => void }) {
   };
   return <Drawer title="Детали импорта" onClose={onClose}><div className={styles.details}>
     <div className={styles.detailsTitle}><strong>{job.filename ?? 'Файл импорта'}</strong><StatusBadge intent={jobStatusMeta[job.status].intent}>{jobStatusMeta[job.status].label}</StatusBadge></div>
-    <dl className={styles.detailsList}><div><dt>Создан</dt><dd>{formatDateTimeRu(job.createdAt)}</dd></div><div><dt>Кто</dt><dd>{job.createdBy ?? '—'}</dd></div><div><dt>Всего строк</dt><dd>{summary?.total_rows ?? '—'}</dd></div><div><dt>Добавлено</dt><dd>{summary?.inserted ?? '—'}</dd></div><div><dt>Обновлено</dt><dd>{summary?.updated ?? '—'}</dd></div><div><dt>Пропущено</dt><dd>{summary?.skipped ?? '—'}</dd></div></dl>
+    <dl className={styles.detailsList}><div><dt>Создан</dt><dd>{formatDateTimeRu(job.createdAt)}</dd></div><div><dt>Кто</dt><dd>{job.createdBy ?? '—'}</dd></div><div><dt>Режим</dt><dd>{job.dryRun ? 'Dry-run' : 'Импорт'}</dd></div><div><dt>Прогресс</dt><dd>{job.progress === null ? '—' : `${job.progress}%`}</dd></div><div><dt>Всего строк</dt><dd>{summary?.total_rows ?? '—'}</dd></div><div><dt>Добавлено</dt><dd>{summary?.inserted ?? '—'}</dd></div><div><dt>Обновлено</dt><dd>{summary?.updated ?? '—'}</dd></div><div><dt>Пропущено</dt><dd>{summary?.skipped ?? '—'}</dd></div><div><dt>Ошибок</dt><dd>{summary?.errors_total ?? summary?.errors.length ?? '—'}</dd></div></dl>
+    {summary?.truncated ? <p className={styles.muted}>Список ошибок сокращён; полное число показано выше.</p> : null}
     {job.error ? <FormErrorBanner>{job.error}</FormErrorBanner> : null}
     {job.errorReportUrl ? <Button type="button" variant="ghost" size="s" loading={downloading} onClick={() => void download()}>Скачать отчёт об ошибках</Button> : null}
     {downloadError ? <FormErrorBanner>{downloadError}</FormErrorBanner> : null}
-    {summary?.errors.length ? <div className={styles.errors}><h3>Ошибки по строкам</h3><TableShell ariaLabel="Ошибки импорта"><table><thead><tr><th>Строка</th><th>Поле</th><th>Ошибка</th></tr></thead><tbody>{summary.errors.map((item, index) => <tr key={`${item.row}-${item.field}-${index}`}><td>{item.row}</td><td>{importTargetLabel(item.field)}</td><td>{item.error}</td></tr>)}</tbody></table></TableShell></div> : null}
+    {summary?.errors.length ? <div className={styles.errors}><h3>Ошибки по строкам</h3><TableShell ariaLabel="Ошибки импорта"><table><thead><tr><th>Строка</th><th>Колонка файла</th><th>Поле системы</th><th>Ошибка</th></tr></thead><tbody>{summary.errors.map((item, index) => <tr key={`${item.row}-${item.field}-${index}`}><td>{item.row}</td><td>{item.sourceField ?? '—'}</td><td>{importTargetLabel(item.field)}</td><td>{item.error}</td></tr>)}</tbody></table></TableShell></div> : null}
     {!summary && job.status === 'processing' ? <p className={styles.muted}>Результат появится после завершения обработки.</p> : null}
   </div></Drawer>;
 }
@@ -232,6 +236,9 @@ export function ImportPage({ initialCatalogType = '' }: { initialCatalogType?: I
   const [allowSkipErrors, setAllowSkipErrors] = useState(false);
   const [dryRunSummary, setDryRunSummary] = useState<ImportSummary | null>(null);
   const [activeDryRunId, setActiveDryRunId] = useState<string | null>(null);
+  const [submittedImportId, setSubmittedImportId] = useState<string | null>(null);
+  const handledImportId = useRef<string | null>(null);
+  const observedActiveJobs = useRef(new Set<string>());
   const [runKind, setRunKind] = useState<'dry-run' | 'import' | null>(null);
   const [selectedJob, setSelectedJob] = useState<ImportJob | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -272,10 +279,33 @@ export function ImportPage({ initialCatalogType = '' }: { initialCatalogType?: I
       if (completed.status === 'done' && completed.result) {
         setDryRunSummary(completed.result);
         setAllowSkipErrors(false);
-        setToast({ intent: completed.result.errors.length ? 'info' : 'success', title: 'Проверочный запуск завершён', message: completed.result.errors.length ? `Найдено ошибок: ${completed.result.errors.length}.` : 'Данные готовы к импорту.' });
+        setToast({ intent: completed.result.errors.length ? 'info' : 'success', title: 'Проверочный запуск завершён', message: completed.result.errors.length ? `Найдено ошибок: ${completed.result.errors_total ?? completed.result.errors.length}.` : 'Данные готовы к импорту.' });
       } else if (completed.error) setActionError(completed.error);
     });
   }, [activeDryRunId, jobs]);
+
+  useEffect(() => {
+    if (!submittedImportId || handledImportId.current === submittedImportId) return;
+    const completed = jobs.find((job) => job.id === submittedImportId && !isImportJobActive(job));
+    if (!completed) return;
+    handledImportId.current = submittedImportId;
+    if (completed.status === 'done' && !completed.dryRun) {
+      void invalidateImportedDomains(queryClient, completed.catalogType);
+      queueMicrotask(() => setToast({ intent: 'success', title: 'Импорт завершён', message: `Добавлено: ${completed.result?.inserted ?? 0}, обновлено: ${completed.result?.updated ?? 0}, ошибок: ${completed.result?.errors_total ?? completed.result?.errors.length ?? 0}.` }));
+    } else if (completed.error) queueMicrotask(() => setActionError(completed.error ?? 'Импорт не выполнен.'));
+  }, [submittedImportId, jobs, queryClient]);
+
+  useEffect(() => {
+    for (const job of jobs) {
+      if (isImportJobActive(job)) {
+        observedActiveJobs.current.add(job.id);
+      } else if (observedActiveJobs.current.delete(job.id) && job.id !== submittedImportId
+        && job.status === 'done' && !job.dryRun) {
+        // Covers an import that finished after the user reloaded the wizard.
+        void invalidateImportedDomains(queryClient, job.catalogType);
+      }
+    }
+  }, [jobs, queryClient, submittedImportId]);
 
   useEffect(() => {
     if (!catalogType || typeof window === 'undefined') return;
@@ -284,20 +314,20 @@ export function ImportPage({ initialCatalogType = '' }: { initialCatalogType?: I
       if (!raw) return;
       const parsed = JSON.parse(raw) as unknown;
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
-      const valid = Object.fromEntries(Object.entries(parsed as Record<string, unknown>).filter(([source, target]) => Boolean(preview?.headers.includes(source)) && typeof target === 'string' && targetFieldsForCatalog(catalogType).some((field) => field.id === target))) as Record<string, string>;
+      const valid = Object.fromEntries(Object.entries(parsed as Record<string, unknown>).filter(([source, target]) => Boolean(preview?.headers.includes(source)) && typeof target === 'string' && Boolean(preview && previewTargetFields(preview, catalogType).some((field) => field.id === target)))) as Record<string, string>;
       if (Object.keys(valid).length) queueMicrotask(() => setMapping(valid));
     } catch { /* localStorage may be disabled; mapping remains editable */ }
-  }, [catalogType, preview?.headers]);
+  }, [catalogType, preview]);
 
   useEffect(() => {
     if (!catalogType || !Object.keys(mapping).length || typeof window === 'undefined') return;
     try { window.localStorage.setItem(`${mappingStoragePrefix}${catalogType}`, JSON.stringify(mapping)); } catch { /* ignore storage quota/private mode */ }
   }, [catalogType, mapping]);
 
-  const uploadMutation = useMutation({ mutationFn: (file: File) => uploadImportPreview(file), onSuccess: (data, file) => { setPreview(data); setFileName(file.name); setFileError(null); setMapping({}); setDryRunSummary(null); setActionError(null); setToast({ intent: 'success', title: 'Файл загружен', message: `Найдено строк: ${data.row_count}.` }); }, onError: (cause) => setFileError(importActionError(cause, 'Не удалось загрузить файл.')) });
-  const runMutation = useMutation({ mutationFn: ({ fileId, dryRun: nextDryRun }: { fileId: string; dryRun: boolean }) => executeImport(fileId, mapping, { skip_header: skipHeader, update_existing: updateExisting, dry_run: nextDryRun, catalog_type: catalogType || 'licenses', filename: fileName }), onSuccess: (data, variables) => { const job = adaptImportJob({ job_id: data.job_id, status: 'queued', filename: fileName, created_by: user?.name, catalog_type: catalogType }); addJob(job); if (variables.dryRun) setActiveDryRunId(data.job_id); else setToast({ intent: 'success', title: 'Импорт поставлен в журнал', message: 'Статус задачи обновляется автоматически.' }); setRunKind(null); setActionError(null); }, onError: (cause) => { setRunKind(null); setActionError(normalizeApiError(cause, { fallbackMessage: 'Не удалось запустить импорт.' }).message); } });
+  const uploadMutation = useMutation({ mutationFn: (file: File) => uploadImportPreview(file, catalogType as ImportCatalogType), onSuccess: (data, file) => { setPreview(data); setFileName(file.name); setFileError(null); setMapping(previewSuggestedMapping(data, catalogType as ImportCatalogType)); setDryRunSummary(null); setActionError(null); setToast({ intent: 'success', title: 'Файл загружен', message: `Найдено строк: ${data.row_count}.` }); }, onError: (cause) => setFileError(importActionError(cause, 'Не удалось загрузить файл.')) });
+  const runMutation = useMutation({ mutationFn: ({ fileId, dryRun: nextDryRun }: { fileId: string; dryRun: boolean }) => executeImport(fileId, mapping, { skip_header: skipHeader, update_existing: updateExisting, dry_run: nextDryRun, catalog_type: catalogType || 'licenses', filename: fileName }), onSuccess: (data, variables) => { const job = adaptImportJob({ job_id: data.job_id, status: 'queued', dry_run: variables.dryRun, filename: fileName, created_by: user?.name, catalog_type: catalogType }); addJob(job); if (variables.dryRun) setActiveDryRunId(data.job_id); else { handledImportId.current = null; setSubmittedImportId(data.job_id); setToast({ intent: 'info', title: 'Импорт поставлен в очередь', message: 'Статус задачи обновляется автоматически.' }); } setRunKind(null); setActionError(null); }, onError: (cause) => { setRunKind(null); setActionError(normalizeApiError(cause, { fallbackMessage: 'Не удалось запустить импорт.' }).message); } });
 
-  const mappingReady = Boolean(catalogType) && requiredImportFields[catalogType || 'licenses'].every((field) => Object.values(mapping).includes(field));
+  const mappingReady = Boolean(catalogType && preview && previewTargetFields(preview, catalogType).length) && previewRequiredFields(preview!, catalogType || 'licenses').every((field) => Object.values(mapping).includes(field));
   const activeStep = currentStep(catalogType, preview, mappingReady, dryRunSummary);
   const acceptFile = (file: File) => { setFileError(null); uploadMutation.mutate(file); };
   const onMappingChange = (source: string, target: string) => { setMapping((current) => { const next = { ...current }; if (target) next[source] = target; else delete next[source]; return next; }); setDryRunSummary(null); };
@@ -309,7 +339,7 @@ export function ImportPage({ initialCatalogType = '' }: { initialCatalogType?: I
     <StepRail active={activeStep} />
     <section className={styles.section} aria-labelledby="import-type-heading"><div className={styles.sectionHeader}><div><p className={styles.eyebrow}>Шаг 1</p><h2 id="import-type-heading">Тип справочника</h2><p>Выберите каталог, который нужно обновить.</p></div></div><Select aria-label="Тип справочника" value={catalogType} onChange={(event) => { setCatalogType(event.target.value as ImportCatalogType | ''); setPreview(null); setMapping({}); setDryRunSummary(null); setFileName(''); }}><option value="">Выберите тип справочника</option>{importCatalogOptions.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</Select>{catalogType ? <p className={styles.hint}>{importCatalogOptions.find((item) => item.id === catalogType)?.description}</p> : null}</section>
     {catalogType ? <section className={styles.section} aria-labelledby="import-file-heading"><div className={styles.sectionHeader}><div><p className={styles.eyebrow}>Шаг 2</p><h2 id="import-file-heading">Файл</h2><p>Загрузите Excel-файл. Сервер проверит структуру и вернёт первые строки.</p></div></div><FileDropzone onFile={acceptFile} loading={uploadMutation.isPending} error={fileError} />{fileName ? <p className={styles.fileSelected} role="status">Выбран файл: <strong>{fileName}</strong></p> : null}</section> : null}
-    {preview && catalogType ? <MappingEditor preview={preview} catalogType={catalogType} mapping={mapping} onChange={onMappingChange} onAutoMap={() => { setMapping(autoMapImportHeaders(preview.headers, catalogType)); setDryRunSummary(null); }} onReset={resetMapping} /> : null}
+    {preview && catalogType ? <MappingEditor preview={preview} catalogType={catalogType} mapping={mapping} onChange={onMappingChange} onAutoMap={() => { setMapping(previewSuggestedMapping(preview, catalogType)); setDryRunSummary(null); }} onReset={resetMapping} /> : null}
     {preview && mappingReady ? <MappedPreview preview={preview} mapping={mapping} summary={dryRunSummary} /> : null}
     {preview && mappingReady ? <OptionsAndRun updateExisting={updateExisting} setUpdateExisting={(value) => { setUpdateExisting(value); setDryRunSummary(null); }} skipHeader={skipHeader} setSkipHeader={(value) => { setSkipHeader(value); setDryRunSummary(null); }} dryRun={dryRun} setDryRun={setDryRun} dryRunSummary={dryRunSummary} allowSkipErrors={allowSkipErrors} setAllowSkipErrors={setAllowSkipErrors} onDryRun={runDryRun} onImport={runImport} dryRunLoading={runMutation.isPending && runKind === 'dry-run'} importLoading={runMutation.isPending && runKind === 'import'} /> : null}
     {actionError ? <FormErrorBanner>{actionError}</FormErrorBanner> : null}
