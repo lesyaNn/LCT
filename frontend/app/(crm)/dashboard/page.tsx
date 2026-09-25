@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import Education from '@atomaro/icons/24/culture/Education';
 import Book from '@atomaro/icons/24/culture/Book';
 import Group from '@atomaro/icons/24/business/Group';
@@ -9,7 +10,11 @@ import Attention from '@atomaro/icons/24/action/Attention';
 import Time from '@atomaro/icons/24/alert/TimeStroke';
 import DocumentText from '@atomaro/icons/24/document/DocumentText';
 import Checklist from '@atomaro/icons/24/action/Checklist';
-import { dashboardQueryKey, getDashboardOverview, type DashboardOverview } from '@/shared/lib/dashboard-repository';
+import { dashboardDataQueryKey, EMPTY_DASHBOARD_FILTERS, getDashboardData, type DashboardFilters, type DashboardOverview } from '@/shared/lib/dashboard-repository';
+import { catalogQueryKeys, getCatalogReferenceData } from '@/shared/lib/catalogs-repository';
+import { DateRangeField } from '@/shared/ui/rtk/date-range-field';
+import { FilterToolbar } from '@/shared/ui/rtk/filter-surface';
+import { MultiSelect } from '@/shared/ui/rtk/multiselect';
 import { PageIntro } from '@/shared/ui/page-intro';
 import { PageSkeleton } from '@/shared/ui/page-skeleton';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
@@ -72,23 +77,34 @@ const kpiDefinitions: KpiDefinition[] = [
 ];
 
 export default function DashboardPage() {
+  const [filters, setFilters] = useState<DashboardFilters>(EMPTY_DASHBOARD_FILTERS);
+  const references = useQuery({ queryKey: catalogQueryKeys.references, queryFn: () => getCatalogReferenceData(), staleTime: 5 * 60_000 });
   const overviewQuery = useQuery({
-    queryKey: dashboardQueryKey,
-    queryFn: getDashboardOverview,
-    staleTime: 30_000,
+    queryKey: dashboardDataQueryKey(filters),
+    queryFn: () => getDashboardData(filters),
+    staleTime: 60_000,
   });
 
+  const filterBar = <FilterToolbar label="Фильтры аналитики" controls={() => <>
+        <DateRangeField presets from={filters.dateFrom} to={filters.dateTo} onFromChange={(dateFrom) => setFilters((current) => ({ ...current, dateFrom }))} onToChange={(dateTo) => setFilters((current) => ({ ...current, dateTo }))} onRangeChange={(dateFrom, dateTo) => setFilters((current) => ({ ...current, dateFrom, dateTo }))} />
+        <MultiSelect label="ВУЗ" values={filters.universityIds} options={references.data?.universities ?? []} disabled={references.isPending || references.isError} onChange={(universityIds) => setFilters((current) => ({ ...current, universityIds }))} />
+        <MultiSelect label="Направление" values={filters.directionIds} options={references.data?.directions ?? []} disabled={references.isPending || references.isError} onChange={(directionIds) => setFilters((current) => ({ ...current, directionIds }))} />
+        <MultiSelect label="Продукт" values={filters.productIds} options={references.data?.products ?? []} disabled={references.isPending || references.isError} onChange={(productIds) => setFilters((current) => ({ ...current, productIds }))} />
+        <MultiSelect label="Ответственный" values={filters.responsibleIds} options={references.data?.responsibles ?? []} disabled={references.isPending || references.isError} onChange={(responsibleIds) => setFilters((current) => ({ ...current, responsibleIds }))} />
+      </>} onReset={() => setFilters(EMPTY_DASHBOARD_FILTERS)} resetDisabled={!filters.dateFrom && !filters.dateTo && !filters.universityIds.length && !filters.directionIds.length && !filters.productIds.length && !filters.responsibleIds.length} mobileCount={[filters.dateFrom, filters.dateTo, ...filters.universityIds, ...filters.directionIds, ...filters.productIds, ...filters.responsibleIds].filter(Boolean).length} />;
+
   if (overviewQuery.isPending) {
-    return <PageSkeleton cardCount={9} variant="dashboard" />;
+    return <div className={styles.page}>{filterBar}<PageSkeleton cardCount={9} variant="dashboard" /></div>;
   }
 
   if (overviewQuery.isError || !overviewQuery.data) {
-    return <RouteErrorState onRetry={() => void overviewQuery.refetch()} />;
+    return <div className={styles.page}>{filterBar}<RouteErrorState onRetry={() => void overviewQuery.refetch()} /></div>;
   }
 
   return (
     <div className={styles.page}>
       <PageIntro title="Обзор" description="Ключевые показатели состояния образовательной сети и операционных задач команды." />
+      {filterBar}
       <section className={styles.section} aria-labelledby="dashboard-kpi-title" data-testid="dashboard-kpi">
         <h2 className={styles.sectionTitle} id="dashboard-kpi-title">Ключевые показатели</h2>
         <div className={styles.grid}>
@@ -101,15 +117,15 @@ export default function DashboardPage() {
                 key={definition.title}
                 title={definition.title}
                 tone={definition.tone}
-                value={definition.value(overviewQuery.data)}
+                value={definition.value(overviewQuery.data.overview)}
               />;
             return definition.tooltip
-              ? <div className={styles.kpiTooltip} key={definition.title}><Tooltip content={<span style={{ whiteSpace: 'pre-line' }}>{definition.tooltip(overviewQuery.data)}</span>}>{card}</Tooltip></div>
+              ? <div className={styles.kpiTooltip} key={definition.title}><Tooltip content={<span style={{ whiteSpace: 'pre-line' }}>{definition.tooltip(overviewQuery.data.overview)}</span>}>{card}</Tooltip></div>
               : card;
           })}
         </div>
       </section>
-      <DashboardAnalytics />
+      <DashboardAnalytics data={overviewQuery.data.analytics} />
     </div>
   );
 }

@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useId, useRef, type ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import {
   Bar,
   BarChart,
@@ -19,8 +18,6 @@ import {
   type TooltipContentProps,
 } from 'recharts';
 import {
-  dashboardAnalyticsQueryKey,
-  getDashboardAnalytics,
   type AttentionItem,
   type DashboardAnalytics,
   type HealthScoreDistributionItem,
@@ -28,8 +25,6 @@ import {
   type ProgramStatusItem,
 } from '@/shared/lib/dashboard-repository';
 import { EmptyState } from '@/shared/ui/empty-state';
-import { RouteErrorState } from '@/shared/ui/route-error-state';
-import { ChartSkeleton } from '@/shared/ui/skeleton';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { ChartExportMenu } from '@/shared/ui/chart-export-menu';
 import { attentionSeverityIntent } from '@/shared/lib/status-semantics';
@@ -236,28 +231,14 @@ function AttentionList({ data }: { data: DashboardAnalytics['attentionItems'] })
   );
 }
 
-export function DashboardAnalytics() {
-  const analyticsQuery = useQuery({
-    queryKey: dashboardAnalyticsQueryKey,
-    queryFn: getDashboardAnalytics,
-    staleTime: 30_000,
-  });
-
+export function DashboardAnalytics({ data }: { data: DashboardAnalytics }) {
   return (
     <section className={styles.section} aria-labelledby="dashboard-analytics-title">
       <div>
         <h2 className={styles.sectionTitle} id="dashboard-analytics-title">Аналитика</h2>
         <p className={styles.sectionDescription}>Сводка по состоянию вузов, программ и задач, требующих внимания.</p>
       </div>
-      {analyticsQuery.isPending ? (
-        <div className={styles.grid}>
-          {Array.from({ length: 4 }, (_, index) => <ChartSkeleton label={`Загрузка графика ${index + 1}`} key={index} />)}
-        </div>
-      ) : analyticsQuery.isError || !analyticsQuery.data ? (
-        <RouteErrorState compact onRetry={() => void analyticsQuery.refetch()} />
-      ) : (
-        <AnalyticsGrid data={analyticsQuery.data} />
-      )}
+      <AnalyticsGrid data={data} />
     </section>
   );
 }

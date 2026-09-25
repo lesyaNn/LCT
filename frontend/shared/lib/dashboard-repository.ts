@@ -2,7 +2,6 @@ import { apiFetch } from './api-client';
 import { ApiRequestError } from './api-errors';
 import { fromDataSource } from './data-source';
 import { queryKeys } from './query-keys';
-import { getExternalDashboardMetrics } from './external-integrations-repository';
 
 export interface DashboardOverview {
   universitiesTotal: number | null;
@@ -68,14 +67,21 @@ export interface DashboardAnalytics {
   attentionItems: AttentionItem[];
 }
 
-export const dashboardQueryKey = queryKeys.dashboard.overview;
-export const dashboardAnalyticsQueryKey = queryKeys.dashboard.analytics;
+export interface DashboardFilters {
+  dateFrom: string;
+  dateTo: string;
+  universityIds: string[];
+  directionIds: string[];
+  productIds: string[];
+  responsibleIds: string[];
+}
 
-/**
- * Temporary fixture for the first frontend slice. The function is the single
- * replacement point for the future analytics API adapter (`GET /analytics/overview`
- * with the university count sourced from `GET /universities?page_size=1`).
- */
+export const EMPTY_DASHBOARD_FILTERS: DashboardFilters = { dateFrom: '', dateTo: '', universityIds: [], directionIds: [], productIds: [], responsibleIds: [] };
+export const dashboardQueryKey = queryKeys.dashboard.overview;
+export const dashboardAnalyticsQueryKey = dashboardQueryKey;
+export const dashboardDataQueryKey = (filters: DashboardFilters) => queryKeys.dashboard.data(filters);
+
+/** Fixture used only when the application is configured for mock data. */
 const dashboardOverviewMock: DashboardOverview = {
   universitiesTotal: 42,
   averageHealthScore: 78.4,
@@ -90,44 +96,39 @@ const dashboardOverviewMock: DashboardOverview = {
   lmsSyncedAt: '2026-09-24T08:45:00.000Z',
 };
 
-type CatalogOverviewApi = {
-  total_universities?: number;
-  rows?: Array<{ expires_at?: string | null }>;
-  directions?: Array<{ programs?: number }>;
+type AnalyticsOverviewDto = {
+  kpi: { universities: number; average_health_score: number; red_universities: number; overdue_stages: number; expiring_licenses: number; active_programs: number; teacher_readiness_issues: number };
+  health_distribution: Array<{ range: string; count: number }>;
+  program_statuses: Array<{ status: string; count: number }>;
+  launch_dynamics?: Array<{ month: string; actual: number; planned: number }>;
+  overdue_items: Array<{ id?: string; university_id?: string | null; university: string; stage?: string | null; task?: string | null; days_overdue: number; type: 'stage' | 'task' }>;
 };
 
-async function getCatalogOverview(): Promise<CatalogOverviewApi> {
-  const result = await apiFetch<CatalogOverviewApi>('/api/v1/catalog/overview?page=1&page_size=100');
-  if (!result.ok) throw new ApiRequestError(result.status, result.body, 'Не удалось загрузить обзор Dashboard.', result.error);
-  return result.data;
+function analyticsParams(filters: DashboardFilters): string {
+  const params = new URLSearchParams();
+  if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+  if (filters.dateTo) params.set('date_to', filters.dateTo);
+  for (const [key, values] of [
+    ['university_ids', filters.universityIds], ['direction_ids', filters.directionIds],
+    ['product_ids', filters.productIds], ['responsible_ids', filters.responsibleIds],
+  ] as const) for (const value of values) params.append(key, value);
+  return params.toString();
 }
 
-async function getRealDashboardOverview(): Promise<DashboardOverview> {
-  const [overview, integration] = await Promise.all([getCatalogOverview(), getExternalDashboardMetrics()]);
-  const expiryThreshold = new Date();
-  expiryThreshold.setDate(expiryThreshold.getDate() + 30);
-  const expiringLicenses = (overview.rows ?? []).filter((row) => {
-    if (!row.expires_at) return false;
-    const expiresAt = new Date(row.expires_at);
-    return Number.isFinite(expiresAt.getTime()) && expiresAt >= new Date() && expiresAt <= expiryThreshold;
-  }).length;
+function mapDashboardOverview(dto: AnalyticsOverviewDto): DashboardOverview {
   return {
-    universitiesTotal: overview.total_universities ?? 0,
-    averageHealthScore: null,
-    redUniversities: null,
-    overdueStages: null,
-    expiringLicenses,
-    activePrograms: (overview.directions ?? []).reduce((sum, direction) => sum + (direction.programs ?? 0), 0),
-    teachersNeedUpgrade: null,
-    websiteApplications7d: integration.websiteApplications7d,
-    lmsStudents: integration.lmsStudents,
-    websiteSyncedAt: integration.websiteSyncedAt,
-    lmsSyncedAt: integration.lmsSyncedAt,
+    universitiesTotal: dto.kpi.universities,
+    averageHealthScore: dto.kpi.average_health_score,
+    redUniversities: dto.kpi.red_universities,
+    overdueStages: dto.kpi.overdue_stages,
+    expiringLicenses: dto.kpi.expiring_licenses,
+    activePrograms: dto.kpi.active_programs,
+    teachersNeedUpgrade: dto.kpi.teacher_readiness_issues,
+    websiteApplications7d: null,
+    lmsStudents: null,
+    websiteSyncedAt: null,
+    lmsSyncedAt: null,
   };
-}
-
-export async function getDashboardOverview(): Promise<DashboardOverview> {
-  return fromDataSource({ mock: () => dashboardOverviewMock, real: getRealDashboardOverview });
 }
 
 const monthFormatter = new Intl.DateTimeFormat('ru-RU', { month: 'short' });
@@ -174,17 +175,27 @@ const dashboardAnalyticsMock: DashboardAnalytics = {
   ],
 };
 
-async function getRealDashboardAnalytics(): Promise<DashboardAnalytics> {
-  const overview = await getCatalogOverview();
-  const activePrograms = (overview.directions ?? []).reduce((sum, direction) => sum + (direction.programs ?? 0), 0);
+function mapDashboardAnalytics(overview: AnalyticsOverviewDto): DashboardAnalytics {
+  const tones: Record<ProgramStatus, ProgramStatusItem['tone']> = { planned: 'neutral', active: 'brand', launched: 'success', archived: 'dark' };
+  const monthFormatter = new Intl.DateTimeFormat('ru-RU', { month: 'short' });
   return {
-    healthScoreDistribution: [],
-    programStatuses: activePrograms ? [{ status: 'active', label: programStatusLabels.active, count: activePrograms, tone: 'brand' }] : [],
-    launchDynamics: [],
-    attentionItems: [],
+    healthScoreDistribution: overview.health_distribution.map((item) => ({ range: item.range.replace('-', '–') as HealthScoreRange, count: item.count, tone: item.range === '0-20' || item.range === '21-40' ? 'danger' : item.range === '41-60' ? 'warning' : item.range === '61-80' ? 'brand' : 'success' })),
+    programStatuses: overview.program_statuses.filter((item): item is { status: ProgramStatus; count: number } => item.status in tones).map((item) => ({ status: item.status, label: programStatusLabels[item.status], count: item.count, tone: tones[item.status] })),
+    launchDynamics: (overview.launch_dynamics ?? []).map((item) => { const date = new Date(`${item.month}-01T12:00:00`); return { monthKey: item.month, monthLabel: monthFormatter.format(date).replace('.', ''), actual: item.actual, planned: item.planned }; }),
+    attentionItems: overview.overdue_items.filter((item) => Boolean(item.university_id)).slice(0, 5).map((item, index) => ({ id: item.id ?? `overdue-${index}`, universityId: item.university_id!, universityName: item.university, problemCode: item.type === 'stage' ? 'WF-OVERDUE' : 'TASK-OVERDUE', problemLabel: item.stage ?? item.task ?? 'Просрочено', severity: item.days_overdue > 14 ? 'red' : item.days_overdue > 7 ? 'orange' : 'yellow', overdueDays: item.days_overdue })),
   };
 }
 
-export async function getDashboardAnalytics(): Promise<DashboardAnalytics> {
-  return fromDataSource({ mock: () => dashboardAnalyticsMock, real: getRealDashboardAnalytics });
+export interface DashboardData { overview: DashboardOverview; analytics: DashboardAnalytics }
+
+export async function getDashboardData(filters: DashboardFilters = EMPTY_DASHBOARD_FILTERS): Promise<DashboardData> {
+  return fromDataSource({
+    mock: () => ({ overview: dashboardOverviewMock, analytics: dashboardAnalyticsMock }),
+    real: async () => {
+      const query = analyticsParams(filters);
+      const result = await apiFetch<AnalyticsOverviewDto>(`/api/v1/analytics/overview${query ? `?${query}` : ''}`);
+      if (!result.ok) throw new ApiRequestError(result.status, result.body, 'Не удалось загрузить аналитику Dashboard.', result.error);
+      return { overview: mapDashboardOverview(result.data), analytics: mapDashboardAnalytics(result.data) };
+    },
+  });
 }

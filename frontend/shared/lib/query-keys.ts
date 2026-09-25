@@ -7,6 +7,7 @@ export const queryKeys = {
   dashboard: {
     overview: ['dashboard-overview'] as const,
     analytics: ['dashboard-analytics'] as const,
+    data: <T>(filters: T) => ['dashboard-overview', filters] as const,
   },
   universities: {
     all: ['universities'] as const,
@@ -54,6 +55,7 @@ export const queryKeys = {
   audit: {
     all: ['audit'] as const,
     list: <T>(query: T) => ['audit', query] as const,
+    filterOptions: ['audit', 'filter-options'] as const,
   },
   workflowTemplates: {
     all: ['workflow-templates'] as const,

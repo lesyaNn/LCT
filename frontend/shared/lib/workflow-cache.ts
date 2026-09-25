@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { queryKeys } from './query-keys';
-import { dashboardAnalyticsQueryKey, dashboardQueryKey } from './dashboard-repository';
+import { dashboardQueryKey } from './dashboard-repository';
 import {
   universityHealthScoreQueryKey,
   universityHistoryFamilyQueryKey,
@@ -43,7 +43,7 @@ export function invalidateWorkflowRelatedQueries(queryClient: QueryClient, insta
     queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowOverview }),
     queryClient.invalidateQueries({ queryKey: universitiesQueryKey }),
     queryClient.invalidateQueries({ queryKey: dashboardQueryKey }),
-    queryClient.invalidateQueries({ queryKey: dashboardAnalyticsQueryKey }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.audit.all }),
   ];
 
   if (universityId) {
