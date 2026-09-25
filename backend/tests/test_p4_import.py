@@ -2,6 +2,7 @@
 
 import io
 import os
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -117,7 +118,7 @@ def test_execute_inserts_everything(staging, db):
     ).scalar_one() is not None
 
 
-def test_execute_fuzzy_matches_university(staging, db):
+def test_execute_does_not_fuzzy_merge_different_universities(staging, db):
     from app.models.catalog import University
 
     db.add(University(name="МГУ им. М.В. Ломоносова", city="Москва"))
@@ -126,7 +127,71 @@ def test_execute_fuzzy_matches_university(staging, db):
              "2026-01-15", "2027-01-15", "accepted", "", "", ""]]
     summary = service.execute_import(db, _stage(make_xlsx(HEADERS, rows)), MAPPING)
     assert summary["inserted"] == 1, summary
-    assert db.execute(select(func.count()).select_from(University)).scalar() == 1
+    assert db.execute(select(func.count()).select_from(University)).scalar() == 2
+
+
+def test_mapping_contract_uses_backend_fields_and_aliases():
+    contract = service.mapping_contract(["\ufeff Название ВУЗа ", "Вендор", "ПО", "Неизвестно"], "products")
+    assert contract["suggested_mapping"] == {"Вендор": "vendor.name", "ПО": "product.name"}
+    assert {field["id"] for field in contract["target_fields"]} == set(service.IMPORT_FIELDS_BY_TYPE["products"])
+    with pytest.raises(ImportValidationError):
+        service.validate_mapping(["Вендор", "ПО"], {"Вендор": "vendor.name", "ПО": "vendor.name"}, "products")
+
+
+def test_repository_example_headers_map_without_inventing_license_dates(staging, db):
+    example = Path(__file__).resolve().parents[2] / "docs" / "import-example-20.xlsx"
+    file_id = _stage(example.read_bytes())
+    preview = service.parse_preview(file_id)
+    assert preview["row_count"] == 20
+    mapping = service.mapping_contract(preview["headers"], "licenses")["suggested_mapping"]
+    assert mapping["Срок действия лицензии (год)"] == "license.expires_at"
+    assert mapping["Статус по передачи"] == "license.transfer_status"
+    summary = service.execute_import(db, file_id, mapping, dry_run=True, catalog_type="licenses")
+    assert summary["total_rows"] == 20
+    assert summary["errors_total"] == 20
+    assert all(item["field"] == "license.expires_at" for item in summary["errors"])
+
+
+def test_year_only_license_date_is_unresolved_not_invented(staging, db):
+    row = list(GOOD_ROWS[0])
+    row[5] = "2027"
+    summary = service.execute_import(db, _stage(make_xlsx(HEADERS, [row])), MAPPING)
+    assert summary["inserted"] == 0
+    assert summary["errors"][0]["field"] == "license.expires_at"
+    assert summary["errors"][0]["source_field"] == "Срок лицензии"
+    assert "полную дату" in summary["errors"][0]["message"]
+
+
+def test_blank_optional_cells_preserve_existing_data(staging, db):
+    from app.models.catalog import Contract, License, Responsible
+
+    first = service.execute_import(db, _stage(make_xlsx(HEADERS, [GOOD_ROWS[0]])), MAPPING)
+    assert first["inserted"] == 1
+    update_row = list(GOOD_ROWS[0])
+    update_row[6] = ""
+    update_row[9] = ""
+    second = service.execute_import(db, _stage(make_xlsx(HEADERS, [update_row])), MAPPING)
+    assert second["updated"] == 1
+    assert db.scalar(select(License)).comment == "первый импорт"
+    assert db.scalar(select(License)).transfer_status_raw == "accepted"
+    assert db.scalar(select(Contract)).comment == "первый импорт"
+
+    fields = ["ФИО", "Почта", "Телефон", "Роль"]
+    mapping = {"ФИО": "responsible.full_name", "Почта": "responsible.email", "Телефон": "responsible.phone", "Роль": "responsible.role"}
+    file_id = _stage(make_xlsx(fields, [["Иван Иванов", "ivan@example.test", "89001234567", "Менеджер"]]))
+    assert service.execute_import(db, file_id, mapping, catalog_type="responsibles")["inserted"] == 1
+    blank_id = _stage(make_xlsx(fields, [["Иван Петров", "ivan@example.test", "", ""]]))
+    assert service.execute_import(db, blank_id, mapping, catalog_type="responsibles")["updated"] == 1
+    person = db.scalar(select(Responsible))
+    assert (person.full_name, person.phone, person.role) == ("Иван Петров", "+79001234567", "Менеджер")
+
+
+def test_upload_rejects_spoofed_xlsx_and_duplicate_headers(staging):
+    with pytest.raises(ImportValidationError, match="не соответствует XLSX"):
+        _stage(b"not an Excel archive", "spoof.xlsx")
+    file_id = _stage(make_xlsx(["ВУЗ", " вуз "], [["A", "B"]]))
+    with pytest.raises(ImportValidationError, match="повторяются"):
+        service.parse_preview(file_id)
 
 
 def test_bad_rows_skipped_with_errors(staging, db):
@@ -330,6 +395,100 @@ def test_api_preview_execute_job_flow(client):
     assert resp.status_code == 200, resp.text
     assert "spreadsheetml.sheet" in resp.headers["content-type"]
     assert len(resp.content) > 0
+
+
+@pytest.mark.parametrize("catalog_type,headers,values,mapping,catalog_path,expected_name", [
+    ("universities", ["ВУЗ", "Город"], ["Интеграционный университет", "Томск"],
+     {"ВУЗ": "university.name", "Город": "university.city"},
+     "/api/v1/universities", "Интеграционный университет"),
+    ("products", ["Компания", "Продукт"], ["Интеграционный вендор", "Интеграционный продукт"],
+     {"Компания": "vendor.name", "Продукт": "product.name"},
+     "/api/v1/products", "Интеграционный продукт"),
+    ("directions", ["Код", "Направление"], ["IMPORT-IT", "Интеграционное направление"],
+     {"Код": "direction.code", "Направление": "direction.name"},
+     "/api/v1/directions", "Интеграционное направление"),
+    ("responsibles", ["ФИО", "Почта"], ["Интеграционный Ответственный", "integration@example.test"],
+     {"ФИО": "responsible.full_name", "Почта": "responsible.email"},
+     "/api/v1/responsibles", "Интеграционный Ответственный"),
+])
+def test_api_four_catalogs_dry_run_execute_and_repeat(
+    client, catalog_type, headers, values, mapping, catalog_path, expected_name,
+):
+    content = make_xlsx(headers, [values])
+    preview_response = client.post(
+        "/api/v1/import/preview", data={"catalog_type": catalog_type},
+        files={"file": ("catalog.xlsx", content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+    assert preview_response.status_code == 200, preview_response.text
+    preview = preview_response.json()
+    assert preview["row_count"] == 1
+    assert preview["suggested_mapping"] == mapping
+    assert preview["target_fields"]
+    assert set(preview["required_fields"]) <= set(mapping.values())
+
+    before = client.get(catalog_path)
+    assert before.status_code == 200, before.text
+    assert before.json()["total"] == 0
+
+    base = {"file_id": preview["file_id"], "catalog_type": catalog_type, "mapping": mapping,
+            "options": {"update_existing": True, "dry_run": True}}
+    dry_response = client.post("/api/v1/import/execute", json=base)
+    assert dry_response.status_code == 202, dry_response.text
+    dry_id = dry_response.json()["job_id"]
+    assert generate_report_task(dry_id) == "ready"
+    dry_job = client.get(f"/api/v1/import/jobs/{dry_id}").json()
+    assert dry_job["dry_run"] is True
+    assert dry_job["result"]["inserted"] == 1
+    assert dry_job["result"]["errors"] == []
+    assert client.get(catalog_path).json()["total"] == 0
+
+    real_response = client.post("/api/v1/import/execute", json={
+        **base, "options": {"update_existing": True, "dry_run": False},
+    })
+    assert real_response.status_code == 202, real_response.text
+    real_id = real_response.json()["job_id"]
+    assert real_id != dry_id
+    assert generate_report_task(real_id) == "ready"
+    real_job = client.get(f"/api/v1/import/jobs/{real_id}").json()
+    assert real_job["result"]["inserted"] == 1
+    after = client.get(catalog_path)
+    assert after.status_code == 200, after.text
+    assert after.json()["total"] == 1
+    assert expected_name in str(after.json()["items"])
+
+    # A new upload produces a new job; natural keys prevent a duplicate.
+    again = client.post(
+        "/api/v1/import/preview", data={"catalog_type": catalog_type},
+        files={"file": ("catalog.xlsx", content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    ).json()
+    repeat = client.post("/api/v1/import/execute", json={
+        **base, "file_id": again["file_id"], "options": {"update_existing": True, "dry_run": False},
+    })
+    assert repeat.status_code == 202, repeat.text
+    assert generate_report_task(repeat.json()["job_id"]) == "ready"
+    assert client.get(catalog_path).json()["total"] == 1
+    assert client.get(f"/api/v1/import/jobs/{repeat.json()['job_id']}").json()["result"]["skipped"] == 1
+
+
+def test_import_permissions_user_manager_admin(client):
+    from app.main import app
+
+    content = make_xlsx(["ВУЗ"], [["Разрешения: тестовый ВУЗ"]])
+    for role, expected in (("user", 403), ("manager", 200), ("admin", 200)):
+        app.dependency_overrides[get_current_user] = lambda role=role: CurrentUser(id=role, roles={role})
+        preview = client.post(
+            "/api/v1/import/preview", data={"catalog_type": "universities"},
+            files={"file": ("roles.xlsx", content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        )
+        assert preview.status_code == expected, preview.text
+        assert client.get("/api/v1/import/jobs").status_code == 200
+        if expected == 200:
+            submit = client.post("/api/v1/import/execute", json={
+                "file_id": preview.json()["file_id"], "catalog_type": "universities",
+                "mapping": {"ВУЗ": "university.name"},
+                "options": {"update_existing": True, "dry_run": True},
+            })
+            assert submit.status_code == 202, submit.text
 
 
 def test_api_execute_idempotent_replay(client):
