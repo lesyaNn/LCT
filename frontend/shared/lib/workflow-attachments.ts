@@ -1,4 +1,5 @@
 import type { AuthUser } from '@/shared/types/user';
+import { hasPermission } from './access-control';
 import { apiUploadFormData } from './api-client';
 import { ApiRequestError, ERROR_MESSAGES } from './api-errors';
 import { isMockDataSource, waitForMockDelay } from './data-source';
@@ -156,7 +157,7 @@ export function workflowAttachmentFromApi(record: WorkflowAttachmentApiRecord, u
 }
 
 export function canWriteWorkflowAttachments(user: AuthUser | null): boolean {
-  return Boolean(user && (user.rawRoles.includes('admin') || user.rawRoles.includes('curator')));
+  return hasPermission(user, 'workflow.change_status');
 }
 
 export function canDeleteWorkflowAttachment(attachment: UniversityWorkflowAttachment, user: AuthUser | null): boolean {

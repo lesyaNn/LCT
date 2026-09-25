@@ -1,5 +1,9 @@
 /** One query-key factory for every server-state family. */
 export const queryKeys = {
+  auth: {
+    all: ['auth'] as const,
+    me: ['auth', 'me'] as const,
+  },
   dashboard: {
     overview: ['dashboard-overview'] as const,
     analytics: ['dashboard-analytics'] as const,

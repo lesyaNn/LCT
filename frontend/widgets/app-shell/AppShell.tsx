@@ -43,11 +43,11 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
     return <AuthRequired message={error ?? undefined} onLogin={() => void login(pathname)} />;
   }
 
-  const forbidden = !canAccessRoute(pathname, user.role);
+  const forbidden = !canAccessRoute(pathname, user);
 
   return (
     <div className={styles.shell}>
-      <Sidebar role={user.role} pathname={pathname} collapsed={collapsed} mobileOpen={mobileOpen} onToggleCollapse={() => setCollapsed((value) => !value)} onCloseMobile={() => setMobileOpen(false)} />
+      <Sidebar user={user} pathname={pathname} collapsed={collapsed} mobileOpen={mobileOpen} onToggleCollapse={() => setCollapsed((value) => !value)} onCloseMobile={() => setMobileOpen(false)} />
       <div className={styles.workspace}>
         <Topbar pathname={pathname} mobileOpen={mobileOpen} onMenuOpen={() => setMobileOpen(true)} />
         <main className={styles.content}>{forbidden ? <ForbiddenState /> : children}</main>

@@ -95,7 +95,9 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
   if (result.status !== 401 || !keycloak || options.anonymous) return result;
 
   try {
-    const refreshedToken = await refreshKeycloakToken(30);
+    // A backend 401 means the token already presented was rejected. Force one
+    // refresh instead of reusing a still-time-valid token, then retry once.
+    const refreshedToken = await refreshKeycloakToken(-1);
     if (refreshedToken) result = await request<T>(path, options, refreshedToken);
   } catch {
     // The common expiry path below clears the in-memory session and redirects.

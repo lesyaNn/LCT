@@ -8,6 +8,7 @@
     "build": "next build",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
+    "test:e2e:auth": "playwright test e2e/auth-foundation.spec.ts",
     "test:e2e:smoke": "playwright test e2e/critical-demo-flow.spec.ts",
     "start": "next start"
   },

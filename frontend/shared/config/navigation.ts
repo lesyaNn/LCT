@@ -1,18 +1,19 @@
 import type { NavigationItem } from '@/shared/types/navigation';
-import type { UserRole } from '@/shared/types/user';
+import { hasPermission } from '@/shared/lib/access-control';
+import type { AuthUser } from '@/shared/types/user';
 
 export const navigationItems: NavigationItem[] = [
-  { label: 'Обзор', href: '/dashboard', icon: 'dashboard', allowedRoles: ['user', 'manager', 'admin'] },
-  { label: 'ВУЗы', href: '/universities', icon: 'university', allowedRoles: ['user', 'manager', 'admin'] },
-  { label: 'Workflow', href: '/workflows', icon: 'workflow', allowedRoles: ['user', 'manager', 'admin'] },
-  { label: 'Отчёты', href: '/reports', icon: 'report', allowedRoles: ['manager', 'admin'] },
-  { label: 'Аудит', href: '/audit', icon: 'audit', allowedRoles: ['manager', 'admin'] },
-  { label: 'Администрирование', href: '/admin', icon: 'admin', allowedRoles: ['admin'] },
-  { label: 'Пользователи и права', href: '/admin/users', icon: 'admin', allowedRoles: ['admin'] },
-  { label: 'Управление каталогами', href: '/admin/catalogs', icon: 'admin', allowedRoles: ['manager', 'admin'] },
-  { label: 'Импорт каталогов', href: '/admin/import', icon: 'admin', allowedRoles: ['manager', 'admin'] },
-  { label: 'Шаблоны Workflow', href: '/admin/workflow/templates', icon: 'workflow', allowedRoles: ['admin'] },
-  { label: 'Документация', href: '/docs', icon: 'docs', allowedRoles: ['user', 'manager', 'admin'] },
+  { label: 'Обзор', href: '/dashboard', icon: 'dashboard', requiredPermission: 'analytics.read' },
+  { label: 'ВУЗы', href: '/universities', icon: 'university', requiredPermission: 'university.read' },
+  { label: 'Workflow', href: '/workflows', icon: 'workflow', requiredPermission: 'workflow.read' },
+  { label: 'Отчёты', href: '/reports', icon: 'report', requiredPermission: 'reports.read' },
+  { label: 'Аудит', href: '/audit', icon: 'audit', requiredPermission: 'audit.read' },
+  { label: 'Администрирование', href: '/admin', icon: 'admin', requiredPermission: 'admin.users' },
+  { label: 'Пользователи и права', href: '/admin/users', icon: 'admin', requiredPermission: 'admin.users' },
+  { label: 'Управление каталогами', href: '/admin/catalogs', icon: 'admin', requiredPermission: 'university.edit' },
+  { label: 'Импорт каталогов', href: '/admin/import', icon: 'admin', requiredPermission: 'import.write' },
+  { label: 'Шаблоны Workflow', href: '/admin/workflow/templates', icon: 'workflow', requiredPermission: 'workflow_template.manage' },
+  { label: 'Документация', href: '/docs', icon: 'docs' },
 ];
 
 export const routeLabels: Record<string, string> = {
@@ -34,15 +35,19 @@ export const detailRouteLabels: Record<string, string> = {
   workflows: 'Взаимодействие',
 };
 
-export function getVisibleNavigationItems(role: UserRole): NavigationItem[] {
-  return navigationItems.filter((item) => !item.allowedRoles || item.allowedRoles.includes(role));
+function canAccessNavigationItem(item: NavigationItem, user: AuthUser): boolean {
+  return !item.requiredPermission || hasPermission(user, item.requiredPermission);
 }
 
-export function canAccessRoute(pathname: string, role: UserRole): boolean {
+export function getVisibleNavigationItems(user: AuthUser): NavigationItem[] {
+  return navigationItems.filter((item) => canAccessNavigationItem(item, user));
+}
+
+export function canAccessRoute(pathname: string, user: AuthUser): boolean {
   const path = pathname === '/' ? '/dashboard' : pathname.replace(/\/$/, '');
   const rule = [...navigationItems]
     .sort((left, right) => right.href.length - left.href.length)
     .find((item) => path === item.href || path.startsWith(`${item.href}/`));
 
-  return !rule || !rule.allowedRoles || rule.allowedRoles.includes(role);
+  return !rule || canAccessNavigationItem(rule, user);
 }

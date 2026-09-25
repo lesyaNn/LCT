@@ -45,6 +45,7 @@ const pageSize = 8;
 const roleOptions: Array<{ value: UserRole; label: string }> = [
   { value: 'user', label: userRoleLabels.user },
   { value: 'manager', label: userRoleLabels.manager },
+  { value: 'curator', label: userRoleLabels.curator },
   { value: 'admin', label: userRoleLabels.admin },
 ];
 

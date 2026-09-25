@@ -71,7 +71,7 @@ test('manager completes the critical ten-step demo flow', async ({ page }, testI
     await expect(page.locator('input[name="username"]')).toBeVisible();
     await page.locator('input[name="username"]').fill(config.managerUsername);
     await page.locator('input[name="password"]').fill(config.managerPassword);
-    await page.getByRole('button', { name: /Войти|Sign in|Log in/i }).click();
+    await page.getByRole('button', { name: /Вход|Войти|Sign in|Log in/i }).click();
 
     await page.waitForURL((url) => url.origin === config.baseURL.origin && url.pathname === '/dashboard');
     await expect(page.getByRole('button', { name: /Менеджер/ })).toBeVisible();

@@ -1,5 +1,11 @@
 # Critical demo-flow smoke
 
+`auth-foundation.spec.ts` includes self-contained adapter checks and real
+Keycloak scenarios when the corresponding `E2E_ADMIN_*`, `E2E_MANAGER_*`,
+`E2E_CURATOR_*`, or `E2E_USER_*` username/password variables are present.
+Credential values stay in the local shell or CI secret store and are never
+committed.
+
 The suite contains one mutating desktop smoke test with ten ordered Playwright
 steps. It runs against a complete deployed stand because authentication,
 Workflow transitions, report jobs, downloads, and audit events cross the

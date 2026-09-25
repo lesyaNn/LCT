@@ -1,16 +1,19 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { authService } from '@/shared/lib/auth-service';
+import { useCurrentUser } from '@/shared/auth/use-current-user';
+import { ApiRequestError, normalizeApiError } from '@/shared/lib/api-errors';
 import {
   initializeKeycloak,
   loginToKeycloak,
   logoutFromKeycloak,
   registerSessionExpiredHandler,
-  type KeycloakAuthResult,
 } from '@/shared/lib/keycloak-adapter';
+import { queryKeys } from '@/shared/lib/query-keys';
 import { currentUser } from '@/shared/mocks/current-user';
-import { roleLabels, type AuthUser, type UserRole } from '@/shared/types/user';
+import type { AuthUser } from '@/shared/types/user';
 
 export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated' | 'error';
 
@@ -27,120 +30,114 @@ export interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function getFrontendRole(rawRoles: string[]): UserRole {
-  if (rawRoles.includes('admin')) return 'admin';
-  if (rawRoles.includes('manager')) return 'manager';
-  // `curator` is a real realm role; the frontend maps it to the least
-  // privileged authenticated UI role until a dedicated permission matrix exists.
-  return 'user';
-}
-
-function getInitials(name: string): string {
-  const initials = name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('');
-
-  return initials.toLocaleUpperCase('ru-RU') || 'П';
-}
-
-function userFromKeycloak(result: KeycloakAuthResult): AuthUser {
-  const role = getFrontendRole(result.roles);
-  const name = result.name || result.username || 'Пользователь';
-
-  return {
-    id: result.id,
-    username: result.username,
-    name,
-    email: result.email,
-    role,
-    roleLabel: roleLabels[role],
-    initials: getInitials(name),
-    rawRoles: result.roles,
-    authSource: 'keycloak',
-  };
-}
-
 export function AuthProvider({ children }: Readonly<{ children: React.ReactNode }>) {
   const mode = authService.mode();
+  const queryClient = useQueryClient();
   const [attempt, setAttempt] = useState(0);
-  const [status, setStatus] = useState<AuthStatus>(() => (
+  const [keycloakStatus, setKeycloakStatus] = useState<AuthStatus>(() => (
     mode === 'keycloak' ? 'loading' : 'authenticated'
   ));
-  const [user, setUser] = useState<AuthUser | null>(() => (
-    mode === 'keycloak' ? null : currentUser
-  ));
-  const [error, setError] = useState<string | null>(null);
+  const [mockAuthenticated, setMockAuthenticated] = useState(mode === 'mock');
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+  const currentUserQuery = useCurrentUser({
+    enabled: mode === 'keycloak' && keycloakStatus === 'authenticated',
+  });
 
   useEffect(() => {
     if (mode !== 'keycloak') return undefined;
 
     let cancelled = false;
     const unregisterSessionExpiredHandler = registerSessionExpiredHandler(() => {
-      setUser(null);
-      setStatus('unauthenticated');
-      setError('Сессия истекла. Войдите снова.');
+      queryClient.removeQueries({ queryKey: queryKeys.auth.all });
+      setKeycloakStatus('unauthenticated');
+      setBootstrapError('Сессия истекла. Войдите снова.');
     });
 
     void initializeKeycloak()
       .then((result) => {
         if (cancelled) return;
-        setUser(result.authenticated ? userFromKeycloak(result) : null);
-        setStatus(result.authenticated ? 'authenticated' : 'unauthenticated');
-        setError(null);
+        if (!result.authenticated) queryClient.removeQueries({ queryKey: queryKeys.auth.all });
+        setKeycloakStatus(result.authenticated ? 'authenticated' : 'unauthenticated');
+        setBootstrapError(null);
       })
       .catch((cause: unknown) => {
         if (cancelled) return;
-        setUser(null);
-        setStatus('error');
-        setError(cause instanceof Error ? cause.message : 'Не удалось определить состояние Keycloak.');
+        queryClient.removeQueries({ queryKey: queryKeys.auth.all });
+        setKeycloakStatus('error');
+        setBootstrapError(cause instanceof Error ? cause.message : 'Не удалось определить состояние Keycloak.');
       });
 
     return () => {
       cancelled = true;
       unregisterSessionExpiredHandler();
     };
-  }, [attempt, mode]);
+  }, [attempt, mode, queryClient]);
 
   const login = useCallback(async (returnTo = '/dashboard') => {
-    setError(null);
+    setBootstrapError(null);
     if (mode === 'keycloak') {
       try {
         await loginToKeycloak(returnTo);
       } catch (cause: unknown) {
-        setStatus('error');
-        setError(cause instanceof Error ? cause.message : 'Не удалось выполнить вход. Попробуйте ещё раз.');
+        setKeycloakStatus('error');
+        setBootstrapError(cause instanceof Error ? cause.message : 'Не удалось выполнить вход. Попробуйте ещё раз.');
       }
       return;
     }
-    setUser(currentUser);
-    setStatus('authenticated');
+    setMockAuthenticated(true);
   }, [mode]);
 
   const logout = useCallback(async () => {
-    setUser(null);
-    setStatus('unauthenticated');
-    setError(null);
+    queryClient.removeQueries({ queryKey: queryKeys.auth.all });
+    setBootstrapError(null);
     if (mode === 'keycloak') {
+      setKeycloakStatus('unauthenticated');
       try {
         await logoutFromKeycloak();
       } catch (cause: unknown) {
-        setError(cause instanceof Error ? cause.message : 'Не удалось завершить сессию Keycloak.');
+        setBootstrapError(cause instanceof Error ? cause.message : 'Не удалось завершить сессию Keycloak.');
       }
       return;
     }
     authService.logout();
-    setUser(null);
-    setStatus('unauthenticated');
-  }, [mode]);
+    setMockAuthenticated(false);
+  }, [mode, queryClient]);
 
   const retry = useCallback(() => {
-    setError(null);
-    setStatus('loading');
+    setBootstrapError(null);
+    if (keycloakStatus === 'authenticated' && currentUserQuery.isError) {
+      void currentUserQuery.refetch();
+      return;
+    }
+    setKeycloakStatus('loading');
     setAttempt((value) => value + 1);
-  }, []);
+  }, [currentUserQuery, keycloakStatus]);
+
+  let status: AuthStatus;
+  let user: AuthUser | null;
+  let error = bootstrapError;
+  if (mode === 'mock') {
+    status = mockAuthenticated ? 'authenticated' : 'unauthenticated';
+    user = mockAuthenticated ? currentUser : null;
+  } else if (keycloakStatus !== 'authenticated') {
+    status = keycloakStatus;
+    user = null;
+  } else if (currentUserQuery.isPending || currentUserQuery.isFetching && !currentUserQuery.data) {
+    status = 'loading';
+    user = null;
+  } else if (currentUserQuery.isError) {
+    status = currentUserQuery.error instanceof ApiRequestError && currentUserQuery.error.status === 401
+      ? 'unauthenticated'
+      : 'error';
+    user = null;
+    error = normalizeApiError(currentUserQuery.error, {
+      fallbackMessage: 'Не удалось загрузить данные текущего пользователя.',
+    }).message;
+  } else {
+    status = 'authenticated';
+    user = currentUserQuery.data ?? null;
+  }
+
   const value = useMemo<AuthContextValue>(() => ({
     status,
     isLoading: status === 'loading',

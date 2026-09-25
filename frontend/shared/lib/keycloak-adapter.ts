@@ -23,6 +23,10 @@ export interface KeycloakAuthResult {
   roles: string[];
 }
 
+export interface KeycloakAccessClaims {
+  universityIds: string[];
+}
+
 const defaultConfig: KeycloakRuntimeConfig = {
   url: 'http://localhost:8081',
   realm: 'rtk',
@@ -93,6 +97,8 @@ export async function initializeKeycloak(): Promise<KeycloakAuthResult> {
     onLoad: 'check-sso',
     pkceMethod: 'S256',
     checkLoginIframe: false,
+    silentCheckSsoRedirectUri: `${window.location.origin}/silent-check-sso.html`,
+    silentCheckSsoFallback: false,
   });
 
   const token = keycloak.tokenParsed ?? {};
@@ -117,6 +123,19 @@ export async function refreshKeycloakToken(minValidity = 30): Promise<string | n
       .finally(() => { refreshPromise = null; });
   }
   return refreshPromise;
+}
+
+/**
+ * Return only the assignment claim that the backend also reads when building
+ * its data scope. Access tokens remain encapsulated in the Keycloak adapter.
+ */
+export function getKeycloakAccessClaims(): KeycloakAccessClaims {
+  const claims = instance?.tokenParsed as Record<string, unknown> | undefined;
+  const raw = claims?.university_ids ?? claims?.university_id;
+  const values = typeof raw === 'string' ? [raw] : Array.isArray(raw) ? raw : [];
+  return {
+    universityIds: [...new Set(values.filter((value): value is string => typeof value === 'string' && Boolean(value.trim())).map((value) => value.trim()))],
+  };
 }
 
 export async function expireKeycloakSession(): Promise<void> {

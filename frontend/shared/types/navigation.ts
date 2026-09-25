@@ -1,5 +1,3 @@
-import type { UserRole } from './user';
-
 export type IconName =
   | 'dashboard'
   | 'university'
@@ -14,7 +12,7 @@ export interface NavigationItem {
   label: string;
   href: string;
   icon: IconName;
-  allowedRoles?: UserRole[];
+  requiredPermission?: string;
 }
 
 export interface BreadcrumbEntry {

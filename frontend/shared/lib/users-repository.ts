@@ -102,12 +102,14 @@ export const adminUsersQueryKeys = {
 export const userRoleLabels: Record<UserRole, string> = {
   user: 'Пользователь',
   manager: 'Менеджер',
+  curator: 'Куратор',
   admin: 'Администратор',
 };
 
 export const userRoleDescriptions: Record<UserRole, string> = {
   user: 'Видит только назначенные ВУЗы и доступные рабочие разделы.',
   manager: 'Работает с назначенным контуром ВУЗов, отчётами и Workflow.',
+  curator: 'Работает с каталогами и Workflow в рамках выданных прав.',
   admin: 'Полный доступ к данным, настройкам и управлению пользователями.',
 };
 

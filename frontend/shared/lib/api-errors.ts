@@ -27,6 +27,7 @@ export interface NormalizedApiError {
   code?: string;
   message: string;
   fieldErrors: NormalizedFieldError[];
+  details: Record<string, unknown>;
 }
 
 export class ApiRequestError extends Error {
@@ -69,6 +70,19 @@ function responseDetail(body: unknown): unknown {
   if ('detail' in body) return body.detail;
   if (isRecord(body.error)) return body.error;
   return body;
+}
+
+function responseDetails(body: unknown): Record<string, unknown> {
+  if (!isRecord(body)) return {};
+  const envelope = isRecord(body.error) ? body.error : isRecord(body.detail) ? body.detail : body;
+  if (!isRecord(envelope.details)) return {};
+  return Object.fromEntries(Object.entries(envelope.details).filter(([key]) => key !== 'field_errors'));
+}
+
+function responseMessage(body: unknown): string | undefined {
+  if (!isRecord(body)) return undefined;
+  const envelope = isRecord(body.error) ? body.error : isRecord(body.detail) ? body.detail : body;
+  return stringValue(envelope.message);
 }
 
 function extractCode(body: unknown): string | undefined {
@@ -115,8 +129,10 @@ function isSafeUserMessage(value: string | undefined): value is string {
 
 function validationItems(body: unknown): NormalizedFieldError[] {
   const detail = responseDetail(body);
+  const backendDetails = isRecord(detail) && isRecord(detail.details) ? detail.details : undefined;
   const candidates = Array.isArray(detail)
     ? detail
+    : backendDetails && Array.isArray(backendDetails.field_errors) ? backendDetails.field_errors
     : isRecord(body) && Array.isArray(body.errors) ? body.errors
       : isRecord(detail) && Array.isArray(detail.errors) ? detail.errors
         : isRecord(detail) && (detail.field || detail.loc) ? [detail]
@@ -126,11 +142,14 @@ function validationItems(body: unknown): NormalizedFieldError[] {
     if (!isRecord(candidate)) return [];
     const field = fieldFromLocation(candidate.field ?? candidate.loc);
     if (!field) return [];
-    const code = stringValue(candidate.code)?.toUpperCase();
+    const code = stringValue(candidate.code ?? candidate.type)?.toUpperCase();
     const directMessage = stringValue(candidate.message);
+    const translatedMessage = translatedValidationMessage(candidate);
     return [{
       field,
-      message: directMessage && code === 'VALIDATION_ERROR' && isSafeUserMessage(directMessage) ? directMessage : translatedValidationMessage(candidate),
+      message: translatedMessage !== 'Некорректное значение.'
+        ? translatedMessage
+        : directMessage && isSafeUserMessage(directMessage) ? directMessage : translatedMessage,
       code,
     }];
   });
@@ -145,6 +164,7 @@ export function normalizeApiError(error: unknown, options: { defaultCode?: Busin
   const source = errorSource(error);
   const status = source.status;
   const body = source.body;
+  const details = responseDetails(body);
   const fieldErrors = status === 422 ? validationItems(body) : [];
   const receivedCode = extractCode(body);
   let code = receivedCode;
@@ -154,15 +174,17 @@ export function normalizeApiError(error: unknown, options: { defaultCode?: Busin
   if (!code && status === 409 && options.defaultCode) code = options.defaultCode;
   if (!code && status === 422 && looksLikeWorkflowTransition(responseDetail(body))) code = 'WORKFLOW_INVALID_TRANSITION';
 
-  if (fieldErrors.length) return { kind: 'validation', status, code: code ?? 'VALIDATION_ERROR', message: 'Исправьте ошибки в форме.', fieldErrors };
-  if (status === 401) return { kind: 'authentication', status, code, message: 'Сессия истекла. Войдите снова.', fieldErrors: [] };
-  if (status === 403) return { kind: 'permission', status, code, message: 'Нет прав.', fieldErrors: [] };
-  if (status === 404) return { kind: 'not-found', status, code, message: ERROR_MESSAGES.ENTITY_NOT_FOUND, fieldErrors: [] };
-  if (status === 0) return { kind: 'network', status, code, message: 'Не удалось связаться с сервером. Проверьте соединение.', fieldErrors: [] };
-  if (code && code in ERROR_MESSAGES) return { kind: 'business', status, code, message: ERROR_MESSAGES[code as BusinessErrorCode], fieldErrors: [] };
-  if (status === 409) return { kind: 'business', status, code, message: ERROR_MESSAGES.DUPLICATE_ENTITY, fieldErrors: [] };
-  if (status === 422) return { kind: 'validation', status, code: code ?? 'VALIDATION_ERROR', message: 'Проверьте введённые данные.', fieldErrors: [] };
-  return { kind: 'generic', status, code, message: options.fallbackMessage ?? GENERIC_ERROR_MESSAGE, fieldErrors: [] };
+  if (fieldErrors.length) return { kind: 'validation', status, code: code ?? 'VALIDATION_ERROR', message: 'Исправьте ошибки в форме.', fieldErrors, details };
+  if (status === 401) return { kind: 'authentication', status, code, message: 'Сессия истекла. Войдите снова.', fieldErrors: [], details };
+  if (status === 403) return { kind: 'permission', status, code, message: 'Нет прав.', fieldErrors: [], details };
+  if (status === 404) return { kind: 'not-found', status, code, message: ERROR_MESSAGES.ENTITY_NOT_FOUND, fieldErrors: [], details };
+  if (status === 0) return { kind: 'network', status, code, message: 'Не удалось связаться с сервером. Проверьте соединение.', fieldErrors: [], details };
+  if (code && code in ERROR_MESSAGES) return { kind: 'business', status, code, message: ERROR_MESSAGES[code as BusinessErrorCode], fieldErrors: [], details };
+  const backendMessage = responseMessage(body);
+  if (code && status < 500 && isSafeUserMessage(backendMessage)) return { kind: 'business', status, code, message: backendMessage, fieldErrors: [], details };
+  if (status === 409) return { kind: 'business', status, code, message: ERROR_MESSAGES.DUPLICATE_ENTITY, fieldErrors: [], details };
+  if (status === 422) return { kind: 'validation', status, code: code ?? 'VALIDATION_ERROR', message: 'Проверьте введённые данные.', fieldErrors: [], details };
+  return { kind: 'generic', status, code, message: options.fallbackMessage ?? GENERIC_ERROR_MESSAGE, fieldErrors: [], details };
 }
 
 export function applyServerErrorsToForm<TFieldValues extends FieldValues>(

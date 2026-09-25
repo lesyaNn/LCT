@@ -4,14 +4,14 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useState } from 'react';
 import { getVisibleNavigationItems } from '@/shared/config/navigation';
-import type { UserRole } from '@/shared/types/user';
+import type { AuthUser } from '@/shared/types/user';
 import { Icon } from '@/shared/ui/rtk/icon';
 import { IconButton } from '@/shared/ui/rtk/icon-button';
 import { Drawer } from '@/shared/ui/rtk/drawer';
 import styles from './sidebar.module.css';
 
 interface SidebarProps {
-  role: UserRole;
+  user: AuthUser;
   pathname: string;
   collapsed: boolean;
   mobileOpen?: boolean;
@@ -19,25 +19,25 @@ interface SidebarProps {
   onCloseMobile?: () => void;
 }
 
-export function Sidebar({ role, pathname, collapsed, mobileOpen = false, onToggleCollapse, onCloseMobile }: SidebarProps) {
+export function Sidebar({ user, pathname, collapsed, mobileOpen = false, onToggleCollapse, onCloseMobile }: SidebarProps) {
   if (mobileOpen) {
     return (
       <Drawer title="Основная навигация" closeLabel="Закрыть меню" side="left" onClose={onCloseMobile ?? (() => undefined)}>
-        <SidebarContent role={role} pathname={pathname} collapsed={false} mobile onCloseMobile={onCloseMobile} />
+        <SidebarContent user={user} pathname={pathname} collapsed={false} mobile onCloseMobile={onCloseMobile} />
       </Drawer>
     );
   }
 
   return (
     <aside className={`${styles.sidebar} ${collapsed ? styles.collapsed : ''}`} aria-label="Основная навигация">
-      <SidebarContent role={role} pathname={pathname} collapsed={collapsed} onToggleCollapse={onToggleCollapse} />
+      <SidebarContent user={user} pathname={pathname} collapsed={collapsed} onToggleCollapse={onToggleCollapse} />
     </aside>
   );
 }
 
-function SidebarContent({ role, pathname, collapsed, mobile = false, onToggleCollapse, onCloseMobile }: SidebarProps & { mobile?: boolean }) {
-  const items = getVisibleNavigationItems(role).filter((item) => item.href !== '/admin' && !item.href.startsWith('/admin/'));
-  const adminItems = getVisibleNavigationItems(role).filter((item) => item.href.startsWith('/admin/'));
+function SidebarContent({ user, pathname, collapsed, mobile = false, onToggleCollapse, onCloseMobile }: SidebarProps & { mobile?: boolean }) {
+  const items = getVisibleNavigationItems(user).filter((item) => item.href !== '/admin' && !item.href.startsWith('/admin/'));
+  const adminItems = getVisibleNavigationItems(user).filter((item) => item.href.startsWith('/admin/'));
   const [adminOpen, setAdminOpen] = useState(false);
   const adminExpanded = adminOpen || pathname.startsWith('/admin');
   const activeHref = items
