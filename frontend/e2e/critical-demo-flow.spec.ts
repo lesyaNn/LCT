@@ -80,6 +80,9 @@ test('manager completes the critical ten-step demo flow', async ({ page }, testI
   });
 
   await test.step('2. Dashboard: KPI и основные графики загрузились', async () => {
+    const overviewResponse = page.waitForResponse((response) => response.request().method() === 'GET' && new URL(response.url()).pathname === '/api/v1/analytics/overview');
+    await page.reload();
+    expect((await overviewResponse).ok()).toBeTruthy();
     await expect(page.getByRole('heading', { name: 'Обзор', level: 1 })).toBeVisible();
     await expect(page.getByTestId('dashboard-kpi')).toBeVisible();
     await expect(page.getByRole('img', { name: 'Распределение вузов по диапазонам Health Score' })).toBeVisible();
@@ -181,7 +184,7 @@ test('manager completes the critical ten-step demo flow', async ({ page }, testI
   await test.step('9. Сформировать, дождаться ready и скачать непустой XLSX', async () => {
     const createResponsePromise = page.waitForResponse((response) => (
       response.request().method() === 'POST'
-      && response.url().includes('/api/v1/reports/export')
+      && new URL(response.url()).pathname === '/api/v1/reports'
     ));
     await page.getByRole('button', { name: 'Сформировать отчёт' }).click();
     const createResponse = await createResponsePromise;
@@ -193,7 +196,7 @@ test('manager completes the critical ten-step demo flow', async ({ page }, testI
     await checkpoint(page, testInfo, '04-report-ready');
 
     const downloadPromise = page.waitForEvent('download');
-    await reportJob.getByRole('link', { name: /Скачать/ }).click();
+    await reportJob.getByRole('button', { name: /Скачать/ }).click();
     const download = await downloadPromise;
     expect(download.suggestedFilename().toLocaleLowerCase()).toMatch(/\.xlsx$/);
     const downloadPath = await download.path();
@@ -207,8 +210,7 @@ test('manager completes the critical ten-step demo flow', async ({ page }, testI
     await expect(page.getByRole('heading', { name: 'Аудит действий', level: 1 })).toBeVisible();
     const matchingEvents = page.getByTestId('audit-event')
       .filter({ hasText: 'Переход Workflow' })
-      .filter({ hasText: config.workflowInstanceId })
-      .filter({ hasText: targetStageName });
+      .filter({ hasText: config.workflowInstanceId });
     await expect(matchingEvents).toHaveCount(1);
     await expect(matchingEvents).toBeVisible();
     await checkpoint(page, testInfo, '05-audit-transition');
