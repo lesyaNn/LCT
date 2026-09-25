@@ -46,3 +46,31 @@ npm run test:e2e:smoke
 Artifacts are written to `test-results/` and `playwright-report/`. Five named
 checkpoint screenshots are attached on successful runs; failure screenshot,
 video, and trace are retained automatically.
+
+## Admin Users / RBAC integration
+
+`admin-users-real.spec.ts` checks real Keycloak login for admin, manager, and
+user. Its fourth test creates users and universities, changes role/scope,
+blocks/unblocks an account, and attempts invite/reset. It is opt-in and must
+run only against a disposable realm and database:
+
+```bash
+docker compose -p team26-admin-users-e2e -f docker-compose.yml -f docker-compose.admin-users-e2e.yml up -d --build frontend
+```
+
+The Compose project name gives this stand its own network and volumes; ports
+are 13000 (frontend), 18000 (backend), and 18081 (Keycloak). On this isolated
+Keycloak instance, update the `rtk-frontend` client's redirect URI and web
+origin to `http://localhost:13000/*` and `http://localhost:13000`. The imported
+realm requires HTTPS by default. For local HTTP testing only, explicitly set
+its `sslRequired` to `NONE` in this disposable realm, or provide HTTPS instead.
+Never change the shared dev realm's SSL policy for this test.
+
+Set `E2E_BASE_URL=http://localhost:13000`, `E2E_API_URL=http://localhost:18000`,
+the `E2E_ADMIN_*`, `E2E_MANAGER_*`, and `E2E_USER_*` credentials, plus
+`E2E_ADMIN_USERS_MUTATIONS=1` and `E2E_ADMIN_USERS_ISOLATED=1` before running
+`npx playwright test e2e/admin-users-real.spec.ts --workers=1`. Without both
+mutation flags, the destructive scenario is skipped. The mutation test restores
+the seeded user's role/scope, but creates uniquely named test records.
+Afterward, `docker compose -p team26-admin-users-e2e -f docker-compose.yml -f
+docker-compose.admin-users-e2e.yml down -v` removes only the disposable stand.

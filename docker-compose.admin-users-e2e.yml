@@ -1,0 +1,21 @@
+# Isolated Admin Users runtime verification. Always use with
+# `docker compose -p team26-admin-users-e2e -f docker-compose.yml
+#  -f docker-compose.admin-users-e2e.yml` so volumes/network are separate.
+services:
+  keycloak:
+    ports: !override
+      - "18081:8080"
+  backend:
+    ports: !override
+      - "18000:8000"
+    environment:
+      KEYCLOAK_ISSUER: http://localhost:18081/realms/rtk
+      FRONTEND_ORIGIN: http://localhost:13000
+      CORS_ORIGINS: http://localhost:13000
+  frontend:
+    ports: !override
+      - "13000:3000"
+    build:
+      args:
+        NEXT_PUBLIC_KEYCLOAK_URL: http://localhost:18081
+        NEXT_PUBLIC_API_URL: http://localhost:18000
