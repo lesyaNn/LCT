@@ -1,0 +1,141 @@
+'use client';
+
+import { useState, type FormEvent } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { normalizeApiError } from '@/shared/lib/api-errors';
+import { queryKeys } from '@/shared/lib/query-keys';
+import {
+  createUniversityMeeting,
+  createUniversityStudent,
+  getWorkflowSelectorPrograms,
+  updateUniversityMeeting,
+  updateUniversityStudent,
+  workflowProgramsQueryKey,
+  type UniversityMeetingInput,
+  type UniversityMeetingRow,
+  type UniversityStudentInput,
+  type UniversityStudentListRow,
+} from '@/shared/lib/universities-repository';
+import { Button } from '@/shared/ui/rtk/button';
+import { Input, Select, TextArea } from '@/shared/ui/rtk/form-controls';
+import { Modal } from '@/shared/ui/rtk/modal';
+import styles from './university-passport-sections.module.css';
+
+function localDateTime(iso?: string): string {
+  const date = iso ? new Date(iso) : new Date();
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
+function fieldError(errors: Record<string, string>, key: string) {
+  return errors[key] ? <span className={styles.assignmentError} role="alert">{errors[key]}</span> : null;
+}
+
+export function StudentMutationForm({ universityId, student, onClose, onSaved }: { universityId: string; student: UniversityStudentListRow | null; onClose: () => void; onSaved: () => void }) {
+  const queryClient = useQueryClient();
+  const programs = useQuery({ queryKey: workflowProgramsQueryKey(universityId), queryFn: () => getWorkflowSelectorPrograms(universityId), staleTime: 30_000 });
+  const [externalId, setExternalId] = useState(student?.externalId ?? '');
+  const [programId, setProgramId] = useState(student?.programId ?? '');
+  const [fullName, setFullName] = useState(student?.studentName ?? '');
+  const [groupName, setGroupName] = useState(student?.flow ?? '');
+  const [status, setStatus] = useState<UniversityStudentInput['status']>((student?.status as UniversityStudentInput['status']) ?? 'active');
+  const [startedAt, setStartedAt] = useState(student?.startedAt ?? new Date().toISOString().slice(0, 10));
+  const [finishedAt, setFinishedAt] = useState(student?.finishedAt ?? '');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [message, setMessage] = useState<string | null>(null);
+  const save = useMutation({
+    mutationFn: (input: UniversityStudentInput) => student ? updateUniversityStudent(student.id, input) : createUniversityStudent(universityId, input),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['university-students', universityId] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.universities.passport(universityId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.universities.historyFamily(universityId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.audit.all }),
+      ]);
+      onSaved();
+    },
+  });
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (save.isPending) return;
+    const nextErrors: Record<string, string> = {};
+    if (!student && !externalId.trim()) nextErrors.external_id = 'Укажите внешний ID.';
+    if (!programId) nextErrors.program_id = 'Выберите программу.';
+    if (!fullName.trim()) nextErrors.full_name = 'Укажите ФИО.';
+    if (!startedAt) nextErrors.started_at = 'Укажите дату начала.';
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return;
+    setMessage(null);
+    save.mutate({ externalId, programId, fullName, groupName, status, startedAt, finishedAt: finishedAt || null }, {
+      onError: (cause) => {
+        const normalized = normalizeApiError(cause);
+        setErrors(Object.fromEntries(normalized.fieldErrors.map((field) => [field.field, field.message])));
+        setMessage(normalized.message);
+      },
+    });
+  };
+  return <Modal title={student ? 'Редактировать студента' : 'Добавить студента'} onClose={() => { if (!save.isPending) onClose(); }}><form className={styles.assignmentForm} onSubmit={submit} noValidate>
+    {!student ? <label className={styles.filter}><span>Внешний ID *</span><Input value={externalId} maxLength={256} aria-invalid={Boolean(errors.external_id)} onChange={(event) => setExternalId(event.target.value)} />{fieldError(errors, 'external_id')}</label> : null}
+    <label className={styles.filter}><span>Программа *</span><Select value={programId} disabled={programs.isPending || programs.isError} aria-invalid={Boolean(errors.program_id)} onChange={(event) => setProgramId(event.target.value)}><option value="">Выберите программу</option>{programs.data?.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}</Select>{fieldError(errors, 'program_id')}</label>
+    {programs.isError ? <p className={styles.assignmentError} role="alert">Не удалось загрузить программы. <button type="button" onClick={() => void programs.refetch()}>Повторить</button></p> : null}
+    <label className={styles.filter}><span>ФИО *</span><Input value={fullName} maxLength={512} aria-invalid={Boolean(errors.full_name)} onChange={(event) => setFullName(event.target.value)} />{fieldError(errors, 'full_name')}</label>
+    <label className={styles.filter}><span>Группа</span><Input value={groupName} maxLength={256} onChange={(event) => setGroupName(event.target.value)} /></label>
+    <label className={styles.filter}><span>Статус</span><Select value={status} onChange={(event) => setStatus(event.target.value as UniversityStudentInput['status'])}><option value="active">Активен</option><option value="graduated">Выпущен</option><option value="academic_leave">Академический отпуск</option><option value="expelled">Отчислен</option></Select></label>
+    <label className={styles.filter}><span>Дата начала *</span><Input type="date" value={startedAt} aria-invalid={Boolean(errors.started_at)} onChange={(event) => setStartedAt(event.target.value)} />{fieldError(errors, 'started_at')}</label>
+    <label className={styles.filter}><span>Дата завершения</span><Input type="date" value={finishedAt} onChange={(event) => setFinishedAt(event.target.value)} /></label>
+    {message ? <p className={styles.assignmentError} role="alert">{message}</p> : null}
+    <div className={styles.assignmentActions}><Button type="button" variant="ghost" disabled={save.isPending} onClick={onClose}>Отмена</Button><Button type="submit" variant="primary" loading={save.isPending} disabled={save.isPending || programs.isPending || programs.isError}>Сохранить</Button></div>
+  </form></Modal>;
+}
+
+export function MeetingMutationForm({ universityId, meeting, onClose, onSaved }: { universityId: string; meeting: UniversityMeetingRow | null; onClose: () => void; onSaved: () => void }) {
+  const queryClient = useQueryClient();
+  const [type, setType] = useState<UniversityMeetingInput['type']>(meeting?.type ?? 'online');
+  const [subject, setSubject] = useState(meeting?.subject ?? '');
+  const [meetingAt, setMeetingAt] = useState(localDateTime(meeting?.occurredAt));
+  const [participants, setParticipants] = useState(meeting?.participants.map((item) => item.name).join(', ') ?? '');
+  const [outcome, setOutcome] = useState(meeting?.outcome === '—' ? '' : meeting?.outcome ?? '');
+  const [nextAction, setNextAction] = useState(meeting?.nextAction === '—' ? '' : meeting?.nextAction ?? '');
+  const [dueDate, setDueDate] = useState(meeting?.dueDate ?? '');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [message, setMessage] = useState<string | null>(null);
+  const save = useMutation({
+    mutationFn: (input: UniversityMeetingInput) => meeting ? updateUniversityMeeting(meeting.id, input) : createUniversityMeeting(universityId, input),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['university-meetings', universityId] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.universities.passport(universityId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.universities.historyFamily(universityId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.audit.all }),
+      ]);
+      onSaved();
+    },
+  });
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (save.isPending) return;
+    const nextErrors: Record<string, string> = {};
+    if (!subject.trim()) nextErrors.subject = 'Укажите тему встречи.';
+    if (!meetingAt || Number.isNaN(new Date(meetingAt).getTime())) nextErrors.meeting_at = 'Укажите дату и время.';
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return;
+    setMessage(null);
+    save.mutate({ type, subject, meetingAt: new Date(meetingAt).toISOString(), participants: participants.split(',').map((item) => item.trim()).filter(Boolean), outcome, nextAction, dueDate }, {
+      onError: (cause) => {
+        const normalized = normalizeApiError(cause);
+        setErrors(Object.fromEntries(normalized.fieldErrors.map((field) => [field.field, field.message])));
+        setMessage(normalized.message);
+      },
+    });
+  };
+  return <Modal title={meeting ? 'Редактировать встречу' : 'Добавить встречу'} onClose={() => { if (!save.isPending) onClose(); }}><form className={styles.assignmentForm} onSubmit={submit} noValidate>
+    <label className={styles.filter}><span>Тип</span><Select value={type} onChange={(event) => setType(event.target.value as UniversityMeetingInput['type'])}><option value="online">Онлайн</option><option value="offline">Очно</option><option value="phone">Телефон</option><option value="email">Email</option></Select></label>
+    <label className={styles.filter}><span>Тема *</span><Input value={subject} maxLength={1024} aria-invalid={Boolean(errors.subject)} onChange={(event) => setSubject(event.target.value)} />{fieldError(errors, 'subject')}</label>
+    <label className={styles.filter}><span>Дата и время *</span><Input type="datetime-local" value={meetingAt} aria-invalid={Boolean(errors.meeting_at)} onChange={(event) => setMeetingAt(event.target.value)} />{fieldError(errors, 'meeting_at')}</label>
+    <label className={styles.filter}><span>Участники через запятую</span><Input value={participants} onChange={(event) => setParticipants(event.target.value)} /></label>
+    <label className={styles.filter}><span>Итог</span><TextArea rows={2} value={outcome} onChange={(event) => setOutcome(event.target.value)} /></label>
+    <label className={styles.filter}><span>Следующее действие</span><TextArea rows={2} value={nextAction} onChange={(event) => setNextAction(event.target.value)} /></label>
+    <label className={styles.filter}><span>Срок следующего действия</span><Input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></label>
+    {message ? <p className={styles.assignmentError} role="alert">{message}</p> : null}
+    <div className={styles.assignmentActions}><Button type="button" variant="ghost" disabled={save.isPending} onClick={onClose}>Отмена</Button><Button type="submit" variant="primary" loading={save.isPending} disabled={save.isPending}>Сохранить</Button></div>
+  </form></Modal>;
+}

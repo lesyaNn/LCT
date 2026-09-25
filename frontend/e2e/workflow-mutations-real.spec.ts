@@ -151,12 +151,17 @@ test('seeded real Kanban: cancel keeps stage, confirm moves once', async ({ page
   await expect(page.getByRole('heading', { name: allowed[0].name, exact: true })).toBeVisible();
 });
 
-test('real comment edit/delete and upload-audit reproduction', async ({ page, request }) => {
+test('real comment edit/delete and attachment upload/download/delete', async ({ page, request }) => {
   test.skip(process.env.E2E_WORKFLOW_MUTATIONS !== '1', 'Opt in for local dev mutations');
   test.skip(!process.env.E2E_ADMIN_USERNAME || !process.env.E2E_ADMIN_PASSWORD || !process.env.E2E_WORKFLOW_INSTANCE_ID, 'Set admin and the test-created Workflow ID');
   const authorization = await login(page);
   const instanceId = process.env.E2E_WORKFLOW_INSTANCE_ID ?? '';
   const headers = { authorization };
+  const leftovers = await request.get(`${apiBase}/api/v1/workflow/instances/${instanceId}/attachments`, { headers });
+  const leftoverFiles = (await leftovers.json()) as PageResult<{ id: string; original_filename: string }>;
+  for (const file of leftoverFiles.items.filter((item) => item.original_filename === 'stage6-upload-check.pdf')) {
+    expect((await request.delete(`${apiBase}/api/v1/workflow/instances/${instanceId}/attachments/${file.id}`, { headers })).status()).toBe(204);
+  }
   const beforeFilesResponse = await request.get(`${apiBase}/api/v1/workflow/instances/${instanceId}/attachments`, { headers });
   expect(beforeFilesResponse.ok()).toBeTruthy();
   const beforeFiles = (await beforeFilesResponse.json()) as PageResult<unknown>;
@@ -182,12 +187,21 @@ test('real comment edit/delete and upload-audit reproduction', async ({ page, re
     name: 'stage6-upload-check.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\nStage 6 local test\n'),
   });
   const upload = await uploadResponse;
-  expect(upload.status()).toBe(409);
-  const error = await upload.json() as { error?: { details?: { field?: string } } };
-  expect(error.error?.details?.field).toBe('entity_id');
-  await expect(page.getByText('Ошибка загрузки')).toBeVisible();
+  expect(upload.status()).toBe(201);
+  const file = await upload.json() as { id: string };
+  await expect(page.getByText('stage6-upload-check.pdf')).toBeVisible();
+  await page.reload();
+  await expect(page.getByText('stage6-upload-check.pdf')).toBeVisible();
   const afterFilesResponse = await request.get(`${apiBase}/api/v1/workflow/instances/${instanceId}/attachments`, { headers });
   expect(afterFilesResponse.ok()).toBeTruthy();
   const afterFiles = (await afterFilesResponse.json()) as PageResult<unknown>;
-  expect(afterFiles.total).toBe(beforeFiles.total);
+  expect(afterFiles.total).toBe(beforeFiles.total + 1);
+  const download = await request.get(`${apiBase}/api/v1/workflow/instances/${instanceId}/attachments/${file.id}/download`, { headers });
+  expect(download.ok()).toBeTruthy();
+  expect((await download.body()).toString()).toContain('Stage 6 local test');
+  await page.getByRole('button', { name: 'Удалить stage6-upload-check.pdf' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Удалить', exact: true }).click();
+  await expect(page.getByText('stage6-upload-check.pdf')).toHaveCount(0);
+  const afterDelete = await request.get(`${apiBase}/api/v1/workflow/instances/${instanceId}/attachments`, { headers });
+  expect(((await afterDelete.json()) as PageResult<unknown>).total).toBe(beforeFiles.total);
 });

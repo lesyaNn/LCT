@@ -7,11 +7,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Download from '@atomaro/icons/24/action/Download';
 import DocumentText from '@atomaro/icons/24/document/DocumentText';
 import Calendar from '@atomaro/icons/24/communication/Calendar';
+import { useAuth } from '@/shared/auth/AuthProvider';
+import { hasPermission } from '@/shared/lib/access-control';
+import { isMockDataSourceFor } from '@/shared/lib/data-source';
 import Mail from '@atomaro/icons/24/communication/Mail';
 import Phone from '@atomaro/icons/24/technology/Phone';
 import { Button } from '@/shared/ui/rtk/button';
 import { Avatar } from '@/shared/ui/rtk/avatar';
 import { Drawer } from '@/shared/ui/rtk/drawer';
+import { Modal } from '@/shared/ui/rtk/modal';
 import { EmptyState } from '@/shared/ui/empty-state';
 import { Select, TextArea } from '@/shared/ui/rtk/form-controls';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
@@ -38,9 +42,11 @@ import {
   getUniversityLicenses,
   getUniversityDocuments,
   getUniversityMeetings,
+  deleteUniversityMeeting,
   getUniversityResponsibles,
   getUniversityStudentsSummary,
   getUniversityStudents,
+  deleteUniversityStudent,
   getUniversityTeachers,
   programStatusLabels,
   universityProductsQueryKey,
@@ -59,6 +65,7 @@ import {
   type UniversityProductStatus,
   type UniversityProgramRow,
   type UniversityStudentsByProgram,
+  type UniversityStudentListRow,
   type UniversityTeacherRow,
   type UniversityLicenseRow,
   type UniversityLicenseStatus,
@@ -69,6 +76,7 @@ import {
   UNIVERSITY_PASSPORT_CAPABILITIES,
 } from '@/shared/lib/universities-repository';
 import { PassportDataTable, PassportTableSkeleton, type PassportMobileField, type PassportTableColumn } from './passport-data-table';
+import { MeetingMutationForm, StudentMutationForm } from './passport-mutation-forms';
 import { ReadinessBadge } from '@/shared/ui/rtk/readiness-badge';
 import styles from './university-passport-sections.module.css';
 
@@ -245,12 +253,30 @@ function StudentRowName({ row }: { row: StudentViewRow }) {
 }
 
 function StudentsSection({ id }: { id: string }) {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
+  const [editor, setEditor] = useState<UniversityStudentListRow | null | undefined>(undefined);
+  const [deleteCandidate, setDeleteCandidate] = useState<UniversityStudentListRow | null>(null);
+  const canWrite = !isMockDataSourceFor('passport') && hasPermission(user, 'university.edit');
   const query = useQuery({ queryKey: universityStudentsSummaryQueryKey(id), queryFn: () => getUniversityStudentsSummary(id, queryClient), staleTime: 30_000 });
   const listQuery = useQuery({ queryKey: universityStudentsQueryKey(id, page), queryFn: ({ signal }) => getUniversityStudents(id, page, 20, signal), staleTime: 30_000 });
   const lmsQuery = useQuery({ queryKey: universityExternalDataQueryKey(id, 'lms'), queryFn: () => getUniversityExternalData(id, 'lms'), enabled: UNIVERSITY_PASSPORT_CAPABILITIES.externalData, staleTime: 30_000 });
   const [toast, setToast] = useState<{ intent: 'success' | 'error' | 'info'; title: string; message?: ReactNode } | null>(null);
+  const remove = useMutation({
+    mutationFn: (studentId: string) => deleteUniversityStudent(studentId),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['university-students', id] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.universities.passport(id) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.universities.historyFamily(id) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.audit.all }),
+      ]);
+      setDeleteCandidate(null);
+      setToast({ intent: 'success', title: 'Студент удалён' });
+    },
+    onError: (cause) => setToast({ intent: 'error', title: normalizeApiError(cause).message }),
+  });
   const rows = useMemo<StudentViewRow[]>(() => {
     const external = lmsQuery.data?.students ?? [];
     const byExternalId = new Map(external.map((student: ExternalStudent) => [student.id, student]));
@@ -269,6 +295,7 @@ function StudentsSection({ id }: { id: string }) {
     { id: 'total', label: 'Всего', sortable: true, sortValue: (row) => row.total, render: (row) => row.total },
     { id: 'source', label: 'Источник', render: (row) => row.source === 'lms' ? <StatusBadge intent="brand">LMS</StatusBadge> : <StatusBadge intent="neutral">Ручные данные</StatusBadge> },
     { id: 'syncedAt', label: 'Синхронизация', render: (row) => row.syncedAt ? formatDate(row.syncedAt) : '—' },
+    { id: 'actions', label: 'Действия', render: (row) => canWrite ? <div className={styles.assignmentActions}><Button variant="ghost" size="s" type="button" onClick={() => setEditor(row)}>Изменить</Button><Button variant="ghost" size="s" type="button" onClick={() => setDeleteCandidate(row)}>Удалить</Button></div> : null },
   ];
   const mobileFields: PassportMobileField<StudentViewRow>[] = [
     { label: 'Студент / программа', render: (row) => <StudentRowName row={row} /> },
@@ -277,6 +304,7 @@ function StudentsSection({ id }: { id: string }) {
     { label: 'Состав', render: (row) => `${row.active} активных · ${row.graduated} выпущены · ${row.total} всего` },
     { label: 'Источник', render: (row) => row.source === 'lms' ? <StatusBadge intent="brand">LMS</StatusBadge> : <StatusBadge intent="neutral">Ручные данные</StatusBadge> },
     { label: 'Синхронизация', render: (row) => row.syncedAt ? formatDate(row.syncedAt) : '—' },
+    { label: 'Действия', render: (row) => canWrite ? <div className={styles.assignmentActions}><Button variant="ghost" size="s" type="button" onClick={() => setEditor(row)}>Изменить</Button><Button variant="ghost" size="s" type="button" onClick={() => setDeleteCandidate(row)}>Удалить</Button></div> : null },
   ];
 
   if (query.isPending || listQuery.isPending) return <section className={styles.section} aria-label="Студенты"><PassportTableSkeleton /></section>;
@@ -285,7 +313,7 @@ function StudentsSection({ id }: { id: string }) {
   const syncedAt = lmsQuery.data?.syncedAt ?? rows.find((row) => row.syncedAt)?.syncedAt ?? null;
   const summary = query.data;
   const externalToast = lmsQuery.isError ? <div className={styles.toastViewport}><Toast intent="error" title="LMS недоступна" message="Показаны доступные локальные данные." /></div> : null;
-  return <div className={styles.studentPage}><StudentSummary total={summary.total} active={summary.active} graduated={summary.graduated} academicLeave={summary.academicLeave} /><section className={styles.section} aria-label="Студенты по программам"><SectionToolbar title="Студенты"><SyncMeta source={lmsQuery.data ? 'LMS' : 'Ручные данные'} syncedAt={syncedAt} /></SectionToolbar>{lmsQuery.isError ? <ExternalUnavailableNotice source="LMS" error={lmsQuery.error} /> : null}<PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Нет данных по студентам" serverPagination={{ page, pageSize: 20, total: listQuery.data.total, onPageChange: setPage }} /></section>{toast ? <div className={styles.toastViewport}><Toast intent={toast.intent} title={toast.title} message={toast.message} onClose={() => setToast(null)} /></div> : externalToast}</div>;
+  return <div className={styles.studentPage}><StudentSummary total={summary.total} active={summary.active} graduated={summary.graduated} academicLeave={summary.academicLeave} /><section className={styles.section} aria-label="Студенты по программам"><SectionToolbar title="Студенты"><div className={styles.toolbarControls}><SyncMeta source={lmsQuery.data ? 'LMS' : 'Ручные данные'} syncedAt={syncedAt} />{canWrite ? <Button variant="primary" size="s" type="button" onClick={() => setEditor(null)}>Добавить студента</Button> : null}</div></SectionToolbar>{lmsQuery.isError ? <ExternalUnavailableNotice source="LMS" error={lmsQuery.error} /> : null}<PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Нет данных по студентам" serverPagination={{ page, pageSize: 20, total: listQuery.data.total, onPageChange: setPage }} /></section>{editor !== undefined ? <StudentMutationForm universityId={id} student={editor} onClose={() => setEditor(undefined)} onSaved={() => { setEditor(undefined); setToast({ intent: 'success', title: 'Данные студента сохранены' }); }} /> : null}{deleteCandidate ? <Modal title="Удалить студента?" onClose={() => { if (!remove.isPending) setDeleteCandidate(null); }}><p>Студент «{deleteCandidate.studentName}» будет удалён без возможности восстановления.</p><div className={styles.assignmentActions}><Button variant="ghost" type="button" disabled={remove.isPending} onClick={() => setDeleteCandidate(null)}>Отмена</Button><Button variant="danger" type="button" loading={remove.isPending} disabled={remove.isPending} onClick={() => remove.mutate(deleteCandidate.id)}>Удалить</Button></div></Modal> : null}{toast ? <div className={styles.toastViewport}><Toast intent={toast.intent} title={toast.title} message={toast.message} onClose={() => setToast(null)} /></div> : externalToast}</div>;
 }
 
 function ProductLicense({ row }: { row: UniversityProductRow }) {
@@ -397,11 +425,37 @@ function MeetingParticipants({ participants }: { participants: UniversityMeeting
 }
 
 function MeetingsSection({ id, canAdd }: { id: string; canAdd: boolean }) {
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
+  const [editor, setEditor] = useState<UniversityMeetingRow | null | undefined>(undefined);
+  const [deleteCandidate, setDeleteCandidate] = useState<UniversityMeetingRow | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const canWrite = canAdd && !isMockDataSourceFor('passport');
   const query = useQuery({ queryKey: universityMeetingsQueryKey(id, page), queryFn: ({ signal }) => getUniversityMeetings(id, page, 20, signal), staleTime: 30_000 });
+  const remove = useMutation({
+    mutationFn: (meetingId: string) => deleteUniversityMeeting(meetingId),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['university-meetings', id] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.universities.passport(id) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.universities.historyFamily(id) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.audit.all }),
+      ]);
+      setDeleteCandidate(null);
+      setMessage('Встреча удалена.');
+    },
+    onError: (cause) => setMessage(normalizeApiError(cause).message),
+  });
   if (query.isPending) return <section className={styles.section} aria-label="Встречи"><PassportTableSkeleton /></section>;
   if (query.isError || !query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
-  return <section className={`${styles.section} ${styles.meetingSurface}`} aria-label="Встречи">{canAdd ? <SectionToolbar title="Встречи"><Button variant="primary" size="s" type="button" disabled title="Создание встречи подключится после появления API"><Calendar size={16} fill="currentColor" />Добавить встречу</Button></SectionToolbar> : <h2 className={styles.meetingTitle}>Встречи</h2>}{query.data.items.length ? <ol className={styles.meetingTimeline}>{query.data.items.slice().sort((left, right) => right.occurredAt.localeCompare(left.occurredAt)).map((meeting) => <li className={styles.meetingItem} key={meeting.id}><div className={styles.meetingMarker} aria-hidden="true" /><article className={styles.meetingContent}><div className={styles.meetingMeta}><time dateTime={meeting.occurredAt}>{formatDateTimeRu(meeting.occurredAt)}</time><span className={styles.meetingType}>{meetingTypeLabels[meeting.type]}</span></div><h3>{meeting.subject}</h3><MeetingParticipants participants={meeting.participants} /><details className={styles.meetingDetails}><summary>Итог и следующее действие</summary><p><strong>Итог:</strong> {meeting.outcome}</p><p><strong>Следующее действие:</strong> {meeting.nextAction}{meeting.dueDate ? ` до ${formatDateRu(meeting.dueDate)}` : ''}</p></details><span className={styles.meetingAuthor}>Автор: {meeting.author}</span></article></li>)}</ol> : <EmptyState icon={<Calendar size={20} fill="currentColor" />} title="Встреч пока нет" description="Записи появятся здесь после первого взаимодействия." headingLevel={3} />}{query.data.total > 20 ? <div className={styles.sectionToolbar}><span>Страница {page} из {Math.ceil(query.data.total / 20)}</span><div className={styles.toolbarControls}><Button variant="ghost" size="s" type="button" disabled={page === 1} onClick={() => setPage(page - 1)}>Назад</Button><Button variant="ghost" size="s" type="button" disabled={page * 20 >= query.data.total} onClick={() => setPage(page + 1)}>Далее</Button></div></div> : null}</section>;
+  return <section className={`${styles.section} ${styles.meetingSurface}`} aria-label="Встречи">
+    {canWrite ? <SectionToolbar title="Встречи"><Button variant="primary" size="s" type="button" onClick={() => setEditor(null)}><Calendar size={16} fill="currentColor" />Добавить встречу</Button></SectionToolbar> : <h2 className={styles.meetingTitle}>Встречи</h2>}
+    {query.data.items.length ? <ol className={styles.meetingTimeline}>{query.data.items.slice().sort((left, right) => right.occurredAt.localeCompare(left.occurredAt)).map((meeting) => <li className={styles.meetingItem} key={meeting.id}><div className={styles.meetingMarker} aria-hidden="true" /><article className={styles.meetingContent}><div className={styles.meetingMeta}><time dateTime={meeting.occurredAt}>{formatDateTimeRu(meeting.occurredAt)}</time><span className={styles.meetingType}>{meetingTypeLabels[meeting.type]}</span></div><h3>{meeting.subject}</h3><MeetingParticipants participants={meeting.participants} /><details className={styles.meetingDetails}><summary>Итог и следующее действие</summary><p><strong>Итог:</strong> {meeting.outcome}</p><p><strong>Следующее действие:</strong> {meeting.nextAction}{meeting.dueDate ? ` до ${formatDateRu(meeting.dueDate)}` : ''}</p></details><span className={styles.meetingAuthor}>Автор: {meeting.author}</span>{canWrite ? <div className={styles.assignmentActions}><Button variant="ghost" size="s" type="button" onClick={() => setEditor(meeting)}>Изменить</Button><Button variant="ghost" size="s" type="button" onClick={() => setDeleteCandidate(meeting)}>Удалить</Button></div> : null}</article></li>)}</ol> : <EmptyState icon={<Calendar size={20} fill="currentColor" />} title="Встреч пока нет" description="Записи появятся здесь после первого взаимодействия." headingLevel={3} />}
+    {query.data.total > 20 ? <div className={styles.sectionToolbar}><span>Страница {page} из {Math.ceil(query.data.total / 20)}</span><div className={styles.toolbarControls}><Button variant="ghost" size="s" type="button" disabled={page === 1} onClick={() => setPage(page - 1)}>Назад</Button><Button variant="ghost" size="s" type="button" disabled={page * 20 >= query.data.total} onClick={() => setPage(page + 1)}>Далее</Button></div></div> : null}
+    {editor !== undefined ? <MeetingMutationForm universityId={id} meeting={editor} onClose={() => setEditor(undefined)} onSaved={() => { setEditor(undefined); setMessage('Встреча сохранена.'); }} /> : null}
+    {deleteCandidate ? <Modal title="Удалить встречу?" onClose={() => { if (!remove.isPending) setDeleteCandidate(null); }}><p>Встреча «{deleteCandidate.subject}» будет удалена без возможности восстановления.</p><div className={styles.assignmentActions}><Button variant="ghost" type="button" disabled={remove.isPending} onClick={() => setDeleteCandidate(null)}>Отмена</Button><Button variant="danger" type="button" loading={remove.isPending} disabled={remove.isPending} onClick={() => remove.mutate(deleteCandidate.id)}>Удалить</Button></div></Modal> : null}
+    {message ? <div className={styles.toastViewport}><Toast intent={remove.isError ? 'error' : 'success'} title={message} onClose={() => setMessage(null)} /></div> : null}
+  </section>;
 }
 
 function ResponsibleAssignmentDrawer({ id, currentName, onClose, onSuccess }: { id: string; currentName: string; onClose: () => void; onSuccess: () => void }) {

@@ -15,6 +15,7 @@ import Education from '@atomaro/icons/24/culture/Education';
 import Edit from '@atomaro/icons/24/editor/Edit';
 import ArrowRight from '@atomaro/icons/24/navigation/ArrowRight';
 import { useAuth } from '@/shared/auth/AuthProvider';
+import { hasPermission } from '@/shared/lib/access-control';
 import { formatDateRu, formatDateTimeRu } from '@/shared/lib/formatters';
 import { healthStatusMeta, type HealthStatus } from '@/shared/lib/health-score';
 import { normalizeApiError } from '@/shared/lib/api-errors';
@@ -247,7 +248,7 @@ export function UniversityPassport({ id }: { id: string }) {
     : tab === 'documents'
       ? <DocumentsSection id={id} />
     : tab === 'meetings'
-      ? <MeetingsSection id={id} canAdd={canReport} />
+      ? <MeetingsSection id={id} canAdd={hasPermission(user, 'university.edit')} />
     : tab === 'responsibles'
       ? <ResponsiblesSection id={id} canEdit={canReport && UNIVERSITY_PASSPORT_CAPABILITIES.mutations} />
     : tab === 'workflow'

@@ -1112,6 +1112,18 @@ export interface UniversityStudentListRow extends UniversityStudentsByProgram {
   externalId?: string;
   flow: string | null;
   status?: string;
+  startedAt?: string;
+  finishedAt?: string | null;
+}
+
+export interface UniversityStudentInput {
+  externalId: string;
+  programId: string;
+  fullName: string;
+  groupName: string;
+  status: 'active' | 'graduated' | 'academic_leave' | 'expelled';
+  startedAt: string;
+  finishedAt: string | null;
 }
 
 export type UniversityProductStatus = 'planned' | 'active' | 'expiring' | 'expired';
@@ -1366,6 +1378,29 @@ export async function getUniversityStudents(id: string, page = 1, pageSize = 20,
   }, real: () => realGetUniversityStudents(id, page, pageSize, signal) });
 }
 
+function unwrapPassportMutation<T>(result: Awaited<ReturnType<typeof apiFetch<T>>>): T {
+  if (result.ok) return result.data;
+  throw new ApiRequestError(result.status, result.body, 'Не удалось сохранить данные паспорта.', result.error);
+}
+
+export async function createUniversityStudent(universityId: string, input: UniversityStudentInput): Promise<{ id: string }> {
+  return unwrapPassportMutation(await apiFetch<{ id: string }>(`/api/v1/universities/${encodeURIComponent(universityId)}/students`, {
+    method: 'POST',
+    body: { external_id: input.externalId.trim(), program_id: input.programId, full_name: input.fullName.trim(), group_name: input.groupName.trim() || null, status: input.status, started_at: input.startedAt, finished_at: input.finishedAt },
+  }));
+}
+
+export async function updateUniversityStudent(studentId: string, input: UniversityStudentInput): Promise<{ id: string }> {
+  return unwrapPassportMutation(await apiFetch<{ id: string }>(`/api/v1/students/${encodeURIComponent(studentId)}`, {
+    method: 'PATCH',
+    body: { program_id: input.programId, full_name: input.fullName.trim(), group_name: input.groupName.trim() || null, status: input.status, started_at: input.startedAt, finished_at: input.finishedAt },
+  }));
+}
+
+export async function deleteUniversityStudent(studentId: string): Promise<void> {
+  unwrapPassportMutation(await apiFetch<void>(`/api/v1/students/${encodeURIComponent(studentId)}`, { method: 'DELETE' }));
+}
+
 /** Typed frontend adapter for the future university products/licenses endpoint. */
 async function getMockUniversityProducts(id: string): Promise<UniversityProductRow[]> {
   const university = getUniversityOrThrow(id);
@@ -1437,6 +1472,16 @@ export interface UniversityMeetingRow {
   nextAction: string;
   dueDate: string | null;
   author: string;
+}
+
+export interface UniversityMeetingInput {
+  type: UniversityMeetingType;
+  subject: string;
+  meetingAt: string;
+  participants: string[];
+  outcome: string;
+  nextAction: string;
+  dueDate: string;
 }
 
 export interface UniversityResponsibleContact {
@@ -1540,6 +1585,24 @@ export async function getUniversityMeetings(id: string, page = 1, pageSize = 20,
     const items = await getMockUniversityMeetings(id);
     return { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: items.length };
   }, real: () => realGetUniversityMeetings(id, page, pageSize, signal) });
+}
+
+export async function createUniversityMeeting(universityId: string, input: UniversityMeetingInput): Promise<{ id: string }> {
+  return unwrapPassportMutation(await apiFetch<{ id: string }>(`/api/v1/universities/${encodeURIComponent(universityId)}/meetings`, {
+    method: 'POST',
+    body: { meeting_type: input.type, subject: input.subject.trim(), meeting_at: input.meetingAt, participants: input.participants.map((name) => ({ name })), outcome: input.outcome.trim() || null, next_action: input.nextAction.trim() || null, next_action_due: input.dueDate || null },
+  }));
+}
+
+export async function updateUniversityMeeting(meetingId: string, input: UniversityMeetingInput): Promise<{ id: string }> {
+  return unwrapPassportMutation(await apiFetch<{ id: string }>(`/api/v1/meetings/${encodeURIComponent(meetingId)}`, {
+    method: 'PATCH',
+    body: { meeting_type: input.type, subject: input.subject.trim(), meeting_at: input.meetingAt, participants: input.participants.map((name) => ({ name })), outcome: input.outcome.trim() || null, next_action: input.nextAction.trim() || null, next_action_due: input.dueDate || null },
+  }));
+}
+
+export async function deleteUniversityMeeting(meetingId: string): Promise<void> {
+  unwrapPassportMutation(await apiFetch<void>(`/api/v1/meetings/${encodeURIComponent(meetingId)}`, { method: 'DELETE' }));
 }
 
 /** Typed frontend adapter for the future university responsibles endpoint. */

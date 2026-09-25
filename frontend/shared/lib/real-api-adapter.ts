@@ -65,7 +65,7 @@ type ApiProduct = { id: string; name: string; version: string; vendor_name: stri
 type ApiDocument = { id: string; document_type: string; title: string; file_name: string; file_size: number; signed_at: string | null; expires_at: string | null; status: string; uploaded_by: string; created_at: string };
 type ApiMeeting = { id: string; meeting_type: string; subject: string; participants: string[]; outcome: string | null; next_action: string | null; next_action_due: string | null; meeting_at: string; created_by: string };
 type ApiMeetingRead = Omit<ApiMeeting, 'participants' | 'created_by'> & { participants: unknown[]; created_by_keycloak_sub: string };
-type ApiStudent = { id: string; external_id: string; university_id: string; program_id: string; full_name: string; group_name: string | null; status: string };
+type ApiStudent = { id: string; external_id: string; university_id: string; program_id: string; full_name: string; group_name: string | null; status: string; started_at: string; finished_at: string | null };
 type ApiResponsible = { id: string; full_name: string; email: string; phone: string | null; role: string };
 type ApiTimeline = { id: string; type: string; title: string; description: string | null; author: string; created_at: string };
 type ApiWorkflowSummary = { instance_id: string | null; template_name: string | null; current_stage: string | { code: string; name: string } | null; progress_percent: number; overdue_stages: number; next_due_date: string | null };
@@ -258,7 +258,7 @@ export async function realGetUniversityStudentsSummary(id: string, queryClient?:
 export async function realGetUniversityStudents(id: string, page = 1, pageSize = 20, signal?: AbortSignal): Promise<PaginatedResult<UniversityStudentListRow>> {
   const data = unwrap(await apiFetch<ApiPage<ApiStudent>>(`/api/v1/universities/${encodeURIComponent(id)}/students?page=${page}&page_size=${pageSize}`, { signal }), 'Не удалось загрузить студентов ВУЗа.');
   return {
-    items: data.items.map((item) => ({ id: item.id, externalId: item.external_id, studentName: item.full_name, programId: item.program_id, programName: 'Программа не указана', active: item.status === 'active' ? 1 : 0, graduated: item.status === 'graduated' ? 1 : 0, total: 1, flow: item.group_name, status: item.status })),
+    items: data.items.map((item) => ({ id: item.id, externalId: item.external_id, studentName: item.full_name, programId: item.program_id, programName: 'Программа не указана', active: item.status === 'active' ? 1 : 0, graduated: item.status === 'graduated' ? 1 : 0, total: 1, flow: item.group_name, status: item.status, startedAt: item.started_at, finishedAt: item.finished_at })),
     page: data.page, pageSize: data.page_size, total: data.total,
   };
 }
