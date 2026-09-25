@@ -5,6 +5,7 @@ import { apiFetch } from './api-client';
 import { ApiRequestError } from './api-errors';
 import { fromDataSource, isMockDataSource, isMockDataSourceFor } from './data-source';
 import { queryKeys } from './query-keys';
+import type { QueryClient } from '@tanstack/react-query';
 import { getMockResponsibleAssignment } from './responsible-assignments';
 import {
   getMockWorkflowCurrentStageId,
@@ -28,6 +29,7 @@ import {
   realGetUniversityPrograms,
   realGetUniversityResponsibles,
   realGetUniversityStudentsSummary,
+  realGetUniversityStudents,
   realGetUniversityTeachers,
 } from './real-api-adapter';
 
@@ -126,6 +128,10 @@ export const UNIVERSITY_LIST_CAPABILITIES = isMockDataSourceFor('universities')
       healthStatusSelection: 'single' as const,
       dateMeaning: 'created-at' as const,
     };
+
+export const UNIVERSITY_PASSPORT_CAPABILITIES = isMockDataSourceFor('passport')
+  ? { programStatusFilter: true, teacherReadinessFilter: true, documentFilters: true, externalData: true, mutations: true }
+  : { programStatusFilter: false, teacherReadinessFilter: false, documentFilters: false, externalData: false, mutations: false };
 // External LMS/website methods share the same Mock ↔ Real repository boundary.
 export {
   createWorkflowFromExternal,
@@ -298,7 +304,7 @@ export interface UniversityPassportMetrics {
   activePrograms: number;
   teachers: { total: number; ready: number; attention: number };
   licenses: { active: number; expiring: number; overdue: number };
-  documents: { total: number; signed: number; overdue: number };
+  documents: { total: number; signed: number; overdue: number; limited?: boolean };
 }
 
 export interface UniversityPassportWorkflow {
@@ -387,8 +393,8 @@ async function getMockUniversityPassport(id: string): Promise<UniversityPassport
   };
 }
 
-export async function getUniversityPassport(id: string): Promise<UniversityPassport> {
-  return fromDataSource({ mock: () => getMockUniversityPassport(id), real: () => realGetUniversityPassport(id) });
+export async function getUniversityPassport(id: string, queryClient?: QueryClient): Promise<UniversityPassport> {
+  return fromDataSource({ domain: 'passport', mock: () => getMockUniversityPassport(id), real: () => realGetUniversityPassport(id, queryClient) });
 }
 
 export type UniversityWorkflowStageStatus = 'completed' | 'current' | 'pending' | 'skipped' | 'overdue';
@@ -868,7 +874,8 @@ export interface UniversityHealthScore {
   breakdown: UniversityHealthScoreBreakdown[];
   reasons: UniversityHealthScoreReason[];
   history: UniversityHealthScoreHistoryPoint[];
-  previousSnapshot: UniversityHealthScoreHistoryPoint;
+  historyUnavailable?: boolean;
+  previousSnapshot: UniversityHealthScoreHistoryPoint | null;
 }
 
 export const universityHealthScoreQueryKey = queryKeys.universities.healthScore;
@@ -928,8 +935,8 @@ async function getMockUniversityHealthScore(id: string): Promise<UniversityHealt
   };
 }
 
-export async function getUniversityHealthScore(id: string): Promise<UniversityHealthScore> {
-  return fromDataSource({ mock: () => getMockUniversityHealthScore(id), real: () => realGetUniversityHealthScore(id) });
+export async function getUniversityHealthScore(id: string, signal?: AbortSignal): Promise<UniversityHealthScore> {
+  return fromDataSource({ domain: 'passport', signal, mock: () => getMockUniversityHealthScore(id), real: () => realGetUniversityHealthScore(id, signal) });
 }
 
 export interface UniversityProgramRow {
@@ -1028,7 +1035,15 @@ export interface UniversityStudentsSummary {
   byProgram: UniversityStudentsByProgram[];
 }
 
-export type UniversityProductStatus = 'active' | 'expiring' | 'expired';
+export interface UniversityStudentListRow extends UniversityStudentsByProgram {
+  id: string;
+  studentName?: string;
+  externalId?: string;
+  flow: string | null;
+  status?: string;
+}
+
+export type UniversityProductStatus = 'planned' | 'active' | 'expiring' | 'expired';
 
 export interface UniversityProductRow {
   id: string;
@@ -1044,6 +1059,7 @@ export const universityProgramsQueryKey = queryKeys.universities.programs;
 export const universityTeachersQueryKey = queryKeys.universities.teachers;
 export const teacherPassportQueryKey = queryKeys.teachers.passport;
 export const universityStudentsQueryKey = queryKeys.universities.students;
+export const universityStudentsSummaryQueryKey = queryKeys.universities.studentsSummary;
 export const universityProductsQueryKey = queryKeys.universities.products;
 
 const programDirections = ['Аналитика и данные', 'Цифровая трансформация', 'Информационная безопасность', 'Управление проектами'];
@@ -1098,8 +1114,11 @@ async function getMockUniversityPrograms(id: string): Promise<UniversityProgramR
   }));
 }
 
-export async function getUniversityPrograms(id: string): Promise<UniversityProgramRow[]> {
-  return fromDataSource({ mock: () => getMockUniversityPrograms(id), real: () => realGetUniversityPrograms(id) });
+export async function getUniversityPrograms(id: string, page = 1, pageSize = 20, signal?: AbortSignal): Promise<PaginatedResult<UniversityProgramRow>> {
+  return fromDataSource({ domain: 'passport', signal, mock: async () => {
+    const items = await getMockUniversityPrograms(id);
+    return { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: items.length };
+  }, real: () => realGetUniversityPrograms(id, page, pageSize, signal) });
 }
 
 /** Typed frontend adapter for the future university teachers endpoint. */
@@ -1108,8 +1127,11 @@ async function getMockUniversityTeachers(id: string): Promise<UniversityTeacherR
   return universityTeachersFixture(id);
 }
 
-export async function getUniversityTeachers(id: string): Promise<UniversityTeacherRow[]> {
-  return fromDataSource({ mock: () => getMockUniversityTeachers(id), real: () => realGetUniversityTeachers(id) });
+export async function getUniversityTeachers(id: string, page = 1, pageSize = 20, signal?: AbortSignal): Promise<PaginatedResult<UniversityTeacherRow>> {
+  return fromDataSource({ domain: 'passport', signal, mock: async () => {
+    const items = await getMockUniversityTeachers(id);
+    return { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: items.length };
+  }, real: () => realGetUniversityTeachers(id, page, pageSize, signal) });
 }
 
 function getTeacherPassportContext(id: string): { teacher: UniversityTeacherRow; university: UniversityListItem } {
@@ -1224,7 +1246,7 @@ async function getMockTeacherPassport(id: string): Promise<TeacherPassport> {
 }
 
 export async function getTeacherPassport(id: string): Promise<TeacherPassport> {
-  return fromDataSource({ mock: () => getMockTeacherPassport(id), real: () => realGetTeacherPassport(id) });
+  return fromDataSource({ domain: 'passport', mock: () => getMockTeacherPassport(id), real: () => realGetTeacherPassport(id) });
 }
 
 /** Typed frontend adapter for the future aggregate students endpoint. */
@@ -1250,8 +1272,16 @@ async function getMockUniversityStudentsSummary(id: string): Promise<UniversityS
   };
 }
 
-export async function getUniversityStudentsSummary(id: string): Promise<UniversityStudentsSummary> {
-  return fromDataSource({ mock: () => getMockUniversityStudentsSummary(id), real: () => realGetUniversityStudentsSummary(id) });
+export async function getUniversityStudentsSummary(id: string, queryClient?: QueryClient): Promise<UniversityStudentsSummary> {
+  return fromDataSource({ domain: 'passport', mock: () => getMockUniversityStudentsSummary(id), real: () => realGetUniversityStudentsSummary(id, queryClient) });
+}
+
+export async function getUniversityStudents(id: string, page = 1, pageSize = 20, signal?: AbortSignal): Promise<PaginatedResult<UniversityStudentListRow>> {
+  return fromDataSource<PaginatedResult<UniversityStudentListRow>>({ domain: 'passport', signal, mock: async () => {
+    const summary = await getMockUniversityStudentsSummary(id);
+    const items = summary.byProgram.map((row) => ({ ...row, id: row.programId, flow: null }));
+    return { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: items.length };
+  }, real: () => realGetUniversityStudents(id, page, pageSize, signal) });
 }
 
 /** Typed frontend adapter for the future university products/licenses endpoint. */
@@ -1273,8 +1303,8 @@ async function getMockUniversityProducts(id: string): Promise<UniversityProductR
   })).filter((_, index) => university.productIds ? index < 3 + (numericId % 3) : index < 2);
 }
 
-export async function getUniversityProducts(id: string): Promise<UniversityProductRow[]> {
-  return fromDataSource({ mock: () => getMockUniversityProducts(id), real: () => realGetUniversityProducts(id) });
+export async function getUniversityProducts(id: string, queryClient?: QueryClient): Promise<UniversityProductRow[]> {
+  return fromDataSource({ domain: 'passport', mock: () => getMockUniversityProducts(id), real: () => realGetUniversityProducts(id, queryClient) });
 }
 
 export type UniversityLicenseStatus = 'active' | 'expires_soon' | 'expired';
@@ -1291,7 +1321,7 @@ export interface UniversityLicenseRow {
   contract: string;
 }
 
-export type UniversityDocumentStatus = 'signed' | 'pending' | 'expired';
+export type UniversityDocumentStatus = 'signed' | 'pending' | 'expired' | 'archived';
 
 export interface UniversityDocumentRow {
   id: string;
@@ -1365,8 +1395,8 @@ async function getMockUniversityLicenses(id: string): Promise<UniversityLicenseR
   }).filter((_, index) => university.productIds ? index < 3 + (numericId % 3) : index < 2);
 }
 
-export async function getUniversityLicenses(id: string): Promise<UniversityLicenseRow[]> {
-  return fromDataSource({ mock: () => getMockUniversityLicenses(id), real: () => realGetUniversityLicenses(id) });
+export async function getUniversityLicenses(id: string, queryClient?: QueryClient): Promise<UniversityLicenseRow[]> {
+  return fromDataSource({ domain: 'passport', mock: () => getMockUniversityLicenses(id), real: () => realGetUniversityLicenses(id, queryClient) });
 }
 
 /** Typed frontend adapter for the future university documents endpoint. */
@@ -1395,8 +1425,8 @@ async function getMockUniversityDocuments(id: string): Promise<UniversityDocumen
   }));
 }
 
-export async function getUniversityDocuments(id: string): Promise<UniversityDocumentRow[]> {
-  return fromDataSource({ mock: () => getMockUniversityDocuments(id), real: () => realGetUniversityDocuments(id) });
+export async function getUniversityDocuments(id: string, queryClient?: QueryClient): Promise<UniversityDocumentRow[]> {
+  return fromDataSource({ domain: 'passport', mock: () => getMockUniversityDocuments(id), real: () => realGetUniversityDocuments(id, queryClient) });
 }
 
 /** Typed frontend adapter for the future university meetings endpoint. */
@@ -1423,8 +1453,11 @@ async function getMockUniversityMeetings(id: string): Promise<UniversityMeetingR
   }));
 }
 
-export async function getUniversityMeetings(id: string): Promise<UniversityMeetingRow[]> {
-  return fromDataSource({ mock: () => getMockUniversityMeetings(id), real: () => realGetUniversityMeetings(id) });
+export async function getUniversityMeetings(id: string, page = 1, pageSize = 20, signal?: AbortSignal): Promise<PaginatedResult<UniversityMeetingRow>> {
+  return fromDataSource({ domain: 'passport', signal, mock: async () => {
+    const items = await getMockUniversityMeetings(id);
+    return { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: items.length };
+  }, real: () => realGetUniversityMeetings(id, page, pageSize, signal) });
 }
 
 /** Typed frontend adapter for the future university responsibles endpoint. */
@@ -1448,6 +1481,6 @@ async function getMockUniversityResponsibles(id: string): Promise<UniversityResp
   return contacts;
 }
 
-export async function getUniversityResponsibles(id: string): Promise<UniversityResponsibleContact[]> {
-  return fromDataSource({ mock: () => getMockUniversityResponsibles(id), real: () => realGetUniversityResponsibles(id) });
+export async function getUniversityResponsibles(id: string, queryClient?: QueryClient): Promise<UniversityResponsibleContact[]> {
+  return fromDataSource({ domain: 'passport', mock: () => getMockUniversityResponsibles(id), real: () => realGetUniversityResponsibles(id, queryClient) });
 }

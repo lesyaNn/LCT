@@ -1,7 +1,7 @@
 'use client';
 
 export type DataSourceMode = 'mock' | 'real';
-export type DataSourceDomain = 'universities' | 'catalogs';
+export type DataSourceDomain = 'universities' | 'catalogs' | 'passport';
 
 const mockRequested = process.env.NEXT_PUBLIC_DATA_SOURCE === 'mock';
 const mockAllowed = process.env.NODE_ENV !== 'production'

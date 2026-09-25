@@ -211,10 +211,10 @@ export function UniversityWorkflow({ id, canAdvance }: { id: string; canAdvance:
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const programsQuery = useQuery({ queryKey: universityProgramsQueryKey(id), queryFn: () => getUniversityPrograms(id), staleTime: 30_000 });
+  const programsQuery = useQuery({ queryKey: universityProgramsQueryKey(id, 1, 100), queryFn: ({ signal }) => getUniversityPrograms(id, 1, 100, signal), staleTime: 30_000 });
   const externalQuery = useQuery({ queryKey: universityExternalDataQueryKey(id, 'website'), queryFn: () => getUniversityExternalData(id, 'website'), staleTime: 30_000 });
   const programs = useMemo(() => {
-    const base = programsQuery.data ?? [];
+    const base = programsQuery.data?.items ?? [];
     const applications = externalQuery.data?.applications ?? [];
     const result = new Map<string, { key: string; name: string; instanceId: string | null; externalIds: string[] }>();
     for (const program of base) {

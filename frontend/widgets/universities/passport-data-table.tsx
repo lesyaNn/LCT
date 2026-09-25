@@ -29,6 +29,7 @@ interface PassportDataTableProps<T extends { id: string }> {
   mobileFields: PassportMobileField<T>[];
   emptyMessage: string;
   pageSize?: number;
+  serverPagination?: { page: number; pageSize: number; total: number; onPageChange: (page: number) => void };
   groupBy?: (row: T) => string;
 }
 
@@ -45,7 +46,7 @@ function SortIcon({ direction }: { direction: SortDirection | null }) {
   return <ChevronSort size={16} fill="currentColor" />;
 }
 
-export function PassportDataTable<T extends { id: string }>({ rows, columns, mobileFields, emptyMessage, pageSize = 20, groupBy }: PassportDataTableProps<T>) {
+export function PassportDataTable<T extends { id: string }>({ rows, columns, mobileFields, emptyMessage, pageSize = 20, serverPagination, groupBy }: PassportDataTableProps<T>) {
   const [sortId, setSortId] = useState<string | null>(null);
   const [direction, setDirection] = useState<SortDirection>('asc');
   const [page, setPage] = useState(1);
@@ -58,9 +59,9 @@ export function PassportDataTable<T extends { id: string }>({ rows, columns, mob
     return [...rows].sort((left, right) => compareValues(column.sortValue?.(left) ?? '', column.sortValue?.(right) ?? '') * (direction === 'desc' ? -1 : 1));
   }, [direction, rows, sortId, sortableColumns]);
 
-  const totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize));
-  const currentPage = Math.min(page, totalPages);
-  const visibleRows = sortedRows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const totalPages = Math.max(1, Math.ceil((serverPagination?.total ?? sortedRows.length) / (serverPagination?.pageSize ?? pageSize)));
+  const currentPage = Math.min(serverPagination?.page ?? page, totalPages);
+  const visibleRows = serverPagination ? sortedRows : sortedRows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const visibleGroups = useMemo(() => {
     if (!groupBy) return [{ label: null, rows: visibleRows }];
     const groups = new Map<string, T[]>();
@@ -73,7 +74,8 @@ export function PassportDataTable<T extends { id: string }>({ rows, columns, mob
 
   const handleSort = (column: PassportTableColumn<T>) => {
     if (!column.sortable || !column.sortValue) return;
-    setPage(1);
+    if (serverPagination) serverPagination.onPageChange(1);
+    else setPage(1);
     if (sortId === column.id) {
       setDirection((current) => current === 'asc' ? 'desc' : 'asc');
     } else {
@@ -116,8 +118,8 @@ export function PassportDataTable<T extends { id: string }>({ rows, columns, mob
         <div className={styles.pagination} aria-label="Пагинация таблицы">
           <span>Страница {currentPage} из {totalPages}</span>
           <div className={styles.paginationActions}>
-            <Button variant="ghost" size="s" type="button" disabled={currentPage === 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Назад</Button>
-            <Button variant="ghost" size="s" type="button" disabled={currentPage === totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>Далее</Button>
+            <Button variant="ghost" size="s" type="button" disabled={currentPage === 1} onClick={() => serverPagination ? serverPagination.onPageChange(Math.max(1, currentPage - 1)) : setPage((current) => Math.max(1, current - 1))}>Назад</Button>
+            <Button variant="ghost" size="s" type="button" disabled={currentPage === totalPages} onClick={() => serverPagination ? serverPagination.onPageChange(Math.min(totalPages, currentPage + 1)) : setPage((current) => Math.min(totalPages, current + 1))}>Далее</Button>
           </div>
         </div>
       ) : null}

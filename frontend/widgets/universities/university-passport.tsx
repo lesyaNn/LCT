@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useSyncExternalStore } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Checklist from '@atomaro/icons/24/action/Checklist';
 import TimeStroke from '@atomaro/icons/24/alert/TimeStroke';
 import Group from '@atomaro/icons/24/business/Group';
@@ -16,11 +16,15 @@ import Edit from '@atomaro/icons/24/editor/Edit';
 import ArrowRight from '@atomaro/icons/24/navigation/ArrowRight';
 import { useAuth } from '@/shared/auth/AuthProvider';
 import { formatDateRu, formatDateTimeRu } from '@/shared/lib/formatters';
-import { getHealthStatus, healthStatusMeta, type HealthStatus } from '@/shared/lib/health-score';
+import { healthStatusMeta, type HealthStatus } from '@/shared/lib/health-score';
+import { normalizeApiError } from '@/shared/lib/api-errors';
 import { workflowStatusIntent } from '@/shared/lib/status-semantics';
 import {
   getUniversityPassport,
+  getUniversityHealthScore,
   universityPassportQueryKey,
+  universityHealthScoreQueryKey,
+  UNIVERSITY_PASSPORT_CAPABILITIES,
   type UniversityPassport,
   type UniversityPassportEvent,
   type UniversityPassportEventType,
@@ -33,6 +37,8 @@ import { EmptyState } from '@/shared/ui/empty-state';
 import { MetricCard } from '@/shared/ui/rtk/metric-card';
 import { StatusBadge as SemanticStatusBadge } from '@/shared/ui/rtk/status-badge';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
+import { NotFoundState } from '@/shared/ui/not-found-state';
+import { ForbiddenState } from '@/shared/ui/access-state';
 import { MetricCardSkeleton, Skeleton, SkeletonGroup } from '@/shared/ui/skeleton';
 import { UniversityHealthScore } from './university-health-score';
 import { UniversityHistory } from './university-history';
@@ -84,8 +90,8 @@ function StatusBadge({ status }: { status: HealthStatus }) {
   return <SemanticStatusBadge intent={meta.tone}>{meta.label}</SemanticStatusBadge>;
 }
 
-function HeaderHealth({ score, onDetails }: { score: number; onDetails: () => void }) {
-  const status = getHealthStatus(score);
+function HeaderHealth({ score, status, onDetails }: { score: number | null; status: HealthStatus | null; onDetails: () => void }) {
+  if (score === null || status === null) return <div className={styles.healthSummary}><span className={styles.overline}>Health Score</span><strong className={styles.healthScore}>—</strong><button className={styles.textAction} type="button" onClick={onDetails}>Подробнее <ArrowRight size={14} fill="currentColor" /></button></div>;
   return (
     <div className={styles.healthSummary}>
       <div className={styles.healthSummaryTop}>
@@ -103,7 +109,7 @@ function HeaderHealth({ score, onDetails }: { score: number; onDetails: () => vo
   );
 }
 
-function PassportHeader({ passport, canEdit, canReport, onTabChange }: { passport: UniversityPassport; canEdit: boolean; canReport: boolean; onTabChange: (tab: PassportTabId) => void }) {
+function PassportHeader({ passport, healthScore, healthStatus, canEdit, canReport, onTabChange }: { passport: UniversityPassport; healthScore: number | null; healthStatus: HealthStatus | null; canEdit: boolean; canReport: boolean; onTabChange: (tab: PassportTabId) => void }) {
   return (
     <header className={styles.header}>
       <div className={styles.headerMain}>
@@ -112,7 +118,7 @@ function PassportHeader({ passport, canEdit, canReport, onTabChange }: { passpor
           <p className={styles.city}>{passport.city}</p>
         </div>
         <div className={styles.headerSide}>
-          <HeaderHealth score={passport.healthScore} onDetails={() => onTabChange('health-score')} />
+          <HeaderHealth score={healthScore} status={healthStatus} onDetails={() => onTabChange('health-score')} />
           <div className={styles.headerActions} aria-label="Действия с вузом">
             {canEdit ? <Button variant="secondary" size="s" type="button" disabled title="Редактирование подключится после появления API"><Edit size={16} fill="currentColor" />Редактировать</Button> : null}
             {canReport ? <Button variant="secondary" size="s" type="button" disabled title="Формирование отчёта подключится после появления API"><DocumentText size={16} fill="currentColor" />Отчёт</Button> : null}
@@ -134,7 +140,7 @@ function OverviewMetrics({ passport }: { passport: UniversityPassport }) {
         <MetricCard label="Активные программы" value={metrics.activePrograms} icon={Book} />
         <MetricCard label="Преподаватели" value={metrics.teachers.total} icon={Group} indicators={[{ value: metrics.teachers.ready, label: 'готовы', intent: 'success' }, { value: metrics.teachers.attention, label: 'требуют внимания', intent: 'warning' }]} />
         <MetricCard label="Лицензии" value={licensesTotal} icon={Education} indicators={[{ value: metrics.licenses.active, label: 'действуют', intent: 'success' }, { value: metrics.licenses.expiring, label: 'истекают', intent: 'warning' }, { value: metrics.licenses.overdue, label: 'просрочены', intent: 'danger' }]} />
-        <MetricCard label="Документы" value={metrics.documents.total} icon={DocumentText} indicators={[{ value: metrics.documents.signed, label: 'подписано', intent: 'success' }, { value: metrics.documents.overdue, label: 'просрочено', intent: 'danger' }]} />
+        <MetricCard label="Документы" value={metrics.documents.limited ? `≥${metrics.documents.total}` : metrics.documents.total} icon={DocumentText} indicators={metrics.documents.limited ? undefined : [{ value: metrics.documents.signed, label: 'подписано', intent: 'success' }, { value: metrics.documents.overdue, label: 'просрочено', intent: 'danger' }]} />
       </div>
     </section>
   );
@@ -198,16 +204,18 @@ function PassportSkeleton() {
 }
 
 export function UniversityPassport({ id }: { id: string }) {
+  const queryClient = useQueryClient();
   const mobileLayout = useSyncExternalStore(subscribeToMobileLayout, isMobileLayout, () => false);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { user } = useAuth();
   const activeTab = parseTab(searchParams.get('tab'));
-  const query = useQuery({ queryKey: universityPassportQueryKey(id), queryFn: () => getUniversityPassport(id), staleTime: 30_000 });
+  const query = useQuery({ queryKey: universityPassportQueryKey(id), queryFn: () => getUniversityPassport(id, queryClient), staleTime: 30_000 });
+  const healthQuery = useQuery({ queryKey: universityHealthScoreQueryKey(id), queryFn: ({ signal }) => getUniversityHealthScore(id, signal), enabled: query.isSuccess, staleTime: 30_000 });
   const canEdit = user?.role === 'admin';
   const canReport = user?.role === 'admin' || user?.role === 'manager';
-  const canAdvance = canReport;
+  const canAdvance = canReport && UNIVERSITY_PASSPORT_CAPABILITIES.mutations;
   const activeTabDefinition = useMemo(() => tabDefinitions.find((tab) => tab.id === activeTab) ?? tabDefinitions[0], [activeTab]);
 
   const selectTab = (tab: PassportTabId) => {
@@ -217,6 +225,8 @@ export function UniversityPassport({ id }: { id: string }) {
   };
 
   if (query.isPending) return <PassportSkeleton />;
+  if (query.isError && normalizeApiError(query.error).kind === 'not-found') return <NotFoundState />;
+  if (query.isError && normalizeApiError(query.error).kind === 'permission') return <ForbiddenState />;
   if (query.isError || !query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
 
   const passport = query.data;
@@ -239,7 +249,7 @@ export function UniversityPassport({ id }: { id: string }) {
     : tab === 'meetings'
       ? <MeetingsSection id={id} canAdd={canReport} />
     : tab === 'responsibles'
-      ? <ResponsiblesSection id={id} canEdit={canReport} />
+      ? <ResponsiblesSection id={id} canEdit={canReport && UNIVERSITY_PASSPORT_CAPABILITIES.mutations} />
     : tab === 'workflow'
       ? <UniversityWorkflow id={id} canAdvance={canAdvance} />
     : tab === 'history'
@@ -248,7 +258,7 @@ export function UniversityPassport({ id }: { id: string }) {
 
   return (
     <div className={styles.page}>
-      <PassportHeader passport={passport} canEdit={canEdit} canReport={canReport} onTabChange={selectTab} />
+      <PassportHeader passport={passport} healthScore={healthQuery.data?.currentScore ?? null} healthStatus={healthQuery.data?.status ?? null} canEdit={canEdit && UNIVERSITY_PASSPORT_CAPABILITIES.mutations} canReport={canReport} onTabChange={selectTab} />
       <TabbedSurface tabs={!mobileLayout ? <Tabs items={tabDefinitions} activeId={activeTab} onChange={(id) => selectTab(id as PassportTabId)} label="Разделы паспорта вуза" prefix="passport-tab" /> : undefined}>
       {!mobileLayout ? <div className={styles.desktopPanel} id="passport-panel" role="tabpanel" aria-labelledby={`passport-tab-${activeTab}`}>{renderContent(activeTab)}</div> : null}
       {mobileLayout ? <div className={styles.mobileAccordion} aria-label="Разделы паспорта вуза">

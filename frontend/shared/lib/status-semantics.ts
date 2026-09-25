@@ -19,8 +19,8 @@ export const certificateStatusIntent: Record<TeacherCertificateStatus, SemanticI
 export const certificateStatusLabels: Record<TeacherCertificateStatus, string> = { ...expirationStatusLabels, no_expiry: 'Бессрочный' };
 export const upcomingDateIntent: Record<UpcomingDateStatus, SemanticIntent> = { long_term: 'success', approaching: 'warning', urgent: 'danger', overdue: 'danger', unknown: 'neutral' };
 export const licenseStatusIntent: Record<UniversityLicenseStatus, SemanticIntent> = { active: 'success', expires_soon: 'warning', expired: 'danger' };
-export const documentStatusIntent: Record<UniversityDocumentStatus, SemanticIntent> = { signed: 'success', pending: 'warning', expired: 'danger' };
-export const productStatusIntent: Record<UniversityProductStatus, SemanticIntent> = { active: 'success', expiring: 'warning', expired: 'danger' };
+export const documentStatusIntent: Record<UniversityDocumentStatus, SemanticIntent> = { signed: 'success', pending: 'warning', expired: 'danger', archived: 'neutral' };
+export const productStatusIntent: Record<UniversityProductStatus, SemanticIntent> = { planned: 'neutral', active: 'success', expiring: 'warning', expired: 'danger' };
 export const workflowStatusIntent: Record<UniversityPassportWorkflow['status'], SemanticIntent> = { in_progress: 'brand', completed: 'success', attention: 'warning' };
 export const workflowStageStatusSemantics: Record<UniversityWorkflowStageStatus, { label: string; intent: SemanticIntent; icon: WorkflowStageIcon; muted: boolean; titleDecoration: 'none' | 'strike'; emphasis: 'default' | 'current' | 'error' }> = {
   completed: { label: 'Завершён', intent: 'success', icon: 'check', muted: false, titleDecoration: 'strike', emphasis: 'default' },

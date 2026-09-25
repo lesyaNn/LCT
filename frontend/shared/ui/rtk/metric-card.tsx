@@ -12,7 +12,7 @@ interface MetricIndicator {
 
 interface MetricCardProps {
   label: string;
-  value: number;
+  value: number | string;
   icon?: ComponentType<{ fill?: string; size?: number }>;
   indicators?: MetricIndicator[];
   centered?: boolean;

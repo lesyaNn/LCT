@@ -73,8 +73,8 @@ function ScoreRing({ score, status }: { score: number; status: HealthStatus }) {
 }
 
 function HealthScoreHero({ data }: { data: UniversityHealthScore }) {
-  const status = getHealthStatus(data.currentScore);
-  const delta = data.currentScore - data.previousSnapshot.score;
+  const status = data.status;
+  const delta = data.previousSnapshot ? data.currentScore - data.previousSnapshot.score : 0;
   const DeltaIcon = delta > 0 ? ArrowUp : delta < 0 ? ArrowDown : StatisticsBoard;
   const deltaTone = delta > 0 ? 'positive' : delta < 0 ? 'negative' : 'neutral';
   const deltaText = delta > 0 ? `+${delta}` : String(delta);
@@ -84,7 +84,7 @@ function HealthScoreHero({ data }: { data: UniversityHealthScore }) {
       <div className={styles.heroCopy}>
         <p className={styles.eyebrow}>ОЦЕНКА СОСТОЯНИЯ</p>
         <div className={styles.heroStatus}><span className={`${styles.statusDot} ${styles[`dot-${status}`]}`} aria-hidden="true" /><strong>{statusDescriptions[status]}</strong><span className={styles.statusLabel}>{healthStatusMeta[status].label}</span></div>
-        <div className={`${styles.delta} ${styles[`delta-${deltaTone}`]}`}><DeltaIcon size={16} fill="currentColor" /><span>Изменение за неделю: <strong>{deltaText}</strong></span><small>с {formatLongDate(data.previousSnapshot.date)}</small></div>
+        {data.previousSnapshot ? <div className={`${styles.delta} ${styles[`delta-${deltaTone}`]}`}><DeltaIcon size={16} fill="currentColor" /><span>Изменение за неделю: <strong>{deltaText}</strong></span><small>с {formatLongDate(data.previousSnapshot.date)}</small></div> : null}
       </div>
       <ScoreRing score={data.currentScore} status={status} />
     </section>
@@ -144,12 +144,12 @@ function HistoryTooltip({ active, payload }: TooltipContentProps) {
   return <div className={styles.tooltip} role="status"><strong>{formatLongDate(point.date)}</strong><span>Health Score: {point.score}</span></div>;
 }
 
-function History({ history }: { history: UniversityHealthScoreHistoryPoint[] }) {
+function History({ history, unavailable, onRetry }: { history: UniversityHealthScoreHistoryPoint[]; unavailable?: boolean; onRetry: () => void }) {
   const sectionRef = useRef<HTMLElement>(null);
   return (
     <section className={styles.section} aria-labelledby="health-score-history-title" ref={sectionRef}>
       <div className={styles.sectionHeading}><h2 id="health-score-history-title">Динамика за 30 дней</h2><ChartExportMenu filenameSlug="health-score-dynamics" targetRef={sectionRef} testId="chart-export-health-score-dynamics" /></div>
-      {history.length ? <div className={styles.historyChart} role="img" aria-label="Динамика Health Score за последние 30 дней"><ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={230}><LineChart data={history} margin={{ top: 12, right: 12, bottom: 4, left: 4 }}><CartesianGrid stroke="var(--rtk-color-border)" strokeDasharray="3 3" vertical={false} /><XAxis dataKey="date" tickFormatter={formatHistoryDate} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} interval="preserveStartEnd" /><YAxis domain={[0, 100]} ticks={[0, 50, 100]} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} width={34} /><Tooltip content={HistoryTooltip} cursor={{ stroke: 'var(--rtk-color-border-strong)' }} /><Line type="monotone" dataKey="score" name="Health Score" stroke="var(--health-score-line)" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} isAnimationActive={false} /></LineChart></ResponsiveContainer></div> : <EmptyState icon={<StatisticsBoard size={20} fill="currentColor" />} title="Нет данных о динамике" description="График появится после накопления истории." headingLevel={3} />}
+      {unavailable ? <RouteErrorState compact title="Не удалось загрузить динамику" onRetry={onRetry} /> : history.length ? <div className={styles.historyChart} role="img" aria-label="Динамика Health Score за последние 30 дней"><ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={230}><LineChart data={history} margin={{ top: 12, right: 12, bottom: 4, left: 4 }}><CartesianGrid stroke="var(--rtk-color-border)" strokeDasharray="3 3" vertical={false} /><XAxis dataKey="date" tickFormatter={formatHistoryDate} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} interval="preserveStartEnd" /><YAxis domain={[0, 100]} ticks={[0, 50, 100]} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} width={34} /><Tooltip content={HistoryTooltip} cursor={{ stroke: 'var(--rtk-color-border-strong)' }} /><Line type="monotone" dataKey="score" name="Health Score" stroke="var(--health-score-line)" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} isAnimationActive={false} /></LineChart></ResponsiveContainer></div> : <EmptyState icon={<StatisticsBoard size={20} fill="currentColor" />} title="Нет данных о динамике" description="График появится после накопления истории." headingLevel={3} />}
       {history.length ? <div className={styles.historyLegend}><span className={styles.historyLegendLine} aria-hidden="true" />Health Score</div> : null}
     </section>
   );
@@ -160,11 +160,11 @@ function HealthScoreSkeleton() {
 }
 
 export function UniversityHealthScore({ id }: { id: string }) {
-  const query = useQuery({ queryKey: universityHealthScoreQueryKey(id), queryFn: () => getUniversityHealthScore(id), staleTime: 30_000 });
+  const query = useQuery({ queryKey: universityHealthScoreQueryKey(id), queryFn: ({ signal }) => getUniversityHealthScore(id, signal), staleTime: 30_000 });
   if (query.isPending) return <HealthScoreSkeleton />;
   if (query.isError || !query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
 
   const data = query.data;
-  const status = getHealthStatus(data.currentScore);
-  return <div className={`${styles.page} ${styles[`theme-${status}`]}`}><HealthScoreHero data={data} /><Breakdown data={data.breakdown} /><Reasons reasons={data.reasons} /><History history={data.history} /></div>;
+  const status = data.status;
+  return <div className={`${styles.page} ${styles[`theme-${status}`]}`}><HealthScoreHero data={data} /><Breakdown data={data.breakdown} /><Reasons reasons={data.reasons} /><History history={data.history} unavailable={data.historyUnavailable} onRetry={() => void query.refetch()} /></div>;
 }

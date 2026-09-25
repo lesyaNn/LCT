@@ -1,7 +1,8 @@
 import { apiFetch, apiUploadFormData } from './api-client';
+import type { QueryClient } from '@tanstack/react-query';
+import { queryKeys } from './query-keys';
 import { ApiRequestError } from './api-errors';
 import { getExpirationStatus } from './formatters';
-import { getHealthStatus } from './health-score';
 import type { ImportExecuteResponse, ImportOptions, ImportPreviewResponse } from './import-repository';
 import type { CatalogInput, CatalogItem, CatalogListQuery, CatalogListResult, CatalogReferenceData, CatalogType, ResponsibleCatalogItem } from './catalogs-repository';
 import type {
@@ -35,6 +36,7 @@ import type {
   UniversityResponsible,
   UniversityResponsibleContact,
   UniversityStudentsSummary,
+  UniversityStudentListRow,
   UniversityTeacherRow,
 } from './universities-repository';
 import type {
@@ -62,9 +64,11 @@ type ApiLicense = { id: string; license_number: string; product_name: string; ve
 type ApiProduct = { id: string; name: string; version: string; vendor_name: string; status: string; license: ApiLicense | null };
 type ApiDocument = { id: string; document_type: string; title: string; file_name: string; file_size: number; signed_at: string | null; expires_at: string | null; status: string; uploaded_by: string; created_at: string };
 type ApiMeeting = { id: string; meeting_type: string; subject: string; participants: string[]; outcome: string | null; next_action: string | null; next_action_due: string | null; meeting_at: string; created_by: string };
+type ApiMeetingRead = Omit<ApiMeeting, 'participants' | 'created_by'> & { participants: unknown[]; created_by_keycloak_sub: string };
+type ApiStudent = { id: string; external_id: string; university_id: string; program_id: string; full_name: string; group_name: string | null; status: string };
 type ApiResponsible = { id: string; full_name: string; email: string; phone: string | null; role: string };
 type ApiTimeline = { id: string; type: string; title: string; description: string | null; author: string; created_at: string };
-type ApiWorkflowSummary = { instance_id: string | null; template_name: string | null; current_stage: string | null; progress_percent: number; overdue_stages: number; next_due_date: string | null };
+type ApiWorkflowSummary = { instance_id: string | null; template_name: string | null; current_stage: string | { code: string; name: string } | null; progress_percent: number; overdue_stages: number; next_due_date: string | null };
 type ApiStudents = { total: number; active: number; graduated: number; by_status: Record<string, number>; by_program: Array<{ program_id: string; program_name: string; total: number; active: number; graduated: number }> };
 type ApiPassport = {
   university: { id: string; name: string; city: string | null };
@@ -98,9 +102,19 @@ function unwrap<T>(result: Awaited<ReturnType<typeof apiFetch<T>>>, message: str
   throw new ApiRequestError(result.status, result.body, message, result.error);
 }
 
-async function passport(id: string, include = ''): Promise<ApiPassport> {
+async function passport(id: string, include = '', signal?: AbortSignal): Promise<ApiPassport> {
   const suffix = include ? `?include=${encodeURIComponent(include)}` : '';
-  return unwrap(await apiFetch<ApiPassport>(`/api/v1/universities/${encodeURIComponent(id)}/passport${suffix}`), 'Не удалось загрузить паспорт ВУЗа.');
+  return unwrap(await apiFetch<ApiPassport>(`/api/v1/universities/${encodeURIComponent(id)}/passport${suffix}`, { signal }), 'Не удалось загрузить паспорт ВУЗа.');
+}
+
+/** The aggregate is the sole backend source for passport-only blocks. */
+async function passportBundle(id: string, queryClient?: QueryClient): Promise<ApiPassport> {
+  if (!queryClient) return passport(id);
+  return queryClient.ensureQueryData({
+    queryKey: queryKeys.universities.passportBundle(id),
+    queryFn: ({ signal }) => passport(id, '', signal),
+    staleTime: 30_000,
+  });
 }
 
 function responsible(value: string | null): UniversityResponsible | null {
@@ -186,8 +200,8 @@ export async function realGetUniversities(params: UniversityListQuery, signal?: 
   };
 }
 
-export async function realGetUniversityPassport(id: string): Promise<UniversityPassport> {
-  const data = await passport(id, 'health_score');
+export async function realGetUniversityPassport(id: string, queryClient?: QueryClient): Promise<UniversityPassport> {
+  const data = await passportBundle(id, queryClient);
   const totalSteps = 100;
   const workflowStatus: UniversityPassport['workflow']['status'] = data.workflow_summary.overdue_stages > 0 ? 'attention' : data.workflow_summary.progress_percent >= 100 ? 'completed' : 'in_progress';
   return {
@@ -199,10 +213,10 @@ export async function realGetUniversityPassport(id: string): Promise<UniversityP
       activePrograms: data.programs.filter((item) => item.status === 'active' || item.status === 'launched').length,
       teachers: { total: data.teachers.length, ready: data.teachers.filter((item) => item.readiness === 'ready').length, attention: data.teachers.filter((item) => item.readiness !== 'ready').length },
       licenses: { active: data.licenses.filter((item) => item.status === 'active').length, expiring: data.licenses.filter((item) => item.status === 'expires_soon').length, overdue: data.licenses.filter((item) => item.status === 'expired').length },
-      documents: { total: data.documents.length, signed: data.documents.filter((item) => item.status === 'signed').length, overdue: data.documents.filter((item) => item.status === 'archived').length },
+      documents: { total: data.documents.length, signed: data.documents.filter((item) => item.status === 'signed').length, overdue: data.documents.filter((item) => item.status === 'expired').length, limited: data.documents.length >= 20 },
     },
     workflow: {
-      currentStage: { id: data.workflow_summary.instance_id ?? 'not-started', name: data.workflow_summary.current_stage ?? 'Не запущен', tone: workflowStatus === 'attention' ? 'warning' : workflowStatus === 'completed' ? 'success' : 'brand' },
+      currentStage: { id: data.workflow_summary.instance_id ?? 'not-started', name: typeof data.workflow_summary.current_stage === 'string' ? data.workflow_summary.current_stage : data.workflow_summary.current_stage?.name ?? 'Не запущен', tone: workflowStatus === 'attention' ? 'warning' : workflowStatus === 'completed' ? 'success' : 'brand' },
       status: workflowStatus,
       deadline: data.workflow_summary.next_due_date ?? '',
       overdue: data.workflow_summary.overdue_stages > 0,
@@ -220,24 +234,32 @@ export async function realGetUniversityPassport(id: string): Promise<UniversityP
   };
 }
 
-export async function realGetUniversityPrograms(id: string): Promise<UniversityProgramRow[]> {
-  const data = unwrap(await apiFetch<ApiPage<ApiProgram>>(`/api/v1/universities/${encodeURIComponent(id)}/passport/programs?page=1&page_size=100`), 'Не удалось загрузить программы ВУЗа.');
-  return data.items.map(mapProgram);
+export async function realGetUniversityPrograms(id: string, page = 1, pageSize = 20, signal?: AbortSignal): Promise<PaginatedResult<UniversityProgramRow>> {
+  const data = unwrap(await apiFetch<ApiPage<ApiProgram>>(`/api/v1/universities/${encodeURIComponent(id)}/passport/programs?page=${page}&page_size=${pageSize}`, { signal }), 'Не удалось загрузить программы ВУЗа.');
+  return { items: data.items.map(mapProgram), page: data.page, pageSize: data.page_size, total: data.total };
 }
 
-export async function realGetUniversityTeachers(id: string): Promise<UniversityTeacherRow[]> {
-  const data = unwrap(await apiFetch<ApiPage<ApiTeacher>>(`/api/v1/universities/${encodeURIComponent(id)}/passport/teachers?page=1&page_size=100`), 'Не удалось загрузить преподавателей ВУЗа.');
-  return data.items.map(mapTeacher);
+export async function realGetUniversityTeachers(id: string, page = 1, pageSize = 20, signal?: AbortSignal): Promise<PaginatedResult<UniversityTeacherRow>> {
+  const data = unwrap(await apiFetch<ApiPage<ApiTeacher>>(`/api/v1/universities/${encodeURIComponent(id)}/passport/teachers?page=${page}&page_size=${pageSize}`, { signal }), 'Не удалось загрузить преподавателей ВУЗа.');
+  return { items: data.items.map(mapTeacher), page: data.page, pageSize: data.page_size, total: data.total };
 }
 
-export async function realGetUniversityStudentsSummary(id: string): Promise<UniversityStudentsSummary> {
-  const data = (await passport(id)).students_summary;
+export async function realGetUniversityStudentsSummary(id: string, queryClient?: QueryClient): Promise<UniversityStudentsSummary> {
+  const data = (await passportBundle(id, queryClient)).students_summary;
   return {
     total: data.total,
     active: data.active,
     graduated: data.graduated,
     academicLeave: data.by_status.academic_leave ?? 0,
     byProgram: data.by_program.map((item) => ({ programId: item.program_id, programName: item.program_name, active: item.active, graduated: item.graduated, total: item.total })),
+  };
+}
+
+export async function realGetUniversityStudents(id: string, page = 1, pageSize = 20, signal?: AbortSignal): Promise<PaginatedResult<UniversityStudentListRow>> {
+  const data = unwrap(await apiFetch<ApiPage<ApiStudent>>(`/api/v1/universities/${encodeURIComponent(id)}/students?page=${page}&page_size=${pageSize}`, { signal }), 'Не удалось загрузить студентов ВУЗа.');
+  return {
+    items: data.items.map((item) => ({ id: item.id, externalId: item.external_id, studentName: item.full_name, programId: item.program_id, programName: 'Программа не указана', active: item.status === 'active' ? 1 : 0, graduated: item.status === 'graduated' ? 1 : 0, total: 1, flow: item.group_name, status: item.status })),
+    page: data.page, pageSize: data.page_size, total: data.total,
   };
 }
 
@@ -355,21 +377,21 @@ export async function realCreateWorkflowFromExternal(
   };
 }
 
-export async function realGetUniversityProducts(id: string): Promise<UniversityProductRow[]> {
-  const data = (await passport(id)).products;
+export async function realGetUniversityProducts(id: string, queryClient?: QueryClient): Promise<UniversityProductRow[]> {
+  const data = (await passportBundle(id, queryClient)).products;
   return data.map((item) => ({
     id: item.id,
     name: item.name,
     version: item.version,
     vendor: item.vendor_name,
-    status: item.status === 'expired' ? 'expired' : item.status === 'active' ? 'active' : 'expiring',
+    status: item.status === 'expired' ? 'expired' : item.status === 'active' ? 'active' : 'planned',
     licenseNumber: item.license?.license_number ?? '—',
     expiresAt: item.license?.expires_at ?? '',
   }));
 }
 
-export async function realGetUniversityLicenses(id: string): Promise<UniversityLicenseRow[]> {
-  const data = (await passport(id)).licenses;
+export async function realGetUniversityLicenses(id: string, queryClient?: QueryClient): Promise<UniversityLicenseRow[]> {
+  const data = (await passportBundle(id, queryClient)).licenses;
   return data.map((item) => ({
     id: item.id,
     product: item.product_name,
@@ -383,8 +405,8 @@ export async function realGetUniversityLicenses(id: string): Promise<UniversityL
   }));
 }
 
-export async function realGetUniversityDocuments(id: string): Promise<UniversityDocumentRow[]> {
-  const data = (await passport(id)).documents;
+export async function realGetUniversityDocuments(id: string, queryClient?: QueryClient): Promise<UniversityDocumentRow[]> {
+  const data = (await passportBundle(id, queryClient)).documents;
   return data.map((item) => ({
     id: item.id,
     type: item.document_type,
@@ -393,29 +415,33 @@ export async function realGetUniversityDocuments(id: string): Promise<University
     fileSize: item.file_size ? `${Math.max(1, Math.round(item.file_size / 1024))} КБ` : '0 КБ',
     signedAt: item.signed_at,
     expiresAt: item.expires_at,
-    status: item.status === 'signed' ? 'signed' : item.status === 'archived' ? 'expired' : 'pending',
+    status: item.status === 'signed' ? 'signed' : item.status === 'archived' ? 'archived' : 'pending',
     uploadedBy: item.uploaded_by,
     uploadedAt: item.created_at,
   }));
 }
 
-export async function realGetUniversityMeetings(id: string): Promise<UniversityMeetingRow[]> {
-  const data = (await passport(id)).meetings;
-  return data.map((item) => ({
+export async function realGetUniversityMeetings(id: string, page = 1, pageSize = 20, signal?: AbortSignal): Promise<PaginatedResult<UniversityMeetingRow>> {
+  const data = unwrap(await apiFetch<ApiPage<ApiMeetingRead>>(`/api/v1/universities/${encodeURIComponent(id)}/meetings?page=${page}&page_size=${pageSize}`, { signal }), 'Не удалось загрузить встречи ВУЗа.');
+  return { items: data.items.map((item) => ({
     id: item.id,
     occurredAt: item.meeting_at,
     type: item.meeting_type === 'offline' || item.meeting_type === 'phone' || item.meeting_type === 'email' ? item.meeting_type : 'online',
     subject: item.subject,
-    participants: item.participants.map((name, index) => ({ id: `${item.id}:${index}`, name, initials: name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('') })),
+    participants: item.participants.map((participant, index) => {
+      const person = isRecord(participant) ? participant : {};
+      const name = typeof participant === 'string' ? participant : stringValue(person.full_name ?? person.name, '—');
+      return { id: `${item.id}:${index}`, name, initials: name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('') };
+    }),
     outcome: item.outcome ?? '—',
     nextAction: item.next_action ?? '—',
     dueDate: item.next_action_due,
-    author: item.created_by,
-  }));
+    author: item.created_by_keycloak_sub,
+  })), page: data.page, pageSize: data.page_size, total: data.total };
 }
 
-export async function realGetUniversityResponsibles(id: string): Promise<UniversityResponsibleContact[]> {
-  const data = (await passport(id)).responsibles;
+export async function realGetUniversityResponsibles(id: string, queryClient?: QueryClient): Promise<UniversityResponsibleContact[]> {
+  const data = (await passportBundle(id, queryClient)).responsibles;
   return data.map((item, index) => ({
     id: item.id,
     name: item.full_name,
@@ -459,20 +485,20 @@ const breakdownMeta = {
   launch: { label: 'Запуск', weight: 15 },
 } as const;
 
-export async function realGetUniversityHealthScore(id: string): Promise<UniversityHealthScore> {
+export async function realGetUniversityHealthScore(id: string, signal?: AbortSignal): Promise<UniversityHealthScore> {
   const [scoreResult, historyResult] = await Promise.all([
-    apiFetch<ApiHealthScore>(`/api/v1/universities/${encodeURIComponent(id)}/health-score`),
-    apiFetch<ApiHealthSnapshot[]>(`/api/v1/universities/${encodeURIComponent(id)}/health-score/history?days=30`),
+    apiFetch<ApiHealthScore>(`/api/v1/universities/${encodeURIComponent(id)}/health-score`, { signal }),
+    apiFetch<ApiHealthSnapshot[]>(`/api/v1/universities/${encodeURIComponent(id)}/health-score/history?days=30`, { signal }),
   ]);
   const score = unwrap(scoreResult, 'Не удалось загрузить Health Score.');
   const history = historyResult.ok
     ? historyResult.data.map((item) => ({ date: item.calculated_at.slice(0, 10), score: item.score })).reverse()
     : [];
-  const points = history.length ? history : [{ date: score.calculated_at.slice(0, 10), score: score.score }];
+  const points = history;
   return {
     universityId: score.university_id,
     currentScore: score.score,
-    status: getHealthStatus(score.score),
+    status: score.status,
     breakdown: (Object.keys(breakdownMeta) as Array<keyof typeof breakdownMeta>).map((key) => ({
       id: key,
       label: breakdownMeta[key].label,
@@ -482,7 +508,8 @@ export async function realGetUniversityHealthScore(id: string): Promise<Universi
     })),
     reasons: score.reasons.map((reason) => ({ id: reason.code, severity: reason.severity, title: reason.text, description: reason.text })),
     history: points,
-    previousSnapshot: points[Math.max(0, points.length - 2)],
+    historyUnavailable: !historyResult.ok,
+    previousSnapshot: points.length > 1 ? points[points.length - 2] : null,
   };
 }
 
