@@ -621,11 +621,12 @@ function userRole(value: unknown): AdminUser['role'] {
 
 function mapRealAdminUser(value: unknown): AdminUser {
   const item = isRecord(value) ? value : {};
-  const rawScope = item.university_ids ?? (isRecord(item.scope) ? item.scope.university_ids : undefined);
+  const scope = isRecord(item.scope) ? item.scope : {};
+  const rawScope = item.university_ids ?? scope.university_ids;
   const universityIds = Array.isArray(rawScope) ? rawScope.filter((id): id is string => typeof id === 'string') : [];
   const role = userRole(item.role ?? item.user_role ?? item.userRole);
   return {
-    id: stringValue(item.id ?? item.user_id, crypto.randomUUID?.() ?? `user-${Date.now()}`),
+    id: stringValue(item.id ?? item.user_id),
     username: stringValue(item.username ?? item.login ?? item.email),
     name: stringValue(item.full_name ?? item.name ?? item.username, 'Пользователь'),
     email: stringValue(item.email),
@@ -651,34 +652,44 @@ export async function realListAdminUsers(query: AdminUserListQuery): Promise<Adm
   const params = new URLSearchParams({ page: String(query.page), page_size: String(query.pageSize) });
   if (query.search) params.set('search', query.search);
   if (query.role !== 'all') params.set('role', query.role);
-  const data = unwrap(await apiFetch<unknown>(`/api/v1/users?${params}`), 'Не удалось загрузить список пользователей.');
+  const data = unwrap(await apiFetch<unknown>(`/api/v1/admin/users?${params}`), 'Не удалось загрузить список пользователей.');
   return mapUserListPayload(data, query);
 }
 
-function usersAdminIntegrationBlocker(action: string): never {
-  throw new ApiRequestError(501, { code: 'USERS_ADMIN_API_UNAVAILABLE', action }, `Операция «${action}» пока не опубликована в текущем backend API.`);
+export async function realGetAdminUser(id: string): Promise<AdminUser> {
+  return mapRealAdminUser(unwrap(await apiFetch<unknown>(`/api/v1/admin/users/${encodeURIComponent(id)}`), 'Не удалось загрузить пользователя.'));
 }
 
-export async function realUpdateAdminUser(_id: string, _input: AdminUserUpdateInput): Promise<AdminUser> {
-  void _id;
-  void _input;
-  return usersAdminIntegrationBlocker('изменение роли и скоупа');
+function userWriteBody(input: AdminUserUpdateInput) {
+  return { role: input.role, scope: { kind: input.scope.kind, university_ids: input.scope.kind === 'all' ? [] : input.scope.universityIds } };
 }
 
-export async function realBlockAdminUser(_id: string, _blocked: boolean): Promise<AdminUser> {
-  void _id;
-  void _blocked;
-  return usersAdminIntegrationBlocker('блокировка пользователя');
+export async function realUpdateAdminUser(id: string, input: AdminUserUpdateInput): Promise<AdminUser> {
+  return mapRealAdminUser(unwrap(await apiFetch<unknown>(`/api/v1/admin/users/${encodeURIComponent(id)}`, {
+    method: 'PATCH', body: userWriteBody(input),
+  }), 'Не удалось сохранить роль и скоуп.'));
 }
 
-export async function realInviteAdminUser(_input: InviteAdminUserInput): Promise<AdminUser> {
-  void _input;
-  return usersAdminIntegrationBlocker('приглашение пользователя');
+export async function realBlockAdminUser(id: string, blocked: boolean): Promise<AdminUser> {
+  return mapRealAdminUser(unwrap(await apiFetch<unknown>(`/api/v1/admin/users/${encodeURIComponent(id)}/block`, {
+    method: 'POST', body: { blocked },
+  }), 'Не удалось изменить статус пользователя.'));
 }
 
-export async function realResetAdminUserPassword(_id: string): Promise<{ status: 'requested'; actionUrl?: string }> {
-  void _id;
-  return usersAdminIntegrationBlocker('сброс пароля через Keycloak');
+export async function realInviteAdminUser(input: InviteAdminUserInput): Promise<{ user: AdminUser; status: 'email_sent' | 'invite_email_unavailable' }> {
+  const data = unwrap(await apiFetch<unknown>('/api/v1/admin/users/invite', {
+    method: 'POST', body: { ...userWriteBody(input), name: input.name, username: input.username, email: input.email },
+  }), 'Не удалось создать учётную запись.');
+  const payload = isRecord(data) ? data : {};
+  return { user: mapRealAdminUser(payload.user), status: payload.status === 'email_sent' ? 'email_sent' : 'invite_email_unavailable' };
+}
+
+export async function realResetAdminUserPassword(id: string): Promise<{ status: 'requested' }> {
+  const data = unwrap(await apiFetch<unknown>(`/api/v1/admin/users/${encodeURIComponent(id)}/password-reset`, {
+    method: 'POST',
+  }), 'Не удалось отправить запрос на сброс пароля.');
+  if (!isRecord(data) || data.status !== 'requested') throw new ApiRequestError(502, data, 'Некорректный ответ сервера сброса пароля.');
+  return { status: 'requested' };
 }
 
 export async function realListResponsibleCandidates(): Promise<ResponsibleCandidate[]> {

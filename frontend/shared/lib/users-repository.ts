@@ -2,6 +2,7 @@ import type { UserRole } from '@/shared/types/user';
 import { ApiRequestError } from './api-errors';
 import { fromDataSource, isMockDataSource } from './data-source';
 import { queryKeys } from './query-keys';
+import { getCatalogReferenceData, type CatalogReferenceOption } from './catalogs-repository';
 import { universityFilterOptions } from './universities-repository';
 import {
   mockAssignUniversityResponsible,
@@ -17,6 +18,7 @@ import {
   realBlockAdminUser,
   realInviteAdminUser,
   realListAdminUsers,
+  realGetAdminUser,
   realListResponsibleCandidates,
   realResetAdminUserPassword,
   realUpdateAdminUser,
@@ -65,6 +67,8 @@ export interface InviteAdminUserInput {
   scope: AdminUserScope;
 }
 
+export interface InviteAdminUserResult { user: AdminUser; status: 'email_sent' | 'invite_email_unavailable' }
+
 export interface ResponsibleCandidate {
   id: string;
   name: string;
@@ -89,7 +93,7 @@ export interface UsersApiCapabilities {
 
 export const USERS_API_CAPABILITIES: UsersApiCapabilities = isMockDataSource
   ? { list: true, updateRoleAndScope: true, block: true, invite: true, passwordReset: true, responsibleAssignment: true }
-  : { list: true, updateRoleAndScope: false, block: false, invite: false, passwordReset: false, responsibleAssignment: true };
+  : { list: true, updateRoleAndScope: true, block: true, invite: true, passwordReset: true, responsibleAssignment: true };
 
 export const adminUsersQueryKeys = {
   all: queryKeys.users.all,
@@ -113,26 +117,32 @@ export const userRoleDescriptions: Record<UserRole, string> = {
   admin: 'Полный доступ к данным, настройкам и управлению пользователями.',
 };
 
-export const userScopeOptions = universityFilterOptions.universities;
+export const userScopeOptions = isMockDataSource ? universityFilterOptions.universities : [];
+
+export async function listUserScopeOptions(): Promise<CatalogReferenceOption[]> {
+  if (isMockDataSource) return userScopeOptions;
+  return (await getCatalogReferenceData()).universities;
+}
 
 export function scopeLabel(scope: AdminUserScope): string {
   if (scope.kind === 'all') return 'Все ВУЗы';
   if (!scope.universityIds.length) return 'Нет доступных ВУЗов';
-  return scope.universityIds.length === 1
-    ? '1 ВУЗ'
-    : `${scope.universityIds.length} ВУЗа`;
+  const count = scope.universityIds.length;
+  const noun = count % 10 === 1 && count % 100 !== 11 ? 'ВУЗ'
+    : count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 12 || count % 100 > 14) ? 'ВУЗа' : 'ВУЗов';
+  return `${count} ${noun}`;
 }
 
-export function scopeDescription(scope: AdminUserScope): string {
+export function scopeDescription(scope: AdminUserScope, options: CatalogReferenceOption[] = userScopeOptions): string {
   if (scope.kind === 'all') return 'Доступ ко всем ВУЗам';
   if (!scope.universityIds.length) return 'Пользователь не увидит ни одного ВУЗа.';
-  const names = userScopeOptions.filter((option) => scope.universityIds.includes(option.id)).map((option) => option.name);
-  return names.slice(0, 2).join(', ') + (names.length > 2 ? ` и ещё ${names.length - 2}` : '');
+  const names = options.filter((option) => scope.universityIds.includes(option.id)).map((option) => option.name);
+  return names.length ? names.slice(0, 2).join(', ') + (names.length > 2 ? ` и ещё ${names.length - 2}` : '') : scopeLabel(scope);
 }
 
 export function normalizeScopeForRole(role: UserRole, scope: AdminUserScope): AdminUserScope {
   if (role === 'admin') return { kind: 'all' };
-  if (role === 'user' && scope.kind === 'all') return { kind: 'universities', universityIds: [] };
+  if (scope.kind === 'all') return { kind: 'universities', universityIds: [] };
   return scope;
 }
 
@@ -144,6 +154,14 @@ export async function listAdminUsers(query: AdminUserListQuery): Promise<AdminUs
   return fromDataSource({ mock: () => mockListAdminUsers(query), real: () => realListAdminUsers(query) });
 }
 
+export async function getAdminUser(id: string): Promise<AdminUser> {
+  return fromDataSource({ mock: () => {
+    const user = mockListAdminUsers({ search: '', role: 'all', page: 1, pageSize: 100 }).items.find((item) => item.id === id);
+    if (!user) throw new ApiRequestError(404, {}, 'Пользователь не найден.');
+    return user;
+  }, real: () => realGetAdminUser(id) });
+}
+
 export async function updateAdminUser(id: string, input: AdminUserUpdateInput): Promise<AdminUser> {
   return fromDataSource({ mock: () => mockUpdateAdminUser(id, input), real: () => realUpdateAdminUser(id, input) });
 }
@@ -152,8 +170,8 @@ export async function setAdminUserBlocked(id: string, blocked: boolean): Promise
   return fromDataSource({ mock: () => mockBlockAdminUser(id, blocked), real: () => realBlockAdminUser(id, blocked) });
 }
 
-export async function inviteAdminUser(input: InviteAdminUserInput): Promise<AdminUser> {
-  return fromDataSource({ mock: () => mockInviteAdminUser(input), real: () => realInviteAdminUser(input) });
+export async function inviteAdminUser(input: InviteAdminUserInput): Promise<InviteAdminUserResult> {
+  return fromDataSource({ mock: () => ({ user: mockInviteAdminUser(input), status: 'email_sent' }), real: () => realInviteAdminUser(input) });
 }
 
 export async function resetAdminUserPassword(id: string): Promise<{ status: 'requested'; actionUrl?: string }> {

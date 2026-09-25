@@ -77,6 +77,7 @@ export const queryKeys = {
     detail: (id: string) => ['users', 'detail', id] as const,
     responsibleCandidates: ['users', 'responsible-candidates'] as const,
     access: ['users', 'access'] as const,
+    scopeOptions: ['users', 'scope-options'] as const,
   },
   catalogs: {
     all: ['catalogs'] as const,
