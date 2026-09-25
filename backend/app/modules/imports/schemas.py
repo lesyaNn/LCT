@@ -38,6 +38,10 @@ class ImportPreview(BaseModel):
     preview: list[dict[str, str | int | float | bool | None]]
     row_count: int
     detected_sheet: str
+    target_fields: list[dict[str, str | bool]] = Field(default_factory=list)
+    required_fields: list[str] = Field(default_factory=list)
+    suggested_mapping: dict[str, str] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
 
 
 class ImportOptions(BaseModel):
@@ -81,6 +85,7 @@ class RowError(BaseModel):
 
     row: int
     field: str
+    source_field: str | None = None
     code: str = "ROW_ERROR"
     message: str
 
@@ -116,6 +121,7 @@ class ImportJobStatus(BaseModel):
     created_by: str | None = None
     filename: str | None = None
     catalog_type: str | None = None
+    dry_run: bool = False
     error_report_url: str | None = None
 
 

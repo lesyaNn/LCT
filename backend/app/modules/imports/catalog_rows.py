@@ -21,7 +21,7 @@ def _unique_match(db: Session, model, field, value: str, label: str):
     matches = list(db.scalars(select(model).where(func.lower(field) == value.lower()).limit(2)))
     if len(matches) > 1:
         raise ImportValidationError(
-            f"Неоднозначное совпадение {label}: {value}", code="DUPLICATE", field=label
+            f"Неоднозначное совпадение поля {label}", code="DUPLICATE", field=label
         )
     return matches[0] if matches else None
 
@@ -48,7 +48,7 @@ def _product(db: Session, vendor: Vendor, name: str, version: str) -> tuple[ITPr
         return candidates[0], False
     if len(candidates) > 1:
         raise ImportValidationError(
-            f"У продукта {name} несколько версий; укажите product.version",
+            "У продукта несколько версий; укажите product.version",
             code="DUPLICATE", field="product.version",
         )
     product = ITProduct(vendor_id=vendor.id, name=name, version=version or "1.0")
@@ -74,13 +74,13 @@ def apply_catalog_row(db: Session, row: dict, kind: str, update_existing: bool) 
 
     if kind == "directions":
         code = _required(row, "direction.code")
-        name = normalized_name(row.get("direction.name")) or code
+        name = normalized_name(row.get("direction.name")) or None
         direction = _unique_match(db, ITDirection, ITDirection.code, code, "direction.code")
         if direction is None:
-            db.add(ITDirection(code=code, name=name))
+            db.add(ITDirection(code=code, name=name or code))
             db.flush()
             return "inserted"
-        if update_existing and direction.name != name:
+        if update_existing and name is not None and direction.name != name:
             direction.name = name
             db.flush()
             return "updated"
@@ -101,8 +101,8 @@ def apply_catalog_row(db: Session, row: dict, kind: str, update_existing: bool) 
             return "inserted"
         if not update_existing:
             return "skipped"
-        next_phone = phone if 'responsible.phone' in row else person.phone
-        next_role = role if 'responsible.role' in row else person.role
+        next_phone = phone if phone is not None else person.phone
+        next_role = role if role else person.role
         changed = (person.full_name, person.phone, person.role) != (name, next_phone, next_role)
         if changed:
             person.full_name, person.phone, person.role = name, next_phone, next_role
@@ -143,10 +143,13 @@ def apply_catalog_row(db: Session, row: dict, kind: str, update_existing: bool) 
             created = True
         elif update_existing and (
             contact.full_name, contact.phone, contact.communication_method
-        ) != (full_name, phone, method):
+        ) != (full_name, phone if phone is not None else contact.phone,
+              method if method is not None else contact.communication_method):
             contact.full_name = full_name
-            contact.phone = phone
-            contact.communication_method = method
+            if phone is not None:
+                contact.phone = phone
+            if method is not None:
+                contact.communication_method = method
             db.flush()
             changed = True
     return "inserted" if created else "updated" if changed else "skipped"

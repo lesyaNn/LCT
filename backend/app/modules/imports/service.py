@@ -13,14 +13,17 @@ atomic claim and commits the terminal summary.
 
 from __future__ import annotations
 
+import io
 import os
 import re
 import uuid
+import zipfile
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.catalog import (
@@ -35,6 +38,7 @@ from app.models.catalog import (
     Vendor,
 )
 from app.models.interactions import UniversityProgram
+from app.modules.imports.normalize import normalized_name
 
 MAX_FILE_BYTES = 10 * 1024 * 1024
 MAX_ROWS = 5000
@@ -80,8 +84,37 @@ TARGET_FIELDS = frozenset({
     "university_responsibles",
 })
 
+# One server-owned mapping contract. The UI receives these definitions with
+# preview; labels and aliases are never used as persistence identifiers.
+FIELD_DEFINITIONS: dict[str, tuple[str, tuple[str, ...]]] = {
+    "university.name": ("Название ВУЗа", ("вуз", "название вуз", "название вуза", "университет", "наименование вуза", "university")),
+    "university.city": ("Город ВУЗа", ("город", "город вуза", "город университета")),
+    "vendor.name": ("Вендор", ("вендор", "поставщик", "компания", "vendor")),
+    "product.name": ("Название продукта", ("продукт", "по", "название продукта", "программное обеспечение", "product")),
+    "product.version": ("Версия продукта", ("версия", "версия продукта")),
+    "vendor_contact.full_name": ("ФИО контакта вендора", ("фио контакта", "контактное лицо")),
+    "vendor_contact.phone": ("Телефон контакта вендора", ("телефон контакта",)),
+    "vendor_contact.email": ("Почта контакта вендора", ("почта контакта",)),
+    "vendor_contact.communication_method": ("Способ связи", ("способ связи", "канал связи")),
+    "direction.code": ("Код направления", ("код", "код направления", "код ит направления")),
+    "direction.name": ("Название направления", ("направление", "ит направление", "it направление", "название направления")),
+    "program.name": ("Название программы", ("программа", "ит программа", "название программы")),
+    "program.description": ("Описание программы", ("описание программы",)),
+    "contract.contract_number": ("Номер договора", ("номер договора", "договор")),
+    "license.signed_at": ("Дата подписания лицензии", ("подписание лицензии", "дата подписания", "дата лицензии")),
+    "license.expires_at": ("Срок действия лицензии", ("срок лицензии", "срок действия лицензии", "срок действия лицензии (год)", "срок действия", "год окончания")),
+    "license.transfer_status": ("Статус передачи", ("статус передачи", "статус по передаче", "статус по передачи")),
+    "license.comment": ("Комментарий к лицензии", ("комментарий", "примечание")),
+    "responsible.full_name": ("ФИО ответственного", ("фио", "фио менеджера", "ответственный")),
+    "responsible.email": ("Почта ответственного", ("почта", "email", "почта ответственного")),
+    "responsible.phone": ("Телефон ответственного", ("телефон ответственного",)),
+    "responsible.role": ("Роль ответственного", ("роль", "должность")),
+    "university_responsibles": ("Ответственные от ВУЗа", ("ответственные от вуза", "представители вуза")),
+}
+assert set(FIELD_DEFINITIONS) == TARGET_FIELDS
+
 IMPORT_REQUIRED_FIELDS = {
-    "licenses": frozenset({"university.name", "contract.contract_number", "license.expires_at"}),
+    "licenses": frozenset({"university.name", "vendor.name", "product.name", "contract.contract_number", "license.signed_at", "license.expires_at"}),
     "universities": frozenset({"university.name"}),
     "directions": frozenset({"direction.code"}),
     "products": frozenset({"vendor.name", "product.name"}),
@@ -90,6 +123,53 @@ IMPORT_REQUIRED_FIELDS = {
         "vendor.name", "product.name", "vendor_contact.full_name", "vendor_contact.email"
     }),
 }
+
+IMPORT_FIELDS_BY_TYPE = {
+    "universities": tuple(k for k in TARGET_FIELDS if k.startswith("university.")),
+    "directions": tuple(k for k in TARGET_FIELDS if k.startswith("direction.")),
+    "products": tuple(k for k in TARGET_FIELDS if k.startswith(("vendor.", "product."))),
+    "responsibles": tuple(k for k in TARGET_FIELDS if k.startswith("responsible.")),
+    "vendor_contacts": tuple(k for k in TARGET_FIELDS if k.startswith(("vendor.", "product.", "vendor_contact."))),
+    "licenses": tuple(k for k in TARGET_FIELDS if not k.startswith("vendor_contact.")),
+}
+
+
+def normalize_header(value: str) -> str:
+    return " ".join(value.lstrip("\ufeff").casefold().replace("ё", "е").replace("_", " ").replace("-", " ").strip().split())
+
+
+def mapping_contract(headers: list[str], catalog_type: str) -> dict[str, Any]:
+    allowed = set(IMPORT_FIELDS_BY_TYPE[catalog_type])
+    fields = [
+        {"id": key, "label": FIELD_DEFINITIONS[key][0], "required": key in IMPORT_REQUIRED_FIELDS[catalog_type]}
+        for key in FIELD_DEFINITIONS if key in allowed
+    ]
+    mapping: dict[str, str] = {}
+    used: set[str] = set()
+    for header in headers:
+        normalized = normalize_header(header)
+        for key in FIELD_DEFINITIONS:
+            if key not in allowed or key in used:
+                continue
+            aliases = (key, key.replace(".", " "), *FIELD_DEFINITIONS[key][1])
+            if normalized and normalized in {normalize_header(alias) for alias in aliases}:
+                mapping[header] = key
+                used.add(key)
+                break
+    return {"target_fields": fields, "required_fields": sorted(IMPORT_REQUIRED_FIELDS[catalog_type]), "suggested_mapping": mapping}
+
+
+def validate_mapping(headers: list[str], mapping: dict[str, str], catalog_type: str) -> None:
+    if catalog_type not in IMPORT_REQUIRED_FIELDS:
+        raise ImportValidationError("Неизвестный тип импорта", code="INVALID_FORMAT", field="catalog_type")
+    unknown_sources = set(mapping) - set(headers)
+    unknown_targets = set(mapping.values()) - set(IMPORT_FIELDS_BY_TYPE[catalog_type])
+    if unknown_sources or unknown_targets:
+        raise ImportValidationError("Маппинг содержит неизвестную колонку или поле", code="INVALID_FORMAT", field="mapping")
+    if len(mapping.values()) != len(set(mapping.values())):
+        raise ImportValidationError("Одно поле системы сопоставлено нескольким колонкам", code="DUPLICATE", field="mapping")
+    if IMPORT_REQUIRED_FIELDS[catalog_type] - set(mapping.values()):
+        raise ImportValidationError("Не сопоставлены обязательные поля", code="REQUIRED", field="mapping")
 
 TRANSFER_STATUSES = frozenset({"pending", "transferred", "accepted", "rejected"})
 
@@ -114,9 +194,8 @@ class ImportValidationError(ValueError):
 def parse_date(value: Any, field: str) -> date | None:
     """Coerce an openpyxl/xlrd cell value to ``date`` (``None`` for empty).
 
-    Accepts datetime/date, full date strings (several formats) and a plain
-    year (``"2027"`` / ``2027`` / ``2027.0``) — year maps to Dec 31 of that
-    year, as the spec column is "Срок действия лицензии (год)".
+    Accepts datetime/date and full date strings. A year alone cannot be
+    stored in the existing DATE column without inventing a day and month.
     """
     if value is None or (isinstance(value, str) and not value.strip()):
         return None
@@ -125,25 +204,29 @@ def parse_date(value: Any, field: str) -> date | None:
     if isinstance(value, date):
         return value
     if isinstance(value, (int, float)):
-        # xlrd may give years as float (2027.0); Excel dates as float are
-        # already converted by the .xls reader, so here float == year.
         if float(value).is_integer() and 1900 <= int(value) <= 2100:
-            return date(int(value), 12, 31)
+            raise ImportValidationError(
+                f"Для поля '{field}' укажите полную дату: год без дня и месяца неоднозначен",
+                code="INVALID_FORMAT", field=field,
+            )
         raise ImportValidationError(
-            f"Неверный формат даты в поле '{field}': {value!r}",
+            f"Неверный формат даты в поле '{field}'",
             code="INVALID_FORMAT", field=field,
         )
     if isinstance(value, str):
         text = value.strip()
         if re.fullmatch(r"(19|20)\d{2}", text):
-            return date(int(text), 12, 31)
+            raise ImportValidationError(
+                f"Для поля '{field}' укажите полную дату: год без дня и месяца неоднозначен",
+                code="INVALID_FORMAT", field=field,
+            )
         for fmt in _DATE_FORMATS:
             try:
                 return datetime.strptime(text, fmt).date()
             except ValueError:
                 continue
     raise ImportValidationError(
-        f"Неверный формат даты в поле '{field}': {value!r}",
+        f"Неверный формат даты в поле '{field}'",
         code="INVALID_FORMAT", field=field,
     )
 
@@ -164,7 +247,7 @@ def stage_upload(filename: str, content: bytes) -> str:
     ext = os.path.splitext(filename or "")[1].lower()
     if ext not in ALLOWED_EXTS:
         raise ImportValidationError(
-            f"Поддерживается только .xlsx/.xls, получено: {filename!r}"
+            "Поддерживаются только .xlsx и .xls"
         )
     if len(content) > MAX_FILE_BYTES:
         raise ImportValidationError(
@@ -172,6 +255,17 @@ def stage_upload(filename: str, content: bytes) -> str:
         )
     if not content:
         raise ImportValidationError("Пустой файл")
+    if ext == ".xlsx":
+        if not content.startswith(b"PK\x03\x04") or not zipfile.is_zipfile(io.BytesIO(content)):
+            raise ImportValidationError("Содержимое файла не соответствует XLSX")
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            members = archive.infolist()
+            if len(members) > 5000 or sum(item.file_size for item in members) > 64 * 1024 * 1024:
+                raise ImportValidationError("XLSX превышает безопасный размер распаковки")
+            if not {"[Content_Types].xml", "xl/workbook.xml"}.issubset(archive.namelist()):
+                raise ImportValidationError("Некорректная структура XLSX")
+    elif not content.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
+        raise ImportValidationError("Содержимое файла не соответствует XLS")
     os.makedirs(STAGING_DIR, exist_ok=True)
     file_id = uuid.uuid4().hex
     with open(os.path.join(STAGING_DIR, f"{file_id}{ext}"), "wb") as fh:
@@ -204,13 +298,18 @@ def _read_xlsx(path: str) -> tuple[str, list[str], list[dict[str, Any]]]:
     ws = wb.active
     if ws is None:
         raise ImportValidationError("В книге нет листов")
-    rows = list(ws.iter_rows(values_only=True))
-    if not rows:
+    row_iter = ws.iter_rows(values_only=True)
+    first = next(row_iter, None)
+    if first is None:
         raise ImportValidationError("Пустой лист")
-    headers = [_cell_text(c) or f"col_{i}" for i, c in enumerate(rows[0])]
-    data = [dict(zip(headers, r)) for r in rows[1:]]
-    if len(data) > MAX_ROWS:
-        raise ImportValidationError(f"Больше лимита {MAX_ROWS} строк")
+    headers = [_cell_text(c).lstrip("\ufeff") or f"col_{i}" for i, c in enumerate(first)]
+    _validate_headers(headers)
+    data = []
+    for row in row_iter:
+        if len(data) >= MAX_ROWS:
+            raise ImportValidationError(f"Больше лимита {MAX_ROWS} строк")
+        data.append(dict(zip(headers, row)))
+    wb.close()
     return ws.title or "Sheet1", headers, data
 
 
@@ -219,7 +318,7 @@ def _read_xls(path: str) -> tuple[str, list[str], list[dict[str, Any]]]:
     import xlrd
 
     try:
-        book = xlrd.open_workbook(path, logfile=open(os.devnull, "w"))
+        book = xlrd.open_workbook(path, logfile=None)
     except Exception as exc:
         raise ImportValidationError(f"Не удалось прочитать .xls: {exc}") from exc
     if book.nsheets == 0:
@@ -228,7 +327,10 @@ def _read_xls(path: str) -> tuple[str, list[str], list[dict[str, Any]]]:
     if sh.nrows == 0:
         raise ImportValidationError("Пустой лист")
     headers = [_cell_text(sh.cell_value(0, c)) or f"col_{c}" for c in range(sh.ncols)]
+    _validate_headers(headers)
     data: list[dict[str, Any]] = []
+    if sh.nrows - 1 > MAX_ROWS:
+        raise ImportValidationError(f"Больше лимита {MAX_ROWS} строк")
     for r in range(1, sh.nrows):
         row: dict[str, Any] = {}
         for c in range(sh.ncols):
@@ -246,6 +348,12 @@ def _read_xls(path: str) -> tuple[str, list[str], list[dict[str, Any]]]:
     if len(data) > MAX_ROWS:
         raise ImportValidationError(f"Больше лимита {MAX_ROWS} строк")
     return sh.name or "Sheet1", headers, data
+
+
+def _validate_headers(headers: list[str]) -> None:
+    normalized = [normalize_header(header) for header in headers]
+    if len(normalized) != len(set(normalized)):
+        raise ImportValidationError("В файле повторяются названия колонок", code="DUPLICATE", field="headers")
 
 
 def read_sheet(file_id: str) -> tuple[str, list[str], list[dict[str, Any]]]:
@@ -287,13 +395,13 @@ def _escape_like(value: str) -> str:
 
 
 def find_university(session: Session, name: str) -> University | None:
-    """Exact match first, then case-insensitive fuzzy (spec: exact/fuzzy)."""
-    uni = session.execute(select(University).filter_by(name=name)).scalar_one_or_none()
-    if uni is not None:
-        return uni
-    return session.execute(
-        select(University).filter(University.name.ilike(f"%{_escape_like(name)}%", escape="\\"))
-    ).scalar_one_or_none()
+    """Exact normalized identity only; substring matches can merge different VУЗы."""
+    matches = list(session.scalars(
+        select(University).where(func.lower(University.name) == name.lower()).limit(2)
+    ))
+    if len(matches) > 1:
+        raise ImportValidationError("Неоднозначное совпадение ВУЗа", code="DUPLICATE", field="university.name")
+    return matches[0] if matches else None
 
 
 def resolve_responsible(session: Session, full_name: str, field: str) -> Responsible:
@@ -303,11 +411,11 @@ def resolve_responsible(session: Session, full_name: str, field: str) -> Respons
     ))
     if not matches:
         raise ImportValidationError(
-            f"Ответственный «{full_name}» отсутствует в каталоге", code="NOT_FOUND", field=field,
+            "Ответственный отсутствует в каталоге", code="NOT_FOUND", field=field,
         )
     if len(matches) > 1:
         raise ImportValidationError(
-            f"Неоднозначный ответственный «{full_name}»", code="DUPLICATE", field=field,
+            "Неоднозначный ответственный", code="DUPLICATE", field=field,
         )
     return matches[0]
 
@@ -404,7 +512,7 @@ def apply_row(
     Raises :class:`ImportValidationError` for bad rows (caller records it
     and continues with the next row).
     """
-    uni_name = _cell_text(mapped.get("university.name"))
+    uni_name = normalized_name(mapped.get("university.name"))
     if not uni_name:
         raise ImportValidationError(
             "Поле 'university.name' обязательно",
@@ -423,23 +531,36 @@ def apply_row(
             code="REQUIRED", field="contract.contract_number",
         )
 
-    product_name = _cell_text(mapped.get("product.name"))
+    product_name = normalized_name(mapped.get("product.name"))
     product = None
     if product_name:
-        vendor_name = _cell_text(mapped.get("vendor.name"))
+        vendor_name = normalized_name(mapped.get("vendor.name"))
         if not vendor_name:
             raise ImportValidationError(
                 "Поле 'vendor.name' обязательно, если указан продукт",
                 code="REQUIRED", field="vendor.name",
             )
-        vendor, _ = _get_or_create(session, Vendor, {}, name=vendor_name)
+        vendors = list(session.scalars(select(Vendor).where(func.lower(Vendor.name) == vendor_name.lower()).limit(2)))
+        if len(vendors) > 1:
+            raise ImportValidationError("Неоднозначный вендор", code="DUPLICATE", field="vendor.name")
+        vendor = vendors[0] if vendors else Vendor(name=vendor_name)
+        if not vendors:
+            session.add(vendor)
+            session.flush()
         # P4-10-03: если колонки "Версия ПО" нет — дефолт "1.0" (ключ продукта
         # включает версию, поэтому "" плодил бы дубли на каждый импорт).
-        version = _cell_text(mapped.get("product.version")) or "1.0"
-        product, _ = _get_or_create(
-            session, ITProduct, {"vendor_id": vendor.id},
-            vendor_id=vendor.id, name=product_name, version=version,
-        )
+        version = normalized_name(mapped.get("product.version")) or "1.0"
+        products = list(session.scalars(select(ITProduct).where(
+            ITProduct.vendor_id == vendor.id,
+            func.lower(ITProduct.name) == product_name.lower(),
+            ITProduct.version == version,
+        ).limit(2)))
+        if len(products) > 1:
+            raise ImportValidationError("Неоднозначный продукт", code="DUPLICATE", field="product.name")
+        product = products[0] if products else ITProduct(vendor_id=vendor.id, name=product_name, version=version)
+        if not products:
+            session.add(product)
+            session.flush()
 
     # ИТ-направление — отдельное поле файла (опционально).
     # Направление строки хранится прямо в лицензии (direction_id).
@@ -477,11 +598,11 @@ def apply_row(
             "Поле 'license.expires_at' обязательно",
             code="REQUIRED", field="license.expires_at",
         )
-    transfer = _cell_text(mapped.get("license.transfer_status")) or "pending"
+    transfer_raw = _cell_text(mapped.get("license.transfer_status"))
+    transfer = transfer_raw or "pending"
     if transfer not in TRANSFER_STATUSES:
         raise ImportValidationError(
-            f"Недопустимый transfer_status {transfer!r} "
-            f"(pending/transferred/accepted/rejected)",
+            "Недопустимый статус передачи (pending/transferred/accepted/rejected)",
             code="INVALID_FORMAT", field="license.transfer_status",
         )
     comment_raw = mapped.get("license.comment")
@@ -501,11 +622,13 @@ def apply_row(
             code="DUPLICATE", field="contract.contract_number",
         )
     if contract is None:
+        if signed_at is None:
+            raise ImportValidationError("Укажите дату подписания лицензии", code="REQUIRED", field="license.signed_at")
         contract = Contract(
             university_id=uni.id, contract_number=contract_no,
             product_id=product.id if product else None,
-            signed_at=signed_at or date.today(), expires_at=expires_at,
-            status_raw="signed", transfer_status_raw="accepted", comment=comment,
+            signed_at=signed_at, expires_at=expires_at,
+            status_raw="signed", transfer_status_raw=transfer, comment=comment,
         )
         session.add(contract)
         session.flush()
@@ -515,7 +638,10 @@ def apply_row(
         contract.expires_at = expires_at
         if product is not None:
             contract.product_id = product.id
-        contract.comment = comment
+        if transfer_raw:
+            contract.transfer_status_raw = transfer
+        if comment is not None:
+            contract.comment = comment
         session.flush()
         contract_created = False
     else:
@@ -536,11 +662,13 @@ def apply_row(
                 "Строка без продукта: не к чему привязать лицензию",
                 code="REQUIRED", field="product.name",
             )
+        if signed_at is None:
+            raise ImportValidationError("Укажите дату подписания лицензии", code="REQUIRED", field="license.signed_at")
         session.add(License(
             university_id=uni.id, product_id=product.id, contract_id=contract.id,
             program_id=row_program.id if row_program else None,
             direction_id=row_direction.id if row_direction else None,
-            license_number=license_number, signed_at=signed_at or date.today(),
+            license_number=license_number, signed_at=signed_at,
             expires_at=expires_at, transfer_status_raw=transfer, comment=comment,
         ))
         session.flush()
@@ -548,13 +676,15 @@ def apply_row(
     elif update_existing:
         lic.expires_at = expires_at
         lic.signed_at = signed_at or lic.signed_at
-        lic.transfer_status_raw = transfer
+        if transfer_raw:
+            lic.transfer_status_raw = transfer
         lic.contract_id = contract.id
         if row_program is not None:
             lic.program_id = row_program.id
         if row_direction is not None:
             lic.direction_id = row_direction.id
-        lic.comment = comment
+        if comment is not None:
+            lic.comment = comment
         session.flush()
         lic_created = False
     else:
@@ -598,25 +728,8 @@ def execute_import(
     Ошибки сверх MAX_ROW_ERRORS не отбрасываются молча: truncated=true,
     errors_total считает все ошибки.
     """
-    unknown = sorted(set(mapping.values()) - TARGET_FIELDS)
-    if unknown:
-        raise ImportValidationError(
-            f"Неизвестные поля маппинга: {', '.join(unknown)}",
-            code="INVALID_FORMAT", field="mapping",
-        )
-    required = IMPORT_REQUIRED_FIELDS.get(catalog_type)
-    if required is None:
-        raise ImportValidationError(
-            f"Неизвестный тип импорта: {catalog_type}", code="INVALID_FORMAT", field="catalog_type",
-        )
-    missing = sorted(required - set(mapping.values()))
-    if missing:
-        raise ImportValidationError(
-            f"Маппинг должен содержать: {', '.join(missing)}",
-            code="REQUIRED", field="mapping",
-        )
-
-    _, _, data = read_sheet(file_id)
+    _, headers, data = read_sheet(file_id)
+    validate_mapping(headers, mapping, catalog_type)
     summary: dict[str, Any] = {
         "total_rows": len(data), "inserted": 0, "updated": 0,
         "skipped": 0, "errors": [], "dry_run": dry_run,
@@ -648,9 +761,17 @@ def execute_import(
                 errors_total += 1
                 if len(summary["errors"]) < MAX_ROW_ERRORS:
                     summary["errors"].append(
-                        {"row": idx, "field": exc.field, "code": exc.code,
+                        {"row": idx, "source_field": next((source for source, target in mapping.items() if target == exc.field), None),
+                         "field": exc.field, "code": exc.code,
                          "message": str(exc)}
                     )
+                else:
+                    truncated = True
+                continue
+            except IntegrityError:
+                errors_total += 1
+                if len(summary["errors"]) < MAX_ROW_ERRORS:
+                    summary["errors"].append({"row": idx, "source_field": None, "field": "row", "code": "DUPLICATE", "message": "Конфликт уникальности или связей; строка не сохранена"})
                 else:
                     truncated = True
                 continue
@@ -695,15 +816,15 @@ def write_error_report(summary: dict[str, Any], dest: str) -> int:
         ws_total.column_dimensions[col].width = 18
 
     ws_err = wb.create_sheet("Ошибки")
-    ws_err.append(["Строка", "Поле", "Код", "Сообщение"])
+    ws_err.append(["Строка", "Колонка файла", "Поле системы", "Код", "Сообщение"])
     for cell in ws_err[1]:
         cell.font = bold
     for err in summary.get("errors", []):
         ws_err.append([
-            err.get("row"), err.get("field"),
+            err.get("row"), err.get("source_field"), err.get("field"),
             err.get("code"), err.get("message"),
         ])
-    for col, width in (("A", 10), ("B", 28), ("C", 16), ("D", 70)):
+    for col, width in (("A", 10), ("B", 28), ("C", 28), ("D", 16), ("E", 70)):
         ws_err.column_dimensions[col].width = width
 
     wb.save(dest)

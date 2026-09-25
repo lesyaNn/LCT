@@ -150,7 +150,12 @@ def run_import_job(db: Session, job: ReportJob) -> str:
             catalog_type=payload.get("catalog_type", "licenses"),
         )
     except Exception as exc:
-        return jobs.requeue_or_fail(db, job, exc)
+        # Import files may contain personal data and database exceptions may
+        # include cell values. Keep the public job error deliberately generic.
+        logger.error("import worker failed id=%s type=%s", job.id, type(exc).__name__)
+        return jobs.requeue_or_fail(
+            db, job, RuntimeError("Не удалось обработать импорт; проверьте файл и маппинг"),
+        )
     artifact = job.file_path or str(jobs.job_file_path(job.id, "xlsx"))
     size = import_service.write_error_report(summary, artifact)
     job.result = summary

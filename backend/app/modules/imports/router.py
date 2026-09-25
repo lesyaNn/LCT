@@ -17,7 +17,7 @@ import hashlib
 import json
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -78,6 +78,7 @@ def _job_status(job: ReportJob) -> ImportJobStatus:
         error=job.error_message, created_at=job.created_at.isoformat(),
         created_by=job.actor_name, filename=payload.get("filename"),
         catalog_type=payload.get("catalog_type", "licenses"),
+        dry_run=bool(payload.get("dry_run", False)),
         error_report_url=f"/api/v1/import/jobs/{job.id}/report" if job.status == STATUS_READY and job.file_path else None,
     )
 
@@ -141,10 +142,20 @@ ERROR_RESPONSES = {
 )
 def import_preview(
     file: UploadFile = File(..., description="XLSX/XLS файл каталогов (до 10 МБ)"),
+    catalog_type: str = Form(default="licenses"),
     db: Session = Depends(get_audit_db),
     _u: CurrentUser = Depends(require_permission("import.write")),
 ):
     _ = db  # audit context for the staging side-effect (H3); no DB writes here.
+    if catalog_type not in service.IMPORT_REQUIRED_FIELDS:
+        raise BusinessException(ErrorCode.VALIDATION_ERROR)
+    allowed_mimes = {
+        ".xlsx": {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/octet-stream", ""},
+        ".xls": {"application/vnd.ms-excel", "application/octet-stream", ""},
+    }
+    extension = "." + (file.filename or "").rsplit(".", 1)[-1].lower()
+    if extension not in allowed_mimes or (file.content_type or "") not in allowed_mimes[extension]:
+        raise BusinessException(ErrorCode.IMPORT_VALIDATION_FAILED)
     try:
         # Стриминг чанками с лимитом mid-stream (C2): никогда не буферизуем
         # больше MAX_FILE_BYTES+chunk, вместо file.file.read() целиком.
@@ -163,6 +174,8 @@ def import_preview(
         parsed = service.parse_preview(file_id)
     except service.ImportValidationError as exc:
         raise BusinessException(ErrorCode.IMPORT_VALIDATION_FAILED) from exc
+    contract = service.mapping_contract(parsed["headers"], catalog_type)
+    unmatched = [header for header in parsed["headers"] if header not in contract["suggested_mapping"]]
     return ImportPreview(
         file_id=file_id,
         filename=file.filename or "",
@@ -170,6 +183,8 @@ def import_preview(
         preview=parsed["preview"],
         row_count=parsed["row_count"],
         detected_sheet=parsed["detected_sheet"],
+        **contract,
+        warnings=[f"Не сопоставлены колонки: {', '.join(unmatched[:10])}"] if unmatched else [],
     )
 
 
@@ -196,10 +211,17 @@ def import_execute(
     user: CurrentUser = Depends(require_permission("import.write")),
 ):
     key = _idempotency_key(
-        req.file_id, req.mapping,
+        f"{user.id}:{req.file_id}", req.mapping,
         req.options.update_existing, req.options.dry_run,
         req.catalog_type,
     )
+    if not req.options.skip_header:
+        raise BusinessException(ErrorCode.VALIDATION_ERROR)
+    try:
+        _, headers, _ = service.read_sheet(req.file_id)
+        service.validate_mapping(headers, req.mapping, req.catalog_type)
+    except service.ImportValidationError as exc:
+        raise BusinessException(ErrorCode.IMPORT_VALIDATION_FAILED) from exc
     job = _get_or_create_job(db, req, user, key)
     if job.status == STATUS_READY:
         return ImportExecuteResponse(job_id=str(job.id))
