@@ -32,6 +32,10 @@ export interface WorkflowOverview {
 
 export const workflowOverviewQueryKey = queryKeys.universities.workflowOverview;
 
+export function workflowStageKey(workflow: UniversityWorkflow, stage: UniversityWorkflowStage): string {
+  return `${workflow.templateId ?? 'unknown-template'}:${stage.templateStageId ?? `${stage.orderIndex}:${stage.name}`}`;
+}
+
 const emptyFilters = {
   search: '', city: '', universityIds: [], programIds: [], productIds: [], responsibleIds: [],
   healthStatuses: [], workflowStageId: '', dateFrom: '', dateTo: '',
@@ -56,7 +60,6 @@ async function universityInstances(university: UniversityListItem): Promise<Work
     const workflow = await getUniversityWorkflow(instanceId);
     const stage = workflow.currentStage ?? workflow.stages.at(-1);
     if (!stage) return null;
-    const templateId = workflow.templateId ?? 'unknown-template';
     return {
       instanceId,
       universityId: university.id,
@@ -66,8 +69,8 @@ async function universityInstances(university: UniversityListItem): Promise<Work
       responsible: passport?.workflow.responsible ?? university.responsible,
       workflow,
       stage,
-      stageKey: `${templateId}:${stage.templateStageId ?? `${stage.orderIndex}:${stage.name}`}`,
-      status: stage.status === 'overdue' ? 'overdue' : workflow.completedSteps >= workflow.totalSteps ? 'completed' : 'in_progress',
+      stageKey: workflowStageKey(workflow, stage),
+      status: stage.status === 'overdue' ? 'overdue' : workflow.stages.every((step) => step.status === 'completed' || step.status === 'skipped') ? 'completed' : 'in_progress',
     } satisfies WorkflowOverviewItem;
   }));
   return entries.flatMap((entry) => entry.status === 'fulfilled' && entry.value ? [entry.value] : []);

@@ -14,14 +14,15 @@ import {
   type Updater,
 } from '@tanstack/react-table';
 import Attention from '@atomaro/icons/24/action/Attention';
-import Filter from '@atomaro/icons/24/action/Filter';
 import Search from '@atomaro/icons/24/action/Search';
 import CloseSmall from '@atomaro/icons/24/navigation/CloseSmall';
 import ChevronSort from '@atomaro/icons/24/navigation/ChevronSort';
 import SortDown from '@atomaro/icons/24/editor/SortDown';
 import SortUp from '@atomaro/icons/24/editor/SortUp';
 import { Button } from '@/shared/ui/rtk/button';
-import { Drawer } from '@/shared/ui/rtk/drawer';
+import { FilterToolbar } from '@/shared/ui/rtk/filter-surface';
+import { DateRangeField } from '@/shared/ui/rtk/date-range-field';
+import { Select } from '@/shared/ui/rtk/form-controls';
 import { EmptyState } from '@/shared/ui/empty-state';
 import { MultiSelect } from '@/shared/ui/rtk/multiselect';
 import { StatusBadge as SemanticStatusBadge } from '@/shared/ui/rtk/status-badge';
@@ -263,14 +264,11 @@ function SortIndicator({ sorted }: { sorted: false | 'asc' | 'desc' }) {
   return <ChevronSort size={16} fill="currentColor" />;
 }
 
-function Filters({ state, searchInput, setSearchInput, onPatch, onReset, hasFilters, onClose, compact = false }: {
+function Filters({ state, searchInput, setSearchInput, onPatch, compact = false }: {
   state: UniversityUrlState;
   searchInput: string;
   setSearchInput: (value: string) => void;
   onPatch: (patch: QueryPatch) => void;
-  onReset: () => void;
-  hasFilters: boolean;
-  onClose: () => void;
   compact?: boolean;
 }) {
   const filters = filtersFromState(state);
@@ -289,13 +287,6 @@ function Filters({ state, searchInput, setSearchInput, onPatch, onReset, hasFilt
 
   return (
     <section className={styles.filters} aria-label="Фильтры списка вузов">
-      {!compact ? <div className={styles.filterPanelHeader}>
-        <div>
-          <h2 id="universities-filter-title">Фильтры</h2>
-          <p>Уточните список вузов по организации, продукту и состоянию.</p>
-        </div>
-        <button className={styles.filterCloseButton} type="button" onClick={onClose} aria-label="Закрыть фильтры"><CloseSmall size={20} fill="currentColor" /></button>
-      </div> : null}
       <div className={`${styles.field} ${styles.searchField}`}>
         <label htmlFor={searchId}>Поиск по названию вуза</label>
         <div className={styles.inputWrap}>
@@ -308,28 +299,21 @@ function Filters({ state, searchInput, setSearchInput, onPatch, onReset, hasFilt
       <MultiSelect label="Продукт" options={universityFilterOptions.products} values={filters.productIds} onChange={(values) => onPatch({ product: values, page: 1 })} />
       <label className={styles.field}>
         <span>Город</span>
-        <select value={filters.city} onChange={(event) => onPatch({ city: event.target.value, page: 1 })}>
+        <Select value={filters.city} onChange={(event) => onPatch({ city: event.target.value, page: 1 })}>
           <option value="">Все города</option>
           {universityFilterOptions.cities.map((city) => <option key={city} value={city}>{city}</option>)}
-        </select>
+        </Select>
       </label>
       <MultiSelect label="Ответственный" options={universityFilterOptions.responsibles.map((person) => ({ id: person.id, name: person.name }))} values={filters.responsibleIds} onChange={(values) => onPatch({ responsible: values, page: 1 })} />
       <MultiSelect label="Health Score" options={HEALTH_STATUS_OPTIONS.map((option) => ({ id: option.value, name: option.label }))} values={filters.healthStatuses} onChange={(values) => onPatch({ health_status: values, page: 1 })} renderOption={(option) => <StatusBadge status={option.id as HealthStatus} />} />
       <label className={styles.field}>
         <span>Текущий этап</span>
-        <select value={filters.workflowStageId} onChange={(event) => onPatch({ stage: event.target.value, page: 1 })}>
+        <Select value={filters.workflowStageId} onChange={(event) => onPatch({ stage: event.target.value, page: 1 })}>
           <option value="">Все этапы</option>
           {universityFilterOptions.stages.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-        </select>
+        </Select>
       </label>
-      <div className={styles.dateRange}>
-        <span className={styles.dateRangeLabel}>Период последнего взаимодействия</span>
-        <div className={styles.dateInputs}>
-          <label className={styles.field}><span>От</span><input type="date" value={filters.dateFrom} max={filters.dateTo || undefined} onChange={(event) => updateDateRange('date_from', event.target.value)} /></label>
-          <label className={styles.field}><span>До</span><input type="date" value={filters.dateTo} min={filters.dateFrom || undefined} onChange={(event) => updateDateRange('date_to', event.target.value)} /></label>
-        </div>
-      </div>
-      <Button variant="ghost" size="s" type="button" disabled={!hasFilters} onClick={onReset}>Сбросить фильтры</Button>
+      <DateRangeField presets label="Период последнего взаимодействия" from={filters.dateFrom} to={filters.dateTo} onFromChange={(value) => updateDateRange('date_from', value)} onToChange={(value) => updateDateRange('date_to', value)} onRangeChange={(dateFrom, dateTo) => onPatch({ date_from: dateFrom, date_to: dateTo, page: 1 })} />
     </section>
   );
 }
@@ -449,8 +433,6 @@ export function UniversitiesList() {
   const searchParams = useSearchParams();
   const state = useMemo(() => parseUrlState(searchParams), [searchParams]);
   const [searchInput, setSearchInput] = useState(state.filters.search);
-  const [filtersExpanded, setFiltersExpanded] = useState(true);
-  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
   const storageRestoredRef = useRef(false);
   const storageReadyRef = useRef(false);
   const pendingStoredFiltersRef = useRef<UniversityFilters | null>(null);
@@ -551,18 +533,7 @@ export function UniversitiesList() {
         </div>
       </header>
       <div className={styles.filterArea}>
-        <Button variant="secondary" size="s" type="button" className={styles.filterTrigger} onClick={() => {
-          if (window.matchMedia('(max-width: 768px)').matches) setFilterDrawerOpen(true);
-          else setFiltersExpanded((expanded) => !expanded);
-        }} aria-expanded={filterDrawerOpen || filtersExpanded} aria-controls="universities-filter-panel">
-          <Filter size={18} fill="currentColor" />Фильтры{activeFilterCount ? ` (${activeFilterCount})` : ''}
-        </Button>
-        <div className={`${styles.filterPanelWrap} ${filtersExpanded ? styles.filterPanelVisible : ''}`}>
-          <div className={styles.filterPanel} id="universities-filter-panel">
-            <Filters state={state} searchInput={searchInput} setSearchInput={setSearchInput} onPatch={goToState} onReset={resetFilters} hasFilters={hasFilters} onClose={() => { setFilterDrawerOpen(false); setFiltersExpanded(false); }} />
-          </div>
-        </div>
-        {filterDrawerOpen ? <Drawer title="Фильтры" onClose={() => setFilterDrawerOpen(false)}><div className={styles.mobileFilterContent}><Filters compact state={state} searchInput={searchInput} setSearchInput={setSearchInput} onPatch={goToState} onReset={resetFilters} hasFilters={hasFilters} onClose={() => setFilterDrawerOpen(false)} /></div></Drawer> : null}
+        <FilterToolbar label="Фильтры списка вузов" controls={(mobile) => <Filters compact={mobile} state={state} searchInput={searchInput} setSearchInput={setSearchInput} onPatch={goToState} />} onReset={resetFilters} resetDisabled={!hasFilters} mobileCount={activeFilterCount} />
         <ActiveFilterChips filters={state.filters} onPatch={goToState} onReset={resetFilters} />
       </div>
       {query.isPending ? <TableSkeleton rows={6} columns={7} label="Загрузка списка вузов" /> : query.isError || !query.data ? <RouteErrorState onRetry={() => void query.refetch()} /> : query.data.total === 0 ? <EmptyState icon={<Search size={20} fill="currentColor" />} title={hasFilters ? 'По заданным фильтрам ничего не найдено' : 'Вузы пока не добавлены'} description={hasFilters ? 'Измените условия поиска или сбросьте фильтры.' : 'Когда появятся записи, они будут отображены в этом списке.'} primaryAction={hasFilters ? { label: 'Сбросить фильтры', onClick: resetFilters, variant: 'secondary' } : undefined} /> : (

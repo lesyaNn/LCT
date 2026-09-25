@@ -526,7 +526,7 @@ export async function getWorkflowInstance(instanceId: string): Promise<WorkflowI
 }
 
 export async function transitionWorkflowInstance(instanceId: string, targetInstanceStageId: string, comment: string, dueDate?: string): Promise<WorkflowInstanceApiRecord> {
-  if (!isWorkflowApiInstanceId(instanceId)) throw new WorkflowApiError(0, 'Переход недоступен для этого Workflow-источника.');
+  if (!isMockDataSource && !isWorkflowApiInstanceId(instanceId)) throw new WorkflowApiError(0, 'Переход недоступен для этого Workflow-источника.');
   return fromDataSource({
     mock: () => mockTransitionWorkflow(instanceId, targetInstanceStageId, comment),
     real: async () => unwrapApiResult(await apiFetch<WorkflowInstanceApiRecord>(`/api/v1/workflow/instances/${instanceId}/transition`, { method: 'POST', body: { target_instance_stage_id: targetInstanceStageId, comment, ...(dueDate ? { due_date: dueDate } : {}) } })),

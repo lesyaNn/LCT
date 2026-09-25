@@ -1,13 +1,15 @@
 import { apiFetch } from './api-client';
 import { ApiRequestError, ERROR_MESSAGES } from './api-errors';
 import { fromDataSource, isMockDataSource } from './data-source';
+import { periodPresetRange, type PeriodPreset } from './date-period';
 import { queryKeys } from './query-keys';
 import { universityFilterOptions, universityProgramDirectionOptions, type UniversityWorkflowStageStatus } from './universities-repository';
 import { workflowStageStatusSemantics } from './status-semantics';
 import { mockCreateReportJob, mockGetReportJob, mockListReportJobs } from '@/shared/mocks/api-adapter';
 
 export type ReportFormat = 'xlsx' | 'pdf' | 'json';
-export type ReportPeriodPreset = 'current_month' | 'current_quarter' | 'current_year' | 'previous_year' | null;
+
+export type ReportPeriodPreset = PeriodPreset | null;
 export type ReportJobStatus = 'queued' | 'building' | 'ready' | 'failed';
 
 export interface ReportFormValues {
@@ -153,21 +155,9 @@ export const EMPTY_REPORT_FORM: ReportFormValues = {
   format: 'xlsx',
 };
 
-function localIsoDate(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
 /** Calculate presets in local calendar dates; no UTC conversion is involved. */
 export function reportPeriodPreset(preset: Exclude<ReportPeriodPreset, null>, now = new Date()): Pick<ReportFormValues, 'dateFrom' | 'dateTo'> {
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  if (preset === 'current_month') return { dateFrom: localIsoDate(new Date(year, month, 1)), dateTo: localIsoDate(new Date(year, month + 1, 0)) };
-  if (preset === 'current_quarter') {
-    const firstMonth = Math.floor(month / 3) * 3;
-    return { dateFrom: localIsoDate(new Date(year, firstMonth, 1)), dateTo: localIsoDate(new Date(year, firstMonth + 3, 0)) };
-  }
-  if (preset === 'current_year') return { dateFrom: localIsoDate(new Date(year, 0, 1)), dateTo: localIsoDate(new Date(year, 11, 31)) };
-  return { dateFrom: localIsoDate(new Date(year - 1, 0, 1)), dateTo: localIsoDate(new Date(year - 1, 11, 31)) };
+  return periodPresetRange(preset, now);
 }
 
 export function reportRequestFromForm(values: ReportFormValues): ReportRequest {

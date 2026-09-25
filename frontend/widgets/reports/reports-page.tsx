@@ -1,6 +1,5 @@
 'use client';
 
-import Calendar from '@atomaro/icons/24/communication/Calendar';
 import CheckStatistics from '@atomaro/icons/24/action/CheckStatistics';
 import CloudDownload from '@atomaro/icons/24/action/CloudDownload';
 import Filter from '@atomaro/icons/24/action/Filter';
@@ -19,8 +18,9 @@ import { type SemanticIntent } from '@/shared/lib/status-semantics';
 import { Button } from '@/shared/ui/rtk/button';
 import { EmptyState } from '@/shared/ui/empty-state';
 import { ErrorState } from '@/shared/ui/error-state';
-import { FormError, FormErrorBanner, FormField } from '@/shared/ui/rtk/form-field';
-import { Input } from '@/shared/ui/rtk/form-controls';
+import { FormError, FormErrorBanner } from '@/shared/ui/rtk/form-field';
+import { DateRangeField } from '@/shared/ui/rtk/date-range-field';
+import { FilterToolbar } from '@/shared/ui/rtk/filter-surface';
 import { MultiSelect } from '@/shared/ui/rtk/multiselect';
 import { Progress } from '@/shared/ui/rtk/progress';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
@@ -38,14 +38,11 @@ import {
   reportColumnDefinitions,
   reportColumnPresetNames,
   reportFilterOptions,
-  reportPeriodPreset,
   reportQueryKeys,
   reportRequestFromForm,
   retryReportJob,
-  type ReportFormValues,
   type ReportJob,
   type ReportJobStatus,
-  type ReportPeriodPreset,
 } from '@/shared/lib/reports-repository';
 import styles from './reports-page.module.css';
 
@@ -69,26 +66,12 @@ const reportSchema = z.object({
 
 type ReportFormSchema = z.infer<typeof reportSchema>;
 
-const periodPresets: Array<{ id: Exclude<ReportPeriodPreset, null>; label: string }> = [
-  { id: 'current_month', label: 'Текущий месяц' },
-  { id: 'current_quarter', label: 'Текущий квартал' },
-  { id: 'current_year', label: 'Текущий год' },
-  { id: 'previous_year', label: 'Прошлый год' },
-];
-
 const statusMeta: Record<ReportJobStatus, { label: string; intent: SemanticIntent; icon: ReactNode }> = {
   queued: { label: 'В очереди', intent: 'neutral', icon: <TimeStroke size={14} fill="currentColor" aria-hidden="true" /> },
   building: { label: 'Формируется', intent: 'info', icon: <InformationStroke size={14} fill="currentColor" aria-hidden="true" /> },
   ready: { label: 'Готов', intent: 'success', icon: <CheckStatistics size={14} fill="currentColor" aria-hidden="true" /> },
   failed: { label: 'Ошибка', intent: 'danger', icon: <ErrorStroke size={14} fill="currentColor" aria-hidden="true" /> },
 };
-
-function activePreset(values: Pick<ReportFormValues, 'dateFrom' | 'dateTo'>): ReportPeriodPreset {
-  return periodPresets.find((preset) => {
-    const dates = reportPeriodPreset(preset.id);
-    return dates.dateFrom === values.dateFrom && dates.dateTo === values.dateTo;
-  })?.id ?? null;
-}
 
 function isActiveJob(job: ReportJob): boolean {
   return job.status === 'queued' || job.status === 'building';
@@ -187,17 +170,16 @@ function ReportForm({ onCreated }: { onCreated: (job: ReportJob) => void }) {
   const [globalError, setGlobalError] = useState<string | null>(null);
   const { control, handleSubmit, setValue, setError, setFocus, formState: { errors }, clearErrors } = useForm<ReportFormSchema>({ resolver: zodResolver(reportSchema), mode: 'onBlur', defaultValues: EMPTY_REPORT_FORM });
   const values = useWatch({ control }) as ReportFormSchema;
-  const preset = activePreset(values);
   const createMutation = useMutation({ mutationFn: (input: ReportFormSchema) => createReportJob(reportRequestFromForm(input)), onSuccess: (job) => { setGlobalError(null); setNotification({ intent: 'success', title: 'Задача отчёта создана', message: 'Задача добавлена в список и будет обновляться автоматически.' }); onCreated(job); }, onError: (cause) => { const normalized = normalizeApiError(cause, { fallbackMessage: 'Не удалось создать задачу отчёта.' }); const mapped = applyServerErrorsToForm(normalized, { fields: reportFields, setError, setFocus }); setGlobalError(mapped.hasUnknownFields || !mapped.applied ? normalized.message : null); setNotification({ intent: 'error', title: 'Отчёт не создан', message: normalized.message }); } });
-  const setPreset = (value: Exclude<ReportPeriodPreset, null>) => { const dates = reportPeriodPreset(value); setValue('dateFrom', dates.dateFrom, { shouldDirty: true, shouldValidate: true }); setValue('dateTo', dates.dateTo, { shouldDirty: true, shouldValidate: true }); clearErrors(['dateFrom', 'dateTo']); };
+  const setPeriod = (dateFrom: string, dateTo: string) => { setValue('dateFrom', dateFrom, { shouldDirty: true, shouldValidate: true }); setValue('dateTo', dateTo, { shouldDirty: true, shouldValidate: true }); clearErrors(['dateFrom', 'dateTo']); };
   const submit = (input: ReportFormSchema) => { setGlobalError(null); if (!REPORTS_API_CAPABILITIES.formats[input.format]) { setGlobalError(`Формат ${input.format.toUpperCase()} пока не поддерживается текущим Reports API.`); return; } if (!REPORTS_API_CAPABILITIES.filters && (input.dateFrom || input.dateTo || input.universityIds.length || input.directionIds.length || input.productIds.length || input.responsibleIds.length || input.workflowStatuses.length)) { setGlobalError('Текущий Reports API принимает только формат и колонки. Фильтры формы будут подключены после P4 unified filters/report contract.'); return; } createMutation.mutate(input); };
 
   return <div className={styles.formSurface}>
     <div className={styles.sectionHeading}><div><h2>Параметры отчёта</h2></div><Filter size={20} fill="currentColor" aria-hidden="true" /></div>
     {globalError ? <FormErrorBanner>{globalError}</FormErrorBanner> : null}
     <form onSubmit={(event) => void handleSubmit(submit)(event)} noValidate>
-      <section className={styles.formSection} aria-labelledby="report-period-heading"><div className={styles.sectionHeading}><div><h3 id="report-period-heading">Период</h3><p>Выберите готовый период или задайте даты вручную.</p></div><Calendar size={18} fill="currentColor" aria-hidden="true" /></div><div className={styles.presetRow}>{periodPresets.map((item) => <Button key={item.id} type="button" variant={preset === item.id ? (item.id === 'current_year' ? 'orange' : 'primary') : 'ghost'} size="s" onClick={() => setPreset(item.id)}>{item.label}</Button>)}</div><div className={styles.dateGrid}><FormField label="С даты" htmlFor="report-date-from" error={errors.dateFrom?.message} errorId="report-date-from-error"><Input id="report-date-from" type="date" aria-invalid={Boolean(errors.dateFrom)} aria-describedby={errors.dateFrom ? 'report-date-from-error' : undefined} {...({ name: 'dateFrom', value: values.dateFrom, onChange: (event) => { setValue('dateFrom', event.target.value, { shouldDirty: true, shouldValidate: true }); clearErrors('dateFrom'); }, onBlur: () => undefined })} /></FormField><FormField label="По дату" htmlFor="report-date-to" error={errors.dateTo?.message} errorId="report-date-to-error"><Input id="report-date-to" type="date" aria-invalid={Boolean(errors.dateTo)} aria-describedby={errors.dateTo ? 'report-date-to-error' : undefined} {...({ name: 'dateTo', value: values.dateTo, onChange: (event) => { setValue('dateTo', event.target.value, { shouldDirty: true, shouldValidate: true }); clearErrors('dateTo'); }, onBlur: () => undefined })} /></FormField></div></section>
-      <section className={styles.formSection} aria-labelledby="report-filters-heading"><div className={styles.sectionHeading}><div><h3 id="report-filters-heading">Фильтры</h3><p>Опции берутся из общих каталогов проекта.</p></div></div><div className={styles.filterGrid}><Controller control={control} name="universityIds" render={({ field }) => <MultiSelect label="ВУЗы" searchable options={reportFilterOptions.universities} values={field.value} onChange={field.onChange} />} /><Controller control={control} name="directionIds" render={({ field }) => <MultiSelect label="Направления" options={reportFilterOptions.directions} values={field.value} onChange={field.onChange} />} /><Controller control={control} name="productIds" render={({ field }) => <MultiSelect label="Продукты" options={reportFilterOptions.products} values={field.value} onChange={field.onChange} />} /><Controller control={control} name="responsibleIds" render={({ field }) => <MultiSelect label="ФИО" searchable options={reportFilterOptions.responsibles} values={field.value} onChange={field.onChange} />} /><Controller control={control} name="workflowStatuses" render={({ field }) => <MultiSelect label="Статусы Workflow" options={reportFilterOptions.workflowStatuses} values={field.value} onChange={field.onChange} />} /></div></section>
+      <section className={styles.formSection}><DateRangeField presets from={values.dateFrom} to={values.dateTo} onFromChange={(dateFrom) => setPeriod(dateFrom, values.dateTo)} onToChange={(dateTo) => setPeriod(values.dateFrom, dateTo)} onRangeChange={setPeriod} fromError={errors.dateFrom?.message} toError={errors.dateTo?.message} /></section>
+      <section className={styles.formSection}><FilterToolbar embedded label="Фильтры отчёта" controls={() => <><Controller control={control} name="universityIds" render={({ field }) => <MultiSelect label="ВУЗы" searchable options={reportFilterOptions.universities} values={field.value} onChange={field.onChange} />} /><Controller control={control} name="directionIds" render={({ field }) => <MultiSelect label="Направления" options={reportFilterOptions.directions} values={field.value} onChange={field.onChange} />} /><Controller control={control} name="productIds" render={({ field }) => <MultiSelect label="Продукты" options={reportFilterOptions.products} values={field.value} onChange={field.onChange} />} /><Controller control={control} name="responsibleIds" render={({ field }) => <MultiSelect label="ФИО" searchable options={reportFilterOptions.responsibles} values={field.value} onChange={field.onChange} />} /><Controller control={control} name="workflowStatuses" render={({ field }) => <MultiSelect label="Статусы Workflow" options={reportFilterOptions.workflowStatuses} values={field.value} onChange={field.onChange} />} /></>} onReset={() => { setValue('universityIds', []); setValue('directionIds', []); setValue('productIds', []); setValue('responsibleIds', []); setValue('workflowStatuses', []); }} resetDisabled={!(values.universityIds.length + values.directionIds.length + values.productIds.length + values.responsibleIds.length + values.workflowStatuses.length)} mobileCount={values.universityIds.length + values.directionIds.length + values.productIds.length + values.responsibleIds.length + values.workflowStatuses.length} /></section>
       <ColumnSelector control={control} errors={errors} />
       <section className={styles.formSection} aria-labelledby="report-format-heading"><div className={styles.sectionHeading}><div><h3 id="report-format-heading">Формат</h3><p>Выберите формат файла отчёта.</p></div></div><Controller control={control} name="format" render={({ field }) => <fieldset className={styles.radioGroup}><legend className={styles.visuallyHidden}>Формат отчёта</legend>{REPORT_FORMATS.map((format) => <label key={format.id} className={!REPORTS_API_CAPABILITIES.formats[format.id] ? styles.optionDisabled : undefined}><input type="radio" value={format.id} checked={field.value === format.id} disabled={!REPORTS_API_CAPABILITIES.formats[format.id]} onChange={() => field.onChange(format.id)} />{format.label}{!REPORTS_API_CAPABILITIES.formats[format.id] ? <small>ожидает API</small> : null}</label>)}</fieldset>} /></section>
       <div className={styles.formActions}><Button type="submit" variant="primary" size="m" loading={createMutation.isPending} disabled={createMutation.isPending}>Сформировать отчёт</Button><span className={styles.actionHint}>Задача добавляется в очередь формирования без перезагрузки страницы; значения формы сохраняются при ошибке.</span></div>

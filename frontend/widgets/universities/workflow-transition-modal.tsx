@@ -9,6 +9,7 @@ import ArrowRight from '@atomaro/icons/24/navigation/ArrowRight';
 import TimeStroke from '@atomaro/icons/24/alert/TimeStroke';
 import { applyServerErrorsToForm, normalizeApiError } from '@/shared/lib/api-errors';
 import { applyOptimisticWorkflowTransition, getAvailableWorkflowTransitionTargets, getLocalTodayIso, isWorkflowTransitionDraft, workflowTransitionDraftKey, type WorkflowTransitionTarget } from '@/shared/lib/workflow-transition';
+import { isMockDataSource } from '@/shared/lib/data-source';
 import { invalidateWorkflowRelatedQueries } from '@/shared/lib/workflow-cache';
 import { isWorkflowApiInstanceId, transitionWorkflowInstance, workflowQueryKey, type UniversityWorkflow, type UniversityWorkflowStage, type WorkflowInstanceApiRecord } from '@/shared/lib/universities-repository';
 import { Button } from '@/shared/ui/rtk/button';
@@ -41,16 +42,16 @@ export interface WorkflowTransitionNotification {
 
 type TransitionMutationContext = { previousWorkflow?: UniversityWorkflow };
 
-export function WorkflowTransitionModal({ open, instanceId, universityId, currentStage, stages, userId, onClose, onSuccess, onNotify }: { open: boolean; instanceId: string; universityId?: string | null; currentStage: UniversityWorkflowStage; stages: UniversityWorkflowStage[]; userId?: string | null; onClose: () => void; onSuccess: () => void; onNotify: (notification: WorkflowTransitionNotification) => void }) {
+export function WorkflowTransitionModal({ open, instanceId, universityId, currentStage, stages, initialTargetStageId, userId, onClose, onSuccess, onNotify }: { open: boolean; instanceId: string; universityId?: string | null; currentStage: UniversityWorkflowStage; stages: UniversityWorkflowStage[]; initialTargetStageId?: string; userId?: string | null; onClose: () => void; onSuccess: () => void; onNotify: (notification: WorkflowTransitionNotification) => void }) {
   const queryClient = useQueryClient();
   const commentRef = useRef<HTMLTextAreaElement>(null);
   const [showDiscard, setShowDiscard] = useState(false);
   const [serverFormError, setServerFormError] = useState<string | null>(null);
   const targets = useMemo(() => getAvailableWorkflowTransitionTargets(stages, currentStage), [currentStage, stages]);
-  const defaultTargetId = targets[0]?.id ?? '';
+  const defaultTargetId = targets.find((target) => target.id === initialTargetStageId)?.id ?? targets[0]?.id ?? '';
   const targetKey = targets.map((target) => target.id).join('|');
   const targetIds = useMemo(() => new Set(targets.map((target) => target.id)), [targets]);
-  const apiAvailable = isWorkflowApiInstanceId(instanceId) && targets.every((target) => isWorkflowApiInstanceId(target.id));
+  const apiAvailable = isMockDataSource || (isWorkflowApiInstanceId(instanceId) && targets.every((target) => isWorkflowApiInstanceId(target.id)));
   const today = getLocalTodayIso();
   const schema = useMemo(() => createTransitionSchema(today, targets), [targets, today]);
   const storageKey = workflowTransitionDraftKey(instanceId, currentStage.id, userId);
@@ -78,8 +79,8 @@ export function WorkflowTransitionModal({ open, instanceId, universityId, curren
     } catch {
       try { window.localStorage.removeItem(storageKey); } catch { /* Storage can be unavailable in privacy mode. */ }
     }
-    reset(restored ?? { targetStageId: defaultTargetId, comment: '', dueDate: '' });
-  }, [defaultTargetId, open, reset, storageKey, targetIds, targetKey, today]);
+    reset(restored ? { ...restored, targetStageId: initialTargetStageId ?? restored.targetStageId } : { targetStageId: defaultTargetId, comment: '', dueDate: '' });
+  }, [defaultTargetId, initialTargetStageId, open, reset, storageKey, targetIds, targetKey, today]);
 
   useEffect(() => {
     if (!open) return undefined;

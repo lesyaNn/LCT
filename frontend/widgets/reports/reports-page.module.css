@@ -10,11 +10,6 @@
 .sectionHeading > svg { color: var(--rtk-color-brand); flex: 0 0 auto; }
 .formSurface form { display: flex; flex-direction: column; gap: var(--rtk-space-5); }
 .formSection, .columnSection { border-top: 1px solid var(--rtk-color-border); display: flex; flex-direction: column; gap: var(--rtk-space-3); padding-top: var(--rtk-space-5); }
-.presetRow { display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); }
-.presetRow button { border: 1px solid var(--rtk-color-border-strong); min-height: 36px; }
-.dateGrid { display: grid; gap: var(--rtk-space-3); grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.filterGrid { display: grid; gap: var(--rtk-space-3); grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.filterGrid > *:first-child { grid-column: 1 / -1; }
 .columnSection .sectionHeading { align-items: flex-start; }
 .columnPresets { display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); }
 .columnGrid { display: grid; gap: 1px var(--rtk-space-3); grid-template-columns: repeat(2, minmax(0, 1fr)); }

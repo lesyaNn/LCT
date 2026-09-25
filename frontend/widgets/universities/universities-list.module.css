@@ -18,26 +18,7 @@
 .description { color: var(--rtk-color-text-secondary); margin: var(--rtk-space-2) 0 0; max-width: 720px; }
 
 .filterArea { display: flex; flex-direction: column; gap: var(--rtk-space-3); min-width: 0; }
-.filterTrigger { align-self: flex-start; align-items: center; display: inline-flex; gap: var(--rtk-space-2); }
-.filterPanelWrap { display: none; position: relative; }
-.filterPanelVisible { display: block; }
-.filterPanel { min-width: 0; }
-.filters {
-  align-items: end;
-  background: var(--rtk-color-surface);
-  border: 1px solid var(--rtk-color-border);
-  border-radius: var(--rtk-radius-medium);
-  display: grid;
-  gap: var(--rtk-space-3);
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  padding: var(--rtk-space-4);
-}
-.filterPanelHeader { align-items: flex-start; display: flex; grid-column: 1 / -1; justify-content: space-between; }
-.filterPanelHeader h2 { font-size: 18px; margin: 0; }
-.filterPanelHeader p { color: var(--rtk-color-text-secondary); font-size: 12px; margin: var(--rtk-space-1) 0 0; }
-.filterCloseButton { align-items: center; background: transparent; border: 0; color: var(--rtk-color-text-secondary); cursor: pointer; display: inline-flex; padding: var(--rtk-space-1); }
-.filterCloseButton:hover { color: var(--rtk-color-text-primary); }
-.mobileFilterContent { min-width: 0; }
+.filters { display: contents; }
 
 .field,
 .multiselect,
@@ -111,9 +92,6 @@
 .optionSearch { align-items: center; border-bottom: 1px solid var(--rtk-color-border); display: flex; gap: var(--rtk-space-2); margin: calc(-1 * var(--rtk-space-1)) calc(-1 * var(--rtk-space-2)) var(--rtk-space-2); padding: 0 var(--rtk-space-2) var(--rtk-space-2); }
 .optionSearch svg { color: var(--rtk-color-text-tertiary); flex: 0 0 auto; }
 .optionSearch input[type='search'] { accent-color: var(--rtk-color-brand); background: transparent; border: 0; color: var(--rtk-color-text-primary); min-width: 0; outline: 0; width: 100%; }
-.dateRange { display: flex; flex-direction: column; gap: var(--rtk-space-2); grid-column: span 2; }
-.dateRangeLabel { color: var(--rtk-color-text-secondary); font-size: 12px; font-weight: 600; }
-.dateInputs { display: grid; gap: var(--rtk-space-3); grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .activeFilters { align-items: flex-start; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); }
 .activeFiltersLabel { color: var(--rtk-color-text-secondary); font-size: 12px; font-weight: 600; padding: 7px 0; }
 .chipList { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); min-width: 0; }
@@ -202,23 +180,7 @@
   to { background-position: -100% 0; }
 }
 
-@media (max-width: 1250px) {
-  .filters { grid-template-columns: repeat(3, minmax(150px, 1fr)); }
-  .searchField { grid-column: span 2; }
-}
-
 @media (max-width: 768px) {
-  .filterPanelWrap { display: none; }
-  .filterTrigger { min-height: 44px; }
-  .mobileFilterContent .field select,
-  .mobileFilterContent .field input[type='date'],
-  .mobileFilterContent .inputWrap,
-  .mobileFilterContent .multiselect summary { min-height: 48px; }
-  .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .searchField { grid-column: 1 / -1; }
-  .filters > button { justify-self: start; }
-  .filterCloseButton { display: inline-flex; }
-  .dateRange { grid-column: 1 / -1; }
   .desktopOnly { display: none; }
   .mobileOnly { display: block; }
   .pagination { align-items: flex-start; flex-direction: column; }
@@ -230,10 +192,6 @@
 }
 
 @media (max-width: 480px) {
-  .filters { grid-template-columns: 1fr; }
-  .searchField { grid-column: auto; }
-  .dateRange { grid-column: auto; }
-  .dateInputs { grid-template-columns: 1fr; }
   .mobileDetails { grid-template-columns: 1fr; }
   .pageButtons { width: 100%; }
   .pageButtons > :first-child,

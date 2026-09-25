@@ -1,0 +1,9 @@
+.root { grid-column: span 2; min-width: 0; }
+.label { color: var(--rtk-color-text-secondary); display: block; font-size: 11px; font-weight: 700; margin-bottom: var(--rtk-space-1); }
+.fields { display: grid; gap: var(--rtk-space-2); grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.presets { display: flex; flex-wrap: wrap; gap: var(--rtk-space-1); margin-bottom: var(--rtk-space-2); }
+.presets button { min-height: 32px; }
+.fields label { color: var(--rtk-color-text-secondary); display: flex; flex-direction: column; font-size: 11px; font-weight: 700; gap: var(--rtk-space-1); min-width: 0; }
+.fields input { width: 100%; }
+.fields small { color: var(--rtk-color-danger); font-weight: 400; }
+@media (max-width: 768px) { .root { grid-column: 1; } }

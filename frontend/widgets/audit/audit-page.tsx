@@ -26,8 +26,8 @@ import {
   type AuditListResult,
 } from '@/shared/lib/audit-repository';
 import { Button } from '@/shared/ui/rtk/button';
-import { FilterSurface } from '@/shared/ui/rtk/filter-surface';
-import { Drawer } from '@/shared/ui/rtk/drawer';
+import { FilterToolbar } from '@/shared/ui/rtk/filter-surface';
+import { DateRangeField } from '@/shared/ui/rtk/date-range-field';
 import { EmptyState } from '@/shared/ui/empty-state';
 import { ErrorState } from '@/shared/ui/error-state';
 import { Modal } from '@/shared/ui/rtk/modal';
@@ -95,35 +95,21 @@ function selectedFilterCount(filters: AuditFilters): number {
   return [filters.dateFrom, filters.dateTo, ...filters.userIds, ...filters.universityIds, ...filters.actions, ...filters.entityTypes].filter(Boolean).length;
 }
 
-function AuditFilters({ query, result, onPatch, onReset, open, onClose }: { query: AuditListQuery; result?: AuditListResult; onPatch: (patch: Partial<AuditFilters>) => void; onReset: () => void; open: boolean; onClose: () => void }) {
+function AuditFilters({ query, result, onPatch, onReset }: { query: AuditListQuery; result?: AuditListResult; onPatch: (patch: Partial<AuditFilters>) => void; onReset: () => void }) {
   const capabilities = result?.capabilities;
   const entityOptions = ENTITY_OPTIONS.map((id) => ({ id, name: getAuditEntityLabel(id) }));
   const actionOptions = ACTION_OPTIONS.map((id) => ({ id, name: getAuditActionMeta(id).label }));
   const users = result?.filterOptions.users ?? [];
   const universities = result?.filterOptions.universities ?? [];
-  const content = (
-    <div className={styles.filterGrid}>
-      <div className={styles.dateRange}>
-        <span className={styles.filterLabel}>Период</span>
-        <div className={styles.dateInputs}>
-          <label><span>От</span><input type="date" value={query.filters.dateFrom} disabled={!capabilities?.dateRange} max={query.filters.dateTo || undefined} onChange={(event) => onPatch({ dateFrom: event.target.value })} /></label>
-          <label><span>До</span><input type="date" value={query.filters.dateTo} disabled={!capabilities?.dateRange} min={query.filters.dateFrom || undefined} onChange={(event) => onPatch({ dateTo: event.target.value })} /></label>
-        </div>
-      </div>
+  const controls = () => <>
+      <DateRangeField presets from={query.filters.dateFrom} to={query.filters.dateTo} disabled={!capabilities?.dateRange} onFromChange={(dateFrom) => onPatch({ dateFrom })} onToChange={(dateTo) => onPatch({ dateTo })} onRangeChange={(dateFrom, dateTo) => onPatch({ dateFrom, dateTo })} />
       <MultiSelect label="Пользователь" values={query.filters.userIds} options={users} disabled={!capabilities?.users} hint="Опции появятся в P5-05-03 API." onChange={(values) => onPatch({ userIds: values })} />
       <MultiSelect label="ВУЗ" values={query.filters.universityIds} options={universities} disabled={!capabilities?.universities} hint="Опции появятся в P5-05-03 API." onChange={(values) => onPatch({ universityIds: values })} />
       <MultiSelect label="Тип действия" values={query.filters.actions} options={actionOptions} disabled={!capabilities?.actions} hint="Фильтр не поддержан текущим API." onChange={(values) => onPatch({ actions: values })} />
       <MultiSelect label="Тип сущности" values={query.filters.entityTypes} options={entityOptions} disabled={!capabilities?.entityTypes} hint="Текущий API поддерживает один тип за запрос." onChange={(values) => onPatch({ entityTypes: values.slice(-1) })} />
-      <Button variant="ghost" size="s" type="button" disabled={!selectedFilterCount(query.filters)} onClick={onReset}>Сбросить фильтры</Button>
-    </div>
-  );
+    </>;
 
-  return (
-    <>
-      <FilterSurface className={styles.desktopFilters} label="Фильтры журнала аудита">{content}</FilterSurface>
-      {open ? <Drawer title="Фильтры" onClose={onClose}><div className={styles.drawerContent}>{content}</div></Drawer> : null}
-    </>
-  );
+  return <FilterToolbar label="Фильтры журнала аудита" controls={controls} onReset={onReset} resetDisabled={!selectedFilterCount(query.filters)} mobileCount={selectedFilterCount(query.filters)} />;
 }
 
 function TimeCell({ value }: { value: string }) {
@@ -159,7 +145,6 @@ export function AuditPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [query, setQuery] = useState<AuditListQuery>(() => parseQuery(new URLSearchParams(searchParams.toString())));
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AuditEvent | null>(null);
   const auditQuery = useQuery({ queryKey: auditQueryKey(query), queryFn: () => getAuditEvents(query), placeholderData: keepPreviousData, staleTime: 30_000 });
   const filtered = selectedFilterCount(query.filters) > 0;
@@ -176,8 +161,7 @@ export function AuditPage() {
   const retry = () => void auditQuery.refetch();
 
   return <div className={styles.page}>
-    <div className={styles.toolbar}><p className={styles.eyebrow}>Только просмотр</p><Button className={styles.mobileFilterButton} variant="secondary" size="s" type="button" onClick={() => setMobileFiltersOpen(true)}>Фильтры{filtered ? ` (${selectedFilterCount(query.filters)})` : ''}</Button></div>
-    <AuditFilters query={query} result={auditQuery.data} onPatch={patchFilters} onReset={resetFilters} open={mobileFiltersOpen} onClose={() => setMobileFiltersOpen(false)} />
+    <AuditFilters query={query} result={auditQuery.data} onPatch={patchFilters} onReset={resetFilters} />
     {filterHint ? <p className={styles.loadingHint}>{filterHint}</p> : null}
     {auditQuery.isPending ? <TableSkeleton rows={6} columns={8} label="Загрузка журнала аудита" /> : auditQuery.isError || !auditQuery.data ? <ErrorState title={normalizedError?.message ?? 'Не удалось загрузить журнал аудита'} description="Повторите попытку или обратитесь к администратору." onRetry={retry} /> : auditQuery.data.items.length ? <AuditTable events={auditQuery.data.items} onOpen={setSelectedEvent} /> : <EmptyState icon={<SecurityCheck size={24} fill="currentColor" />} title={filtered ? 'По заданным фильтрам события не найдены' : 'Событий пока нет'} description={filtered ? 'Измените условия поиска или сбросьте фильтры.' : 'Когда появятся записи, они будут отображены в этом журнале.'} primaryAction={filtered ? { label: 'Сбросить фильтры', onClick: resetFilters, variant: 'secondary' } : undefined} />}
     {auditQuery.data ? <Pagination result={auditQuery.data} pageSize={query.pageSize} onPage={(page) => setQuery((current) => ({ ...current, page }))} onPageSize={(pageSize) => setQuery((current) => ({ ...current, page: 1, pageSize }))} /> : null}
