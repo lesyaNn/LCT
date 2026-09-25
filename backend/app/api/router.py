@@ -11,6 +11,7 @@ unmounted; see ``docs/AUDIT.md`` for their reactivation requirements.
 from fastapi import APIRouter
 
 from app.modules.analytics.reports_router import router as reports_router
+from app.modules.admin_users.router import router as admin_users_router
 from app.modules.audit.router import router as audit_router
 from app.modules.analytics.router import router as analytics_router
 from app.modules.auth.router import router as auth_router
@@ -29,6 +30,7 @@ from app.modules.workflow_transitions.router import router as workflow_transitio
 
 v1 = APIRouter(prefix="/api/v1")
 v1.include_router(auth_router)
+v1.include_router(admin_users_router)
 v1.include_router(imports_router)
 # NOTE: health_router ДО catalog_router: точный путь /universities/health-score
 # (batch, P2-08-02) иначе перехватывается GET /universities/{university_id}.

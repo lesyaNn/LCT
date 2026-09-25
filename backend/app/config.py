@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     keycloak_jwks_url: str = "http://keycloak:8080/realms/rtk/protocol/openid-connect/certs"
     keycloak_realm: str = "rtk"
     keycloak_audience: str = "rtk-api"
+    # Server-only Keycloak Admin API credentials. Never exposed as NEXT_PUBLIC.
+    keycloak_admin_base_url: str = "http://keycloak:8080"
+    keycloak_admin_username: str = ""
+    keycloak_admin_password: str = ""
     # Fail-closed dev bypass: real compose runs with false. Tests may enable it.
     auth_dev_bypass: bool = False
 

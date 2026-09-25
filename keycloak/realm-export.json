@@ -111,6 +111,9 @@
       "webOrigins": ["http://localhost:3000"],
       "defaultClientScopes": ["web-origins", "basic", "profile", "roles", "email", "rtk-api-audience"],
       "optionalClientScopes": [],
+      "protocolMappers": [
+        { "name": "rtk university ids", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper", "consentRequired": false, "config": { "user.attribute": "university_ids", "claim.name": "university_ids", "jsonType.label": "String", "multivalued": "true", "access.token.claim": "true", "id.token.claim": "false", "userinfo.token.claim": "false" } }
+      ],
       "attributes": {
         "post.logout.redirect.uris": "http://localhost:3000/*",
         "pkce.code.challenge.method": "S256"

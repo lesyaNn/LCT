@@ -100,6 +100,9 @@ services:
       KEYCLOAK_ISSUER: ${KEYCLOAK_EXTERNAL_URL:-http://localhost:8081}/realms/${KEYCLOAK_REALM:-rtk}
       KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/${KEYCLOAK_REALM:-rtk}/protocol/openid-connect/certs
       KEYCLOAK_AUDIENCE: ${KEYCLOAK_AUDIENCE:-rtk-api}
+      KEYCLOAK_ADMIN_BASE_URL: http://keycloak:8080
+      KEYCLOAK_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-change-me}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
       REDIS_URL: redis://redis:6379/0
       IMPORT_STAGING_DIR: /tmp/rtk-imports

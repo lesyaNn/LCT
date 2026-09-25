@@ -141,6 +141,7 @@ def test_deferred_models_isolated_on_deferred_base():
 def test_mounted_routers_are_only_the_production_contract():
     allowed = (
         "/api/v1/auth",
+        "/api/v1/admin/users",  # Keycloak-backed Admin API; legacy /users stays deferred.
         "/api/v1/import",
         "/api/v1/catalog",
         "/api/v1/universities",
