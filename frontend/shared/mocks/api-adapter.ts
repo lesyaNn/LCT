@@ -752,6 +752,15 @@ export function mockGetCatalogReferenceData(): CatalogReferenceData {
   return {
     vendors: mockVendors.map((item) => ({ ...item })),
     universities: [...catalogGroup('universities').values()].filter((item) => item.type === 'universities' && item.isActive).map((item) => ({ id: item.id, name: item.name })),
+    products: [...catalogGroup('products').values()].flatMap((item) => item.type === 'products' && item.isActive ? [{ id: item.id, name: item.name, description: item.vendorName }] : []),
+    directions: [...catalogGroup('directions').values()].flatMap((item) => item.type === 'directions' && item.isActive ? [{ id: item.id, name: item.name, description: item.code }] : []),
+    programs: [
+      { id: 'program-data-analytics', name: 'Аналитика данных' },
+      { id: 'program-digital-economy', name: 'Цифровая экономика' },
+      { id: 'program-it-management', name: 'ИТ-менеджмент' },
+      { id: 'program-cybersecurity', name: 'Кибербезопасность' },
+    ],
+    responsibles: [...catalogGroup('responsibles').values()].flatMap((item) => item.type === 'responsibles' && item.isActive ? [{ id: item.id, name: item.name, description: item.role || item.email }] : []),
   };
 }
 

@@ -47,7 +47,15 @@ import type {
 } from './external-integrations-repository';
 
 type ApiPage<T> = { items: T[]; page: number; page_size: number; total: number };
-type ApiUniversity = { id: string; name: string; city: string | null; created_at: string; updated_at: string };
+type ApiUniversity = {
+  id: string;
+  name: string;
+  city: string | null;
+  created_at: string;
+  updated_at: string;
+  health_score: number | null;
+  health_status: 'green' | 'yellow' | 'red' | null;
+};
 type ApiProgram = { id: string; name: string; direction_name: string; status: ProgramStatus; launch_date: string | null; responsible_name: string | null; teachers_count: number; students_count: number };
 type ApiTeacher = { id: string; full_name: string; email: string; position: string; readiness: TeacherReadiness; next_qualification_date: string | null; programs: ApiProgram[] };
 type ApiLicense = { id: string; license_number: string; product_name: string; vendor_name: string; signed_at: string; expires_at: string; status: string; transfer_status: string; contract_number: string | null };
@@ -123,21 +131,35 @@ function mapTeacher(item: ApiTeacher): UniversityTeacherRow {
   };
 }
 
-export async function realGetUniversities(params: UniversityListQuery): Promise<PaginatedResult<UniversityListItem>> {
+function appendRepeated(params: URLSearchParams, key: string, values: readonly string[]): void {
+  values.forEach((value) => params.append(key, value));
+}
+
+/** Single UniversityListQuery -> FastAPI query-contract serializer. */
+export function serializeUniversityListQuery(params: UniversityListQuery): URLSearchParams {
   const search = new URLSearchParams({ page: String(params.page), page_size: String(params.pageSize) });
   const filters: UniversityFilters = params.filters;
-  if (filters.search) search.set('search', filters.search);
+  if (filters.search.trim()) search.set('search', filters.search.trim());
   if (filters.city) search.set('city', filters.city);
-  if (filters.responsibleIds.length === 1) search.set('responsible_id', filters.responsibleIds[0]);
-  const supportedSort = params.sort === 'last_interaction' ? 'created_at' : 'name';
+  appendRepeated(search, 'university_ids', filters.universityIds);
+  appendRepeated(search, 'program_ids', filters.programIds);
+  appendRepeated(search, 'product_ids', filters.productIds);
+  appendRepeated(search, 'responsible_ids', filters.responsibleIds);
+  if (filters.dateFrom) search.set('date_from', filters.dateFrom);
+  if (filters.dateTo) search.set('date_to', filters.dateTo);
+  if (filters.healthStatuses.length === 1) search.set('health_status', filters.healthStatuses[0]);
+  const supportedSort = params.sort === 'health_score' ? 'health_score' : 'name';
   search.set('sort_by', supportedSort);
   search.set('sort_order', params.order);
-  const page = unwrap(await apiFetch<ApiPage<ApiUniversity>>(`/api/v1/universities?${search}`), 'Не удалось загрузить список ВУЗов.');
-  let scores = new Map<string, number>();
-  if (page.items.length) {
-    const batch = await apiFetch<{ items: Array<{ university_id: string; score: number }> }>(`/api/v1/universities/health-score?ids=${encodeURIComponent(page.items.map((item) => item.id).join(','))}`);
-    if (batch.ok) scores = new Map(batch.data.items.map((item) => [item.university_id, item.score]));
-  }
+  return search;
+}
+
+export async function realGetUniversities(params: UniversityListQuery, signal?: AbortSignal): Promise<PaginatedResult<UniversityListItem>> {
+  const search = serializeUniversityListQuery(params);
+  const page = unwrap(
+    await apiFetch<ApiPage<ApiUniversity>>(`/api/v1/universities?${search}`, { signal }),
+    'Не удалось загрузить список ВУЗов.',
+  );
   return {
     items: page.items.map((item) => ({
       id: item.id,
@@ -146,10 +168,17 @@ export async function realGetUniversities(params: UniversityListQuery): Promise<
       responsible: null,
       programsCount: 0,
       programStatusCounts: {},
-      currentStage: { id: 'preparation', name: 'Подготовка', tone: 'neutral' },
-      healthScore: scores.get(item.id) ?? 0,
+      currentStage: { id: 'unavailable', name: '—', tone: 'neutral' },
+      healthScore: item.health_score ?? 0,
       lastInteractionAt: item.updated_at || item.created_at,
-      attention: (scores.get(item.id) ?? 100) < 60,
+      attention: item.health_status === 'red',
+      availability: {
+        responsible: false,
+        programs: false,
+        stage: false,
+        healthScore: item.health_score !== null,
+        lastInteraction: false,
+      },
     })),
     page: page.page,
     pageSize: page.page_size,
@@ -690,37 +719,94 @@ function catalogPayloadPage(value: unknown, query: CatalogListQuery): CatalogLis
   };
 }
 
-export async function realListCatalogItems(query: CatalogListQuery): Promise<CatalogListResult> {
+export async function realListCatalogItems(query: CatalogListQuery, signal?: AbortSignal): Promise<CatalogListResult> {
   const params = new URLSearchParams({ page: String(query.page), page_size: String(query.pageSize) });
   if (query.search.trim()) params.set('search', query.search.trim());
-  const data = unwrap(await apiFetch<unknown>(`/api/v1/${query.type}?${params}`), 'Не удалось загрузить каталог.');
+  const data = unwrap(await apiFetch<unknown>(`/api/v1/${query.type}?${params}`, { signal }), 'Не удалось загрузить каталог.');
   return catalogPayloadPage(data, query);
 }
 
-export async function realGetCatalogItem(type: CatalogType, id: string): Promise<CatalogItem> {
-  const data = unwrap(await apiFetch<unknown>(`/api/v1/${type}/${encodeURIComponent(id)}`), 'Не удалось загрузить запись каталога.');
+export async function realGetCatalogItem(type: CatalogType, id: string, signal?: AbortSignal): Promise<CatalogItem> {
+  const data = unwrap(await apiFetch<unknown>(`/api/v1/${type}/${encodeURIComponent(id)}`, { signal }), 'Не удалось загрузить запись каталога.');
   return catalogItem(type, data);
 }
 
-function referenceItems(value: unknown): Array<{ id: string; name: string }> {
+function referenceItems(
+  value: unknown,
+  names: readonly string[] = ['name'],
+  descriptions: readonly string[] = [],
+): Array<{ id: string; name: string; description?: string }> {
   const payload = isRecord(value) ? value : {};
   const rows = Array.isArray(value) ? value : Array.isArray(payload.items) ? payload.items : [];
   return rows.flatMap((value) => {
     const item = isRecord(value) ? value : {};
     const id = stringValue(item.id);
-    const name = stringValue(item.name);
-    return id && name ? [{ id, name }] : [];
+    const name = names.map((key) => stringValue(item[key])).find(Boolean) ?? '';
+    const description = descriptions.map((key) => stringValue(item[key])).find(Boolean);
+    return id && name ? [{ id, name, ...(description ? { description } : {}) }] : [];
   });
 }
 
-export async function realGetCatalogReferenceData(): Promise<CatalogReferenceData> {
-  const [vendorsResult, universitiesResult] = await Promise.all([
-    apiFetch<unknown>('/api/v1/vendors?page=1&page_size=100'),
-    apiFetch<unknown>('/api/v1/universities?page=1&page_size=100'),
+async function allReferencePages(
+  path: string,
+  message: string,
+  signal?: AbortSignal,
+): Promise<unknown[]> {
+  const first = unwrap(
+    await apiFetch<ApiPage<unknown>>(`/api/v1/${path}?page=1&page_size=100`, { signal }),
+    message,
+  );
+  const pages = Math.ceil(first.total / first.page_size);
+  if (pages <= 1) return first.items;
+  const rest = await Promise.all(
+    Array.from({ length: pages - 1 }, (_, index) => index + 2).map(async (page) => unwrap(
+      await apiFetch<ApiPage<unknown>>(`/api/v1/${path}?page=${page}&page_size=100`, { signal }),
+      message,
+    )),
+  );
+  return [first.items, ...rest.map((page) => page.items)].flat();
+}
+
+function universityReferenceQuery(page: number): UniversityListQuery {
+  return {
+    filters: {
+      search: '', city: '', universityIds: [], programIds: [], productIds: [],
+      responsibleIds: [], healthStatuses: [], workflowStageId: '', dateFrom: '', dateTo: '',
+    },
+    sort: 'name',
+    order: 'asc',
+    page,
+    pageSize: 100,
+  };
+}
+
+async function allUniversityReferencePages(signal?: AbortSignal): Promise<UniversityListItem[]> {
+  const first = await realGetUniversities(universityReferenceQuery(1), signal);
+  const pages = Math.ceil(first.total / first.pageSize);
+  if (pages <= 1) return first.items;
+  const rest = await Promise.all(
+    Array.from({ length: pages - 1 }, (_, index) => index + 2)
+      .map((page) => realGetUniversities(universityReferenceQuery(page), signal)),
+  );
+  return [first.items, ...rest.map((page) => page.items)].flat();
+}
+
+export async function realGetCatalogReferenceData(signal?: AbortSignal): Promise<CatalogReferenceData> {
+  const [vendors, universities, products, directions, programs, responsibles] = await Promise.all([
+    allReferencePages('vendors', 'Не удалось загрузить список вендоров.', signal),
+    allUniversityReferencePages(signal),
+    allReferencePages('products', 'Не удалось загрузить список продуктов.', signal),
+    allReferencePages('directions', 'Не удалось загрузить список направлений.', signal),
+    allReferencePages('programs', 'Не удалось загрузить список программ.', signal),
+    allReferencePages('responsibles', 'Не удалось загрузить список ответственных.', signal),
   ]);
   return {
-    vendors: referenceItems(unwrap(vendorsResult, 'Не удалось загрузить список вендоров.')),
-    universities: referenceItems(unwrap(universitiesResult, 'Не удалось загрузить список ВУЗов.')),
+    vendors: referenceItems(vendors),
+    universities: referenceItems(universities, ['name'], ['city']),
+    products: referenceItems(products, ['name'], ['vendor_name', 'version']),
+    directions: referenceItems(directions, ['name'], ['code']),
+    programs: referenceItems(programs, ['name'], ['direction_name']),
+    responsibles: referenceItems(responsibles, ['full_name', 'name'], ['role', 'email']),
   };
 }
 

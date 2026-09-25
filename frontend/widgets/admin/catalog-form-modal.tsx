@@ -115,7 +115,7 @@ export function CatalogFormModal({ type, item, references, pending, onClose, onS
   const [serverError, setServerError] = useState<string | null>(null);
   const detailQuery = useQuery({
     queryKey: catalogQueryKeys.detail(type, item?.id ?? 'new'),
-    queryFn: () => getCatalogItem(type, item!.id),
+    queryFn: ({ signal }) => getCatalogItem(type, item!.id, signal),
     enabled: Boolean(item && type === 'responsibles'),
   });
   const effectiveItem = detailQuery.data ?? item;

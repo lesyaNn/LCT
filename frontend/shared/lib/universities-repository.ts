@@ -3,7 +3,7 @@ import { programStatusLabels, type ProgramStatus } from './dashboard-repository'
 import { getExpirationStatus, type ExpirationStatus } from './formatters';
 import { apiFetch } from './api-client';
 import { ApiRequestError } from './api-errors';
-import { fromDataSource, isMockDataSource } from './data-source';
+import { fromDataSource, isMockDataSource, isMockDataSourceFor } from './data-source';
 import { queryKeys } from './query-keys';
 import { getMockResponsibleAssignment } from './responsible-assignments';
 import {
@@ -59,6 +59,13 @@ export interface UniversityListItem {
   healthScore: number;
   lastInteractionAt: string;
   attention: boolean;
+  availability?: {
+    responsible: boolean;
+    programs: boolean;
+    stage: boolean;
+    healthScore: boolean;
+    lastInteraction: boolean;
+  };
   /** Mock relationship ids mirror the fields expected from the future analytics API. */
   programIds?: string[];
   productIds?: string[];
@@ -105,6 +112,20 @@ export interface UniversityFilterOptions {
 }
 
 export { programStatusLabels };
+
+export const UNIVERSITY_LIST_CAPABILITIES = isMockDataSourceFor('universities')
+  ? {
+      filters: { university: true, program: true, product: true, responsible: true, health: true, stage: true, date: true },
+      sorts: { name: true, responsible: true, programs: true, stage: true, health_score: true, last_interaction: true },
+      healthStatusSelection: 'multiple' as const,
+      dateMeaning: 'last-interaction' as const,
+    }
+  : {
+      filters: { university: true, program: true, product: true, responsible: true, health: true, stage: false, date: true },
+      sorts: { name: true, responsible: false, programs: false, stage: false, health_score: true, last_interaction: false },
+      healthStatusSelection: 'single' as const,
+      dateMeaning: 'created-at' as const,
+    };
 // External LMS/website methods share the same Mock ↔ Real repository boundary.
 export {
   createWorkflowFromExternal,
@@ -200,6 +221,8 @@ const universitiesWithRelationships = universitiesMock.map((item, index) => ({
   productIds: [productOptionIds[index % productOptionIds.length]],
 }));
 
+const observedUniversities = new Map<string, UniversityListItem>();
+
 function compareValues(left: string | number, right: string | number): number {
   if (typeof left === 'number' && typeof right === 'number') return left - right;
   return String(left).localeCompare(String(right), 'ru', { sensitivity: 'base' });
@@ -258,8 +281,15 @@ async function getMockUniversities(params: UniversityListQuery): Promise<Paginat
   };
 }
 
-export async function getUniversities(params: UniversityListQuery): Promise<PaginatedResult<UniversityListItem>> {
-  return fromDataSource({ mock: () => getMockUniversities(params), real: () => realGetUniversities(params) });
+export async function getUniversities(params: UniversityListQuery, signal?: AbortSignal): Promise<PaginatedResult<UniversityListItem>> {
+  const result = await fromDataSource({
+    domain: 'universities',
+    signal,
+    mock: () => getMockUniversities(params),
+    real: () => realGetUniversities(params, signal),
+  });
+  result.items.forEach((item) => observedUniversities.set(item.id, item));
+  return result;
 }
 
 export type UniversityPassportEventType = 'meeting' | 'document' | 'workflow' | 'note';
@@ -312,15 +342,14 @@ function getPassportNextStage(currentStageId: string): UniversityStage | null {
  * switch to a real source without changing passport components.
  */
 async function getMockUniversityPassport(id: string): Promise<UniversityPassport> {
-  const university = universitiesWithRelationships.find((item) => item.id === id);
-  if (!university) throw new Error('Университет не найден');
+  const university = getUniversityOrThrow(id);
 
   const assignedResponsible = assignedMockResponsible(id);
   const currentResponsible = assignedResponsible === undefined ? university.responsible : assignedResponsible;
 
   const launchedPrograms = university.programStatusCounts.launched ?? 0;
   const activePrograms = launchedPrograms + (university.programStatusCounts.active ?? 0);
-  const numericId = Number(id.split('-').at(-1)) || 1;
+  const numericId = getUniversityNumericId(id);
   const teachersTotal = 42 + numericId;
   const teachersAttention = university.attention ? 8 : 3;
   const workflowStatus: UniversityPassportWorkflow['status'] = university.currentStage.id === stage.completed.id
@@ -613,7 +642,7 @@ function getWorkflowComments(id: string, index: number, responsible: UniversityR
 
 /** Typed frontend adapter for the future GET /universities/{id}/workflow endpoint. */
 async function getMockUniversityWorkflow(id: string): Promise<UniversityWorkflow> {
-  if (!universitiesWithRelationships.some((item) => item.id === id)) return getApiUniversityWorkflow(mockGetWorkflowInstance(id));
+  if (!hasUniversityContext(id)) return getApiUniversityWorkflow(mockGetWorkflowInstance(id));
   const university = getUniversityOrThrow(id);
   const assignedResponsible = assignedMockResponsible(id);
   const currentResponsible = assignedResponsible === undefined ? university.responsible : assignedResponsible;
@@ -861,8 +890,7 @@ function createHealthHistory(currentScore: number, numericId: number): Universit
 
 /** Temporary typed adapter for the future GET /universities/{id}/health-score endpoints. */
 async function getMockUniversityHealthScore(id: string): Promise<UniversityHealthScore> {
-  const university = universitiesWithRelationships.find((item) => item.id === id);
-  if (!university) throw new Error('Университет не найден');
+  const university = getUniversityOrThrow(id);
 
   const numericId = Number(id.split('-').at(-1)) || 1;
   const currentScore = university.healthScore;
@@ -1026,13 +1054,29 @@ const teacherNames = ['Мария Кузнецова', 'Алексей Орло�
 const teacherPositions = ['Руководитель программы', 'Старший преподаватель', 'Преподаватель-практик'];
 
 function getUniversityNumericId(id: string): number {
-  return Number(id.split('-').at(-1)) || 1;
+  const mockSuffix = id.match(/(?:^|-)0*(\d{1,4})$/)?.[1];
+  if (mockSuffix) return Math.max(1, Number(mockSuffix));
+  return [...id].reduce((hash, character) => (hash * 31 + character.charCodeAt(0)) % 97, 0) + 1;
 }
 
 function getUniversityOrThrow(id: string): UniversityListItem {
-  const university = universitiesWithRelationships.find((item) => item.id === id);
+  const university = universitiesWithRelationships.find((item) => item.id === id) ?? observedUniversities.get(id);
   if (!university) throw new Error('Университет не найден');
+  if (university.availability) {
+    return {
+      ...university,
+      programsCount: university.availability.programs ? university.programsCount : 4,
+      programStatusCounts: university.availability.programs ? university.programStatusCounts : programCounts(1, 2, 1),
+      currentStage: university.availability.stage ? university.currentStage : stage.preparation,
+      healthScore: university.availability.healthScore ? university.healthScore : 72,
+      attention: university.availability.healthScore ? university.attention : false,
+    };
+  }
   return university;
+}
+
+function hasUniversityContext(id: string): boolean {
+  return universitiesWithRelationships.some((item) => item.id === id) || observedUniversities.has(id);
 }
 
 /** Typed frontend adapter for the future university programs endpoint. */

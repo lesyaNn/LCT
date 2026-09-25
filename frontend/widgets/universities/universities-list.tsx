@@ -37,13 +37,20 @@ import {
 import {
   getUniversities,
   programStatusLabels,
+  UNIVERSITY_LIST_CAPABILITIES,
   universityFilterOptions,
   universitiesListQueryKey,
+  type UniversityFilterOptions,
   type UniversityListItem,
   type UniversityListQuery,
   type UniversityFilters,
   type UniversitySortColumn,
 } from '@/shared/lib/universities-repository';
+import {
+  catalogQueryKeys,
+  getCatalogReferenceData,
+  type CatalogReferenceData,
+} from '@/shared/lib/catalogs-repository';
 import styles from './universities-list.module.css';
 
 const DEFAULT_PAGE_SIZE = 8;
@@ -85,7 +92,10 @@ function parsePositiveInteger(value: string | null, fallback: number): number {
 function parseUrlState(searchParams: SearchParamsLike): UniversityUrlState {
   const sortValue = searchParams.get('sort');
   const parseList = (key: string) => (searchParams.get(key) ?? '').split(',').map((value) => value.trim()).filter(Boolean);
-  const healthStatuses = parseList('health_status').filter((value): value is HealthStatus => HEALTH_STATUSES.has(value as HealthStatus));
+  const parsedHealthStatuses = parseList('health_status').filter((value): value is HealthStatus => HEALTH_STATUSES.has(value as HealthStatus));
+  const healthStatuses = UNIVERSITY_LIST_CAPABILITIES.healthStatusSelection === 'single'
+    ? parsedHealthStatuses.slice(-1)
+    : parsedHealthStatuses;
   const pageSizeValue = parsePositiveInteger(searchParams.get('page_size'), DEFAULT_PAGE_SIZE);
   const rawDateFrom = searchParams.get('date_from') ?? '';
   const rawDateTo = searchParams.get('date_to') ?? '';
@@ -105,7 +115,10 @@ function parseUrlState(searchParams: SearchParamsLike): UniversityUrlState {
       dateFrom,
       dateTo,
       }),
-    sort: SORT_COLUMNS.has(sortValue as UniversitySortColumn) ? sortValue as UniversitySortColumn : null,
+    sort: SORT_COLUMNS.has(sortValue as UniversitySortColumn)
+      && UNIVERSITY_LIST_CAPABILITIES.sorts[sortValue as UniversitySortColumn]
+      ? sortValue as UniversitySortColumn
+      : null,
     order: searchParams.get('order') === 'desc' ? 'desc' : 'asc',
     page: parsePositiveInteger(searchParams.get('page'), 1),
     pageSize: PAGE_SIZE_OPTIONS.includes(pageSizeValue) ? pageSizeValue : DEFAULT_PAGE_SIZE,
@@ -226,10 +239,12 @@ function StatusBadge({ status }: { status: HealthStatus }) {
 }
 
 function StageBadge({ item }: { item: UniversityListItem }) {
+  if (item.availability?.stage === false) return <span>—</span>;
   return <SemanticStatusBadge intent={item.currentStage.tone}>{item.currentStage.name}</SemanticStatusBadge>;
 }
 
 function ProgramsCell({ item }: { item: UniversityListItem }) {
+  if (item.availability?.programs === false) return <span>—</span>;
   const statuses = Object.entries(item.programStatusCounts).filter(([, count]) => count);
 
   return (
@@ -264,8 +279,11 @@ function SortIndicator({ sorted }: { sorted: false | 'asc' | 'desc' }) {
   return <ChevronSort size={16} fill="currentColor" />;
 }
 
-function Filters({ state, searchInput, setSearchInput, onPatch, compact = false }: {
+function Filters({ state, options, catalogsLoading, catalogsUnavailable, searchInput, setSearchInput, onPatch, compact = false }: {
   state: UniversityUrlState;
+  options: UniversityFilterOptions;
+  catalogsLoading: boolean;
+  catalogsUnavailable: boolean;
   searchInput: string;
   setSearchInput: (value: string) => void;
   onPatch: (patch: QueryPatch) => void;
@@ -294,26 +312,26 @@ function Filters({ state, searchInput, setSearchInput, onPatch, compact = false 
           <input id={searchId} type="search" value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Поиск по названию вуза" />
         </div>
       </div>
-      <MultiSelect label="Вуз" options={universityFilterOptions.universities} values={filters.universityIds} onChange={(values) => onPatch({ university: values, page: 1 })} searchable />
-      <MultiSelect label="Программа" options={universityFilterOptions.programs} values={filters.programIds} onChange={(values) => onPatch({ program: values, page: 1 })} />
-      <MultiSelect label="Продукт" options={universityFilterOptions.products} values={filters.productIds} onChange={(values) => onPatch({ product: values, page: 1 })} />
+      <MultiSelect label="Вуз" options={options.universities} values={filters.universityIds} onChange={(values) => onPatch({ university: values, page: 1 })} searchable loading={catalogsLoading} disabled={catalogsUnavailable} />
+      <MultiSelect label="Программа" options={options.programs} values={filters.programIds} onChange={(values) => onPatch({ program: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
+      <MultiSelect label="Продукт" options={options.products} values={filters.productIds} onChange={(values) => onPatch({ product: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
       <label className={styles.field}>
         <span>Город</span>
-        <Select value={filters.city} onChange={(event) => onPatch({ city: event.target.value, page: 1 })}>
+        <Select disabled={catalogsLoading || catalogsUnavailable} value={filters.city} onChange={(event) => onPatch({ city: event.target.value, page: 1 })}>
           <option value="">Все города</option>
-          {universityFilterOptions.cities.map((city) => <option key={city} value={city}>{city}</option>)}
+          {options.cities.map((city) => <option key={city} value={city}>{city}</option>)}
         </Select>
       </label>
-      <MultiSelect label="Ответственный" options={universityFilterOptions.responsibles.map((person) => ({ id: person.id, name: person.name }))} values={filters.responsibleIds} onChange={(values) => onPatch({ responsible: values, page: 1 })} />
-      <MultiSelect label="Health Score" options={HEALTH_STATUS_OPTIONS.map((option) => ({ id: option.value, name: option.label }))} values={filters.healthStatuses} onChange={(values) => onPatch({ health_status: values, page: 1 })} renderOption={(option) => <StatusBadge status={option.id as HealthStatus} />} />
-      <label className={styles.field}>
+      <MultiSelect label="Ответственный" options={options.responsibles.map((person) => ({ id: person.id, name: person.name, description: person.role }))} values={filters.responsibleIds} onChange={(values) => onPatch({ responsible: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
+      <MultiSelect label="Health Score" options={HEALTH_STATUS_OPTIONS.map((option) => ({ id: option.value, name: option.label }))} values={filters.healthStatuses} onChange={(values) => onPatch({ health_status: UNIVERSITY_LIST_CAPABILITIES.healthStatusSelection === 'single' ? values.slice(-1) : values, page: 1 })} renderOption={(option) => <StatusBadge status={option.id as HealthStatus} />} hint={UNIVERSITY_LIST_CAPABILITIES.healthStatusSelection === 'single' ? 'Backend поддерживает выбор одного статуса.' : undefined} />
+      <label className={styles.field} title={!UNIVERSITY_LIST_CAPABILITIES.filters.stage ? 'Backend пока не публикует фильтр по текущему этапу.' : undefined}>
         <span>Текущий этап</span>
-        <Select value={filters.workflowStageId} onChange={(event) => onPatch({ stage: event.target.value, page: 1 })}>
+        <Select disabled={!UNIVERSITY_LIST_CAPABILITIES.filters.stage} value={filters.workflowStageId} onChange={(event) => onPatch({ stage: event.target.value, page: 1 })}>
           <option value="">Все этапы</option>
-          {universityFilterOptions.stages.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          {options.stages.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </Select>
       </label>
-      <DateRangeField presets label="Период последнего взаимодействия" from={filters.dateFrom} to={filters.dateTo} onFromChange={(value) => updateDateRange('date_from', value)} onToChange={(value) => updateDateRange('date_to', value)} onRangeChange={(dateFrom, dateTo) => onPatch({ date_from: dateFrom, date_to: dateTo, page: 1 })} />
+      <DateRangeField presets label={UNIVERSITY_LIST_CAPABILITIES.dateMeaning === 'created-at' ? 'Период создания' : 'Период последнего взаимодействия'} from={filters.dateFrom} to={filters.dateTo} onFromChange={(value) => updateDateRange('date_from', value)} onToChange={(value) => updateDateRange('date_to', value)} onRangeChange={(dateFrom, dateTo) => onPatch({ date_from: dateFrom, date_to: dateTo, page: 1 })} />
     </section>
   );
 }
@@ -324,16 +342,16 @@ function selectedNames(values: string[], options: Array<{ id: string; name: stri
   return `${names.slice(0, 2).join(', ')} +${names.length - 2}`;
 }
 
-function ActiveFilterChips({ filters, onPatch, onReset }: { filters: UniversityFilters; onPatch: (patch: QueryPatch) => void; onReset: () => void }) {
+function ActiveFilterChips({ filters, options, onPatch, onReset }: { filters: UniversityFilters; options: UniversityFilterOptions; onPatch: (patch: QueryPatch) => void; onReset: () => void }) {
   const chips: Array<{ key: string; label: string; patch: QueryPatch }> = [];
   if (filters.search) chips.push({ key: 'search', label: `Поиск: ${filters.search}`, patch: { search: null, page: 1 } });
-  if (filters.universityIds.length) chips.push({ key: 'university', label: `Вуз: ${selectedNames(filters.universityIds, universityFilterOptions.universities)}`, patch: { university: null, page: 1 } });
-  if (filters.programIds.length) chips.push({ key: 'program', label: `Программа: ${selectedNames(filters.programIds, universityFilterOptions.programs)}`, patch: { program: null, page: 1 } });
-  if (filters.productIds.length) chips.push({ key: 'product', label: `Продукт: ${selectedNames(filters.productIds, universityFilterOptions.products)}`, patch: { product: null, page: 1 } });
+  if (filters.universityIds.length) chips.push({ key: 'university', label: `Вуз: ${selectedNames(filters.universityIds, options.universities)}`, patch: { university: null, page: 1 } });
+  if (filters.programIds.length) chips.push({ key: 'program', label: `Программа: ${selectedNames(filters.programIds, options.programs)}`, patch: { program: null, page: 1 } });
+  if (filters.productIds.length) chips.push({ key: 'product', label: `Продукт: ${selectedNames(filters.productIds, options.products)}`, patch: { product: null, page: 1 } });
   if (filters.city) chips.push({ key: 'city', label: `Город: ${filters.city}`, patch: { city: null, page: 1 } });
-  if (filters.responsibleIds.length) chips.push({ key: 'responsible', label: `Ответственный: ${selectedNames(filters.responsibleIds, universityFilterOptions.responsibles)}`, patch: { responsible: null, page: 1 } });
+  if (filters.responsibleIds.length) chips.push({ key: 'responsible', label: `Ответственный: ${selectedNames(filters.responsibleIds, options.responsibles)}`, patch: { responsible: null, page: 1 } });
   if (filters.healthStatuses.length) chips.push({ key: 'health_status', label: `Health Score: ${selectedNames(filters.healthStatuses, HEALTH_STATUS_OPTIONS.map((option) => ({ id: option.value, name: option.label })))}`, patch: { health_status: null, page: 1 } });
-  if (filters.workflowStageId) chips.push({ key: 'stage', label: `Этап: ${universityFilterOptions.stages.find((item) => item.id === filters.workflowStageId)?.name ?? filters.workflowStageId}`, patch: { stage: null, page: 1 } });
+  if (filters.workflowStageId) chips.push({ key: 'stage', label: `Этап: ${options.stages.find((item) => item.id === filters.workflowStageId)?.name ?? filters.workflowStageId}`, patch: { stage: null, page: 1 } });
   if (filters.dateFrom || filters.dateTo) chips.push({ key: 'date', label: `Период: ${filters.dateFrom || '…'} — ${filters.dateTo || '…'}`, patch: { date_from: null, date_to: null, page: 1 } });
   if (!chips.length) return null;
 
@@ -348,6 +366,20 @@ function ActiveFilterChips({ filters, onPatch, onReset }: { filters: UniversityF
   );
 }
 
+function filterOptionsFromCatalogs(references?: CatalogReferenceData): UniversityFilterOptions {
+  if (!references) {
+    return { cities: [], responsibles: [], stages: universityFilterOptions.stages, universities: [], programs: [], products: [] };
+  }
+  return {
+    cities: [...new Set(references.universities.map((item) => item.description).filter((city): city is string => Boolean(city)))].sort((left, right) => left.localeCompare(right, 'ru')),
+    responsibles: references.responsibles.map((item) => ({ id: item.id, name: item.name, role: item.description })),
+    stages: universityFilterOptions.stages,
+    universities: references.universities,
+    programs: references.programs,
+    products: references.products,
+  };
+}
+
 function MobileUniversityCards({ items }: { items: UniversityListItem[] }) {
   return (
     <div className={styles.mobileCards} aria-label="Список вузов в формате карточек">
@@ -357,12 +389,12 @@ function MobileUniversityCards({ items }: { items: UniversityListItem[] }) {
             <strong>{item.name}</strong>
             <AttentionIndicator active={item.attention} />
           </div>
-          <div className={styles.mobileCardScore}><span>Health Score</span><strong>{item.healthScore}</strong><StatusBadge status={getHealthStatus(item.healthScore)} /></div>
+          <div className={styles.mobileCardScore}><span>Health Score</span>{item.availability?.healthScore === false ? <strong>—</strong> : <><strong>{item.healthScore}</strong><StatusBadge status={getHealthStatus(item.healthScore)} /></>}</div>
           <dl className={styles.mobileDetails}>
             <div><dt>Этап</dt><dd><StageBadge item={item} /></dd></div>
             <div><dt>Ответственный</dt><dd>{item.responsible?.name ?? '—'}</dd></div>
-            <div><dt>Программы</dt><dd>{item.programsCount}</dd></div>
-            <div><dt>Последнее взаимодействие</dt><dd title={formatFullDate(item.lastInteractionAt)}>{formatRelativeTime(item.lastInteractionAt)}</dd></div>
+            <div><dt>Программы</dt><dd>{item.availability?.programs === false ? '—' : item.programsCount}</dd></div>
+            <div><dt>Последнее взаимодействие</dt><dd title={item.availability?.lastInteraction === false ? undefined : formatFullDate(item.lastInteractionAt)}>{item.availability?.lastInteraction === false ? '—' : formatRelativeTime(item.lastInteractionAt)}</dd></div>
           </dl>
           <span className={styles.mobileCardAction}>Открыть</span>
         </Link>
@@ -477,18 +509,24 @@ export function UniversitiesList() {
 
   const query = useQuery({
     queryKey: universitiesListQueryKey(state),
-    queryFn: () => getUniversities(state),
+    queryFn: ({ signal }) => getUniversities(state, signal),
     placeholderData: keepPreviousData,
   });
+  const catalogsQuery = useQuery({
+    queryKey: catalogQueryKeys.references,
+    queryFn: ({ signal }) => getCatalogReferenceData(signal),
+    staleTime: 5 * 60_000,
+  });
+  const filterOptions = useMemo(() => filterOptionsFromCatalogs(catalogsQuery.data), [catalogsQuery.data]);
 
   const sorting: SortingState = state.sort ? [{ id: state.sort, desc: state.order === 'desc' }] : [];
   const columns = useMemo<ColumnDef<UniversityListItem>[]>(() => [
     { accessorKey: 'name', header: 'ВУЗ', cell: ({ row }) => <Link className={styles.universityLink} href={`/universities/${row.original.id}`}>{row.original.name}</Link> },
-    { id: 'responsible', accessorFn: (row) => row.responsible?.name ?? '', header: 'Ответственный', cell: ({ row }) => row.original.responsible?.name ?? '—' },
-    { id: 'programs', accessorFn: (row) => row.programsCount, header: 'Программы', cell: ({ row }) => <ProgramsCell item={row.original} /> },
-    { id: 'stage', accessorFn: (row) => row.currentStage.name, header: 'Текущий этап', cell: ({ row }) => <StageBadge item={row.original} /> },
-    { id: 'health_score', accessorFn: (row) => row.healthScore, header: 'Health Score', cell: ({ row }) => <div className={styles.healthCell}><strong>{row.original.healthScore}</strong><StatusBadge status={getHealthStatus(row.original.healthScore)} /></div> },
-    { id: 'last_interaction', accessorFn: (row) => row.lastInteractionAt, header: 'Последнее взаимодействие', cell: ({ row }) => <time dateTime={row.original.lastInteractionAt} title={formatFullDate(row.original.lastInteractionAt)}>{formatRelativeTime(row.original.lastInteractionAt)}</time> },
+    { id: 'responsible', accessorFn: (row) => row.responsible?.name ?? '', enableSorting: UNIVERSITY_LIST_CAPABILITIES.sorts.responsible, header: 'Ответственный', cell: ({ row }) => row.original.responsible?.name ?? '—' },
+    { id: 'programs', accessorFn: (row) => row.programsCount, enableSorting: UNIVERSITY_LIST_CAPABILITIES.sorts.programs, header: 'Программы', cell: ({ row }) => <ProgramsCell item={row.original} /> },
+    { id: 'stage', accessorFn: (row) => row.currentStage.name, enableSorting: UNIVERSITY_LIST_CAPABILITIES.sorts.stage, header: 'Текущий этап', cell: ({ row }) => <StageBadge item={row.original} /> },
+    { id: 'health_score', accessorFn: (row) => row.healthScore, enableSorting: UNIVERSITY_LIST_CAPABILITIES.sorts.health_score, header: 'Health Score', cell: ({ row }) => row.original.availability?.healthScore === false ? '—' : <div className={styles.healthCell}><strong>{row.original.healthScore}</strong><StatusBadge status={getHealthStatus(row.original.healthScore)} /></div> },
+    { id: 'last_interaction', accessorFn: (row) => row.lastInteractionAt, enableSorting: UNIVERSITY_LIST_CAPABILITIES.sorts.last_interaction, header: 'Последнее взаимодействие', cell: ({ row }) => row.original.availability?.lastInteraction === false ? '—' : <time dateTime={row.original.lastInteractionAt} title={formatFullDate(row.original.lastInteractionAt)}>{formatRelativeTime(row.original.lastInteractionAt)}</time> },
     { id: 'attention', enableSorting: false, header: 'Attention', cell: ({ row }) => <AttentionIndicator active={row.original.attention} /> },
   ], []);
 
@@ -533,8 +571,9 @@ export function UniversitiesList() {
         </div>
       </header>
       <div className={styles.filterArea}>
-        <FilterToolbar label="Фильтры списка вузов" controls={(mobile) => <Filters compact={mobile} state={state} searchInput={searchInput} setSearchInput={setSearchInput} onPatch={goToState} />} onReset={resetFilters} resetDisabled={!hasFilters} mobileCount={activeFilterCount} />
-        <ActiveFilterChips filters={state.filters} onPatch={goToState} onReset={resetFilters} />
+        <FilterToolbar label="Фильтры списка вузов" controls={(mobile) => <Filters compact={mobile} state={state} options={filterOptions} catalogsLoading={catalogsQuery.isPending} catalogsUnavailable={catalogsQuery.isError} searchInput={searchInput} setSearchInput={setSearchInput} onPatch={goToState} />} onReset={resetFilters} resetDisabled={!hasFilters} mobileCount={activeFilterCount} />
+        <ActiveFilterChips filters={state.filters} options={filterOptions} onPatch={goToState} onReset={resetFilters} />
+        {catalogsQuery.isError ? <RouteErrorState compact onRetry={() => void catalogsQuery.refetch()} /> : null}
       </div>
       {query.isPending ? <TableSkeleton rows={6} columns={7} label="Загрузка списка вузов" /> : query.isError || !query.data ? <RouteErrorState onRetry={() => void query.refetch()} /> : query.data.total === 0 ? <EmptyState icon={<Search size={20} fill="currentColor" />} title={hasFilters ? 'По заданным фильтрам ничего не найдено' : 'Вузы пока не добавлены'} description={hasFilters ? 'Измените условия поиска или сбросьте фильтры.' : 'Когда появятся записи, они будут отображены в этом списке.'} primaryAction={hasFilters ? { label: 'Сбросить фильтры', onClick: resetFilters, variant: 'secondary' } : undefined} /> : (
         <>

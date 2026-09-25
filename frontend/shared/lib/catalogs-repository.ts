@@ -1,6 +1,6 @@
 import type { UserRole } from '@/shared/types/user';
 import { ApiRequestError } from './api-errors';
-import { fromDataSource, isMockDataSource } from './data-source';
+import { fromDataSource, isMockDataSourceFor } from './data-source';
 import { queryKeys } from './query-keys';
 import {
   mockCreateCatalogItem,
@@ -78,9 +78,19 @@ export interface CatalogListResult {
   total: number;
 }
 
+export interface CatalogReferenceOption {
+  id: string;
+  name: string;
+  description?: string;
+}
+
 export interface CatalogReferenceData {
-  vendors: Array<{ id: string; name: string }>;
-  universities: Array<{ id: string; name: string }>;
+  vendors: CatalogReferenceOption[];
+  universities: CatalogReferenceOption[];
+  products: CatalogReferenceOption[];
+  directions: CatalogReferenceOption[];
+  programs: CatalogReferenceOption[];
+  responsibles: CatalogReferenceOption[];
 }
 
 export const catalogDefinitions: ReadonlyArray<{ id: CatalogType; label: string; singular: string; searchPlaceholder: string }> = [
@@ -98,9 +108,9 @@ export const catalogQueryKeys = {
   references: queryKeys.catalogs.references,
 };
 
-export const CATALOG_API_CAPABILITIES = isMockDataSource
+export const CATALOG_API_CAPABILITIES = isMockDataSourceFor('catalogs')
   ? { softActivation: true, inactiveFilter: true, mutationRoles: ['admin', 'manager'] as UserRole[] }
-  : { softActivation: false, inactiveFilter: false, mutationRoles: ['admin'] as UserRole[] };
+  : { softActivation: false, inactiveFilter: false, mutationRoles: [] as UserRole[] };
 
 export function canMutateCatalog(role: UserRole | undefined): boolean {
   return Boolean(role && CATALOG_API_CAPABILITIES.mutationRoles.includes(role));
@@ -114,16 +124,16 @@ export function isCatalogType(value: unknown): value is CatalogType {
   return catalogDefinitions.some((item) => item.id === value);
 }
 
-export async function listCatalogItems(query: CatalogListQuery): Promise<CatalogListResult> {
-  return fromDataSource({ mock: () => mockListCatalogItems(query), real: () => realListCatalogItems(query) });
+export async function listCatalogItems(query: CatalogListQuery, signal?: AbortSignal): Promise<CatalogListResult> {
+  return fromDataSource({ domain: 'catalogs', signal, mock: () => mockListCatalogItems(query), real: () => realListCatalogItems(query, signal) });
 }
 
-export async function getCatalogItem(type: CatalogType, id: string): Promise<CatalogItem> {
-  return fromDataSource({ mock: () => mockGetCatalogItem(type, id), real: () => realGetCatalogItem(type, id) });
+export async function getCatalogItem(type: CatalogType, id: string, signal?: AbortSignal): Promise<CatalogItem> {
+  return fromDataSource({ domain: 'catalogs', signal, mock: () => mockGetCatalogItem(type, id), real: () => realGetCatalogItem(type, id, signal) });
 }
 
-export async function getCatalogReferenceData(): Promise<CatalogReferenceData> {
-  return fromDataSource({ mock: mockGetCatalogReferenceData, real: realGetCatalogReferenceData });
+export async function getCatalogReferenceData(signal?: AbortSignal): Promise<CatalogReferenceData> {
+  return fromDataSource({ domain: 'catalogs', signal, mock: mockGetCatalogReferenceData, real: () => realGetCatalogReferenceData(signal) });
 }
 
 export async function createCatalogItem(input: CatalogInput): Promise<CatalogItem> {
