@@ -24,6 +24,7 @@ from app.modules.audit.models import AuditEvent
 from app.modules.audit.service import AuditService
 from app.modules.health_score.service import compute_score
 from app.modules.universities import passport_service as ps
+from app.modules.universities import passport_blocks
 from app.modules.universities.passport_schemas import UniversityPassport
 
 TEST_URL = os.getenv("TEST_DATABASE_URL", "sqlite://")
@@ -171,7 +172,7 @@ def test_compute_score_matches_legacy_formula():
 def test_no_include_returns_base_and_calls_nothing(engine, api_client, monkeypatch):
     health_calls: list = []
     audit_calls: list = []
-    real_health = ps.get_health_score_for_passport
+    real_health = passport_blocks.get_health_score_for_passport
     real_audit = AuditService.recent_for_university
 
     def _health_spy(*args, **kwargs):
@@ -182,7 +183,7 @@ def test_no_include_returns_base_and_calls_nothing(engine, api_client, monkeypat
         audit_calls.append(args)
         return real_audit(self, *args, **kwargs)
 
-    monkeypatch.setattr(ps, "get_health_score_for_passport", _health_spy)
+    monkeypatch.setattr(passport_blocks, "get_health_score_for_passport", _health_spy)
     monkeypatch.setattr(AuditService, "recent_for_university", _audit_spy)
 
     with Session(engine) as s:
@@ -272,13 +273,13 @@ def test_health_score_reflects_passport_signals(db: Session):
 
 def test_include_audit_last_five_desc(engine, api_client, monkeypatch):
     health_calls: list = []
-    real_health = ps.get_health_score_for_passport
+    real_health = passport_blocks.get_health_score_for_passport
 
     def _health_spy(*args, **kwargs):
         health_calls.append(args)
         return real_health(*args, **kwargs)
 
-    monkeypatch.setattr(ps, "get_health_score_for_passport", _health_spy)
+    monkeypatch.setattr(passport_blocks, "get_health_score_for_passport", _health_spy)
     with Session(engine) as s:
         u = base_t._seed_full(s)
         uid = str(u.id)
@@ -345,7 +346,7 @@ def test_health_failure_degrades_to_null(engine, api_client, monkeypatch):
     def _boom(*args, **kwargs):
         raise TimeoutError("health backend down")
 
-    monkeypatch.setattr(ps, "get_health_score_for_passport", _boom)
+    monkeypatch.setattr(passport_blocks, "get_health_score_for_passport", _boom)
     with Session(engine) as s:
         u = base_t._seed_full(s)
         uid = str(u.id)
@@ -374,7 +375,7 @@ def test_audit_failure_degrades_to_empty(engine, api_client, monkeypatch):
 
 def test_both_fail_base_still_200(engine, api_client, monkeypatch):
     monkeypatch.setattr(
-        ps,
+        passport_blocks,
         "get_health_score_for_passport",
         lambda *a, **k: (_ for _ in ()).throw(RuntimeError("hs down")),
     )
@@ -483,10 +484,10 @@ def test_unknown_university_with_include_404_and_no_integration_calls(
 ):
     health_calls: list = []
     audit_calls: list = []
-    real_health = ps.get_health_score_for_passport
+    real_health = passport_blocks.get_health_score_for_passport
     real_audit = AuditService.recent_for_university
     monkeypatch.setattr(
-        ps,
+        passport_blocks,
         "get_health_score_for_passport",
         lambda *a, **k: (health_calls.append(a), real_health(*a, **k))[1],
     )

@@ -10,12 +10,18 @@ from __future__ import annotations
 import enum
 import logging
 import uuid
-from datetime import date, datetime
+from collections import defaultdict
+from datetime import date, datetime, timedelta, timezone
+
+from sqlalchemy import func, select
 
 from app.core.errors import BusinessException
 from app.core.exceptions import NotFound
 from app.schemas.errors import ErrorCode
-from app.models.enums import TeacherReadiness
+from app.models.catalog import Contract, ITDirection, ITProgram, License, Responsible
+from app.models.enums import EXPIRY_WARNING_DAYS, TeacherReadiness, UniversityProductStatus, UniversityProgramStatus
+from app.models.interactions import Document, InteractionNote, Meeting, Student, UniversityProgram
+from app.models.teachers import Teacher, TeacherCertificate, TeacherProgram, TeacherQualification
 from app.modules.audit.service import AuditService
 from app.modules.health_score.service import compute_score
 from app.modules.universities.passport_loading import (
@@ -33,6 +39,7 @@ from app.modules.universities.passport_loading import (
     _load_student_rows,
     _load_teacher_rows,
     _load_university_row,
+    _readiness_scalar,
     _teacher_count_scalar,
 )
 from app.modules.universities.passport_schemas import (
@@ -948,4 +955,3 @@ def get_teachers_page(
     )
     teacher_rows = list(db.execute(stmt).all())
     return _assemble_teachers(teacher_rows), int(total)
-

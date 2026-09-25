@@ -11,7 +11,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import Date, Integer, Text, func, literal, select, union_all
+from sqlalchemy import Date, Integer, Text, Uuid, func, literal, select, union_all
 
 from app.models.catalog import (
     Contract,

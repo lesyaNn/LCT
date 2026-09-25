@@ -336,8 +336,10 @@ def test_canonical_ignores_non_mandatory_and_undated():
 def test_passport_readiness_deterministic_under_frozen_clock(db: Session, monkeypatch):
     """Passport readiness uses the frozen today; matches canonical formula."""
     from app.services import teacher_readiness as tr_mod
+    from app.modules.universities import passport_blocks, passport_loading
 
-    monkeypatch.setattr(ps, "date", _FrozenDate)
+    monkeypatch.setattr(passport_loading, "date", _FrozenDate)
+    monkeypatch.setattr(passport_blocks, "date", _FrozenDate)
     monkeypatch.setattr(tr_mod, "date", _FrozenDate)
     today = _FrozenDate.today()
     _, p1, _, _, _ = base_t._catalog(db, "frozen")
@@ -1326,11 +1328,12 @@ def test_audit_isolation_http(engine, api_client):
 
 def test_base_error_not_masked_by_graceful_degradation(engine, api_client, monkeypatch):
     """A base pipeline failure with ?include=... must NOT degrade to 200."""
+    from app.modules.universities import passport_blocks
 
     def _boom(db, university_id):
         raise RuntimeError("base pipeline down")
 
-    monkeypatch.setattr(ps, "_load_program_rows", _boom)
+    monkeypatch.setattr(passport_blocks, "_load_program_rows", _boom)
     with Session(engine) as s:
         u = base_t._seed_full(s)
         uid = str(u.id)

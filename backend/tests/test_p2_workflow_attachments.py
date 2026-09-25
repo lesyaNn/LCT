@@ -34,6 +34,7 @@ import app.models  # noqa: F401  (register canon metadata)
 from app.config import settings
 from app.db.session import get_db
 from app.main import app
+from app.modules.audit.models import AuditEvent
 from app.models.catalog import University
 from app.models.workflow_instances import WorkflowAttachment, WorkflowInstance
 from app.models.workflow_templates import WorkflowTemplate
@@ -391,6 +392,18 @@ def test_small_upload_metadata_download_delete(client, db, backend, storage_dir)
     ).scalar_one()
     assert row.storage_key and "/" not in row.storage_key
     assert row.instance_id == g["ia"].id
+    created_audit = db.execute(
+        select(AuditEvent).where(
+            AuditEvent.entity_type == "document",
+            AuditEvent.entity_id == row.id,
+            AuditEvent.action == "CREATE",
+        )
+    ).scalar_one()
+    assert created_audit.university_id == g["ua"].id
+
+    listed = client.get(f"/api/v1/workflow/instances/{g['ia'].id}/attachments")
+    assert listed.status_code == 200, listed.text
+    assert any(item["id"] == meta["id"] for item in listed.json()["items"])
 
     # --- metadata endpoint mirrors the upload response, still no leak
     m = client.get(f"/api/v1/workflow/instances/{g['ia'].id}/attachments/{meta['id']}")

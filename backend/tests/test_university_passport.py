@@ -813,6 +813,10 @@ def test_endpoint_200_full_structure(engine, api_client):
     UniversityPassport.model_validate(body)  # Pydantic validation
     assert body["workflow_summary"]["progress_percent"] == 0.0
 
+    # Both UNION branches must resolve their typed UUID padding on the
+    # request path; a missing Uuid import previously returned HTTP 500.
+    assert body["licenses"] and body["contracts"]
+
 
 def test_endpoint_empty_collections(engine, api_client):
     with Session(engine) as s:

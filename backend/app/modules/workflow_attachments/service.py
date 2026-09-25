@@ -158,6 +158,8 @@ def upload_attachment(
     )
     db.add(attachment)
     try:
+        if "audit_context" in db.info:
+            db.flush()  # Generate attachment.id before the same-transaction audit event.
         _audit_attachment_event(
             db, action="CREATE", attachment=attachment,
             university_id=instance.university_id,
