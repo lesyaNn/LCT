@@ -20,7 +20,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.catalog import (
@@ -56,9 +56,14 @@ _FILE_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 #: file column -> model field paths accepted in ``mapping`` (P4-10-01 §2).
 TARGET_FIELDS = frozenset({
     "university.name",
+    "university.city",
     "vendor.name",
     "product.name",
     "product.version",
+    "vendor_contact.full_name",
+    "vendor_contact.phone",
+    "vendor_contact.email",
+    "vendor_contact.communication_method",
     "direction.code",
     "direction.name",
     "program.name",
@@ -69,8 +74,22 @@ TARGET_FIELDS = frozenset({
     "license.transfer_status",
     "license.comment",
     "responsible.full_name",
+    "responsible.email",
+    "responsible.phone",
+    "responsible.role",
     "university_responsibles",
 })
+
+IMPORT_REQUIRED_FIELDS = {
+    "licenses": frozenset({"university.name", "contract.contract_number", "license.expires_at"}),
+    "universities": frozenset({"university.name"}),
+    "directions": frozenset({"direction.code"}),
+    "products": frozenset({"vendor.name", "product.name"}),
+    "responsibles": frozenset({"responsible.full_name", "responsible.email"}),
+    "vendor_contacts": frozenset({
+        "vendor.name", "product.name", "vendor_contact.full_name", "vendor_contact.email"
+    }),
+}
 
 TRANSFER_STATUSES = frozenset({"pending", "transferred", "accepted", "rejected"})
 
@@ -277,20 +296,20 @@ def find_university(session: Session, name: str) -> University | None:
     ).scalar_one_or_none()
 
 
-def find_or_create_responsible(
-    session: Session, full_name: str, role: str
-) -> Responsible:
-    existing = session.execute(
-        select(Responsible).filter_by(full_name=full_name)
-    ).scalar_one_or_none()
-    if existing is not None:
-        return existing
-    # email is UNIQUE NOT NULL — stable synthetic value for import-created rows.
-    email = f"import-{uuid.uuid4().hex[:8]}@example.local"
-    resp = Responsible(full_name=full_name, email=email, role=role)
-    session.add(resp)
-    session.flush()
-    return resp
+def resolve_responsible(session: Session, full_name: str, field: str) -> Responsible:
+    """Resolve an existing catalog identity; never invent a synthetic email."""
+    matches = list(session.scalars(
+        select(Responsible).where(func.lower(Responsible.full_name) == full_name.lower()).limit(2)
+    ))
+    if not matches:
+        raise ImportValidationError(
+            f"Ответственный «{full_name}» отсутствует в каталоге", code="NOT_FOUND", field=field,
+        )
+    if len(matches) > 1:
+        raise ImportValidationError(
+            f"Неоднозначный ответственный «{full_name}»", code="DUPLICATE", field=field,
+        )
+    return matches[0]
 
 
 def link_responsible(
@@ -471,6 +490,16 @@ def apply_row(
     contract = session.execute(
         select(Contract).filter_by(contract_number=contract_no)
     ).scalar_one_or_none()
+    if contract is not None and contract.university_id != uni.id:
+        raise ImportValidationError(
+            "Номер договора уже принадлежит другому ВУЗу",
+            code="DUPLICATE", field="contract.contract_number",
+        )
+    if contract is not None and product is not None and contract.product_id not in (None, product.id):
+        raise ImportValidationError(
+            "Договор уже привязан к другому продукту",
+            code="DUPLICATE", field="contract.contract_number",
+        )
     if contract is None:
         contract = Contract(
             university_id=uni.id, contract_number=contract_no,
@@ -533,7 +562,7 @@ def apply_row(
 
     manager_name = _cell_text(mapped.get("responsible.full_name"))
     if manager_name:
-        manager = find_or_create_responsible(session, manager_name, "our_manager")
+        manager = resolve_responsible(session, manager_name, "responsible.full_name")
         link_responsible(session, uni.id, manager.id, "our_manager")
 
     contacts_raw = _cell_text(mapped.get("university_responsibles"))
@@ -542,7 +571,7 @@ def apply_row(
             name = part.strip()
             if not name:
                 continue
-            contact = find_or_create_responsible(session, name, "university_contact")
+            contact = resolve_responsible(session, name, "university_responsibles")
             link_responsible(session, uni.id, contact.id, "university_contact")
 
     if contract_created or lic_created:
@@ -556,6 +585,7 @@ def execute_import(
     mapping: dict[str, str],
     update_existing: bool = True,
     dry_run: bool = False,
+    catalog_type: str = "licenses",
 ) -> dict[str, Any]:
     """Run the import over all staged rows. Bad rows are collected, never fatal.
 
@@ -574,14 +604,15 @@ def execute_import(
             f"Неизвестные поля маппинга: {', '.join(unknown)}",
             code="INVALID_FORMAT", field="mapping",
         )
-    if "university.name" not in mapping.values():
+    required = IMPORT_REQUIRED_FIELDS.get(catalog_type)
+    if required is None:
         raise ImportValidationError(
-            "Маппинг должен содержать university.name",
-            code="REQUIRED", field="mapping",
+            f"Неизвестный тип импорта: {catalog_type}", code="INVALID_FORMAT", field="catalog_type",
         )
-    if "contract.contract_number" not in mapping.values():
+    missing = sorted(required - set(mapping.values()))
+    if missing:
         raise ImportValidationError(
-            "Маппинг должен содержать contract.contract_number",
+            f"Маппинг должен содержать: {', '.join(missing)}",
             code="REQUIRED", field="mapping",
         )
 
@@ -604,7 +635,13 @@ def execute_import(
                 continue
             try:
                 with session.begin_nested():
-                    outcome = apply_row(session, _mapped(row, mapping), update_existing)
+                    mapped = _mapped(row, mapping)
+                    if catalog_type == "licenses":
+                        outcome = apply_row(session, mapped, update_existing)
+                    else:
+                        from app.modules.imports.catalog_rows import apply_catalog_row
+
+                        outcome = apply_catalog_row(session, mapped, catalog_type, update_existing)
                 summary[outcome] += 1
                 processed_since_commit += 1
             except ImportValidationError as exc:

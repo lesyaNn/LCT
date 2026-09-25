@@ -27,6 +27,7 @@ CANON_TABLES = frozenset(
         "it_programs",
         "vendors",
         "it_products",
+        "vendor_contacts",
         "contracts",
         "licenses",
         "responsibles",

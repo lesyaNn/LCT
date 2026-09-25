@@ -49,9 +49,9 @@ router = APIRouter(prefix="/import", tags=["Import"])
 REUSABLE_STATUSES = ("queued", "building", "ready")
 
 
-def _idempotency_key(file_id: str, mapping: dict, update_existing: bool, dry_run: bool) -> str:
+def _idempotency_key(file_id: str, mapping: dict, update_existing: bool, dry_run: bool, catalog_type: str = "licenses") -> str:
     raw = json.dumps(
-        {"f": file_id, "m": mapping, "u": update_existing, "d": dry_run},
+        {"f": file_id, "m": mapping, "u": update_existing, "d": dry_run, "t": catalog_type},
         sort_keys=True, ensure_ascii=False,
     )
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -68,6 +68,18 @@ def _get_visible_job(db: Session, job_id: str, user: CurrentUser) -> ReportJob:
     if not ledger.job_visible_to(job, user, is_admin=_is_admin(user)):
         raise SecurityError(ErrorCode.FORBIDDEN)
     return job
+
+
+def _job_status(job: ReportJob) -> ImportJobStatus:
+    payload = job.payload or {}
+    return ImportJobStatus(
+        id=str(job.id), type=job.job_type, status=job.status,
+        progress=int(job.progress or 0), result=job.result,
+        error=job.error_message, created_at=job.created_at.isoformat(),
+        created_by=job.actor_name, filename=payload.get("filename"),
+        catalog_type=payload.get("catalog_type", "licenses"),
+        error_report_url=f"/api/v1/import/jobs/{job.id}/report" if job.status == STATUS_READY and job.file_path else None,
+    )
 
 
 def _get_or_create_job(
@@ -99,9 +111,11 @@ def _get_or_create_job(
         job_type=JOB_TYPE_XLSX_IMPORT,
         payload={
             "file_id": req.file_id,
+            "filename": req.filename.rsplit("/", 1)[-1].rsplit("\\", 1)[-1] if req.filename else None,
             "mapping": req.mapping,
             "update_existing": req.options.update_existing,
             "dry_run": req.options.dry_run,
+            "catalog_type": req.catalog_type,
         },
         idempotency_key=key,
     )
@@ -184,6 +198,7 @@ def import_execute(
     key = _idempotency_key(
         req.file_id, req.mapping,
         req.options.update_existing, req.options.dry_run,
+        req.catalog_type,
     )
     job = _get_or_create_job(db, req, user, key)
     if job.status == STATUS_READY:
@@ -194,6 +209,22 @@ def import_execute(
     # The persisted queued job is the sole hand-off. Only report_worker may
     # claim it and call execute_import; HTTP never runs the import body.
     return ImportExecuteResponse(job_id=str(job.id))
+
+
+@router.get(
+    "/jobs",
+    response_model=list[ImportJobStatus],
+    summary="Журнал импортов",
+)
+def import_jobs(
+    user: CurrentUser = Depends(require_permission("import.read")),
+    db: Session = Depends(get_audit_db),
+) -> list[ImportJobStatus]:
+    stmt = select(ReportJob).where(ReportJob.job_type == JOB_TYPE_XLSX_IMPORT)
+    if not _is_admin(user) and "manager" not in (user.roles or set()):
+        stmt = stmt.where(ReportJob.actor_sub == (user.id or ""))
+    stmt = stmt.order_by(ReportJob.created_at.desc()).limit(100)
+    return [_job_status(job) for job in db.scalars(stmt)]
 
 
 @router.get(
@@ -219,11 +250,7 @@ def import_job_status(
     db: Session = Depends(get_audit_db),
 ):
     job = _get_visible_job(db, job_id, user)
-    return ImportJobStatus(
-        id=str(job.id), type=job.job_type, status=job.status,
-        progress=int(job.progress or 0), result=job.result,
-        error=job.error_message,
-    )
+    return _job_status(job)
 
 
 @router.get(

@@ -22,12 +22,13 @@ from app.core.policies import ensure_university_visible
 from app.core.security import CurrentUser
 from app.modules.analytics.filters import UnifiedFilter, get_unified_filter
 from app.modules.audit.service import get_audit_db
-from app.modules.catalog import service
+from app.modules.catalog import passport_relations, service
 from app.modules.catalog.schemas import (
     DirectionDetail,
     DirectionRead,
     ProductDetail,
     ProductRead,
+    PrimaryResponsibleChange,
     ProgramDetail,
     ProgramRead,
     ResponsibleAssign,
@@ -38,6 +39,10 @@ from app.modules.catalog.schemas import (
     UniversityDetail,
     UniversityRead,
     UniversityResponsibleRead,
+    UniversityProgramAttach,
+    UniversityProgramRead,
+    UniversityProductAttach,
+    UniversityProductRead,
     VendorDetail,
     VendorRead,
 )
@@ -196,6 +201,56 @@ def delete_university(
 ) -> None:
     ensure_university_visible(university_id, user)
     service.delete_university(db, university_id)
+
+
+@router.post(
+    "/universities/{university_id}/programs",
+    response_model=UniversityProgramRead,
+    status_code=201,
+    tags=["Universities"],
+    summary="Attach an existing catalog program to a university",
+)
+def attach_university_program(
+    university_id: uuid.UUID,
+    data: UniversityProgramAttach,
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(WRITE),
+) -> UniversityProgramRead:
+    ensure_university_visible(university_id, user)
+    return passport_relations.attach_program(db, university_id, data)
+
+
+@router.post(
+    "/universities/{university_id}/products",
+    response_model=UniversityProductRead,
+    status_code=201,
+    tags=["Universities"],
+    summary="Attach an existing catalog product to a university",
+)
+def attach_university_product(
+    university_id: uuid.UUID,
+    data: UniversityProductAttach,
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(WRITE),
+) -> UniversityProductRead:
+    ensure_university_visible(university_id, user)
+    return passport_relations.attach_product(db, university_id, data)
+
+
+@router.patch(
+    "/universities/{university_id}/responsibles/primary",
+    response_model=UniversityResponsibleRead,
+    tags=["Universities"],
+    summary="Atomically change the primary responsible",
+)
+def change_primary_responsible(
+    university_id: uuid.UUID,
+    data: PrimaryResponsibleChange,
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(WRITE),
+) -> UniversityResponsibleRead:
+    ensure_university_visible(university_id, user)
+    return passport_relations.change_primary_responsible(db, university_id, data)
 
 
 @router.post(

@@ -34,8 +34,8 @@ MAPPING = {
 
 GOOD_ROWS = [
     ["МГУ им. М.В. Ломоносова", "РЕД СОФТ", "РЕД ОС", "DOG-IMP-01",
-     "2026-01-15", "2027-01-15", "accepted", "Менеджеров Менеджер 1",
-     "Иванов Иван; Петрова Анна", "первый импорт"],
+     "2026-01-15", "2027-01-15", "accepted", "",
+     "", "первый импорт"],
     ["Новый ВУЗ", "Астра", "Astra Linux", "DOG-IMP-02",
      "15.02.2026", "15.02.2027", "transferred", "",
      "", ""],
@@ -179,6 +179,72 @@ def test_unknown_mapping_rejected(staging, db):
         service.execute_import(db, file_id, {**MAPPING, "ВУЗ2": "nope.field"})
 
 
+@pytest.mark.parametrize("catalog_type, headers, values, mapping, model", [
+    ("universities", ["ВУЗ", "Город"], ["Новый университет", "Казань"],
+     {"ВУЗ": "university.name", "Город": "university.city"}, "University"),
+    ("directions", ["Код", "Направление"], ["AI", "Искусственный интеллект"],
+     {"Код": "direction.code", "Направление": "direction.name"}, "ITDirection"),
+    ("responsibles", ["ФИО", "Почта", "Телефон"], ["Тестовый Иван", "TEST@example.ru", 89001234567],
+     {"ФИО": "responsible.full_name", "Почта": "responsible.email", "Телефон": "responsible.phone"}, "Responsible"),
+    ("products", ["Компания", "Продукт"], ["Тестовый вендор", "«Продукт А», «Продукт Б»"],
+     {"Компания": "vendor.name", "Продукт": "product.name"}, "ITProduct"),
+])
+def test_catalog_import_is_idempotent(staging, db, catalog_type, headers, values, mapping, model):
+    from app import models
+
+    file_id = _stage(make_xlsx(headers, [values]))
+    first = service.execute_import(db, file_id, mapping, catalog_type=catalog_type)
+    second = service.execute_import(db, file_id, mapping, catalog_type=catalog_type)
+    assert first["inserted"] == 1 and not first["errors"], first
+    assert second["skipped"] == 1 and not second["errors"], second
+    expected = 2 if catalog_type == "products" else 1
+    assert db.scalar(select(func.count()).select_from(getattr(models, model))) == expected
+
+
+def test_vendor_contacts_import_preserves_product_relations(staging, db):
+    from app.models.catalog import ITProduct, Vendor, VendorContact
+
+    headers = ["Компания", "Продукт", "ФИО", "Телефон", "Почта", "Способ связи"]
+    mapping = {
+        "Компания": "vendor.name", "Продукт": "product.name",
+        "ФИО": "vendor_contact.full_name", "Телефон": "vendor_contact.phone",
+        "Почта": "vendor_contact.email", "Способ связи": "vendor_contact.communication_method",
+    }
+    rows = [["Тестовый вендор", "«Продукт А», «Продукт Б»", "Иван Иванов", 89001234567,
+             "contact@example.ru", "Chat TG"]]
+    file_id = _stage(make_xlsx(headers, rows))
+    dry = service.execute_import(db, file_id, mapping, dry_run=True, catalog_type="vendor_contacts")
+    assert dry["inserted"] == 1 and not dry["errors"], dry
+    assert db.scalar(select(func.count()).select_from(Vendor)) == 0
+    first = service.execute_import(db, file_id, mapping, catalog_type="vendor_contacts")
+    second = service.execute_import(db, file_id, mapping, catalog_type="vendor_contacts")
+    assert first["inserted"] == 1 and second["skipped"] == 1
+    assert db.scalar(select(func.count()).select_from(ITProduct)) == 2
+    assert db.scalar(select(func.count()).select_from(VendorContact)) == 2
+    assert {item.phone for item in db.scalars(select(VendorContact))} == {"+79001234567"}
+
+
+def test_license_import_reports_unresolved_manager_without_fake_contact(staging, db):
+    from app.models.catalog import Responsible
+
+    row = list(GOOD_ROWS[0])
+    row[7] = "Неизвестный Менеджер"
+    summary = service.execute_import(db, _stage(make_xlsx(HEADERS, [row])), MAPPING)
+    assert summary["inserted"] == 0
+    assert summary["errors"][0]["field"] == "responsible.full_name"
+    assert summary["errors"][0]["code"] == "NOT_FOUND"
+    assert db.scalar(select(func.count()).select_from(Responsible)) == 0
+
+
+def test_license_import_rejects_contract_from_another_university(staging, db):
+    rows = [list(GOOD_ROWS[0]), list(GOOD_ROWS[0])]
+    rows[1][0] = "Другой ВУЗ"
+    summary = service.execute_import(db, _stage(make_xlsx(HEADERS, rows)), MAPPING)
+    assert summary["inserted"] == 1
+    assert summary["errors"][0]["field"] == "contract.contract_number"
+    assert summary["errors"][0]["code"] == "DUPLICATE"
+
+
 # ------------------------------------------------------------------ API level
 
 
@@ -225,6 +291,8 @@ def test_api_preview_execute_job_flow(client):
 
     resp = client.post("/api/v1/import/execute", json={
         "file_id": preview["file_id"],
+        "filename": "import.xlsx",
+        "catalog_type": "licenses",
         "mapping": MAPPING,
         "options": {"update_existing": True, "dry_run": False},
     })
@@ -240,6 +308,11 @@ def test_api_preview_execute_job_flow(client):
     assert job["status"] == "queued"
     assert job["progress"] == 0
     assert job["result"] is None
+    assert job["filename"] == "import.xlsx"
+    assert job["catalog_type"] == "licenses"
+    journal = client.get("/api/v1/import/jobs")
+    assert journal.status_code == 200, journal.text
+    assert [entry["id"] for entry in journal.json()] == [job_id]
 
     # The HTTP request only enqueues.  The worker performs the business
     # import and then publishes the terminal status.
@@ -250,6 +323,7 @@ def test_api_preview_execute_job_flow(client):
     assert job["error"] is None
     assert job["result"]["inserted"] == 2, job["result"]
     assert job["result"]["errors"] == []
+    assert job["error_report_url"] == f"/api/v1/import/jobs/{job_id}/report"
 
     # P4-10-02: скачиваемый XLSX-отчёт (Итог + Ошибки).
     resp = client.get(f"/api/v1/import/jobs/{job_id}/report")

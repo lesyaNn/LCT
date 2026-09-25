@@ -8,6 +8,8 @@ Mapping UI itself is P3-owned (P3-11-01); the backend only accepts the
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 #: Ключи — заголовки колонок файла, значения — поля БД (см. TARGET_FIELDS).
@@ -60,6 +62,8 @@ class ImportExecuteRequest(BaseModel):
     )
 
     file_id: str = Field(pattern=r"^[0-9a-f]{32}$")
+    filename: str | None = Field(default=None, max_length=256)
+    catalog_type: Literal["licenses", "universities", "directions", "products", "responsibles", "vendor_contacts"] = "licenses"
     mapping: dict[str, str] = Field(examples=[EXAMPLE_MAPPING])
     options: ImportOptions = Field(default_factory=ImportOptions)
 
@@ -108,6 +112,11 @@ class ImportJobStatus(BaseModel):
     progress: int = 0
     result: dict | None = None
     error: str | None = None
+    created_at: str | None = None
+    created_by: str | None = None
+    filename: str | None = None
+    catalog_type: str | None = None
+    error_report_url: str | None = None
 
 
 __all__ = [

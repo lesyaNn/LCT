@@ -38,6 +38,7 @@ from app.modules.catalog.schemas import (
     UniversityResponsibleRead,
     VendorDetail,
     VendorRead,
+    VendorContactRead,
 )
 from app.schemas.catalog import (
     DirectionShort,
@@ -343,6 +344,7 @@ def get_product_detail(db: Session, product_id: uuid.UUID) -> ProductDetail:
     detail = ProductDetail.model_validate(prod)
     detail.vendor_name = vendor.name if vendor is not None else None
     detail.vendor = VendorShort.model_validate(vendor) if vendor is not None else None
+    detail.contacts = [VendorContactRead.model_validate(contact) for contact in repo.product_contacts(db, product_id)]
     return detail
 
 
@@ -411,6 +413,7 @@ def get_vendor_detail(db: Session, vendor_id: uuid.UUID) -> VendorDetail:
         ProductShort(id=p.id, name=p.name, version=p.version, vendor_name=obj.name)
         for p in repo.vendor_products(db, vendor_id)
     ]
+    detail.contacts = [VendorContactRead.model_validate(contact) for contact in repo.vendor_contacts(db, vendor_id)]
     return detail
 
 

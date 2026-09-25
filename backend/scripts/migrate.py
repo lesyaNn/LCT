@@ -90,6 +90,7 @@ EXPECTED_TABLES = [
     "health_score_current",
     "report_jobs",
     "audit_outbox",
+    "vendor_contacts",
 ]
 
 VERSION_RE = re.compile(r"^(?P<ver>\d{6}_[a-z0-9_]+)\.(?P<dir>up|down)\.sql$")

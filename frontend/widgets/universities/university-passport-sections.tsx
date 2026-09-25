@@ -76,7 +76,7 @@ import {
   UNIVERSITY_PASSPORT_CAPABILITIES,
 } from '@/shared/lib/universities-repository';
 import { PassportDataTable, PassportTableSkeleton, type PassportMobileField, type PassportTableColumn } from './passport-data-table';
-import { MeetingMutationForm, StudentMutationForm } from './passport-mutation-forms';
+import { MeetingMutationForm, ProductAssignmentForm, ProgramAssignmentForm, StudentMutationForm } from './passport-mutation-forms';
 import { ReadinessBadge } from '@/shared/ui/rtk/readiness-badge';
 import styles from './university-passport-sections.module.css';
 
@@ -134,12 +134,15 @@ function ExternalUnavailableNotice({ source, error }: { source: 'LMS' | 'сай�
 }
 
 function ProgramsSection({ id }: { id: string }) {
+  const { user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [statusFilter, setStatusFilter] = useState<ProgramStatus | 'all'>('all');
   const [page, setPage] = useState(1);
   const [toast, setToast] = useState<{ intent: 'success' | 'error' | 'info'; title: string; message?: ReactNode } | null>(null);
+  const [assignmentOpen, setAssignmentOpen] = useState(false);
+  const canAttach = !isMockDataSourceFor('passport') && hasPermission(user, 'university.edit');
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: universityProgramsQueryKey(id, page), queryFn: ({ signal }) => getUniversityPrograms(id, page, 20, signal), staleTime: 30_000 });
   const websiteQuery = useQuery({ queryKey: universityExternalDataQueryKey(id, 'website'), queryFn: () => getUniversityExternalData(id, 'website'), enabled: UNIVERSITY_PASSPORT_CAPABILITIES.externalData, staleTime: 30_000 });
@@ -197,7 +200,7 @@ function ProgramsSection({ id }: { id: string }) {
   if (query.isPending) return <section className={styles.section} aria-label="Программы"><PassportTableSkeleton /></section>;
   if (query.isError || !query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
   const externalToast = websiteQuery.isError ? <div className={styles.toastViewport}><Toast intent="error" title="Источник сайта недоступен" message="Показаны доступные локальные данные." /></div> : null;
-  return <section className={styles.section} aria-label="Программы"><SectionToolbar title="Программы"><div className={styles.integrationControls}>{websiteQuery.data ? <SyncMeta source="Сайт" syncedAt={websiteQuery.data.syncedAt} /> : <StatusBadge intent="neutral">Ручные данные</StatusBadge>}<ProgramFilter value={statusFilter} onChange={setStatusFilter} /></div></SectionToolbar>{websiteQuery.isError ? <ExternalUnavailableNotice source="сайта" error={websiteQuery.error} /> : null}<PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Нет программ с выбранным статусом" serverPagination={{ page, pageSize: 20, total: query.data.total, onPageChange: setPage }} />{toast ? <div className={styles.toastViewport}><Toast intent={toast.intent} title={toast.title} message={toast.message} onClose={() => setToast(null)} /></div> : externalToast}</section>;
+  return <section className={styles.section} aria-label="Программы"><SectionToolbar title="Программы"><div className={styles.integrationControls}>{websiteQuery.data ? <SyncMeta source="Сайт" syncedAt={websiteQuery.data.syncedAt} /> : <StatusBadge intent="neutral">Ручные данные</StatusBadge>}<ProgramFilter value={statusFilter} onChange={setStatusFilter} />{canAttach ? <Button variant="primary" size="s" type="button" onClick={() => setAssignmentOpen(true)}>Добавить программу</Button> : null}</div></SectionToolbar>{websiteQuery.isError ? <ExternalUnavailableNotice source="сайта" error={websiteQuery.error} /> : null}<PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Нет программ с выбранным статусом" serverPagination={{ page, pageSize: 20, total: query.data.total, onPageChange: setPage }} />{assignmentOpen ? <ProgramAssignmentForm universityId={id} existingProgramIds={query.data.items.map((program) => program.id)} onClose={() => setAssignmentOpen(false)} onSaved={() => { setAssignmentOpen(false); setToast({ intent: 'success', title: 'Программа добавлена' }); }} /> : null}{toast ? <div className={styles.toastViewport}><Toast intent={toast.intent} title={toast.title} message={toast.message} onClose={() => setToast(null)} /></div> : externalToast}</section>;
 }
 
 function ProgramChips({ programs }: { programs: string[] }) {
@@ -321,6 +324,10 @@ function ProductLicense({ row }: { row: UniversityProductRow }) {
 }
 
 function ProductsSection({ id }: { id: string }) {
+  const { user } = useAuth();
+  const [assignmentOpen, setAssignmentOpen] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const canAttach = !isMockDataSourceFor('passport') && hasPermission(user, 'university.edit');
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: universityProductsQueryKey(id), queryFn: () => getUniversityProducts(id, queryClient), staleTime: 30_000 });
   const columns: PassportTableColumn<UniversityProductRow>[] = [
@@ -341,7 +348,7 @@ function ProductsSection({ id }: { id: string }) {
   if (query.isPending) return <section className={styles.section} aria-label="Продукты"><PassportTableSkeleton /></section>;
   if (query.isError || !query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
 
-  return <section className={styles.section} aria-label="Продукты"><PassportDataTable rows={query.data} columns={columns} mobileFields={mobileFields} emptyMessage="Нет подключённых продуктов" /></section>;
+  return <section className={styles.section} aria-label="Продукты"><SectionToolbar title="Продукты">{canAttach ? <Button variant="primary" size="s" type="button" onClick={() => setAssignmentOpen(true)}>Добавить продукт</Button> : null}</SectionToolbar><PassportDataTable rows={query.data} columns={columns} mobileFields={mobileFields} emptyMessage="Нет подключённых продуктов" />{assignmentOpen ? <ProductAssignmentForm universityId={id} existingProductIds={query.data.map((product) => product.id)} onClose={() => setAssignmentOpen(false)} onSaved={() => { setAssignmentOpen(false); setSaved(true); }} /> : null}{saved ? <div className={styles.toastViewport}><Toast intent="success" title="Продукт добавлен" onClose={() => setSaved(false)} /></div> : null}</section>;
 }
 
 export { ProgramsSection, ProductsSection, StudentsSection, TeachersSection };

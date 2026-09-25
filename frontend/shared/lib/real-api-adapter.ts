@@ -66,7 +66,7 @@ type ApiDocument = { id: string; document_type: string; title: string; file_name
 type ApiMeeting = { id: string; meeting_type: string; subject: string; participants: string[]; outcome: string | null; next_action: string | null; next_action_due: string | null; meeting_at: string; created_by: string };
 type ApiMeetingRead = Omit<ApiMeeting, 'participants' | 'created_by'> & { participants: unknown[]; created_by_keycloak_sub: string };
 type ApiStudent = { id: string; external_id: string; university_id: string; program_id: string; full_name: string; group_name: string | null; status: string; started_at: string; finished_at: string | null };
-type ApiResponsible = { id: string; full_name: string; email: string; phone: string | null; role: string };
+type ApiResponsible = { id: string; full_name: string; email: string; phone: string | null; role: string; is_primary?: boolean };
 type ApiTimeline = { id: string; type: string; title: string; description: string | null; author: string; created_at: string };
 type ApiWorkflowSummary = { instance_id: string | null; template_name: string | null; current_stage: string | { code: string; name: string } | null; progress_percent: number; overdue_stages: number; next_due_date: string | null };
 type ApiStudents = { total: number; active: number; graduated: number; by_status: Record<string, number>; by_program: Array<{ program_id: string; program_name: string; total: number; active: number; graduated: number }> };
@@ -442,13 +442,13 @@ export async function realGetUniversityMeetings(id: string, page = 1, pageSize =
 
 export async function realGetUniversityResponsibles(id: string, queryClient?: QueryClient): Promise<UniversityResponsibleContact[]> {
   const data = (await passportBundle(id, queryClient)).responsibles;
-  return data.map((item, index) => ({
+  return data.map((item) => ({
     id: item.id,
     name: item.full_name,
     role: item.role,
     email: item.email,
     phone: item.phone ?? '—',
-    isPrimary: index === 0,
+    isPrimary: item.is_primary === true,
     initials: item.full_name.split(/\s+/).slice(0, 2).map((part) => part[0]).join(''),
   }));
 }
@@ -589,7 +589,7 @@ export async function realUploadImportPreview(file: File, signal?: AbortSignal, 
 export async function realExecuteImport(fileId: string, mapping: Record<string, string>, options: ImportOptions): Promise<ImportExecuteResponse> {
   return unwrap(await apiFetch<ImportExecuteResponse>('/api/v1/import/execute', {
     method: 'POST',
-    body: { file_id: fileId, mapping, options },
+    body: { file_id: fileId, filename: options.filename, mapping, catalog_type: options.catalog_type, options: { skip_header: options.skip_header, update_existing: options.update_existing, dry_run: options.dry_run } },
   }), 'Не удалось запустить импорт.');
 }
 
@@ -697,9 +697,9 @@ export async function realListResponsibleCandidates(): Promise<ResponsibleCandid
 }
 
 export async function realAssignUniversityResponsible(input: ResponsibleAssignmentInput): Promise<void> {
-  unwrap(await apiFetch<unknown>(`/api/v1/universities/${encodeURIComponent(input.universityId)}/responsibles/${encodeURIComponent(input.responsibleId)}`, {
-    method: 'POST',
-    body: { is_primary: true },
+  unwrap(await apiFetch<unknown>(`/api/v1/universities/${encodeURIComponent(input.universityId)}/responsibles/primary`, {
+    method: 'PATCH',
+    body: { responsible_id: input.responsibleId, reason: input.reason },
   }), 'Не удалось назначить ответственного ВУЗа.');
 }
 
@@ -721,7 +721,11 @@ function catalogItem(type: CatalogType, value: unknown): CatalogItem {
   if (type === 'universities') return { ...base, type, city: stringValue(item.city) };
   if (type === 'products') {
     const vendor = isRecord(item.vendor) ? item.vendor : {};
-    return { ...base, type, version: stringValue(item.version), vendorId: stringValue(item.vendor_id ?? vendor.id), vendorName: stringValue(item.vendor_name ?? vendor.name) };
+    const contacts = Array.isArray(item.contacts) ? item.contacts.flatMap((value) => {
+      if (!isRecord(value)) return [];
+      return [{ id: stringValue(value.id), fullName: stringValue(value.full_name), email: stringValue(value.email), phone: stringValue(value.phone), communicationMethod: stringValue(value.communication_method) }];
+    }) : undefined;
+    return { ...base, type, version: stringValue(item.version), vendorId: stringValue(item.vendor_id ?? vendor.id), vendorName: stringValue(item.vendor_name ?? vendor.name), contacts };
   }
   if (type === 'directions') return { ...base, type, code: stringValue(item.code) };
   const universities = Array.isArray(item.universities) ? item.universities : [];

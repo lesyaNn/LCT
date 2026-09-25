@@ -1378,6 +1378,20 @@ export async function getUniversityStudents(id: string, page = 1, pageSize = 20,
   }, real: () => realGetUniversityStudents(id, page, pageSize, signal) });
 }
 
+export async function attachUniversityProgram(universityId: string, programId: string): Promise<{ id: string }> {
+  return unwrapPassportMutation(await apiFetch<{ id: string }>(`/api/v1/universities/${encodeURIComponent(universityId)}/programs`, {
+    method: 'POST',
+    body: { program_id: programId, status: 'planned' },
+  }));
+}
+
+export async function attachUniversityProduct(universityId: string, productId: string): Promise<{ id: string }> {
+  return unwrapPassportMutation(await apiFetch<{ id: string }>(`/api/v1/universities/${encodeURIComponent(universityId)}/products`, {
+    method: 'POST',
+    body: { product_id: productId, status: 'planned' },
+  }));
+}
+
 function unwrapPassportMutation<T>(result: Awaited<ReturnType<typeof apiFetch<T>>>): T {
   if (result.ok) return result.data;
   throw new ApiRequestError(result.status, result.body, 'Не удалось сохранить данные паспорта.', result.error);

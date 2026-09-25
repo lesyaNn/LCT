@@ -25,6 +25,7 @@ from app.models.catalog import (
     University,
     UniversityResponsible,
     Vendor,
+    VendorContact,
 )
 from app.models.health_score import HealthScoreCurrent
 from app.modules.audit.service import AuditAction, AuditService, context_for
@@ -487,6 +488,14 @@ def get_product(db: Session, product_id: uuid.UUID) -> tuple | None:
     ).first()
 
 
+def product_contacts(db: Session, product_id: uuid.UUID) -> list[VendorContact]:
+    return list(db.scalars(
+        select(VendorContact)
+        .where(VendorContact.product_id == product_id)
+        .order_by(VendorContact.full_name, VendorContact.id)
+    ).all())
+
+
 # ----------------------------------------------------------------- vendors
 
 
@@ -532,6 +541,14 @@ def vendor_products(db: Session, vendor_id: uuid.UUID) -> list[ITProduct]:
         .scalars()
         .all()
     )
+
+
+def vendor_contacts(db: Session, vendor_id: uuid.UUID) -> list[VendorContact]:
+    return list(db.scalars(
+        select(VendorContact)
+        .where(VendorContact.vendor_id == vendor_id)
+        .order_by(VendorContact.full_name, VendorContact.id)
+    ).all())
 
 
 # ------------------------------------------------------------- responsibles

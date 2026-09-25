@@ -637,6 +637,7 @@ def get_responsibles(db, university_id: uuid.UUID) -> list[ResponsibleShort]:
             email=resp.email,
             phone=resp.phone,
             role=link.role_in_university or resp.role or "",
+            is_primary=link.is_primary,
         )
         for resp, link in rows
     ]
@@ -808,6 +809,7 @@ def get_passport(
             email=resp.email,
             phone=resp.phone,
             role=link.role_in_university or resp.role or "",
+            is_primary=link.is_primary,
         )
         for resp, link in ctx.responsible_rows
     ]

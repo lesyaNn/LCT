@@ -27,6 +27,7 @@ from app.models.catalog import (  # noqa: F401
     University,
     UniversityResponsible,
     Vendor,
+    VendorContact,
 )
 from app.models.health_score import HealthScoreCurrent, HealthScoreSnapshot  # noqa: F401
 from app.models.audit_outbox import AuditOutbox  # noqa: F401

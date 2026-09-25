@@ -40,6 +40,7 @@ export interface ProductCatalogItem extends CatalogItemBase {
   vendorId: string;
   vendorName: string;
   version: string;
+  contacts?: Array<{ id: string; fullName: string; email: string; phone: string; communicationMethod: string }>;
 }
 
 export interface DirectionCatalogItem extends CatalogItemBase {
@@ -110,7 +111,7 @@ export const catalogQueryKeys = {
 
 export const CATALOG_API_CAPABILITIES = isMockDataSourceFor('catalogs')
   ? { softActivation: true, inactiveFilter: true, mutationRoles: ['admin', 'manager'] as UserRole[] }
-  : { softActivation: false, inactiveFilter: false, mutationRoles: [] as UserRole[] };
+  : { softActivation: false, inactiveFilter: false, mutationRoles: ['admin', 'curator'] as UserRole[] };
 
 export function canMutateCatalog(role: UserRole | undefined): boolean {
   return Boolean(role && CATALOG_API_CAPABILITIES.mutationRoles.includes(role));

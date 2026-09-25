@@ -497,7 +497,7 @@ export function mockExecuteImport(fileId: string, _mapping: Record<string, strin
     status: 'queued',
     createdAt: now(),
     filename: file.filename,
-    catalogType: file.catalogType,
+    catalogType: options.catalog_type,
     createdBy: 'Мария Менеджер',
     processingAt: created + 700,
     doneAt: created + 2_400,

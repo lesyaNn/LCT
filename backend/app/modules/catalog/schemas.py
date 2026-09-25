@@ -44,6 +44,43 @@ class UniversityResponsibleRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class PrimaryResponsibleChange(BaseModel):
+    responsible_id: uuid.UUID
+    reason: str = Field(min_length=1, max_length=1000)
+
+
+class UniversityProgramAttach(BaseModel):
+    program_id: uuid.UUID
+    status: str = Field(default="planned", pattern="^(planned|active|launched|archived)$")
+
+
+class UniversityProgramRead(BaseModel):
+    id: uuid.UUID
+    university_id: uuid.UUID
+    program_id: uuid.UUID
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class UniversityProductAttach(BaseModel):
+    product_id: uuid.UUID
+    status: str = Field(default="planned", pattern="^(planned|active|expired)$")
+
+
+class UniversityProductRead(BaseModel):
+    id: uuid.UUID
+    university_id: uuid.UUID
+    product_id: uuid.UUID
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 # --------------------------------------------------------------- university
 
 
@@ -53,6 +90,7 @@ class ResponsibleShort(BaseModel):
     email: str
     phone: str | None = None
     role: str = ""
+    is_primary: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -170,6 +208,7 @@ class ProductRead(BaseModel):
 class ProductDetail(ProductRead):
     # Many-to-one parent, joined in the same statement.
     vendor: VendorShort | None = None
+    contacts: list["VendorContactRead"] = Field(default_factory=list)
 
 
 # ------------------------------------------------------------------ vendor
@@ -184,9 +223,21 @@ class VendorRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class VendorContactRead(BaseModel):
+    id: uuid.UUID
+    product_id: uuid.UUID
+    full_name: str
+    phone: str | None = None
+    email: str
+    communication_method: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
 class VendorDetail(VendorRead):
     # Products of this vendor (ONE query, no N+1).
     products: list[ProductShort] = Field(default_factory=list)
+    contacts: list[VendorContactRead] = Field(default_factory=list)
 
 
 __all__ = [

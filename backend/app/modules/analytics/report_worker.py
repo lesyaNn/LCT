@@ -147,6 +147,7 @@ def run_import_job(db: Session, job: ReportJob) -> str:
             payload.get("mapping", {}),
             update_existing=payload.get("update_existing", True),
             dry_run=payload.get("dry_run", False),
+            catalog_type=payload.get("catalog_type", "licenses"),
         )
     except Exception as exc:
         return jobs.requeue_or_fail(db, job, exc)

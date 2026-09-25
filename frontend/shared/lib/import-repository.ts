@@ -1,4 +1,5 @@
 import { ApiRequestError } from './api-errors';
+import { apiDownload } from './api-client';
 import { fromDataSource } from './data-source';
 import { queryKeys } from './query-keys';
 import {
@@ -14,7 +15,7 @@ import {
   realUploadImportPreview,
 } from './real-api-adapter';
 
-export type ImportCatalogType = 'universities' | 'products' | 'directions' | 'responsibles' | 'licenses';
+export type ImportCatalogType = 'universities' | 'products' | 'directions' | 'responsibles' | 'licenses' | 'vendor_contacts';
 export type ImportJobStatus = 'queued' | 'processing' | 'done' | 'failed';
 
 export interface ImportCatalogOption {
@@ -29,6 +30,7 @@ export const importCatalogOptions: ImportCatalogOption[] = [
   { id: 'directions', label: 'Направления', description: 'ИТ-направления и программы' },
   { id: 'responsibles', label: 'Ответственные', description: 'Менеджеры и представители ВУЗа' },
   { id: 'licenses', label: 'Лицензии', description: 'Лицензии, договоры и сроки действия' },
+  { id: 'vendor_contacts', label: 'Контакты поставщиков', description: 'Контакты существующих вендоров и их ИТ-продуктов' },
 ];
 
 export function isImportCatalogType(value: unknown): value is ImportCatalogType {
@@ -47,9 +49,14 @@ export interface ImportTargetField {
  */
 export const importTargetFields: ImportTargetField[] = [
   { id: 'university.name', label: 'Название ВУЗа' },
+  { id: 'university.city', label: 'Город ВУЗа' },
   { id: 'vendor.name', label: 'Вендор' },
   { id: 'product.name', label: 'Название продукта' },
   { id: 'product.version', label: 'Версия продукта' },
+  { id: 'vendor_contact.full_name', label: 'ФИО контакта вендора' },
+  { id: 'vendor_contact.phone', label: 'Телефон контакта вендора' },
+  { id: 'vendor_contact.email', label: 'Почта контакта вендора' },
+  { id: 'vendor_contact.communication_method', label: 'Способ связи' },
   { id: 'direction.code', label: 'Код направления' },
   { id: 'direction.name', label: 'Название направления' },
   { id: 'program.name', label: 'Название программы' },
@@ -60,15 +67,34 @@ export const importTargetFields: ImportTargetField[] = [
   { id: 'license.transfer_status', label: 'Статус передачи' },
   { id: 'license.comment', label: 'Комментарий к лицензии' },
   { id: 'responsible.full_name', label: 'ФИО ответственного' },
+  { id: 'responsible.email', label: 'Почта ответственного' },
+  { id: 'responsible.phone', label: 'Телефон ответственного' },
+  { id: 'responsible.role', label: 'Роль ответственного' },
   { id: 'university_responsibles', label: 'Ответственные от ВУЗа' },
 ];
 
 /** The import service validates these values for every catalog row. */
-export const requiredImportFields = [
-  'university.name',
-  'contract.contract_number',
-  'license.expires_at',
-] as const;
+export const requiredImportFields: Record<ImportCatalogType, readonly string[]> = {
+  universities: ['university.name'],
+  directions: ['direction.code'],
+  products: ['vendor.name', 'product.name'],
+  responsibles: ['responsible.full_name', 'responsible.email'],
+  licenses: ['university.name', 'contract.contract_number', 'license.expires_at'],
+  vendor_contacts: ['vendor.name', 'product.name', 'vendor_contact.full_name', 'vendor_contact.email'],
+};
+
+const importFieldPrefixes: Record<ImportCatalogType, readonly string[]> = {
+  universities: ['university.'],
+  directions: ['direction.'],
+  products: ['vendor.', 'product.'],
+  responsibles: ['responsible.'],
+  vendor_contacts: ['vendor.', 'product.', 'vendor_contact.'],
+  licenses: ['university.', 'vendor.', 'product.', 'direction.', 'program.', 'contract.', 'license.', 'responsible.', 'university_responsibles'],
+};
+
+export function targetFieldsForCatalog(type: ImportCatalogType): ImportTargetField[] {
+  return importTargetFields.filter((field) => importFieldPrefixes[type].some((prefix) => field.id.startsWith(prefix)));
+}
 
 export interface ImportPreviewResponse {
   file_id: string;
@@ -83,6 +109,8 @@ export interface ImportOptions {
   skip_header: boolean;
   update_existing: boolean;
   dry_run: boolean;
+  catalog_type: ImportCatalogType;
+  filename?: string;
 }
 
 export interface ImportRowError {
@@ -162,8 +190,8 @@ export function adaptImportSummary(raw: unknown): ImportSummary | undefined {
 
 function statusValue(value: unknown): ImportJobStatus {
   if (value === 'queued' || value === 'processing' || value === 'done' || value === 'failed') return value;
-  if (value === 'running' || value === 'in_progress') return 'processing';
-  if (value === 'completed' || value === 'success') return 'done';
+  if (value === 'running' || value === 'in_progress' || value === 'building') return 'processing';
+  if (value === 'completed' || value === 'success' || value === 'ready') return 'done';
   return 'failed';
 }
 
@@ -231,6 +259,12 @@ export async function listImportJobs(): Promise<ImportJob[]> {
   return items.map((item) => adaptImportJob(item));
 }
 
+export async function downloadImportReport(jobId: string): Promise<Blob> {
+  const result = await apiDownload(`/api/v1/import/jobs/${encodeURIComponent(jobId)}/report`);
+  if (!result.ok) throw new ApiRequestError(result.status, result.body, 'Не удалось скачать отчёт импорта.', result.error);
+  return result.data;
+}
+
 export function importTargetLabel(id: string): string {
   return importTargetFields.find((field) => field.id === id)?.label ?? id;
 }
@@ -246,9 +280,14 @@ export function normalizeImportHeader(value: string): string {
 
 const importHeaderAliases: Record<string, string[]> = {
   'university.name': ['вуз', 'название вуз', 'название вуза', 'университет', 'наименование вуза', 'university name', 'university'],
-  'vendor.name': ['вендор', 'поставщик', 'vendor', 'vendor name'],
+  'university.city': ['город вуза', 'город университета', 'university city'],
+  'vendor.name': ['вендор', 'поставщик', 'компания', 'vendor', 'vendor name'],
   'product.name': ['продукт', 'по', 'название продукта', 'программное обеспечение', 'product', 'product name'],
   'product.version': ['версия', 'версия продукта', 'product version', 'version'],
+  'vendor_contact.full_name': ['фио контакта', 'контактное лицо', 'фио', 'contact name'],
+  'vendor_contact.phone': ['телефон контакта', 'телефон', 'contact phone'],
+  'vendor_contact.email': ['почта контакта', 'почта', 'email', 'contact email'],
+  'vendor_contact.communication_method': ['способ связи', 'канал связи', 'communication method'],
   'direction.code': ['код направления', 'код ит направления', 'direction code'],
   'direction.name': ['направление', 'ит направление', 'название направления', 'direction', 'direction name'],
   'program.name': ['программа', 'ит программа', 'название программы', 'program', 'program name'],
@@ -256,20 +295,24 @@ const importHeaderAliases: Record<string, string[]> = {
   'contract.contract_number': ['номер договора', 'договор', 'contract number', 'contract'],
   'license.signed_at': ['подписание лицензии', 'дата подписания', 'дата лицензии', 'license signed at', 'signed at'],
   'license.expires_at': ['срок действия лицензии', 'срок действия', 'год окончания', 'год действия лицензии', 'license expires at', 'expires at'],
-  'license.transfer_status': ['статус передачи', 'статус по передачи', 'статус лицензии', 'transfer status'],
+  'license.transfer_status': ['статус передачи', 'статус по передаче', 'статус лицензии', 'transfer status'],
   'license.comment': ['комментарий', 'комментарий к лицензии', 'примечание', 'comment'],
   'responsible.full_name': ['фио', 'фио менеджера', 'ответственный', 'ответственный менеджер', 'responsible', 'responsible full name'],
+  'responsible.email': ['email ответственного', 'почта ответственного', 'email', 'почта'],
+  'responsible.phone': ['телефон ответственного', 'телефон'],
+  'responsible.role': ['роль ответственного', 'роль', 'должность'],
   university_responsibles: ['ответственные от вуза', 'контакты вуза', 'представители вуза', 'university responsibles'],
 };
 
-export function autoMapImportHeaders(headers: string[]): Record<string, string> {
+export function autoMapImportHeaders(headers: string[], catalogType: ImportCatalogType = 'licenses'): Record<string, string> {
   const mapping: Record<string, string> = {};
   const usedTargets = new Set<string>();
+  const fields = targetFieldsForCatalog(catalogType);
   for (const header of headers) {
     const normalized = normalizeImportHeader(header);
     if (!normalized) continue;
     let candidate: string | undefined;
-    for (const field of importTargetFields) {
+    for (const field of fields) {
       if (usedTargets.has(field.id)) continue;
       const fieldName = normalizeImportHeader(field.id.replace('.', ' '));
       const aliases = (importHeaderAliases[field.id] ?? []).map(normalizeImportHeader);
@@ -277,7 +320,7 @@ export function autoMapImportHeaders(headers: string[]): Record<string, string> 
         candidate = field.id;
         break;
       }
-      if (!candidate && (normalized.includes(fieldName) || aliases.some((alias) => normalized.includes(alias) || alias.includes(normalized)))) candidate = field.id;
+      if (!candidate && (normalized.includes(fieldName) || aliases.some((alias) => alias.length > 3 && (normalized.includes(alias) || alias.includes(normalized))))) candidate = field.id;
     }
     if (candidate) {
       mapping[header] = candidate;

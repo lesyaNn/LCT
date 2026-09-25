@@ -385,6 +385,6 @@ def _load_responsible_rows(db, university_id: uuid.UUID) -> list[tuple]:
                 UniversityResponsible.responsible_id == Responsible.id,
             )
             .where(UniversityResponsible.university_id == university_id)
-            .order_by(Responsible.full_name)
+            .order_by(UniversityResponsible.is_primary.desc(), Responsible.full_name)
         ).all()
     )

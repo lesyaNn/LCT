@@ -403,6 +403,80 @@ def test_university_assign_unassign_responsible(client):
     )
 
 
+def test_passport_program_relation_is_atomic_and_rejects_duplicate(client, engine):
+    from sqlalchemy import select
+    from app.models.interactions import UniversityProgram
+
+    university = _uni(client)
+    direction = _direction(client)
+    program = _program(client, direction["id"])
+    url = f"/api/v1/universities/{university['id']}/programs"
+    created = client.post(url, json={"program_id": program["id"], "status": "active"})
+    assert created.status_code == 201, created.text
+    assert created.json()["program_id"] == program["id"]
+    assert client.post(url, json={"program_id": program["id"]}).status_code == 409
+    passport = client.get(f"/api/v1/universities/{university['id']}/passport")
+    assert passport.status_code == 200, passport.text
+    assert program["id"] in [item["id"] for item in passport.json()["programs"]]
+    with Session(engine) as db:
+        links = db.scalars(select(UniversityProgram).where(
+            UniversityProgram.university_id == uuid.UUID(university["id"])
+        )).all()
+        assert len(links) == 1
+
+
+def test_passport_product_relation_is_atomic_and_rejects_duplicate(client, engine):
+    from sqlalchemy import select
+    from app.models.interactions import UniversityProduct
+
+    university = _uni(client)
+    vendor = _vendor(client)
+    product = _product(client, vendor["id"])
+    url = f"/api/v1/universities/{university['id']}/products"
+    created = client.post(url, json={"product_id": product["id"], "status": "active"})
+    assert created.status_code == 201, created.text
+    assert created.json()["product_id"] == product["id"]
+    assert client.post(url, json={"product_id": product["id"]}).status_code == 409
+    passport = client.get(f"/api/v1/universities/{university['id']}/passport")
+    assert passport.status_code == 200, passport.text
+    assert product["id"] in [item["id"] for item in passport.json()["products"]]
+    with Session(engine) as db:
+        links = db.scalars(select(UniversityProduct).where(
+            UniversityProduct.university_id == uuid.UUID(university["id"])
+        )).all()
+        assert len(links) == 1
+
+
+def test_primary_responsible_change_preserves_old_link_and_audits(client, engine):
+    from sqlalchemy import select
+    from app.models.catalog import UniversityResponsible
+    from app.modules.audit.models import AuditEvent
+
+    university = _uni(client)
+    first = _responsible(client)
+    second = _responsible(client)
+    prefix = f"/api/v1/universities/{university['id']}/responsibles"
+    assert client.post(f"{prefix}/{first['id']}", json={"is_primary": True}).status_code == 201
+    changed = client.patch(f"{prefix}/primary", json={
+        "responsible_id": second["id"], "reason": "Передача ответственности",
+    })
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["is_primary"] is True
+    with Session(engine) as db:
+        links = db.scalars(select(UniversityResponsible).where(
+            UniversityResponsible.university_id == uuid.UUID(university["id"])
+        )).all()
+        assert len(links) == 2
+        assert [str(link.responsible_id) for link in links if link.is_primary] == [second["id"]]
+        event = db.scalars(select(AuditEvent).where(
+            AuditEvent.university_id == uuid.UUID(university["id"]),
+            AuditEvent.action == "ASSIGN_RESPONSIBLE",
+            AuditEvent.entity_id == uuid.UUID(changed.json()["id"]),
+        )).one()
+        assert event.old_value["responsible_id"] == first["id"]
+        assert event.new_value["responsible_id"] == second["id"]
+
+
 def test_university_responsible_delete_cascades_link_keeps_university(client):
     u = _uni(client)
     r1 = _responsible(client)

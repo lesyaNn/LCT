@@ -19,7 +19,7 @@ import uuid
 from datetime import date
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Date, ForeignKey, Index, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Date, ForeignKey, Index, String, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -103,6 +103,7 @@ class Vendor(UUIDPKMixin, TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(512), unique=True, nullable=False)
 
     products: Mapped[list["ITProduct"]] = relationship(back_populates="vendor")
+    contacts: Mapped[list["VendorContact"]] = relationship(back_populates="vendor")
 
 
 class ITProduct(UUIDPKMixin, TimestampMixin, Base):
@@ -122,7 +123,32 @@ class ITProduct(UUIDPKMixin, TimestampMixin, Base):
     version: Mapped[str] = mapped_column(String(128), nullable=False, default="")
 
     vendor: Mapped["Vendor"] = relationship(back_populates="products")
+    contacts: Mapped[list["VendorContact"]] = relationship(back_populates="product")
     licenses: Mapped[list["License"]] = relationship(back_populates="product")
+
+
+class VendorContact(UUIDPKMixin, TimestampMixin, Base):
+    """Contact for a particular vendor/product pair, as supplied by the catalog."""
+
+    __tablename__ = "vendor_contacts"
+    __table_args__ = (
+        UniqueConstraint("product_id", "email", name="uq_vendor_contacts_product_email"),
+        Index("ix_vendor_contacts_vendor_id", "vendor_id"),
+    )
+
+    vendor_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("vendors.id", ondelete="RESTRICT"), nullable=False
+    )
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("it_products.id", ondelete="CASCADE"), nullable=False
+    )
+    full_name: Mapped[str] = mapped_column(String(512), nullable=False)
+    phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    email: Mapped[str] = mapped_column(String(512), nullable=False)
+    communication_method: Mapped[str | None] = mapped_column(String(256), nullable=True)
+
+    vendor: Mapped["Vendor"] = relationship(back_populates="contacts")
+    product: Mapped["ITProduct"] = relationship(back_populates="contacts")
 
 
 class Contract(UUIDPKMixin, TimestampMixin, Base):
@@ -277,6 +303,12 @@ class UniversityResponsible(UUIDPKMixin, TimestampMixin, Base):
                          name="uq_university_responsibles_uni_resp"),
         Index("ix_university_responsibles_university_id", "university_id"),
         Index("ix_university_responsibles_responsible_id", "responsible_id"),
+        Index(
+            "uq_university_responsibles_primary",
+            "university_id",
+            unique=True,
+            postgresql_where=text("is_primary"),
+        ),
     )
 
     university_id: Mapped[uuid.UUID] = mapped_column(
