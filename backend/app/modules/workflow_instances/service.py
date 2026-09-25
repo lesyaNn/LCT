@@ -209,4 +209,22 @@ def create_instance(
             )
         )
     db.commit()  # header + snapshot + pointers + transition atomically
+    if "audit_context" in db.info:
+        # H3: instance creation is audited in a follow-up statement (the core
+        # creation stays atomic above); without audit_context (seeds/scripts)
+        # this is skipped, like other services.
+        from app.modules.audit.service import AuditService, context_for
+
+        AuditService(db).log_event(
+            context=context_for(db, actor_sub or "system"),
+            action="CREATE",
+            entity_type="workflow_instance",
+            entity_id=instance.id,
+            university_id=university.id,
+            new_value={
+                "template_id": str(template.id),
+                "stages": len(snapshots),
+            },
+        )
+        db.commit()
     return get_instance_detail(db, instance.id, today=day)

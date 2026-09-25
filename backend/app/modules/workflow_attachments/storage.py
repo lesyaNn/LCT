@@ -74,6 +74,14 @@ class StorageBackend(ABC):
     def exists(self, key: str) -> bool:
         """True when the object is present (never raises for missing)."""
 
+    @abstractmethod
+    def size(self, key: str) -> int | None:
+        """L4: verified object size in bytes; None when unknown/missing.
+
+        Download responses must use this — never the DB ``file_size``
+        metadata, which can drift from the stored object.
+        """
+
 
 class LocalStorageBackend(StorageBackend):
     """Filesystem backend rooted at ``root`` (production: ``/app/storage``).
@@ -146,6 +154,12 @@ class LocalStorageBackend(StorageBackend):
             return self._path_for(key).is_file()
         except StorageError:
             return False
+
+    def size(self, key: str) -> int | None:
+        try:
+            return self._path_for(key).stat().st_size
+        except OSError:
+            return None
 
 
 class S3StorageBackend(StorageBackend):
@@ -274,18 +288,31 @@ class S3StorageBackend(StorageBackend):
             return False
         return True
 
+    def size(self, key: str) -> int | None:
+        try:
+            stat = self._connect().stat_object(self._bucket, self._object(key))
+            return int(stat.size)
+        except Exception:
+            return None
+
 
 # Backwards-compatible alias (MinIO speaks the S3 API).
 MinioStorageBackend = S3StorageBackend
 
 
 @lru_cache(maxsize=8)
-def _cached_build(backend: str, root: str, endpoint: str, bucket: str) -> StorageBackend:
+def _cached_build(
+    backend: str, root: str, endpoint: str, bucket: str,
+    access_key: str = "", secret_key: str = "",
+) -> StorageBackend:
+    # M9: credentials are part of the cache key — a rotation without restart
+    # builds a fresh backend instead of reusing a stale one. Old entries age
+    # out via maxsize; the default local backend carries no secrets.
     if backend == "s3":
         return S3StorageBackend(
             endpoint=endpoint,
-            access_key=settings.s3_access_key,
-            secret_key=settings.s3_secret_key,
+            access_key=access_key or settings.s3_access_key,
+            secret_key=secret_key or settings.s3_secret_key,
             bucket=bucket or settings.s3_bucket,
         )
     return LocalStorageBackend(root or settings.storage_root)
@@ -302,6 +329,7 @@ def build_storage_backend(
     name = (backend or settings.storage_backend or "local").lower()
     if name in ("s3", "minio"):
         return _cached_build(
-            "s3", "", endpoint or settings.s3_endpoint, bucket or settings.s3_bucket
+            "s3", "", endpoint or settings.s3_endpoint, bucket or settings.s3_bucket,
+            settings.s3_access_key, settings.s3_secret_key,
         )
     return _cached_build("local", str(root or settings.storage_root), "", "")

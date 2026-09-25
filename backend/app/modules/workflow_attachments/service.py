@@ -20,6 +20,7 @@ Failure semantics:
 
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import BinaryIO
 
@@ -31,6 +32,9 @@ from app.core.errors import BusinessException
 from app.schemas.errors import ErrorCode
 from app.core.policies import ensure_university_access
 from app.models.workflow_instances import WorkflowAttachment, WorkflowInstance
+from app.modules.workflow_instances.service import get_instance_or_404
+
+logger = logging.getLogger(__name__)
 
 from .policy import (
     MAX_FILE_SIZE_BYTES,
@@ -44,13 +48,6 @@ from .storage import (
     StorageObjectNotFound,
     new_storage_key,
 )
-
-
-def get_instance_or_404(db: Session, instance_id: uuid.UUID) -> WorkflowInstance:
-    instance = db.get(WorkflowInstance, instance_id)
-    if instance is None:
-        raise NotFound("Workflow instance not found")
-    return instance
 
 
 def authorize_scope(user, instance: WorkflowInstance) -> None:
@@ -105,6 +102,31 @@ def _limited_chunks(stream: BinaryIO):
         yield piece
 
 
+def _audit_attachment_event(db: Session, *, action: str, attachment: WorkflowAttachment,
+                              university_id) -> None:
+    """H3: upload/delete пишут аудит в той же транзакции; без audit_context
+    (воркер/прямые вызовы) — молча пропускаем, как остальные сервисы."""
+    if "audit_context" not in db.info:
+        return
+    from app.modules.audit.service import AuditService, context_for
+
+    snapshot = {
+        "instance_id": str(attachment.instance_id),
+        "original_filename": attachment.original_filename,
+        "file_size": attachment.file_size,
+        "mime_type": attachment.mime_type,
+    }
+    AuditService(db).log_event(
+        context=context_for(db, attachment.uploaded_by_keycloak_sub or "system"),
+        action=action,
+        entity_type="document",
+        entity_id=attachment.id,
+        university_id=university_id,
+        old_value=None if action == "CREATE" else snapshot,
+        new_value=snapshot if action == "CREATE" else None,
+    )
+
+
 def upload_attachment(
     db: Session,
     storage: StorageBackend,
@@ -136,13 +158,17 @@ def upload_attachment(
     )
     db.add(attachment)
     try:
+        _audit_attachment_event(
+            db, action="CREATE", attachment=attachment,
+            university_id=instance.university_id,
+        )
         db.commit()
     except Exception:
         db.rollback()
         try:
             storage.delete(key)
         except StorageError:
-            pass
+            logger.exception("attachment storage cleanup failed", extra={"key": key})
         raise
     db.refresh(attachment)
     return attachment
@@ -165,11 +191,16 @@ def delete_attachment(
     db: Session, storage: StorageBackend, *, attachment: WorkflowAttachment
 ) -> None:
     """Physical object first, metadata row second (no false 204)."""
+    instance = get_instance_or_404(db, attachment.instance_id)
     try:
         storage.delete(attachment.storage_key)
     except StorageObjectNotFound:
         pass  # idempotent: row cleanup below still happens
     except StorageError as exc:
         raise BusinessException(ErrorCode.INTERNAL_ERROR) from exc
+    _audit_attachment_event(
+        db, action="DELETE", attachment=attachment,
+        university_id=instance.university_id,
+    )
     db.delete(attachment)
     db.commit()

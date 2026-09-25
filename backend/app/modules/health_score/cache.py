@@ -42,17 +42,11 @@ def put_cached(response: HealthScoreResponse) -> None:
 def invalidate_health_score(university_id: uuid.UUID) -> None:
     """Инвалидировать кэш вуза (вызывают писатели после изменений).
 
-    In-memory fallback не хранит TTL-индекс для удаления — кладём TTL=0?
-    Нет: ``cache_set`` с ``ttl=0`` означает «без срока» в fallback. Поэтому
-    инвалидация = перезапись маркером с истёкшим TTL невозможна напрямую;
-    вместо этого удаляем ключ из fallback-словаря, если он там есть.
-    Redis-клиент: ``delete``.
+    H6: удаление — через публичный ``cache_delete`` инфраструктуры (Redis или
+    fallback), без доступа к приватным полям и без незащищённого ``delete``.
+    Никогда не бросает исключение в вызывающий поток.
     """
-    client = redis_infra.get_client()
-    if client is not None:
-        client.delete(cache_key(university_id))
-        return
-    redis_infra._memory.pop(cache_key(university_id), None)
+    redis_infra.cache_delete(cache_key(university_id))
 
 
 __all__ = [

@@ -27,8 +27,7 @@ from app.core.security import CurrentUser
 from app.core.errors import BusinessException, SecurityError
 from app.schemas.errors import ErrorCode
 from app.modules.audit.service import get_audit_db
-from app.models.report_job import (
-    JOB_TYPE_XLSX_IMPORT,
+from app.models.report_job import (    JOB_TYPE_XLSX_IMPORT,
     STATUS_BUILDING,
     STATUS_READY,
     ReportJob,
@@ -128,10 +127,24 @@ ERROR_RESPONSES = {
 )
 def import_preview(
     file: UploadFile = File(..., description="XLSX/XLS файл каталогов (до 10 МБ)"),
+    db: Session = Depends(get_audit_db),
     _u: CurrentUser = Depends(require_permission("import.write")),
 ):
+    _ = db  # audit context for the staging side-effect (H3); no DB writes here.
     try:
-        content = file.file.read()
+        # Стриминг чанками с лимитом mid-stream (C2): никогда не буферизуем
+        # больше MAX_FILE_BYTES+chunk, вместо file.file.read() целиком.
+        chunks: list[bytes] = []
+        total = 0
+        while True:
+            chunk = file.file.read(256 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > service.MAX_FILE_BYTES:
+                raise BusinessException(ErrorCode.FILE_TOO_LARGE)
+            chunks.append(chunk)
+        content = b"".join(chunks)
         file_id = service.stage_upload(file.filename or "", content)
         parsed = service.parse_preview(file_id)
     except service.ImportValidationError as exc:

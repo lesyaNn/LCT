@@ -14,6 +14,8 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.schemas.errors import ERROR_MESSAGES, ErrorCode, ErrorResponse
 
+from app.core.rate_limit import bucket_key, check_rate_limit, hash_client_id
+
 MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024
 # Multipart framing adds headers and boundaries around the canonical 50 MiB
 # file-content limit.  Keep a bounded allowance without weakening the file
@@ -172,9 +174,84 @@ class _RequestTooLarge(Exception):
     """Internal control flow for chunked bodies exceeding the hard limit."""
 
 
+#: M10: heavy endpoints protected by the rate limiter (fixed window).
+#: Deliberately narrow — cheap reads stay unlimited so the limiter cannot
+#: break polling/dashboard flows or the test-suite.
+RATE_LIMITED_PATHS = (
+    "/api/v1/catalog/overview",
+    "/api/v1/analytics/overview",
+    "/api/v1/analytics/matrix",
+    "/api/v1/import/preview",
+)
+
+RATE_LIMIT_PER_MINUTE = 120
+RATE_LIMIT_WINDOW_SECONDS = 60
+
+
+def _rate_limited_response(request_id: str, retry_after: int):
+    from starlette.responses import JSONResponse
+
+    body = ErrorResponse(
+        error={
+            "code": ErrorCode.RATE_LIMITED,
+            "message": ERROR_MESSAGES[ErrorCode.RATE_LIMITED],
+            "request_id": request_id,
+            "details": {"retry_after_seconds": retry_after},
+        }
+    )
+    return JSONResponse(
+        status_code=429,
+        content=body.model_dump(mode="json"),
+        headers={
+            "X-Request-ID": request_id,
+            "Retry-After": str(retry_after),
+        },
+    )
+
+
+class RateLimitMiddleware:
+    """M10: fixed-window 429 for heavy endpoints (fail-open on backend errors)."""
+
+    def __init__(
+        self,
+        app: ASGIApp,
+        limit_per_minute: int = RATE_LIMIT_PER_MINUTE,
+        window_seconds: int = RATE_LIMIT_WINDOW_SECONDS,
+        paths: tuple[str, ...] = RATE_LIMITED_PATHS,
+    ) -> None:
+        self.app = app
+        self.limit = limit_per_minute
+        self.window = window_seconds
+        self.paths = paths
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or self.limit <= 0:
+            await self.app(scope, receive, send)
+            return
+        if scope.get("path") not in self.paths:
+            await self.app(scope, receive, send)
+            return
+        headers = Headers(scope=scope)
+        # Per-token buckets when authenticated, per-IP otherwise (the raw
+        # credential is hashed and never logged).
+        identity = headers.get("authorization") or (scope.get("client") or ("?", 0))[0]
+        key = bucket_key(scope["path"], hash_client_id(str(identity)))
+        allowed, retry_after = check_rate_limit(key, self.limit, self.window)
+        if not allowed:
+            await _rate_limited_response(_request_id(scope), retry_after)(
+                scope, receive, send
+            )
+            return
+        await self.app(scope, receive, send)
+
+
 __all__ = [
     "MAX_FILE_SIZE_BYTES",
     "REQUEST_BODY_LIMIT_BYTES",
+    "RATE_LIMIT_PER_MINUTE",
+    "RATE_LIMIT_WINDOW_SECONDS",
+    "RATE_LIMITED_PATHS",
+    "RateLimitMiddleware",
     "SECURITY_HEADERS",
     "SecurityHeadersMiddleware",
     "RequestSizeLimitMiddleware",

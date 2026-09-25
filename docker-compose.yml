@@ -140,6 +140,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      # Audit/report tables are created by backend migrations; starting
+      # earlier only produces one-time "relation does not exist" noise.
+      backend:
+        condition: service_healthy
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-rtk}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-rtk}
       REDIS_URL: redis://redis:6379/0

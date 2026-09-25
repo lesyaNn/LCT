@@ -29,6 +29,13 @@ class Settings(BaseSettings):
 
     # --- Domain stage (NOT used by minimal auth stack) ---
     database_url: str = "sqlite:///./dev.db"
+    # M5: explicit DB pool/timeout knobs (PostgreSQL only; SQLite ignores them).
+    # Defaults fit uvicorn sync workers + one report worker; raise MAX_OVERFLOW
+    # for import-heavy deployments (H1 batches hold connections briefly).
+    db_pool_size: int = 5
+    db_max_overflow: int = 10
+    db_pool_timeout: int = 30
+    db_statement_timeout_ms: int = 30000
     redis_url: str = "redis://localhost:6379/0"
     s3_endpoint: str = "http://localhost:9000"
     # Credentials are intentionally empty by default.  They are required from
@@ -49,6 +56,10 @@ class Settings(BaseSettings):
     # as declared, never allowlisted (no MIME contract).
     upload_allowed_extensions: str = ""
     cors_origins: str = "http://localhost:3000"
+
+    # --- Rate limiting (M10, heavy endpoints only) ---
+    # 0 disables the limiter (tests); default 120 req/min per token/IP.
+    rate_limit_per_minute: int = 120
 
     # --- Analytics reports (P4-06-01) ---
     # Filesystem root for generated xlsx/pdf/json reports. Mounted as a

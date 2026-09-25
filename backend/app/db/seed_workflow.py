@@ -19,6 +19,7 @@ Usage::
     DATABASE_URL=postgresql+psycopg://... python -m app.db.seed_workflow
 """
 
+import logging
 import os
 import sys
 
@@ -117,9 +118,7 @@ def main() -> None:
     engine = create_engine(url)
     with Session(engine) as session:
         stats = seed_workflow_templates(session)
-    print("SEED WORKFLOW OK:")
-    for key, value in stats.items():
-        print(f"  {key}: {value}")
+    logging.getLogger("rtk.seed").info("SEED WORKFLOW OK: %s", stats)
 
 
 if __name__ == "__main__":

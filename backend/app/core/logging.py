@@ -60,13 +60,28 @@ class SensitiveFilter(logging.Filter):
                     "[REDACTED]" if _SENSITIVE_KEY.search(key)
                     else _redact_value(record.__dict__[key])
                 )
-            rendered = record.getMessage()
+            # Preserve the record shape: third-party formatters (notably
+            # uvicorn's AccessFormatter) unpack ``record.args`` positionally,
+            # so pre-rendering msg + clearing args breaks them with ValueError
+            # on every request. Redact in place instead.
+            if isinstance(record.msg, str):
+                record.msg = _redact_text(record.msg)
+            else:
+                record.msg = _redact_value(record.msg)
+            args = record.args
+            if isinstance(args, tuple):
+                record.args = tuple(_redact_value(arg) for arg in args)
+            elif isinstance(args, Mapping):
+                record.args = {
+                    str(key): _redact_value(item) for key, item in args.items()
+                }
             if record.exc_info:
-                rendered += "\n" + "".join(traceback.format_exception(*record.exc_info))
+                # Formatter.format appends exc_text verbatim, so a redacted
+                # snapshot keeps tracebacks safe without touching args.
+                record.exc_text = _redact_text(
+                    "".join(traceback.format_exception(*record.exc_info))
+                )
                 record.exc_info = None
-                record.exc_text = None
-            record.msg = _redact_text(rendered)
-            record.args = ()
         except Exception:
             # Logging must never break a request because a third-party object
             # cannot be formatted or sanitized.

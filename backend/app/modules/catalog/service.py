@@ -11,7 +11,7 @@ import uuid
 
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import NotFound
+from app.core.exceptions import Conflict, NotFound
 from app.models.catalog import (
     ITDirection,
     ITProduct,
@@ -105,8 +105,16 @@ def list_university_page(
     return items, total
 
 
-def get_university_detail(db: Session, university_id: uuid.UUID) -> UniversityDetail:
-    obj = repo.get_university(db, university_id)
+def get_university_detail(
+    db: Session, university_id: uuid.UUID, user=None,
+) -> UniversityDetail:
+    """H5: with ``user`` the row is loaded scope-first (one SELECT, 404 for
+    both missing and out-of-scope); without it the legacy unscoped load."""
+    obj = (
+        repo.get_university_scoped(db, university_id, user)
+        if user is not None
+        else repo.get_university(db, university_id)
+    )
     if obj is None:
         raise NotFound("University not found")
     detail = UniversityDetail.model_validate(obj)
@@ -143,8 +151,17 @@ def patch_university(
 
 
 def delete_university(db: Session, university_id: uuid.UUID) -> None:
+    """Hard-delete with the unified M4 policy: refuse (409) while ANY
+    business data references the university — catalog rows (DB RESTRICT
+    backstop) AND history/links (DB CASCADE, must never be wiped silently).
+    """
     if repo.get_university(db, university_id) is None:
         raise NotFound("University not found")
+    blockers = repo.university_delete_blockers(db, university_id)
+    if blockers:
+        raise Conflict(
+            f"University has {', '.join(blockers)}; deletion blocked"
+        )
     repo.delete_by_id(db, University, university_id)
 
 
@@ -547,3 +564,78 @@ def unassign_responsible(db: Session, university_id: uuid.UUID, responsible_id: 
             raise NotFound("Responsible not found")
         raise NotFound("UniversityResponsible link not found")
     repo.delete_link(db, link)
+
+
+# ---------------------------------------------------------- catalog overview
+
+
+def get_catalog_overview(db: Session, user, *, page: int, size: int) -> dict:
+    """Assemble the read-only /catalog/overview payload (H4).
+
+    SQL lives in the repository (scoped counts/page + GROUP BY counters);
+    this function only maps rows to plain dicts. Returns the exact shape the
+    router previously built inline.
+    """
+    total_universities, total_licenses = repo.count_overview(db, user)
+    licenses = repo.page_overview_licenses(
+        db, user, limit=size, offset=(page - 1) * size
+    )
+
+    rows = []
+    for lic in licenses:
+        uni = lic.university
+        managers: list[str] = []
+        contacts: list[str] = []
+        # Направление именно этой строки (одна строка = один договор/лицензия).
+        # Fallback — направления вуза (старые строки без direction_id).
+        if lic.direction is not None:
+            directions = [lic.direction.name]
+        elif lic.program is not None and lic.program.direction is not None:
+            directions = [lic.program.direction.name]
+        else:
+            directions = []
+            if uni is not None:
+                for upl in uni.university_programs:
+                    if upl.program is not None and upl.program.direction is not None:
+                        name = upl.program.direction.name
+                        if name not in directions:
+                            directions.append(name)
+        if uni is not None:
+            for link in uni.university_responsibles:
+                if link.responsible is None:
+                    continue
+                if link.role_in_university == "our_manager":
+                    managers.append(link.responsible.full_name)
+                else:
+                    contacts.append(link.responsible.full_name)
+        product = lic.product
+        rows.append({
+            "university": uni.name if uni else None,
+            "vendor": product.vendor.name if product and product.vendor else None,
+            "product": product.name if product else None,
+            "contract_number": lic.contract.contract_number if lic.contract else lic.license_number,
+            "signed_at": lic.signed_at.isoformat() if lic.signed_at else None,
+            "expires_at": lic.expires_at.isoformat() if lic.expires_at else None,
+            "transfer_status": lic.transfer_status_raw,
+            "manager": "; ".join(managers) or None,
+            "responsibles": contacts,
+            "comment": lic.comment,
+            "direction": "; ".join(directions) or None,
+        })
+
+    directions, prog_by_dir = repo.direction_program_counts(db, user)
+    return {
+        "total_universities": total_universities,
+        "total_licenses": total_licenses,
+        "page": page,
+        "page_size": size,
+        "rows": rows,
+        "directions": [
+            {
+                "code": d.code,
+                "name": d.name,
+                "programs": prog_by_dir.get(str(d.id), 0),
+            }
+            for d in directions
+        ],
+    }

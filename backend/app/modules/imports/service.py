@@ -17,6 +17,7 @@ import os
 import re
 import uuid
 from datetime import date, datetime
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import select
@@ -38,9 +39,19 @@ from app.models.interactions import UniversityProgram
 MAX_FILE_BYTES = 10 * 1024 * 1024
 MAX_ROWS = 5000
 PREVIEW_ROWS = 10
+#: Cap на число сохраняемых построчных ошибок в summary (H1): хвост не
+#: отбрасывается молча — выставляется truncated=true + errors_total.
+MAX_ROW_ERRORS = 100
+#: Периодический commit батчами (H1): не держим одну транзакцию на 5000 строк.
+#: Прогрессивная фиксация — при крэше воркера уже закоммиченные батчи остаются.
+IMPORT_COMMIT_BATCH = 500
 STAGING_DIR = os.getenv("IMPORT_STAGING_DIR", "/tmp/rtk-imports")
 
 ALLOWED_EXTS = frozenset({".xlsx", ".xls"})
+
+#: Канонический file_id из stage_upload(): uuid4().hex (32 hex-символа).
+#: Строгая валидация закрывает path traversal через file_id (C1).
+_FILE_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 
 #: file column -> model field paths accepted in ``mapping`` (P4-10-01 §2).
 TARGET_FIELDS = frozenset({
@@ -150,19 +161,21 @@ def stage_upload(filename: str, content: bytes) -> str:
 
 
 def _staged_path(file_id: str) -> str:
-    # New layout: <STAGING_DIR>/<file_id>.<ext>. Legacy (MVP) layout stored
-    # everything as <file_id>.xlsx — keep reading it for backward compat.
-    candidates = [
-        os.path.join(STAGING_DIR, f"{file_id}{ext}") for ext in (".xlsx", ".xls")
-    ]
-    for path in candidates:
-        if os.path.exists(path):
-            return path
-    # file_id may already include extension (defensive, not part of API).
-    direct = os.path.join(STAGING_DIR, file_id)
-    if os.path.exists(direct):
-        return direct
-    raise ImportValidationError(f"Файл {file_id} не найден (загрузите заново)")
+    # Строгая валидация: только канонический <hex32>, иначе 400.
+    # Закрывает path traversal (C1): '../../' и 'a.xlsx' отклоняются до join.
+    if not _FILE_ID_RE.fullmatch(file_id or ""):
+        raise ImportValidationError("Некорректный file_id (загрузите файл заново)")
+    base = Path(STAGING_DIR).resolve()
+    for ext in (".xlsx", ".xls"):
+        candidate = (base / f"{file_id}{ext}").resolve()
+        # Пояс от судьбы: даже при корректном file_id проверяем containment.
+        try:
+            candidate.relative_to(base)
+        except ValueError:
+            raise ImportValidationError("Некорректный file_id (загрузите файл заново)")
+        if candidate.is_file():
+            return str(candidate)
+    raise ImportValidationError("Файл не найден (загрузите заново)")
 
 
 def _read_xlsx(path: str) -> tuple[str, list[str], list[dict[str, Any]]]:
@@ -548,6 +561,12 @@ def execute_import(
 
     P4-10-02: каждая строка выполняется в собственном savepoint
     (``session.begin_nested()``) — откат плохой строки не трогает хорошие.
+
+    H1: успешные строки фиксируются батчами (IMPORT_COMMIT_BATCH), а не одним
+    commit в конце — не держим открытую транзакцию/снапшот на весь файл.
+    При dry_run коммитов нет — в конце общий rollback.
+    Ошибки сверх MAX_ROW_ERRORS не отбрасываются молча: truncated=true,
+    errors_total считает все ошибки.
     """
     unknown = sorted(set(mapping.values()) - TARGET_FIELDS)
     if unknown:
@@ -570,9 +589,16 @@ def execute_import(
     summary: dict[str, Any] = {
         "total_rows": len(data), "inserted": 0, "updated": 0,
         "skipped": 0, "errors": [], "dry_run": dry_run,
+        "truncated": False, "errors_total": 0,
     }
+    errors_total = 0
+    truncated = False
+    processed_since_commit = 0
     try:
         for idx, row in enumerate(data, start=2):  # 1-based incl. header
+            if truncated:
+                summary["skipped"] += 1
+                continue
             if all(v is None or _cell_text(v) == "" for v in row.values()):
                 summary["skipped"] += 1
                 continue
@@ -580,13 +606,22 @@ def execute_import(
                 with session.begin_nested():
                     outcome = apply_row(session, _mapped(row, mapping), update_existing)
                 summary[outcome] += 1
+                processed_since_commit += 1
             except ImportValidationError as exc:
-                summary["errors"].append(
-                    {"row": idx, "field": exc.field, "code": exc.code,
-                     "message": str(exc)}
-                )
-                if len(summary["errors"]) >= 100:
-                    break
+                errors_total += 1
+                if len(summary["errors"]) < MAX_ROW_ERRORS:
+                    summary["errors"].append(
+                        {"row": idx, "field": exc.field, "code": exc.code,
+                         "message": str(exc)}
+                    )
+                else:
+                    truncated = True
+                continue
+            if not dry_run and processed_since_commit >= IMPORT_COMMIT_BATCH:
+                session.commit()
+                processed_since_commit = 0
+        summary["truncated"] = truncated
+        summary["errors_total"] = errors_total
         if dry_run:
             session.rollback()
         else:
@@ -617,6 +652,8 @@ def write_error_report(summary: dict[str, Any], dest: str) -> int:
     for key in ("total_rows", "inserted", "updated", "skipped", "dry_run"):
         ws_total.append([key, summary.get(key)])
     ws_total.append(["errors", len(summary.get("errors", []))])
+    ws_total.append(["errors_total", summary.get("errors_total", len(summary.get("errors", [])))])
+    ws_total.append(["truncated", summary.get("truncated", False)])
     for col in ("A", "B"):
         ws_total.column_dimensions[col].width = 18
 

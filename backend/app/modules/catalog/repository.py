@@ -12,12 +12,15 @@ import uuid
 
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import exists, func, inspect, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
+from app.core.policies import apply_university_scope
 from app.models.catalog import (
+    Contract,
     ITDirection,
     ITProduct,
     ITProgram,
+    License,
     Responsible,
     University,
     UniversityResponsible,
@@ -248,6 +251,75 @@ def list_university_candidates(
 
 def get_university(db: Session, university_id: uuid.UUID) -> University | None:
     return db.get(University, university_id)
+
+
+def get_university_scoped(db: Session, university_id: uuid.UUID, user) -> University | None:
+    """H5: single scoped SELECT — missing and out-of-scope both yield None,
+    so the router returns 404 without a second check query (no timing oracle
+    between existing/foreign ids and no unscoped row load)."""
+    return db.execute(
+        apply_university_scope(
+            select(University).where(University.id == university_id),
+            University.id,
+            user,
+        )
+    ).scalar_one_or_none()
+
+
+# M4: unified university delete policy. DB-level ON DELETE is mixed
+# (RESTRICT for licenses/contracts/teachers/students, CASCADE for workflow
+# instances/meetings/documents/notes/links/snapshots), so a bare Core DELETE
+# would silently wipe history while refusing on catalog rows. The service
+# therefore pre-checks EVERYTHING and refuses with 409 while any business
+# data references the university; the DB constraints stay as backstop.
+_DELETE_REFERENCE_CHECKS: tuple[tuple[str, object, object], ...] = ()
+
+
+def _delete_checks():
+    """(label, model, university_fk) pairs, resolved lazily (import cycle)."""
+    from app.models.interactions import (
+        Document,
+        InteractionNote,
+        Meeting,
+        Student,
+        UniversityProduct,
+        UniversityProgram,
+    )
+    from app.models.teachers import Teacher
+    from app.models.workflow_instances import WorkflowInstance
+
+    return (
+        ("licenses", License, License.university_id),
+        ("contracts", Contract, Contract.university_id),
+        ("teachers", Teacher, Teacher.university_id),
+        ("students", Student, Student.university_id),
+        ("workflow instances", WorkflowInstance, WorkflowInstance.university_id),
+        ("meetings", Meeting, Meeting.university_id),
+        ("documents", Document, Document.university_id),
+        ("interaction notes", InteractionNote, InteractionNote.university_id),
+        ("university programs", UniversityProgram, UniversityProgram.university_id),
+        ("university products", UniversityProduct, UniversityProduct.university_id),
+        (
+            "responsible links",
+            UniversityResponsible,
+            UniversityResponsible.university_id,
+        ),
+    )
+
+
+def university_delete_blockers(db: Session, university_id: uuid.UUID) -> list[str]:
+    """Labels of referencing data blocking a university hard-delete (M4)."""
+    global _DELETE_REFERENCE_CHECKS
+    if not _DELETE_REFERENCE_CHECKS:
+        _DELETE_REFERENCE_CHECKS = _delete_checks()
+    blockers = []
+    for label, model, column in _DELETE_REFERENCE_CHECKS:
+        present = db.execute(
+            select(exists().where(column == university_id))
+        ).scalar()
+        if present:
+            blockers.append(label)
+    return blockers
 
 
 def university_responsibles(db: Session, university_id: uuid.UUID) -> list[tuple]:
@@ -612,6 +684,83 @@ def delete_link(db: Session, link: UniversityResponsible) -> None:
     db.commit()
 
 
+# ------------------------------------------------------- catalog overview
+
+
+def count_overview(db: Session, user) -> tuple[int, int]:
+    """Scoped totals for the overview header (H4: both counts respect scope)."""
+    total_universities = db.execute(apply_university_scope(
+        select(func.count()).select_from(University), University.id, user
+    )).scalar() or 0
+    total_licenses = db.execute(apply_university_scope(
+        select(func.count()).select_from(License), License.university_id, user
+    )).scalar() or 0
+    return total_universities, total_licenses
+
+
+def page_overview_licenses(db: Session, user, *, limit: int, offset: int):
+    """Scoped license page with all display relations eager (H4).
+
+    Nested ``product.vendor`` and ``link.responsible`` are eager too — the
+    previous router-inline version lazy-loaded them per row (N+1).
+    """
+    from app.models.interactions import UniversityProgram
+
+    return (
+        db.execute(
+            apply_university_scope(select(License), License.university_id, user)
+            .options(
+                selectinload(License.university).selectinload(
+                    University.university_responsibles
+                ).selectinload(UniversityResponsible.responsible),
+                selectinload(License.university).selectinload(
+                    University.university_programs
+                ).selectinload(UniversityProgram.program).selectinload(
+                    ITProgram.direction
+                ),
+                selectinload(License.product).selectinload(ITProduct.vendor),
+                selectinload(License.contract),
+                selectinload(License.program).selectinload(ITProgram.direction),
+                selectinload(License.direction),
+            )
+            .order_by(License.expires_at)
+            .limit(limit)
+            .offset(offset)
+        )
+        .scalars()
+        .all()
+    )
+
+
+def direction_program_counts(db: Session, user) -> tuple[list, dict[str, int]]:
+    """Reference direction list + per-direction program counts (H4).
+
+    The direction list itself is global reference data (filter dropdowns need
+    it whole); the COUNTS are scoped to in-scope universities via a single
+    GROUP BY instead of loading every program row into Python.
+    """
+    from app.models.interactions import UniversityProgram
+
+    directions = (
+        db.execute(select(ITDirection).order_by(ITDirection.code)).scalars().all()
+    )
+    counts = dict(
+        db.execute(
+            apply_university_scope(
+                select(ITProgram.direction_id, func.count(ITProgram.id))
+                .select_from(ITProgram)
+                .join(
+                    UniversityProgram,
+                    UniversityProgram.program_id == ITProgram.id,
+                ),
+                UniversityProgram.university_id,
+                user,
+            ).group_by(ITProgram.direction_id)
+        ).all()
+    )
+    return list(directions), {str(k): v for k, v in counts.items()}
+
+
 __all__ = [
     "RESPONSIBLE_SORT",
     "DIRECTION_SORT",
@@ -620,8 +769,10 @@ __all__ = [
     "UNIVERSITY_SORT",
     "VENDOR_SORT",
     "add_and_flush",
+    "count_overview",
     "delete_by_id",
     "delete_link",
+    "direction_program_counts",
     "direction_programs",
     "get_direction",
     "get_link",
@@ -637,8 +788,10 @@ __all__ = [
     "list_responsibles",
     "list_universities",
     "list_vendors",
+    "page_overview_licenses",
     "responsible_universities",
     "save",
+    "university_delete_blockers",
     "university_responsibles",
     "vendor_products",
 ]

@@ -15,9 +15,13 @@ class Conflict(BusinessException):
 
 
 class BadTransition(BusinessException):
-    def __init__(self, detail: str = "Transition not allowed"):
-        text = detail.lower()
-        code = (ErrorCode.WORKFLOW_INSTANCE_NOT_ACTIVE if "active" in text
-                else ErrorCode.STAGE_ALREADY_COMPLETED if "already" in text or "closed" in text
-                else ErrorCode.WORKFLOW_INVALID_TRANSITION)
+    """Invalid workflow move. M3: the public code is an EXPLICIT argument —
+    never derived by substring-matching the human message (a reworded
+    message used to silently change the HTTP contract)."""
+
+    def __init__(
+        self,
+        detail: str = "Transition not allowed",
+        code: ErrorCode = ErrorCode.WORKFLOW_INVALID_TRANSITION,
+    ):
         super().__init__(code, details={}, message=detail)

@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.core.permissions import require_permission
 from app.core.security import CurrentUser
 from app.db.session import get_db
+from app.modules.audit.service import get_audit_db
 from app.modules.workflow_attachments import service
 from app.modules.workflow_attachments.policy import (
     UPLOAD_CHUNK_SIZE_BYTES,
@@ -48,7 +49,7 @@ def get_storage() -> StorageBackend:
 def upload_attachment(
     instance_id: uuid.UUID,
     file: UploadFile = File(...),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     storage: StorageBackend = Depends(get_storage),
     user: CurrentUser = Depends(WRITE),
 ) -> AttachmentRead:
@@ -138,13 +139,22 @@ def download_attachment(
         finally:
             opener.__exit__(None, None, None)
 
+    # L4: Content-Length comes from the verified stored object, never from
+    # the DB metadata (which can drift). Unknown size -> chunked, no header.
+    headers = {
+        "Content-Disposition": content_disposition(attachment.original_filename),
+    }
+    try:
+        verified_size = storage.size(attachment.storage_key)
+    except Exception:
+        verified_size = None
+    if verified_size is not None:
+        headers["Content-Length"] = str(verified_size)
+
     return StreamingResponse(
         _iter(),
         media_type=mime,
-        headers={
-            "Content-Length": str(attachment.file_size),
-            "Content-Disposition": content_disposition(attachment.original_filename),
-        },
+        headers=headers,
     )
 
 
@@ -156,7 +166,7 @@ def download_attachment(
 def delete_attachment(
     instance_id: uuid.UUID,
     attachment_id: uuid.UUID,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     storage: StorageBackend = Depends(get_storage),
     user: CurrentUser = Depends(WRITE),
 ):
