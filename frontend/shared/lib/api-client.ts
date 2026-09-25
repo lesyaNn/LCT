@@ -111,6 +111,36 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
   return result;
 }
 
+/** Authenticated binary GET; shared by all read-only file download domains. */
+export async function apiDownload(path: string, signal?: AbortSignal): Promise<ApiResult<Blob>> {
+  const keycloak = isKeycloakMode() ? await ensureKeycloak() : null;
+  if (!keycloak?.authenticated) return { ok: false, status: 401, error: 'AUTH_REQUIRED — войдите в систему' };
+  let token: string | null;
+  try { token = await refreshKeycloakToken(30); }
+  catch { await expireKeycloakSession(); return { ok: false, status: 401, error: 'Сессия истекла. Войдите снова.' }; }
+  if (!token) return { ok: false, status: 401, error: 'AUTH_REQUIRED — войдите в систему' };
+  const fetchBlob = async (accessToken: string): Promise<ApiResult<Blob>> => {
+    try {
+      const response = await fetch(`${apiBaseUrl()}${path}`, { headers: { Authorization: `Bearer ${accessToken}` }, signal });
+      if (!response.ok) {
+        const raw = await response.text().catch(() => '');
+        let body: unknown;
+        try { body = raw ? JSON.parse(raw) : undefined; } catch { body = undefined; }
+        return { ok: false, status: response.status, error: `HTTP ${response.status}`, body };
+      }
+      return { ok: true, status: response.status, data: await response.blob() };
+    } catch (error) {
+      return { ok: false, status: 0, error: error instanceof DOMException && error.name === 'AbortError' ? 'Запрос отменён' : `Backend недоступен: ${String(error)}` };
+    }
+  };
+  let result = await fetchBlob(token);
+  if (result.status === 401) {
+    try { const fresh = await refreshKeycloakToken(-1); if (fresh) result = await fetchBlob(fresh); } catch { /* expiry below */ }
+    if (result.status === 401) await expireKeycloakSession();
+  }
+  return result;
+}
+
 /**
  * Multipart transport for uploads that need real browser upload progress.
  * XMLHttpRequest stays in the shared data layer; callers only provide a

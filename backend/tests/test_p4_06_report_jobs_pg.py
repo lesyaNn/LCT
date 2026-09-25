@@ -682,8 +682,8 @@ def test_migration_chain_latest_is_report_jobs():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     versions = [v for v, _, _ in module._discover()]
-    assert versions[-1] == "000023_audit_outbox"
-    assert len(versions) == 23
+    assert versions[-1] == "000024_workflow_program_read"
+    assert len(versions) == 24
     assert "report_jobs" in module.EXPECTED_TABLES
     assert module.EXPECTED_TABLES[-1] == "audit_outbox"
 

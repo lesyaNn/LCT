@@ -2,7 +2,7 @@ import type { AuthUser } from '@/shared/types/user';
 import { hasPermission } from './access-control';
 import { apiUploadFormData } from './api-client';
 import { ApiRequestError, ERROR_MESSAGES } from './api-errors';
-import { isMockDataSource, waitForMockDelay } from './data-source';
+import { isMockDataSourceFor, waitForMockDelay } from './data-source';
 import { isWorkflowApiInstanceId, workflowAttachmentDownloadUrl, type UniversityWorkflowAttachment } from './universities-repository';
 
 export type WorkflowAttachmentCategory = 'pdf' | 'image' | 'archive' | 'document' | 'spreadsheet' | 'other';
@@ -114,8 +114,9 @@ export class WorkflowAttachmentUploadError extends ApiRequestError {
 }
 
 export async function uploadWorkflowAttachment(instanceId: string, file: File, options: { signal: AbortSignal; onProgress: (progress: number) => void }): Promise<WorkflowAttachmentApiRecord> {
+  if (!isMockDataSourceFor('workflow')) throw new WorkflowAttachmentUploadError(0, undefined, 'Загрузка будет подключена на этапе 6.');
   if (!isWorkflowApiInstanceId(instanceId)) throw new WorkflowAttachmentUploadError(0, undefined, 'Загрузка недоступна для этого Workflow.');
-  if (isMockDataSource) {
+  if (isMockDataSourceFor('workflow')) {
     options.onProgress(15);
     await waitForMockDelay(options.signal);
     options.onProgress(100);

@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class InstanceCreate(BaseModel):
     university_id: uuid.UUID
     template_id: uuid.UUID
+    program_id: uuid.UUID | None = None
     responsible_id: uuid.UUID | None = Field(default=None)
 
 
@@ -35,6 +36,8 @@ class InstanceStageRead(BaseModel):
     days_overdue: int = 0
     created_at: datetime
     updated_at: datetime
+    tasks_total: int = 0
+    tasks_completed: int = 0
 
 
 class InstanceRead(BaseModel):
@@ -43,6 +46,7 @@ class InstanceRead(BaseModel):
     id: uuid.UUID
     university_id: uuid.UUID
     template_id: uuid.UUID
+    program_id: uuid.UUID | None = None
     current_stage_id: uuid.UUID | None
     current_instance_stage_id: uuid.UUID | None
     responsible_id: uuid.UUID | None
@@ -57,3 +61,29 @@ class InstanceRead(BaseModel):
 
 class InstanceDetail(InstanceRead):
     stages: list[InstanceStageRead] = Field(default_factory=list)
+    university_name: str | None = None
+    university_city: str | None = None
+    program_name: str | None = None
+
+
+class WorkflowTaskRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    instance_id: uuid.UUID
+    stage_id: uuid.UUID | None
+    title: str
+    description: str
+    responsible_id: uuid.UUID | None
+    deadline: date | None
+    status: str
+    priority: str
+    completed_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AllowedTransitionRead(BaseModel):
+    id: uuid.UUID
+    order_index: int
+    name: str

@@ -1,10 +1,12 @@
-import { isMockDataSource } from './data-source';
+import { isMockDataSource, isMockDataSourceFor } from './data-source';
 import { queryKeys } from './query-keys';
 import { getUniversityExternalData } from './external-integrations-repository';
 import {
   getUniversities,
   getUniversityPassport,
   getUniversityWorkflow,
+  getApiUniversityWorkflow,
+  listWorkflowInstancePage,
   type UniversityResponsible,
   type UniversityWorkflow,
   type UniversityWorkflowStage,
@@ -78,6 +80,26 @@ async function universityInstances(university: UniversityListItem): Promise<Work
 
 /** Aggregate only instance IDs actually exposed by existing university/passport and website APIs. */
 export async function getWorkflowOverview(): Promise<WorkflowOverview> {
+  if (!isMockDataSourceFor('workflow')) {
+    const page = await listWorkflowInstancePage(1, 100);
+    const items = page.items.flatMap((record) => {
+      const workflow = getApiUniversityWorkflow(record);
+      const stage = workflow.currentStage ?? workflow.stages.at(-1);
+      return stage ? [{
+        instanceId: record.id,
+        universityId: record.university_id,
+        universityName: record.university_name ?? record.university_id,
+        programName: record.program_name ?? null,
+        programKey: record.program_id ?? null,
+        responsible: null,
+        workflow,
+        stage,
+        stageKey: workflowStageKey(workflow, stage),
+        status: stage.status === 'overdue' ? 'overdue' as const : record.status === 'completed' ? 'completed' as const : 'in_progress' as const,
+      }] : [];
+    });
+    return { items, unavailableUniversities: 0, limited: page.total > page.items.length };
+  }
   const page = await getUniversities({ filters: emptyFilters, sort: 'name', order: 'asc', page: 1, pageSize: 100 });
   const results = await Promise.allSettled(page.items.map(universityInstances));
   return {

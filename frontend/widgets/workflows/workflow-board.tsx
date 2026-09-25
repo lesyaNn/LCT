@@ -5,6 +5,7 @@ import { DndContext, DragOverlay, KeyboardSensor, MouseSensor, TouchSensor, useD
 import DragVerticalDots from '@atomaro/icons/24/editor/DragVerticalDots';
 import { useAuth } from '@/shared/auth/AuthProvider';
 import { getAvailableWorkflowTransitionTargets } from '@/shared/lib/workflow-transition';
+import { isRealWorkflowMode } from '@/shared/lib/universities-repository';
 import { workflowStageKey, type WorkflowOverviewItem } from '@/shared/lib/workflow-overview-repository';
 import { Toast } from '@/shared/ui/rtk/toast';
 import { WorkflowTransitionModal, type WorkflowTransitionNotification } from '@/widgets/universities/workflow-transition-modal';
@@ -43,7 +44,7 @@ function WorkflowBoardColumn({ column, valid, active }: { column: Column; valid:
 
 export function WorkflowBoard({ items }: { items: WorkflowOverviewItem[] }) {
   const { user } = useAuth();
-  const canManage = user?.role === 'admin' || user?.role === 'manager';
+  const canManage = !isRealWorkflowMode() && (user?.role === 'admin' || user?.role === 'manager');
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingDrop | null>(null);
   const [notification, setNotification] = useState<WorkflowTransitionNotification | null>(null);

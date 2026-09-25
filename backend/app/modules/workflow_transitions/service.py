@@ -89,6 +89,18 @@ def _current_stage(
     raise Conflict("Workflow instance has no current stage")
 
 
+def allowed_transition_targets(instance: WorkflowInstance, stages: list[InstanceStage]) -> list[InstanceStage]:
+    """Read projection of the same forward/required-stage policy as POST."""
+    if instance.status != "active" or instance.current_instance_stage_id is None:
+        return []
+    current = _current_stage(instance, stages)
+    return [target for target in stages
+            if target.order_index > current.order_index
+            and target.status not in CLOSED_STAGE_STATUSES
+            and not any(row.is_required for row in stages
+                        if current.order_index < row.order_index < target.order_index)]
+
+
 def validate_transition(
     instance: WorkflowInstance,
     stages: list[InstanceStage],

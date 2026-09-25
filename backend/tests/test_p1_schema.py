@@ -523,7 +523,7 @@ def test_seed_idempotent(engine):
 
 
 def test_sql_migration_single_head_chain():
-    """SQL files are the single schema source: 000001..000023, paired up/down."""
+    """SQL files are the single schema source: 000001..000024, paired up/down."""
     import re as _re
 
     versions = os.path.join(
@@ -535,8 +535,8 @@ def test_sql_migration_single_head_chain():
         assert m, f"bad migration filename: {fname}"
         (ups if m.group(2) == "up" else downs).add(m.group(1))
     assert ups == downs, f"unpaired migrations: up^down={ups ^ downs}"
-    assert sorted(ups)[-1] == "000023_audit_outbox"
-    assert len(ups) == 23
+    assert sorted(ups)[-1] == "000024_workflow_program_read"
+    assert len(ups) == 24
 
 
 @pytest.mark.skipif(

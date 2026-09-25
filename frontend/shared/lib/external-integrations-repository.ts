@@ -1,5 +1,5 @@
 import { normalizeApiError } from './api-errors';
-import { fromDataSource } from './data-source';
+import { fromDataSource, isMockDataSourceFor } from './data-source';
 import { queryKeys } from './query-keys';
 import {
   mockCreateWorkflowFromExternal,
@@ -82,6 +82,7 @@ export async function getUniversityExternalData(
 export async function createWorkflowFromExternal(
   input: CreateWorkflowFromExternalInput,
 ): Promise<CreateWorkflowFromExternalResult> {
+  if (!isMockDataSourceFor('workflow')) throw new Error('Создание Workflow будет подключено на этапе 6.');
   return fromDataSource({
     mock: () => mockCreateWorkflowFromExternal(input),
     real: () => realCreateWorkflowFromExternal(input),

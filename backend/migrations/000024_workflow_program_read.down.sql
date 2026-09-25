@@ -1,0 +1,4 @@
+DROP INDEX ix_workflow_instances_program_id;
+DROP INDEX uq_workflow_instances_university_program;
+ALTER TABLE workflow_instances DROP CONSTRAINT fk_workflow_instances_program_id_it_programs;
+ALTER TABLE workflow_instances DROP COLUMN program_id;

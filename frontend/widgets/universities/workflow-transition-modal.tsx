@@ -9,7 +9,7 @@ import ArrowRight from '@atomaro/icons/24/navigation/ArrowRight';
 import TimeStroke from '@atomaro/icons/24/alert/TimeStroke';
 import { applyServerErrorsToForm, normalizeApiError } from '@/shared/lib/api-errors';
 import { applyOptimisticWorkflowTransition, getAvailableWorkflowTransitionTargets, getLocalTodayIso, isWorkflowTransitionDraft, workflowTransitionDraftKey, type WorkflowTransitionTarget } from '@/shared/lib/workflow-transition';
-import { isMockDataSource } from '@/shared/lib/data-source';
+import { isMockDataSourceFor } from '@/shared/lib/data-source';
 import { invalidateWorkflowRelatedQueries } from '@/shared/lib/workflow-cache';
 import { isWorkflowApiInstanceId, transitionWorkflowInstance, workflowQueryKey, type UniversityWorkflow, type UniversityWorkflowStage, type WorkflowInstanceApiRecord } from '@/shared/lib/universities-repository';
 import { Button } from '@/shared/ui/rtk/button';
@@ -51,7 +51,7 @@ export function WorkflowTransitionModal({ open, instanceId, universityId, curren
   const defaultTargetId = targets.find((target) => target.id === initialTargetStageId)?.id ?? targets[0]?.id ?? '';
   const targetKey = targets.map((target) => target.id).join('|');
   const targetIds = useMemo(() => new Set(targets.map((target) => target.id)), [targets]);
-  const apiAvailable = isMockDataSource || (isWorkflowApiInstanceId(instanceId) && targets.every((target) => isWorkflowApiInstanceId(target.id)));
+  const apiAvailable = isMockDataSourceFor('workflow') && (isWorkflowApiInstanceId(instanceId) && targets.every((target) => isWorkflowApiInstanceId(target.id)));
   const today = getLocalTodayIso();
   const schema = useMemo(() => createTransitionSchema(today, targets), [targets, today]);
   const storageKey = workflowTransitionDraftKey(instanceId, currentStage.id, userId);

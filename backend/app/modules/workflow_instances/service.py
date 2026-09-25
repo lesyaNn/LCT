@@ -26,16 +26,18 @@ from __future__ import annotations
 import uuid
 from datetime import date, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.exceptions import NotFound
-from app.core.policies import ensure_university_access
-from app.models.catalog import Responsible, University
+from app.core.policies import apply_university_scope, ensure_university_access
+from app.models.catalog import ITProgram, Responsible, University
+from app.models.interactions import UniversityProgram
 from app.models.workflow_instances import (
     InstanceStage,
     WorkflowInstance,
     WorkflowStageTransition,
+    WorkflowTask,
 )
 from app.models.workflow_templates import WorkflowStage, WorkflowTemplate
 
@@ -80,7 +82,7 @@ def stage_due_dates(
     return out
 
 
-def _stage_to_read(row: InstanceStage, today: date) -> InstanceStageRead:
+def _stage_to_read(row: InstanceStage, today: date, counts: tuple[int, int] = (0, 0)) -> InstanceStageRead:
     overdue, days = compute_overdue(row.due_date, row.completed_at, today)
     return InstanceStageRead(
         id=row.id,
@@ -96,6 +98,8 @@ def _stage_to_read(row: InstanceStage, today: date) -> InstanceStageRead:
         days_overdue=days,
         created_at=row.created_at,
         updated_at=row.updated_at,
+        tasks_total=counts[0],
+        tasks_completed=counts[1],
     )
 
 
@@ -104,23 +108,36 @@ def get_instance_detail(
 ) -> InstanceDetail:
     """Instance + runtime stages in stable order (no N+1 via selectinload)."""
     day = today if today is not None else today_utc()
-    instance = (
-        db.execute(
-            select(WorkflowInstance)
-            .options(selectinload(WorkflowInstance.instance_stages))
-            .where(WorkflowInstance.id == instance_id)
+    result = db.execute(
+        select(WorkflowInstance, University.name, University.city, ITProgram.name)
+        .join(University, University.id == WorkflowInstance.university_id)
+        .outerjoin(ITProgram, ITProgram.id == WorkflowInstance.program_id)
+        .options(
+            selectinload(WorkflowInstance.instance_stages),
+            selectinload(WorkflowInstance.tasks),
         )
-        .scalars()
-        .first()
-    )
-    if instance is None:
+        .where(WorkflowInstance.id == instance_id)
+    ).first()
+    if result is None:
         raise NotFound("Workflow instance not found")
+    instance, university_name, university_city, program_name = result
+    return _to_detail(instance, university_name, university_city, program_name, day)
+
+
+def _to_detail(instance: WorkflowInstance, university_name: str,
+               university_city: str | None, program_name: str | None,
+               day: date) -> InstanceDetail:
     rows = sorted(instance.instance_stages, key=lambda r: r.order_index)
+    task_counts: dict[uuid.UUID | None, tuple[int, int]] = {}
+    for task in instance.tasks:
+        total, completed = task_counts.get(task.stage_id, (0, 0))
+        task_counts[task.stage_id] = (total + 1, completed + (task.status == "done"))
     overdue, days = compute_overdue(instance.due_date, instance.completed_at, day)
     return InstanceDetail(
         id=instance.id,
         university_id=instance.university_id,
         template_id=instance.template_id,
+        program_id=instance.program_id,
         current_stage_id=instance.current_stage_id,
         current_instance_stage_id=instance.current_instance_stage_id,
         responsible_id=instance.responsible_id,
@@ -131,8 +148,54 @@ def get_instance_detail(
         days_overdue=days,
         created_at=instance.created_at,
         updated_at=instance.updated_at,
-        stages=[_stage_to_read(r, day) for r in rows],
+        stages=[_stage_to_read(r, day, task_counts.get(r.template_stage_id, (0, 0))) for r in rows],
+        university_name=university_name,
+        university_city=university_city,
+        program_name=program_name,
     )
+
+
+def get_instance_by_program(db: Session, university_id: uuid.UUID, program_id: uuid.UUID) -> InstanceDetail | None:
+    """A missing binding is a valid empty state; never infer it by name/template."""
+    instance_id = db.scalar(select(WorkflowInstance.id).where(
+        WorkflowInstance.university_id == university_id,
+        WorkflowInstance.program_id == program_id,
+    ))
+    return get_instance_detail(db, instance_id) if instance_id else None
+
+
+def list_instance_page(db: Session, user, page: int, page_size: int, university_id: uuid.UUID | None = None):
+    stmt = select(WorkflowInstance.id)
+    if university_id is not None:
+        stmt = stmt.where(WorkflowInstance.university_id == university_id)
+    stmt = apply_university_scope(stmt, WorkflowInstance.university_id, user)
+    total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    ids = db.scalars(stmt.order_by(WorkflowInstance.created_at.desc(), WorkflowInstance.id)
+                     .offset((page - 1) * page_size).limit(page_size)).all()
+    if not ids:
+        return [], total
+    rows = db.execute(
+        select(WorkflowInstance, University.name, University.city, ITProgram.name)
+        .join(University, University.id == WorkflowInstance.university_id)
+        .outerjoin(ITProgram, ITProgram.id == WorkflowInstance.program_id)
+        .options(
+            selectinload(WorkflowInstance.instance_stages),
+            selectinload(WorkflowInstance.tasks),
+        )
+        .where(WorkflowInstance.id.in_(ids))
+    ).all()
+    day = today_utc()
+    details = {instance.id: _to_detail(instance, name, city, program_name, day)
+               for instance, name, city, program_name in rows}
+    return [details[instance_id] for instance_id in ids], total
+
+
+def list_task_page(db: Session, instance_id: uuid.UUID, page: int, page_size: int):
+    stmt = select(WorkflowTask).where(WorkflowTask.instance_id == instance_id)
+    total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    rows = db.scalars(stmt.order_by(WorkflowTask.created_at.asc(), WorkflowTask.id)
+                      .offset((page - 1) * page_size).limit(page_size)).all()
+    return rows, total
 
 
 def create_instance(
@@ -140,6 +203,7 @@ def create_instance(
     *,
     university_id: uuid.UUID,
     template_id: uuid.UUID,
+    program_id: uuid.UUID | None = None,
     responsible_id: uuid.UUID | None = None,
     actor_sub: str = "",
     today: date | None = None,
@@ -148,6 +212,13 @@ def create_instance(
     university = db.get(University, university_id)
     if university is None:
         raise NotFound("University not found")
+    if program_id is not None and db.scalar(
+        select(UniversityProgram.id).where(
+            UniversityProgram.university_id == university_id,
+            UniversityProgram.program_id == program_id,
+        )
+    ) is None:
+        raise NotFound("Program is not linked to university")
     template = db.get(WorkflowTemplate, template_id)
     if template is None:
         raise NotFound("Workflow template not found")
@@ -172,6 +243,7 @@ def create_instance(
 
     instance = WorkflowInstance(
         university_id=university.id,
+        program_id=program_id,
         template_id=template.id,
         responsible_id=responsible_id,
         status="active",

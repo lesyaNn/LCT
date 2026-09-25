@@ -1,7 +1,7 @@
 import { getHealthStatus, type HealthStatus } from './health-score';
 import { programStatusLabels, type ProgramStatus } from './dashboard-repository';
 import { getExpirationStatus, type ExpirationStatus } from './formatters';
-import { apiFetch } from './api-client';
+import { apiDownload, apiFetch } from './api-client';
 import { ApiRequestError } from './api-errors';
 import { fromDataSource, isMockDataSource, isMockDataSourceFor } from './data-source';
 import { queryKeys } from './query-keys';
@@ -441,6 +441,7 @@ export interface UniversityWorkflowTransition {
   fromStatus: UniversityWorkflowStageStatus;
   toStatus: UniversityWorkflowStageStatus;
   comment: string;
+  description?: string;
 }
 
 export interface UniversityWorkflowStage {
@@ -458,6 +459,8 @@ export interface UniversityWorkflowStage {
   comments: UniversityWorkflowComment[];
   attachments: UniversityWorkflowAttachment[];
   tasks: UniversityWorkflowTask[];
+  taskTotal?: number;
+  taskCompleted?: number;
   transitions: UniversityWorkflowTransition[];
 }
 
@@ -476,6 +479,8 @@ export interface UniversityWorkflow {
 export const workflowQueryKey = queryKeys.universities.workflow;
 export const universityWorkflowQueryKey = workflowQueryKey;
 export const workflowCommentsQueryKey = queryKeys.universities.workflowComments;
+export const workflowByProgramQueryKey = queryKeys.universities.workflowByProgram;
+export const workflowProgramsQueryKey = queryKeys.universities.workflowPrograms;
 export const universityPassportQueryKey = queryKeys.universities.passport;
 
 export class WorkflowApiError extends ApiRequestError {
@@ -499,8 +504,12 @@ export interface WorkflowCommentApiRecord {
 }
 
 export function isWorkflowApiInstanceId(instanceId: string): boolean {
-  return isMockDataSource || /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(instanceId);
+  return isMockDataSourceFor('workflow') || /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(instanceId);
 }
+
+export const isRealWorkflowMode = () => !isMockDataSourceFor('workflow');
+
+export interface WorkflowPage<T> { items: T[]; page: number; page_size: number; total: number }
 
 function unwrapApiResult<T>(result: Awaited<ReturnType<typeof apiFetch<T>>>): T {
   if (result.ok) return result.data;
@@ -511,15 +520,22 @@ export async function listWorkflowComments(instanceId: string): Promise<Workflow
   if (!isWorkflowApiInstanceId(instanceId)) return [];
   return fromDataSource({
     mock: () => mockListWorkflowComments(instanceId),
-    real: async () => unwrapApiResult(await apiFetch<WorkflowCommentApiRecord[]>(`/api/v1/workflow/instances/${instanceId}/comments`)),
+    real: async () => (await listWorkflowCommentsPage(instanceId, 1)).items,
+    domain: 'workflow',
   });
 }
 
+export async function listWorkflowCommentsPage(instanceId: string, page: number): Promise<WorkflowPage<WorkflowCommentApiRecord>> {
+  return unwrapApiResult(await apiFetch<WorkflowPage<WorkflowCommentApiRecord>>(`/api/v1/workflow/instances/${instanceId}/comments?page=${page}&page_size=100`));
+}
+
 export async function createWorkflowComment(instanceId: string, content: string, stageId?: string): Promise<WorkflowCommentApiRecord> {
+  if (isRealWorkflowMode()) throw new WorkflowApiError(0, 'Комментарии будут доступны для изменения на этапе 6.');
   if (!isWorkflowApiInstanceId(instanceId)) throw new Error('Добавление комментариев недоступно для этого Workflow-источника.');
   return fromDataSource({
     mock: () => mockCreateWorkflowComment(instanceId, content, stageId),
-    real: async () => unwrapApiResult(await apiFetch<WorkflowCommentApiRecord>(`/api/v1/workflow/instances/${instanceId}/comments`, { method: 'POST', body: { content, stage_id: stageId ?? null } })),
+    real: async () => { throw new WorkflowApiError(0, 'Комментарии будут доступны для изменения на этапе 6.'); },
+    domain: 'workflow',
   });
 }
 
@@ -535,12 +551,18 @@ export interface WorkflowInstanceApiStage {
   completed_at: string | null;
   is_overdue: boolean;
   days_overdue: number;
+  tasks_total?: number;
+  tasks_completed?: number;
 }
 
 export interface WorkflowInstanceApiRecord {
   id: string;
   university_id: string;
   template_id: string;
+  program_id?: string | null;
+  university_name?: string | null;
+  university_city?: string | null;
+  program_name?: string | null;
   current_stage_id: string | null;
   current_instance_stage_id: string | null;
   responsible_id: string | null;
@@ -557,34 +579,77 @@ export async function getWorkflowInstance(instanceId: string): Promise<WorkflowI
   return fromDataSource({
     mock: () => mockGetWorkflowInstance(instanceId),
     real: async () => unwrapApiResult(await apiFetch<WorkflowInstanceApiRecord>(`/api/v1/workflow/instances/${instanceId}`)),
+    domain: 'workflow',
   });
 }
 
+export async function getWorkflowByProgram(universityId: string, programId: string): Promise<WorkflowInstanceApiRecord | null> {
+  return fromDataSource({
+    domain: 'workflow',
+    mock: () => null,
+    real: async () => unwrapApiResult(await apiFetch<WorkflowInstanceApiRecord | null>(`/api/v1/workflow/instances/by-program/${encodeURIComponent(programId)}?university_id=${encodeURIComponent(universityId)}`)),
+  });
+}
+
+export async function listWorkflowInstancePage(page: number, pageSize = 100): Promise<WorkflowPage<WorkflowInstanceApiRecord>> {
+  return unwrapApiResult(await apiFetch<WorkflowPage<WorkflowInstanceApiRecord>>(`/api/v1/workflow/instances?page=${page}&page_size=${pageSize}`));
+}
+
+export interface WorkflowTaskApiRecord { id: string; instance_id: string; stage_id: string | null; title: string; status: string; responsible_id: string | null; deadline: string | null; completed_at: string | null }
+export interface WorkflowAttachmentApiRecord { id: string; instance_id: string; stage_id: string | null; original_filename: string; mime_type: string; file_size: number; uploaded_by_keycloak_sub: string; created_at: string; updated_at: string }
+export interface WorkflowTransitionApiRecord { id: string; instance_id: string; from_stage_id: string | null; to_stage_id: string | null; actor_keycloak_sub: string; comment: string; created_at: string }
+export interface WorkflowAllowedApiRecord { id: string; name: string; order_index: number }
+
+export async function listWorkflowTasksPage(instanceId: string, page: number): Promise<WorkflowPage<WorkflowTaskApiRecord>> {
+  return unwrapApiResult(await apiFetch<WorkflowPage<WorkflowTaskApiRecord>>(`/api/v1/workflow/instances/${instanceId}/tasks?page=${page}&page_size=100`));
+}
+export async function listWorkflowAttachmentsPage(instanceId: string, page: number): Promise<WorkflowPage<WorkflowAttachmentApiRecord>> {
+  return unwrapApiResult(await apiFetch<WorkflowPage<WorkflowAttachmentApiRecord>>(`/api/v1/workflow/instances/${instanceId}/attachments?page=${page}&page_size=100`));
+}
+export async function listWorkflowHistory(instanceId: string): Promise<WorkflowTransitionApiRecord[]> {
+  return unwrapApiResult(await apiFetch<WorkflowTransitionApiRecord[]>(`/api/v1/workflow/instances/${instanceId}/transitions`));
+}
+export async function getWorkflowAllowedTransitions(instanceId: string): Promise<WorkflowAllowedApiRecord[]> {
+  return unwrapApiResult(await apiFetch<WorkflowAllowedApiRecord[]>(`/api/v1/workflow/instances/${instanceId}/allowed-transitions`));
+}
+
 export async function transitionWorkflowInstance(instanceId: string, targetInstanceStageId: string, comment: string, dueDate?: string): Promise<WorkflowInstanceApiRecord> {
+  void dueDate;
+  if (isRealWorkflowMode()) throw new WorkflowApiError(0, 'Переход будет подключён на этапе 6.');
   if (!isMockDataSource && !isWorkflowApiInstanceId(instanceId)) throw new WorkflowApiError(0, 'Переход недоступен для этого Workflow-источника.');
   return fromDataSource({
     mock: () => mockTransitionWorkflow(instanceId, targetInstanceStageId, comment),
-    real: async () => unwrapApiResult(await apiFetch<WorkflowInstanceApiRecord>(`/api/v1/workflow/instances/${instanceId}/transition`, { method: 'POST', body: { target_instance_stage_id: targetInstanceStageId, comment, ...(dueDate ? { due_date: dueDate } : {}) } })),
+    real: async () => { throw new WorkflowApiError(0, 'Переход будет подключён на этапе 6.'); },
+    domain: 'workflow',
   });
 }
 
 export async function editWorkflowComment(commentId: string, content: string): Promise<WorkflowCommentApiRecord> {
+  if (isRealWorkflowMode()) throw new WorkflowApiError(0, 'Редактирование будет подключено на этапе 6.');
   return fromDataSource({
     mock: () => mockEditWorkflowComment(commentId, content),
-    real: async () => unwrapApiResult(await apiFetch<WorkflowCommentApiRecord>(`/api/v1/workflow/comments/${commentId}`, { method: 'PATCH', body: { content } })),
+    real: async () => { throw new WorkflowApiError(0, 'Редактирование будет подключено на этапе 6.'); },
+    domain: 'workflow',
   });
 }
 
 export function workflowAttachmentDownloadUrl(instanceId: string, attachmentId: string): string | null {
-  if (isMockDataSource) return `data:text/plain;charset=utf-8,Mock%20attachment%20${encodeURIComponent(attachmentId)}`;
-  return isWorkflowApiInstanceId(instanceId) ? `/api/v1/workflow/instances/${instanceId}/attachments/${attachmentId}/download` : null;
+  return isMockDataSourceFor('workflow') ? `data:text/plain;charset=utf-8,Mock%20attachment%20${encodeURIComponent(attachmentId)}` : null;
+}
+
+export async function downloadWorkflowAttachment(instanceId: string, attachmentId: string): Promise<Blob> {
+  if (!isWorkflowApiInstanceId(instanceId)) throw new WorkflowApiError(0, 'Некорректный идентификатор Workflow.');
+  return unwrapApiResult(await apiDownload(`/api/v1/workflow/instances/${instanceId}/attachments/${attachmentId}/download`));
 }
 
 export async function deleteWorkflowAttachment(instanceId: string, attachmentId: string): Promise<void> {
+  void attachmentId;
+  if (isRealWorkflowMode()) throw new WorkflowApiError(0, 'Удаление будет подключено на этапе 6.');
   if (!isWorkflowApiInstanceId(instanceId)) throw new Error('Удаление вложений недоступно для этого Workflow-источника.');
   await fromDataSource({
     mock: () => undefined,
-    real: async () => unwrapApiResult(await apiFetch<undefined>(`/api/v1/workflow/instances/${instanceId}/attachments/${attachmentId}`, { method: 'DELETE' })),
+    real: async () => { throw new WorkflowApiError(0, 'Удаление будет подключено на этапе 6.'); },
+    domain: 'workflow',
   });
 }
 
@@ -717,19 +782,18 @@ async function getMockUniversityWorkflow(id: string): Promise<UniversityWorkflow
 
 export async function getUniversityWorkflow(id: string): Promise<UniversityWorkflow> {
   return fromDataSource({
+    domain: 'workflow',
     mock: () => getMockUniversityWorkflow(id),
     real: async () => getApiUniversityWorkflow(await getWorkflowInstance(id)),
   });
 }
 
-function getApiUniversityWorkflow(instance: WorkflowInstanceApiRecord): UniversityWorkflow {
+export function getApiUniversityWorkflow(instance: WorkflowInstanceApiRecord): UniversityWorkflow {
   const stages = instance.stages.map((stage): UniversityWorkflowStage => {
     const isCurrent = stage.id === instance.current_instance_stage_id;
-    const status: UniversityWorkflowStageStatus = isCurrent
-      ? 'current'
-      : stage.status === 'completed' || stage.status === 'skipped'
-        ? stage.status
-        : stage.is_overdue ? 'overdue' : 'pending';
+    const status: UniversityWorkflowStageStatus = stage.status === 'completed' || stage.status === 'skipped'
+      ? stage.status
+      : stage.is_overdue ? 'overdue' : isCurrent ? 'current' : 'pending';
     return {
       id: stage.id,
       templateStageId: stage.template_stage_id,
@@ -745,16 +809,18 @@ function getApiUniversityWorkflow(instance: WorkflowInstanceApiRecord): Universi
       comments: [],
       attachments: [],
       tasks: [],
+      taskTotal: stage.tasks_total ?? 0,
+      taskCompleted: stage.tasks_completed ?? 0,
       transitions: [],
     };
   });
-  const currentStage = stages.find((stage) => stage.status === 'current') ?? null;
+  const currentStage = stages.find((stage) => stage.id === instance.current_instance_stage_id) ?? null;
   return {
     templateId: instance.template_id,
     universityId: instance.university_id,
-    universityName: 'Workflow',
-    universityCity: '',
-    workflowName: 'Workflow',
+    universityName: instance.university_name ?? 'Workflow',
+    universityCity: instance.university_city ?? '',
+    workflowName: instance.program_name ?? 'Workflow',
     currentStage,
     completedSteps: stages.filter((stage) => stage.status === 'completed' || stage.status === 'skipped').length,
     totalSteps: stages.length,
@@ -1119,6 +1185,17 @@ export async function getUniversityPrograms(id: string, page = 1, pageSize = 20,
     const items = await getMockUniversityPrograms(id);
     return { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: items.length };
   }, real: () => realGetUniversityPrograms(id, page, pageSize, signal) });
+}
+
+export async function getWorkflowSelectorPrograms(id: string, signal?: AbortSignal): Promise<UniversityProgramRow[]> {
+  const first = await getUniversityPrograms(id, 1, 100, signal);
+  const items = [...first.items];
+  for (let page = 2; items.length < first.total; page += 1) {
+    const next = await getUniversityPrograms(id, page, 100, signal);
+    if (!next.items.length) break;
+    items.push(...next.items);
+  }
+  return items;
 }
 
 /** Typed frontend adapter for the future university teachers endpoint. */

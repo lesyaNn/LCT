@@ -37,6 +37,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    text,
     UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -52,6 +53,8 @@ class WorkflowInstance(UUIDPKMixin, TimestampMixin, Base):
     __table_args__ = (
         Index("ix_workflow_instances_university_id", "university_id"),
         Index("ix_workflow_instances_template_id", "template_id"),
+        Index("ix_workflow_instances_program_id", "program_id"),
+        Index("uq_workflow_instances_university_program", "university_id", "program_id", unique=True, postgresql_where=text("program_id IS NOT NULL")),
         Index("ix_workflow_instances_current_stage_id", "current_stage_id"),
         Index("ix_workflow_instances_current_instance_stage_id", "current_instance_stage_id"),
         Index("ix_workflow_instances_status", "status"),
@@ -72,6 +75,11 @@ class WorkflowInstance(UUIDPKMixin, TimestampMixin, Base):
             ondelete="RESTRICT",
         ),
         nullable=False,
+    )
+    program_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("it_programs.id", name="fk_workflow_instances_program_id_it_programs", ondelete="RESTRICT"),
+        nullable=True,
+        default=None,
     )
     current_stage_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey(
