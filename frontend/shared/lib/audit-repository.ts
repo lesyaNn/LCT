@@ -105,14 +105,14 @@ export const auditRoleLabels: Record<string, string> = {
   user: 'Пользователь',
 };
 
-/** Current backend exposes only entity_type/entity_id and a plain array. */
+/** The server provides scoped filtering and paginated audit events. */
 export const CURRENT_AUDIT_API_CAPABILITIES: AuditApiCapabilities = {
-  dateRange: false,
-  users: false,
-  universities: false,
-  actions: false,
+  dateRange: true,
+  users: true,
+  universities: true,
+  actions: true,
   entityTypes: true,
-  pagination: false,
+  pagination: true,
 };
 
 export function getAuditActionMeta(action: string): { label: string; intent: SemanticIntent } {
@@ -132,9 +132,13 @@ export function getAuditRoleLabel(role?: string): string {
 
 export function formatAuditValue(value: AuditJsonValue | undefined, maxLength = 92): string {
   if (value === undefined || value === null) return '—';
-  const text = typeof value === 'string' ? value : JSON.stringify(value);
-  if (!text) return '—';
-  return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
+  if (isAuditJsonObject(value)) {
+    const fields = Object.keys(value);
+    const text = fields.length ? `Поля: ${fields.join(', ')}` : 'Изменена запись';
+    return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
+  }
+  if (Array.isArray(value)) return `Изменён список (${value.length})`;
+  return 'Значение изменено';
 }
 
 export function isAuditJsonObject(value: AuditJsonValue | undefined): value is { [key: string]: AuditJsonValue } {
@@ -186,7 +190,7 @@ function adaptAuditEvent(raw: unknown, index: number): AuditEvent {
   const action = stringValue(item.action) ?? 'UNKNOWN';
   return {
     id: stringValue(item.id) ?? `audit-${index}`,
-    occurredAt: stringValue(item.created_at ?? item.occurredAt ?? item.createdAt) ?? '',
+    occurredAt: stringValue(item.timestamp ?? item.created_at ?? item.occurredAt ?? item.createdAt) ?? '',
     user: {
       id: userId,
       name: stringValue(item.user_name ?? item.userName) ?? userId,
@@ -196,8 +200,8 @@ function adaptAuditEvent(raw: unknown, index: number): AuditEvent {
     action,
     entity: { id: entityId, type: entityType, label: `${getAuditEntityLabel(entityType)} · ${entityId}` },
     university: { id: universityId ?? '', name: stringValue(item.university_name ?? item.universityName) ?? universityId ?? '—' },
-    oldValues: parseJsonValue(item.before_data ?? item.beforeData ?? item.old_values ?? item.oldValues),
-    newValues: parseJsonValue(item.after_data ?? item.afterData ?? item.new_values ?? item.newValues),
+    oldValues: parseJsonValue(item.old_value ?? item.before_data ?? item.beforeData ?? item.old_values ?? item.oldValues),
+    newValues: parseJsonValue(item.new_value ?? item.after_data ?? item.afterData ?? item.new_values ?? item.newValues),
     requestId: stringValue(item.request_id ?? item.requestId),
     ip: stringValue(item.ip_address ?? item.ip),
     userAgent: stringValue(item.user_agent ?? item.userAgent),
@@ -206,10 +210,16 @@ function adaptAuditEvent(raw: unknown, index: number): AuditEvent {
 
 function queryPath(query: AuditListQuery): string {
   const params = new URLSearchParams();
-  // These are the only query parameters in the currently implemented backend contract.
-  if (query.filters.entityTypes.length === 1) params.set('entity_type', query.filters.entityTypes[0]);
+  if (query.filters.dateFrom) params.set('date_from', query.filters.dateFrom);
+  if (query.filters.dateTo) params.set('date_to', query.filters.dateTo);
+  for (const [key, values] of [
+    ['user_id', query.filters.userIds], ['university_id', query.filters.universityIds],
+    ['action', query.filters.actions], ['entity_type', query.filters.entityTypes],
+  ] as const) for (const value of values) params.append(key, value);
+  params.set('page', String(query.page));
+  params.set('page_size', String(query.pageSize));
   const queryString = params.toString();
-  return queryString ? `/api/v1/audit?${queryString}` : '/api/v1/audit';
+  return `/api/v1/audit/events?${queryString}`;
 }
 
 async function getRealAuditEvents(query: AuditListQuery): Promise<AuditListResult> {
@@ -219,20 +229,26 @@ async function getRealAuditEvents(query: AuditListQuery): Promise<AuditListResul
   const payload = result.data;
   const rows = Array.isArray(payload) ? payload : isRecord(payload) && Array.isArray(payload.items) ? payload.items : [];
   const items = rows.map(adaptAuditEvent);
-  // The discovered contract is a plain array capped at 200 rows. Do not infer
-  // pagination from a future-shaped payload until P5-05-03 is actually wired.
-  const page = 1;
-  const pageSize = query.pageSize;
-  const total = items.length;
+  const page = isRecord(payload) && typeof payload.page === 'number' ? payload.page : query.page;
+  const pageSize = isRecord(payload) && typeof payload.page_size === 'number' ? payload.page_size : query.pageSize;
+  const total = isRecord(payload) && typeof payload.total === 'number' ? payload.total : items.length;
 
   return {
     items,
     total,
     page,
     pageSize,
-    filterOptions: { users: [], universities: [], actions: Object.keys(auditActionMeta), entityTypes: Object.keys(auditEntityLabels) },
+    filterOptions: { users: [], universities: [], actions: [], entityTypes: [] },
     capabilities: CURRENT_AUDIT_API_CAPABILITIES,
   };
+}
+
+export async function getAuditFilterOptions(): Promise<AuditFilterOptions> {
+  const result = await apiFetch<unknown>('/api/v1/audit/filter-options');
+  if (!result.ok) throw new ApiRequestError(result.status, result.body, 'Не удалось загрузить фильтры аудита.', result.error);
+  const raw = isRecord(result.data) ? result.data : {};
+  const options = (value: unknown): Array<{ id: string; name: string }> => Array.isArray(value) ? value.flatMap((item) => isRecord(item) && stringValue(item.id) ? [{ id: stringValue(item.id)!, name: stringValue(item.name) ?? stringValue(item.id)! }] : []) : [];
+  return { users: options(raw.users), universities: options(raw.universities), actions: Array.isArray(raw.actions) ? raw.actions.filter((value): value is string => typeof value === 'string') : [], entityTypes: Array.isArray(raw.entity_types) ? raw.entity_types.filter((value): value is string => typeof value === 'string') : [] };
 }
 
 export async function getAuditEvents(query: AuditListQuery): Promise<AuditListResult> {

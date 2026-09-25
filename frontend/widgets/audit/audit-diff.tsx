@@ -1,13 +1,11 @@
 import type { AuditEvent, AuditJsonValue } from '@/shared/lib/audit-repository';
-import { isAuditJsonObject } from '@/shared/lib/audit-repository';
+import { formatAuditValue, isAuditJsonObject } from '@/shared/lib/audit-repository';
 import styles from './audit-diff.module.css';
 
 type AuditDiffSource = Pick<AuditEvent, 'oldValues' | 'newValues' | 'requestId' | 'ip' | 'userAgent'>;
 
-function valueAsJson(value: AuditJsonValue | undefined): string {
-  if (value === undefined) return '—';
-  if (typeof value === 'string') return value;
-  return JSON.stringify(value, null, 2);
+function safeValue(value: AuditJsonValue | undefined): string {
+  return value === undefined || value === null ? '—' : 'Изменено';
 }
 
 export function AuditDiff({ event }: { event: AuditDiffSource }) {
@@ -22,11 +20,11 @@ export function AuditDiff({ event }: { event: AuditDiffSource }) {
         <div className={styles.tableWrap}>
           <table>
             <thead><tr><th scope="col">Поле</th><th scope="col">Было</th><th scope="col">Стало</th></tr></thead>
-            <tbody>{keys.map((key) => <tr key={key}><th scope="row">{key}</th><td>{valueAsJson(oldObject?.[key])}</td><td>{valueAsJson(newObject?.[key])}</td></tr>)}</tbody>
+            <tbody>{keys.map((key) => <tr key={key}><th scope="row">{key}</th><td>{safeValue(oldObject?.[key])}</td><td>{safeValue(newObject?.[key])}</td></tr>)}</tbody>
           </table>
         </div>
       ) : hasValues ? (
-        <div className={styles.jsonGrid}><div><span>Было</span><pre>{valueAsJson(event.oldValues)}</pre></div><div><span>Стало</span><pre>{valueAsJson(event.newValues)}</pre></div></div>
+        <div className={styles.jsonGrid}><div><span>Было</span><p>{formatAuditValue(event.oldValues)}</p></div><div><span>Стало</span><p>{formatAuditValue(event.newValues)}</p></div></div>
       ) : <p className={styles.muted}>Данные до/после изменения не переданы.</p>}
       {event.requestId || event.ip || event.userAgent ? (
         <dl className={styles.technical}>
