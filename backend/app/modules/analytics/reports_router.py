@@ -34,17 +34,18 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from sqlalchemy import func, select
 
 from app.core.permissions import require_permission, user_permissions
 from app.core.security import CurrentUser
 from app.core.errors import BusinessException, SecurityError
 from app.schemas.errors import ErrorCode
 from app.modules.audit.service import get_audit_db
-from app.models.report_job import ReportJob
+from app.models.report_job import JOB_TYPE_REPORT, ReportJob
 from app.modules.analytics import report_jobs as jobs
 from app.modules.analytics.report_request import ReportRequest
 from app.modules.analytics.report_service import (
@@ -52,7 +53,7 @@ from app.modules.analytics.report_service import (
     ReportQueuedResponse,
     create_report_job,
 )
-from app.schemas.common import ErrorResponse, ReportFormat
+from app.schemas.common import ErrorResponse, PaginatedResponse, ReportFormat
 
 __all__ = ["ReportJobRead", "router"]
 
@@ -153,6 +154,30 @@ def create_report(
     except ValueError as exc:
         raise BusinessException(ErrorCode.VALIDATION_ERROR) from exc
     return queued
+
+
+@router.get(
+    "",
+    response_model=PaginatedResponse[ReportJobRead],
+    summary="Список задач отчётов",
+)
+def list_report_jobs(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(require_permission(REPORTS_READ_PERMISSION)),
+) -> PaginatedResponse[ReportJobRead]:
+    stmt = select(ReportJob).where(ReportJob.job_type == JOB_TYPE_REPORT)
+    if not _is_admin(user) and "manager" not in (user.roles or set()):
+        stmt = stmt.where(ReportJob.actor_sub == (user.id or ""))
+    total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    rows = db.scalars(
+        stmt.order_by(ReportJob.created_at.desc(), ReportJob.id.desc())
+        .limit(page_size).offset((page - 1) * page_size)
+    ).all()
+    return PaginatedResponse(
+        items=[_read_model(job) for job in rows], total=total, page=page, page_size=page_size
+    )
 
 
 @router.get(

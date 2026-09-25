@@ -52,6 +52,8 @@ class TeacherWarning(BaseModel):
 
 class OverdueItem(BaseModel):
     type: Literal["stage", "task"]
+    id: str | None = None
+    university_id: UUID | None = None
     university: str
     stage: str | None = None
     task: str | None = None
@@ -63,6 +65,12 @@ class TrendPoint(BaseModel):
     avg_score: float
 
 
+class LaunchPoint(BaseModel):
+    month: str
+    actual: int = 0
+    planned: int = 0
+
+
 class Overview(BaseModel):
     kpi: KPI
     health_distribution: list[HealthBucket]
@@ -72,6 +80,7 @@ class Overview(BaseModel):
     teacher_readiness: list[TeacherWarning]
     overdue_items: list[OverdueItem]
     health_trend: list[TrendPoint]
+    launch_dynamics: list[LaunchPoint] = Field(default_factory=list)
 
 
 class MatrixRow(BaseModel):

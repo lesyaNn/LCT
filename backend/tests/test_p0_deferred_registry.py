@@ -157,6 +157,7 @@ def test_mounted_routers_are_only_the_production_contract():
         "/api/v1/analytics",
         "/api/v1/reports",
         "/api/v1/audit/events",
+        "/api/v1/audit/filter-options",
     )
     paths = _mounted_api_paths()
     assert all(path.startswith(allowed) for path in paths), paths

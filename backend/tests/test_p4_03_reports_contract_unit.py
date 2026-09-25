@@ -278,6 +278,7 @@ def test_router_openapi_paths_and_unique_operation_ids():
         if isinstance(op, dict) and "operationId" in op
     }
     assert report_ops == {
+        "get /api/v1/reports",
         "post /api/v1/reports",
         "get /api/v1/reports/{job_id}",
         "get /api/v1/reports/{job_id}/download",

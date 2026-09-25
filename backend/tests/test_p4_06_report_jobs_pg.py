@@ -34,7 +34,7 @@ from sqlalchemy.orm import Session, sessionmaker
 import app.models  # noqa: F401 (register ReportJob metadata)
 from app.core.errors import register_error_handlers
 from app.core.security import CurrentUser, get_current_user
-from app.models.catalog import ITProduct, License, University, Vendor
+from app.models.catalog import Contract, ITProduct, License, Responsible, University, UniversityResponsible, Vendor
 from app.models.report_job import ReportJob
 from app.modules.analytics import report_jobs as jobs
 from app.modules.analytics.filters import UnifiedFilter
@@ -240,6 +240,40 @@ def test_xlsx_e2e_ready_download_valid_workbook(pg):
     assert data == [("Альфа", "ПО Репортёр")]  # filter + scope respected
 
 
+def test_xlsx_file_contains_linked_business_fields(pg):
+    eng, tmp = pg
+    ids = _ids(pg)
+    with _session(eng) as s:
+        license_row = s.scalar(select(License).where(License.university_id == ids["Альфа"]))
+        contract = Contract(id=uuid4(), university_id=ids["Альфа"],
+                            contract_number="C-REPORT-1", signed_at=date(2026, 2, 9),
+                            product_id=license_row.product_id)
+        person = Responsible(id=uuid4(), full_name="Менеджер Альфа",
+                             email="report-manager@example.test", role="manager")
+        s.add_all([contract, person])
+        s.flush()
+        license_row.contract_id = contract.id
+        s.add(UniversityResponsible(id=uuid4(), university_id=ids["Альфа"],
+                                    responsible_id=person.id, is_primary=True))
+        s.commit()
+    columns = ["university", "vendor", "software", "contract_number",
+               "license_signed", "license_expires", "transfer_status", "responsible", "comment"]
+    client = _client(_admin())
+    response = client.post("/reports", json={"format": "xlsx", "columns": columns,
+                                           "filters": {"university_ids": [str(ids["Альфа"])]}})
+    assert response.status_code == 202, response.text
+    job_id = response.json()["job_id"]
+    assert generate_report_task(job_id) == "ready"
+    from openpyxl import load_workbook
+
+    path = tmp / "linked-business-report.xlsx"
+    path.write_bytes(client.get(f"/reports/{job_id}/download").content)
+    row = next(load_workbook(path, read_only=True)["Отчёт"].iter_rows(min_row=7, max_row=7, values_only=True))
+    assert row[:4] == ("Альфа", "Вендор Р", "ПО Репортёр", "C-REPORT-1")
+    assert (row[4].date(), row[5].date()) == (date(2026, 2, 10), date(2027, 2, 10))
+    assert row[6:] == ("accepted", "Менеджер Альфа", "Комментарий Альфы")
+
+
 def test_pdf_e2e_ready_download(pg):
     client = _client(_admin())
     resp = client.post("/reports", json={"format": "pdf", "columns": ["university"]})
@@ -420,6 +454,29 @@ def test_own_job_access_matrix(pg):
     pending = _client(owner).get(f"/reports/{job_id}/download")
     assert pending.status_code == 400
     assert pending.json()["error"]["code"] == "REPORT_NOT_READY"
+
+
+def test_list_jobs_is_paged_and_excludes_imports(pg):
+    eng, _ = pg
+    owner = CurrentUser(id="mgr-a", roles={"manager"})
+    stranger = CurrentUser(id="user-c", roles={"user"})
+    with _session(eng) as s:
+        first = create_report_job(s, ReportRequest(format="xlsx"), owner).job_id
+        second = create_report_job(s, ReportRequest(format="pdf"), owner).job_id
+        foreign = create_report_job(s, ReportRequest(format="json"), stranger).job_id
+        import_job = s.get(ReportJob, first)
+        import_job.job_type = "xlsx_import"
+        s.commit()
+    manager_result = _client(owner).get("/reports?page=1&page_size=1")
+    assert manager_result.status_code == 200, manager_result.text
+    assert manager_result.json()["total"] == 2
+    assert len(manager_result.json()["items"]) == 1
+    assert _client(owner).get("/reports?page=2&page_size=1").json()["items"][0]["id"] in {second, foreign}
+    user_result = _client(stranger).get("/reports")
+    assert user_result.status_code == 200
+    assert [item["id"] for item in user_result.json()["items"]] == [foreign]
+    assert _client(_admin()).get("/reports").json()["total"] == 2
+    assert _client(owner).get("/reports?page_size=101").status_code == 422
 
 
 # ------------------------------------------------------- download states

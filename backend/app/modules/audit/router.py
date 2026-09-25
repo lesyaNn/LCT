@@ -15,11 +15,27 @@ from app.core.policies import apply_university_scope, get_data_scope
 from app.core.security import CurrentUser
 from app.db.session import get_db
 from app.modules.audit.models import AuditEvent
+from app.models.catalog import University
 from app.modules.audit.service import AuditAction, AuditEntityType
 from app.schemas.common import PaginatedResponse
 from app.schemas.errors import ErrorCode, ErrorResponse
 
 router = APIRouter(prefix="/audit", tags=["Audit"])
+
+_SENSITIVE_KEYS = ("snils", "снилс", "passport", "паспорт", "address", "адрес", "birth", "рождения", "diploma", "диплом")
+
+
+def public_audit_value(value: Any) -> Any:
+    """Redact personal-document fields in API output without altering the ledger."""
+    if isinstance(value, dict):
+        return {
+            key: "***REDACTED***" if any(part in str(key).lower() for part in _SENSITIVE_KEYS)
+            else public_audit_value(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [public_audit_value(item) for item in value]
+    return value
 
 
 class AuditEventRead(BaseModel):
@@ -46,10 +62,43 @@ class AuditEventRead(BaseModel):
             id=event.id, timestamp=event.created_at, user_id=event.user_id,
             user_name=event.user_name, role=event.role, action=event.action,
             entity_type=event.entity_type, entity_id=event.entity_id,
-            university_id=event.university_id, old_value=event.old_value,
-            new_value=event.new_value, request_id=event.request_id,
+            university_id=event.university_id, old_value=public_audit_value(event.old_value),
+            new_value=public_audit_value(event.new_value), request_id=event.request_id,
             ip=event.ip_address, user_agent=event.user_agent,
         )
+
+
+class AuditFilterOptionsRead(BaseModel):
+    users: list[dict[str, str]]
+    universities: list[dict[str, str]]
+    actions: list[str]
+    entity_types: list[str]
+
+
+@router.get("/filter-options", response_model=AuditFilterOptionsRead)
+def audit_filter_options(
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_permission("audit.read")),
+) -> AuditFilterOptionsRead:
+    visible = apply_university_scope(
+        select(AuditEvent.user_id, AuditEvent.user_name, AuditEvent.university_id),
+        AuditEvent.university_id, user,
+    ).subquery()
+    actors = db.execute(
+        select(visible.c.user_id, func.max(visible.c.user_name))
+        .group_by(visible.c.user_id).order_by(visible.c.user_id).limit(500)
+    ).all()
+    universities = db.execute(
+        select(University.id, University.name)
+        .where(University.id.in_(select(visible.c.university_id).where(visible.c.university_id.is_not(None))))
+        .order_by(University.name).limit(500)
+    ).all()
+    return AuditFilterOptionsRead(
+        users=[{"id": actor_id, "name": name or actor_id} for actor_id, name in actors],
+        universities=[{"id": str(uid), "name": name} for uid, name in universities],
+        actions=[action.value for action in AuditAction],
+        entity_types=[entity.value for entity in AuditEntityType],
+    )
 
 
 @router.get(

@@ -111,6 +111,13 @@ def build_overview(data: AnalyticsData, *, today: date) -> Overview:
                 )
     warnings.sort(key=lambda row: (row["expires_at"], row["teacher"], row["certificate"]))
     overdue = overdue_items(data, today)
+    launch_months = [
+        (today.year * 12 + today.month - 1 - offset) for offset in range(11, -1, -1)
+    ]
+    launches = Counter(
+        (link.launch_date.year * 12 + link.launch_date.month - 1, link.status)
+        for link in data.links if getattr(link, "launch_date", None) is not None
+    )
     return Overview.model_validate(
         {
             "kpi": {
@@ -140,6 +147,14 @@ def build_overview(data: AnalyticsData, *, today: date) -> Overview:
             "teacher_readiness": warnings[:10],
             "overdue_items": overdue[:10],
             "health_trend": data.trend,
+            "launch_dynamics": [
+                {
+                    "month": f"{month // 12:04d}-{month % 12 + 1:02d}",
+                    "actual": launches[(month, "launched")],
+                    "planned": launches[(month, "planned")],
+                }
+                for month in launch_months
+            ],
         }
     )
 

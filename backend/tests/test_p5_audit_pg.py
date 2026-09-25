@@ -216,6 +216,29 @@ def test_scoped_filters_rbac_and_openapi(audit_context):
     )
 
 
+def test_filter_options_scope_and_personal_field_redaction(audit_context):
+    engine, client, current, own, foreign = audit_context
+    with Session(engine) as db:
+        AuditService(db).log_event(
+            context=AuditContext("visible-actor", "Visible Actor", "manager"),
+            action=AuditAction.UPDATE, entity_type="university", entity_id=own,
+            university_id=own,
+            new_value={"safe": "shown", "passport_number": "123456", "nested": [{"СНИЛС": "secret"}]},
+        )
+        _event(db, foreign, "hidden-actor")
+        db.commit()
+    current["user"] = CurrentUser(id="manager", roles={"manager"}, university_ids=(str(own),))
+    options = client.get("/api/v1/audit/filter-options")
+    assert options.status_code == 200, options.text
+    assert [item["id"] for item in options.json()["users"]] == ["visible-actor"]
+    assert [item["id"] for item in options.json()["universities"]] == [str(own)]
+    assert "UPDATE" in options.json()["actions"]
+    event = client.get("/api/v1/audit/events").json()["items"][0]
+    assert event["new_value"] == {"safe": "shown", "passport_number": "***REDACTED***", "nested": [{"СНИЛС": "***REDACTED***"}]}
+    current["user"] = CurrentUser(id="user", roles={"user"}, university_ids=(str(own),))
+    assert client.get("/api/v1/audit/filter-options").status_code == 403
+
+
 def test_http_university_mutation_context(audit_context):
     engine, client, current, own, _ = audit_context
     request_id = str(uuid.uuid4())

@@ -48,6 +48,21 @@ def test_empty_data_keeps_zero_buckets():
     assert result.health_trend == []
 
 
+def test_launch_dynamics_uses_real_launch_dates_and_stable_months():
+    data = golden_data([1])
+    data.links = [
+        Row(status="launched", launch_date=TODAY.replace(day=1)),
+        Row(status="planned", launch_date=TODAY.replace(day=1)),
+        Row(status="planned", launch_date=None),
+    ]
+    result = build_overview(data, today=TODAY)
+    assert len(result.launch_dynamics) == 12
+    assert result.launch_dynamics[-1].month == TODAY.strftime("%Y-%m")
+    assert result.launch_dynamics[-1].actual == 1
+    assert result.launch_dynamics[-1].planned == 1
+    assert sum(item.actual + item.planned for item in result.launch_dynamics) == 2
+
+
 def test_totals_not_top10_and_expired_not_expiring():
     data = golden_data([1])
     data.licenses = [
