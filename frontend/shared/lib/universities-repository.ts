@@ -530,11 +530,10 @@ export async function listWorkflowCommentsPage(instanceId: string, page: number)
 }
 
 export async function createWorkflowComment(instanceId: string, content: string, stageId?: string): Promise<WorkflowCommentApiRecord> {
-  if (isRealWorkflowMode()) throw new WorkflowApiError(0, 'Комментарии будут доступны для изменения на этапе 6.');
   if (!isWorkflowApiInstanceId(instanceId)) throw new Error('Добавление комментариев недоступно для этого Workflow-источника.');
   return fromDataSource({
     mock: () => mockCreateWorkflowComment(instanceId, content, stageId),
-    real: async () => { throw new WorkflowApiError(0, 'Комментарии будут доступны для изменения на этапе 6.'); },
+    real: async () => unwrapApiResult(await apiFetch<WorkflowCommentApiRecord>(`/api/v1/workflow/instances/${instanceId}/comments`, { method: 'POST', body: { content, stage_id: stageId ?? null } })),
     domain: 'workflow',
   });
 }
@@ -591,6 +590,12 @@ export async function getWorkflowByProgram(universityId: string, programId: stri
   });
 }
 
+export async function createProgramWorkflow(universityId: string, programId: string, templateId: string): Promise<WorkflowInstanceApiRecord> {
+  return unwrapApiResult(await apiFetch<WorkflowInstanceApiRecord>('/api/v1/workflow/instances', {
+    method: 'POST', body: { university_id: universityId, program_id: programId, template_id: templateId },
+  }));
+}
+
 export async function listWorkflowInstancePage(page: number, pageSize = 100): Promise<WorkflowPage<WorkflowInstanceApiRecord>> {
   return unwrapApiResult(await apiFetch<WorkflowPage<WorkflowInstanceApiRecord>>(`/api/v1/workflow/instances?page=${page}&page_size=${pageSize}`));
 }
@@ -614,23 +619,25 @@ export async function getWorkflowAllowedTransitions(instanceId: string): Promise
 }
 
 export async function transitionWorkflowInstance(instanceId: string, targetInstanceStageId: string, comment: string, dueDate?: string): Promise<WorkflowInstanceApiRecord> {
-  void dueDate;
-  if (isRealWorkflowMode()) throw new WorkflowApiError(0, 'Переход будет подключён на этапе 6.');
+  if (isRealWorkflowMode() && dueDate) throw new WorkflowApiError(0, 'Backend не поддерживает изменение дедлайна при переходе.');
   if (!isMockDataSource && !isWorkflowApiInstanceId(instanceId)) throw new WorkflowApiError(0, 'Переход недоступен для этого Workflow-источника.');
   return fromDataSource({
     mock: () => mockTransitionWorkflow(instanceId, targetInstanceStageId, comment),
-    real: async () => { throw new WorkflowApiError(0, 'Переход будет подключён на этапе 6.'); },
+    real: async () => unwrapApiResult(await apiFetch<WorkflowInstanceApiRecord>(`/api/v1/workflow/instances/${instanceId}/transition`, { method: 'POST', body: { target_instance_stage_id: targetInstanceStageId, comment } })),
     domain: 'workflow',
   });
 }
 
 export async function editWorkflowComment(commentId: string, content: string): Promise<WorkflowCommentApiRecord> {
-  if (isRealWorkflowMode()) throw new WorkflowApiError(0, 'Редактирование будет подключено на этапе 6.');
   return fromDataSource({
     mock: () => mockEditWorkflowComment(commentId, content),
-    real: async () => { throw new WorkflowApiError(0, 'Редактирование будет подключено на этапе 6.'); },
+    real: async () => unwrapApiResult(await apiFetch<WorkflowCommentApiRecord>(`/api/v1/workflow/comments/${commentId}`, { method: 'PATCH', body: { content } })),
     domain: 'workflow',
   });
+}
+
+export async function deleteWorkflowComment(commentId: string): Promise<void> {
+  unwrapApiResult(await apiFetch<void>(`/api/v1/workflow/comments/${commentId}`, { method: 'DELETE' }));
 }
 
 export function workflowAttachmentDownloadUrl(instanceId: string, attachmentId: string): string | null {
@@ -643,12 +650,10 @@ export async function downloadWorkflowAttachment(instanceId: string, attachmentI
 }
 
 export async function deleteWorkflowAttachment(instanceId: string, attachmentId: string): Promise<void> {
-  void attachmentId;
-  if (isRealWorkflowMode()) throw new WorkflowApiError(0, 'Удаление будет подключено на этапе 6.');
   if (!isWorkflowApiInstanceId(instanceId)) throw new Error('Удаление вложений недоступно для этого Workflow-источника.');
   await fromDataSource({
     mock: () => undefined,
-    real: async () => { throw new WorkflowApiError(0, 'Удаление будет подключено на этапе 6.'); },
+    real: async () => unwrapApiResult(await apiFetch<void>(`/api/v1/workflow/instances/${instanceId}/attachments/${attachmentId}`, { method: 'DELETE' })),
     domain: 'workflow',
   });
 }

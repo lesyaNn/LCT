@@ -11,7 +11,8 @@ import { applyServerErrorsToForm, normalizeApiError } from '@/shared/lib/api-err
 import { applyOptimisticWorkflowTransition, getAvailableWorkflowTransitionTargets, getLocalTodayIso, isWorkflowTransitionDraft, workflowTransitionDraftKey, type WorkflowTransitionTarget } from '@/shared/lib/workflow-transition';
 import { isMockDataSourceFor } from '@/shared/lib/data-source';
 import { invalidateWorkflowRelatedQueries } from '@/shared/lib/workflow-cache';
-import { isWorkflowApiInstanceId, transitionWorkflowInstance, workflowQueryKey, type UniversityWorkflow, type UniversityWorkflowStage, type WorkflowInstanceApiRecord } from '@/shared/lib/universities-repository';
+import { getApiUniversityWorkflow, isWorkflowApiInstanceId, transitionWorkflowInstance, workflowQueryKey, type UniversityWorkflow, type UniversityWorkflowStage, type WorkflowInstanceApiRecord } from '@/shared/lib/universities-repository';
+import { queryKeys } from '@/shared/lib/query-keys';
 import { Button } from '@/shared/ui/rtk/button';
 import { FormErrorBanner, FormField } from '@/shared/ui/rtk/form-field';
 import { Input, Select, TextArea } from '@/shared/ui/rtk/form-controls';
@@ -42,16 +43,17 @@ export interface WorkflowTransitionNotification {
 
 type TransitionMutationContext = { previousWorkflow?: UniversityWorkflow };
 
-export function WorkflowTransitionModal({ open, instanceId, universityId, currentStage, stages, initialTargetStageId, userId, onClose, onSuccess, onNotify }: { open: boolean; instanceId: string; universityId?: string | null; currentStage: UniversityWorkflowStage; stages: UniversityWorkflowStage[]; initialTargetStageId?: string; userId?: string | null; onClose: () => void; onSuccess: () => void; onNotify: (notification: WorkflowTransitionNotification) => void }) {
+export function WorkflowTransitionModal({ open, instanceId, universityId, currentStage, stages, allowedTargets, initialTargetStageId, userId, onClose, onSuccess, onNotify }: { open: boolean; instanceId: string; universityId?: string | null; currentStage: UniversityWorkflowStage; stages: UniversityWorkflowStage[]; allowedTargets?: WorkflowTransitionTarget[]; initialTargetStageId?: string; userId?: string | null; onClose: () => void; onSuccess: () => void; onNotify: (notification: WorkflowTransitionNotification) => void }) {
   const queryClient = useQueryClient();
   const commentRef = useRef<HTMLTextAreaElement>(null);
   const [showDiscard, setShowDiscard] = useState(false);
   const [serverFormError, setServerFormError] = useState<string | null>(null);
-  const targets = useMemo(() => getAvailableWorkflowTransitionTargets(stages, currentStage), [currentStage, stages]);
+  const realWorkflow = !isMockDataSourceFor('workflow');
+  const targets = useMemo(() => realWorkflow ? allowedTargets ?? [] : getAvailableWorkflowTransitionTargets(stages, currentStage), [allowedTargets, currentStage, realWorkflow, stages]);
   const defaultTargetId = targets.find((target) => target.id === initialTargetStageId)?.id ?? targets[0]?.id ?? '';
   const targetKey = targets.map((target) => target.id).join('|');
   const targetIds = useMemo(() => new Set(targets.map((target) => target.id)), [targets]);
-  const apiAvailable = isMockDataSourceFor('workflow') && (isWorkflowApiInstanceId(instanceId) && targets.every((target) => isWorkflowApiInstanceId(target.id)));
+  const apiAvailable = isWorkflowApiInstanceId(instanceId) && targets.length > 0 && targets.every((target) => isWorkflowApiInstanceId(target.id));
   const today = getLocalTodayIso();
   const schema = useMemo(() => createTransitionSchema(today, targets), [targets, today]);
   const storageKey = workflowTransitionDraftKey(instanceId, currentStage.id, userId);
@@ -97,25 +99,36 @@ export function WorkflowTransitionModal({ open, instanceId, universityId, curren
   const transition = useMutation<WorkflowInstanceApiRecord, unknown, TransitionValues, TransitionMutationContext>({
     mutationFn: (input) => transitionWorkflowInstance(instanceId, input.targetStageId, input.comment.trim(), input.dueDate || undefined),
     onMutate: async (input) => {
+      if (realWorkflow) return {};
       await queryClient.cancelQueries({ queryKey: workflowQueryKey(instanceId) });
       const previousWorkflow = queryClient.getQueryData<UniversityWorkflow>(workflowQueryKey(instanceId));
       if (previousWorkflow) queryClient.setQueryData(workflowQueryKey(instanceId), applyOptimisticWorkflowTransition(previousWorkflow, input.targetStageId));
       return { previousWorkflow };
     },
-    onSuccess: async () => {
+    onSuccess: async (record) => {
       clearDraft();
+      if (realWorkflow) queryClient.setQueryData(workflowQueryKey(instanceId), getApiUniversityWorkflow(record));
       await invalidateWorkflowRelatedQueries(queryClient, instanceId, universityId);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowAllowed(instanceId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowHistory(instanceId) }),
+      ]);
       onNotify({ intent: 'success', title: 'Этап успешно переведён', message: 'Workflow синхронизирован с сервером.' });
       onSuccess();
     },
     onError: async (cause, _variables, context) => {
       if (context?.previousWorkflow) queryClient.setQueryData(workflowQueryKey(instanceId), context.previousWorkflow);
       const normalized = normalizeApiError(cause, { defaultCode: 'WORKFLOW_INVALID_TRANSITION' });
-      if (normalized.status === 409 || normalized.code === 'WORKFLOW_INVALID_TRANSITION') await queryClient.invalidateQueries({ queryKey: workflowQueryKey(instanceId) });
+      if (normalized.status === 409 || normalized.status === 400 || normalized.code === 'WORKFLOW_INVALID_TRANSITION') await Promise.all([
+        queryClient.invalidateQueries({ queryKey: workflowQueryKey(instanceId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowAllowed(instanceId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowOverview }),
+      ]);
     },
   });
 
   const submit = handleSubmit(async (input) => {
+    if (transition.isPending) return;
     setServerFormError(null);
     try {
       await transition.mutateAsync(input);
@@ -150,5 +163,5 @@ export function WorkflowTransitionModal({ open, instanceId, universityId, curren
   const commentRegistration = register('comment');
   const showBanner = Boolean(serverFormError || (submitCount > 0 && Object.keys(errors).length));
 
-  return <Modal title="Перевести на следующий этап" onClose={modalClose} initialFocusRef={commentRef}><div className={styles.context}><span>Текущий: {currentStage.orderIndex}. {currentStage.name}</span><ArrowRight size={16} fill="currentColor" aria-hidden="true" /><span>Следующий: {target ? `${target.orderIndex}. ${target.name}` : 'нет доступного этапа'}</span></div>{showDiscard ? <div className={styles.discard} role="alertdialog" aria-labelledby="workflow-transition-discard-title" aria-describedby="workflow-transition-discard-description"><h3 id="workflow-transition-discard-title">Есть несохранённые изменения. Закрыть окно?</h3><p id="workflow-transition-discard-description">Черновик будет удалён, а введённые данные потеряны.</p><div className={styles.actions}><Button variant="ghost" size="s" type="button" autoFocus onClick={() => setShowDiscard(false)}>Продолжить редактирование</Button><Button variant="secondary" size="s" type="button" onClick={() => { clearDraft(); setShowDiscard(false); onClose(); }}>Закрыть без сохранения</Button></div></div> : <form className={styles.form} onSubmit={submit} noValidate>{showBanner ? <FormErrorBanner>{serverFormError ?? undefined}</FormErrorBanner> : null}<FormField label="Целевой этап" htmlFor={targetId} error={errors.targetStageId?.message} errorId={targetErrorId}><Select id={targetId} disabled={transition.isPending || targets.length <= 1} aria-invalid={Boolean(errors.targetStageId)} aria-describedby={errors.targetStageId ? targetErrorId : undefined} {...register('targetStageId')}>{targets.map((item) => <option value={item.id} key={item.id}>{item.orderIndex}. {item.name}</option>)}</Select></FormField><FormField label="Комментарий" htmlFor={commentId} required error={errors.comment?.message} errorId={commentErrorId} hint={`Минимум ${COMMENT_MIN_LENGTH} символов`} hintId={commentHintId}><TextArea id={commentId} ref={(element) => { commentRegistration.ref(element); commentRef.current = element; }} name={commentRegistration.name} onBlur={commentRegistration.onBlur} onChange={commentRegistration.onChange} maxLength={COMMENT_MAX_LENGTH} minLength={COMMENT_MIN_LENGTH} rows={5} placeholder="Опишите, что сделано, почему переводите..." required aria-required="true" aria-invalid={Boolean(errors.comment)} aria-describedby={`${errors.comment ? commentErrorId : commentHintId} ${commentCountId}`} /><span id={commentCountId} className={styles.counter}>{comment.length} / {COMMENT_MAX_LENGTH}</span></FormField><FormField label="Дедлайн для следующего этапа (необязательно)" htmlFor={dueDateId} error={errors.dueDate?.message} errorId={dueDateErrorId} hint="Если не указать, будет рассчитан автоматически" hintId={dueDateHintId}><span className={styles.dateControl}><TimeStroke size={16} fill="currentColor" aria-hidden="true" /><Input id={dueDateId} type="date" min={today} aria-invalid={Boolean(errors.dueDate)} aria-describedby={errors.dueDate ? dueDateErrorId : dueDateHintId} {...register('dueDate')} /></span></FormField>{!apiAvailable ? <p className={styles.integrationHint}>Переход станет доступен после подключения API.</p> : null}<div className={styles.actions}><Button variant="ghost" size="s" type="button" disabled={transition.isPending} onClick={modalClose}>Отмена</Button><Button variant="primary" size="s" type="submit" loading={transition.isPending} disabled={!apiAvailable || !targets.length || transition.isPending}>Перевести</Button></div></form>}</Modal>;
+  return <Modal title="Перевести на следующий этап" onClose={modalClose} initialFocusRef={commentRef}><div className={styles.context}><span>Текущий: {currentStage.orderIndex}. {currentStage.name}</span><ArrowRight size={16} fill="currentColor" aria-hidden="true" /><span>Следующий: {target ? `${target.orderIndex}. ${target.name}` : 'нет доступного этапа'}</span></div>{showDiscard ? <div className={styles.discard} role="alertdialog" aria-labelledby="workflow-transition-discard-title" aria-describedby="workflow-transition-discard-description"><h3 id="workflow-transition-discard-title">Есть несохранённые изменения. Закрыть окно?</h3><p id="workflow-transition-discard-description">Черновик будет удалён, а введённые данные потеряны.</p><div className={styles.actions}><Button variant="ghost" size="s" type="button" autoFocus onClick={() => setShowDiscard(false)}>Продолжить редактирование</Button><Button variant="secondary" size="s" type="button" onClick={() => { clearDraft(); setShowDiscard(false); onClose(); }}>Закрыть без сохранения</Button></div></div> : <form className={styles.form} onSubmit={submit} noValidate>{showBanner ? <FormErrorBanner>{serverFormError ?? undefined}</FormErrorBanner> : null}<FormField label="Целевой этап" htmlFor={targetId} error={errors.targetStageId?.message} errorId={targetErrorId}><Select id={targetId} disabled={transition.isPending || targets.length <= 1} aria-invalid={Boolean(errors.targetStageId)} aria-describedby={errors.targetStageId ? targetErrorId : undefined} {...register('targetStageId')}>{targets.map((item) => <option value={item.id} key={item.id}>{item.orderIndex}. {item.name}</option>)}</Select></FormField><FormField label="Комментарий" htmlFor={commentId} required error={errors.comment?.message} errorId={commentErrorId} hint={`Минимум ${COMMENT_MIN_LENGTH} символов`} hintId={commentHintId}><TextArea id={commentId} ref={(element) => { commentRegistration.ref(element); commentRef.current = element; }} name={commentRegistration.name} onBlur={commentRegistration.onBlur} onChange={commentRegistration.onChange} maxLength={COMMENT_MAX_LENGTH} minLength={COMMENT_MIN_LENGTH} rows={5} placeholder="Опишите, что сделано, почему переводите..." required aria-required="true" aria-invalid={Boolean(errors.comment)} aria-describedby={`${errors.comment ? commentErrorId : commentHintId} ${commentCountId}`} /><span id={commentCountId} className={styles.counter}>{comment.length} / {COMMENT_MAX_LENGTH}</span></FormField>{!realWorkflow ? <FormField label="Дедлайн для следующего этапа (необязательно)" htmlFor={dueDateId} error={errors.dueDate?.message} errorId={dueDateErrorId} hint="Если не указать, будет рассчитан автоматически" hintId={dueDateHintId}><span className={styles.dateControl}><TimeStroke size={16} fill="currentColor" aria-hidden="true" /><Input id={dueDateId} type="date" min={today} aria-invalid={Boolean(errors.dueDate)} aria-describedby={errors.dueDate ? dueDateErrorId : dueDateHintId} {...register('dueDate')} /></span></FormField> : null}{!apiAvailable ? <p className={styles.integrationHint}>Нет доступного перехода. Обновите Workflow.</p> : null}<div className={styles.actions}><Button variant="ghost" size="s" type="button" disabled={transition.isPending} onClick={modalClose}>Отмена</Button><Button variant="primary" size="s" type="submit" loading={transition.isPending} disabled={!apiAvailable || transition.isPending}>Перевести</Button></div></form>}</Modal>;
 }

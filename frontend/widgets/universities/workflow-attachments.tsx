@@ -33,6 +33,7 @@ import {
   type WorkflowAttachmentCategory,
 } from '@/shared/lib/workflow-attachments';
 import { addWorkflowAttachmentToCache, removeWorkflowAttachmentFromCache } from '@/shared/lib/workflow-cache';
+import { queryKeys } from '@/shared/lib/query-keys';
 import { Avatar } from '@/shared/ui/rtk/avatar';
 import { Button } from '@/shared/ui/rtk/button';
 import { EmptyState } from '@/shared/ui/empty-state';
@@ -137,23 +138,25 @@ export function WorkflowAttachments({ instanceId, stageId, attachments, readOnly
   const [error, setError] = useState<string | null>(null);
   const images = useMemo(() => attachments.filter((attachment) => isWorkflowImageAttachment(attachment.mimeType, attachment.fileName) && attachment.previewUrl), [attachments]);
   const handleUploadSuccess = useCallback((record: Parameters<typeof workflowAttachmentFromApi>[0]) => {
-    addWorkflowAttachmentToCache(queryClient, instanceId, stageId, workflowAttachmentFromApi(record, user));
+    if (isRealWorkflowMode()) void queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowAttachments(instanceId) });
+    else addWorkflowAttachmentToCache(queryClient, instanceId, stageId, workflowAttachmentFromApi(record, user));
   }, [instanceId, queryClient, stageId, user]);
   const queue = useAttachmentUploadQueue({ instanceId, onSuccess: handleUploadSuccess, onServerError: (normalized: NormalizedApiError) => onNotify?.({ intent: 'error', title: 'Ошибка загрузки', message: normalized.message }) });
   const visibleAttachments = useMemo(() => {
     const temporarySuccessIds = new Set(queue.items.flatMap((item) => item.serverAttachmentId ? [item.serverAttachmentId] : []));
     return attachments.filter((attachment) => !temporarySuccessIds.has(attachment.id));
   }, [attachments, queue.items]);
-  const canUpload = !isRealWorkflowMode() && !readOnly && isWorkflowApiInstanceId(instanceId) && canWriteWorkflowAttachments(user);
+  const canUpload = !readOnly && isWorkflowApiInstanceId(instanceId) && canWriteWorkflowAttachments(user);
   const remove = useMutation({
     mutationFn: (attachment: UniversityWorkflowAttachment) => deleteWorkflowAttachment(instanceId, attachment.id),
     onSuccess: (_data, attachment) => {
-      removeWorkflowAttachmentFromCache(queryClient, instanceId, stageId, attachment.id);
+      if (isRealWorkflowMode()) void queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowAttachments(instanceId) });
+      else removeWorkflowAttachmentFromCache(queryClient, instanceId, stageId, attachment.id);
       setDeleteCandidate(null);
       setSelectedImage(null);
     },
     onError: (cause: unknown) => { const normalized = normalizeApiError(cause); setError(normalized.message); onNotify?.({ intent: 'error', title: 'Ошибка удаления вложения', message: normalized.message }); },
   });
   const headingId = `${instanceId}-${stageId}-attachments-title`;
-  return <section className={styles.section} aria-labelledby={headingId}><div className={styles.heading}><h3 id={headingId}><Attachment size={18} fill="currentColor" />Вложения <span className={styles.count}>{attachments.length}</span></h3></div>{canUpload ? <AttachmentDropZone onFiles={queue.addFiles} /> : null}{!readOnly && queue.items.length ? <ul className={styles.queueList} aria-label="Очередь загрузки">{queue.items.map((item) => <UploadQueueRow key={item.id} item={item} onCancel={() => queue.cancel(item.id)} onRetry={() => queue.retry(item.id)} onRemove={() => queue.remove(item.id)} />)}</ul> : null}{visibleAttachments.length ? <ul className={styles.list}>{visibleAttachments.map((attachment) => <AttachmentRow key={attachment.id} attachment={attachment} instanceId={instanceId} canDelete={!isRealWorkflowMode() && !readOnly && canDeleteWorkflowAttachment(attachment, user) && isWorkflowApiInstanceId(instanceId)} onOpen={() => { const index = images.findIndex((image) => image.id === attachment.id); if (index >= 0) setSelectedImage(index); }} onDelete={setDeleteCandidate} />)}</ul> : !queue.items.length ? <EmptyState icon={<Attachment size={18} fill="currentColor" />} title="Вложений пока нет" description={canUpload ? 'Перетащите файлы в область выше или выберите их вручную.' : 'Файлы появятся здесь после загрузки.'} headingLevel={3} /> : null}{!readOnly && deleteCandidate ? <Modal title="Удалить вложение?" onClose={() => setDeleteCandidate(null)}><p className={styles.confirmText}>Файл «{deleteCandidate.fileName}» будет удалён. Это действие нельзя отменить.</p><div className={styles.confirmActions}><Button variant="ghost" size="s" type="button" onClick={() => setDeleteCandidate(null)}>Отмена</Button><Button variant="danger" size="s" type="button" loading={remove.isPending} disabled={remove.isPending} onClick={() => { setError(null); remove.mutate(deleteCandidate); }}>Удалить</Button></div>{error ? <p className={styles.error} role="alert">{error}</p> : null}</Modal> : null}{selectedImage !== null ? <ImagePreviewModal images={images} selected={selectedImage} onClose={() => setSelectedImage(null)} onSelect={setSelectedImage} /> : null}</section>;
+  return <section className={styles.section} aria-labelledby={headingId}><div className={styles.heading}><h3 id={headingId}><Attachment size={18} fill="currentColor" />Вложения <span className={styles.count}>{attachments.length}</span></h3></div>{canUpload ? <><AttachmentDropZone onFiles={queue.addFiles} />{isRealWorkflowMode() ? <p className={styles.description}>Backend прикрепляет файл к Workflow целиком, без привязки к этапу.</p> : null}</> : null}{!readOnly && queue.items.length ? <ul className={styles.queueList} aria-label="Очередь загрузки">{queue.items.map((item) => <UploadQueueRow key={item.id} item={item} onCancel={() => queue.cancel(item.id)} onRetry={() => queue.retry(item.id)} onRemove={() => queue.remove(item.id)} />)}</ul> : null}{visibleAttachments.length ? <ul className={styles.list}>{visibleAttachments.map((attachment) => <AttachmentRow key={attachment.id} attachment={attachment} instanceId={instanceId} canDelete={!readOnly && canDeleteWorkflowAttachment(attachment, user) && isWorkflowApiInstanceId(instanceId)} onOpen={() => { const index = images.findIndex((image) => image.id === attachment.id); if (index >= 0) setSelectedImage(index); }} onDelete={setDeleteCandidate} />)}</ul> : !queue.items.length ? <EmptyState icon={<Attachment size={18} fill="currentColor" />} title="Вложений пока нет" description={canUpload ? 'Перетащите файлы в область выше или выберите их вручную.' : 'Файлы появятся здесь после загрузки.'} headingLevel={3} /> : null}{!readOnly && deleteCandidate ? <Modal title="Удалить вложение?" onClose={() => setDeleteCandidate(null)}><p className={styles.confirmText}>Файл «{deleteCandidate.fileName}» будет удалён. Это действие нельзя отменить.</p><div className={styles.confirmActions}><Button variant="ghost" size="s" type="button" disabled={remove.isPending} onClick={() => setDeleteCandidate(null)}>Отмена</Button><Button variant="danger" size="s" type="button" loading={remove.isPending} disabled={remove.isPending} onClick={() => { setError(null); remove.mutate(deleteCandidate); }}>Удалить</Button></div>{error ? <p className={styles.error} role="alert">{error}</p> : null}</Modal> : null}{selectedImage !== null ? <ImagePreviewModal images={images} selected={selectedImage} onClose={() => setSelectedImage(null)} onSelect={setSelectedImage} /> : null}</section>;
 }

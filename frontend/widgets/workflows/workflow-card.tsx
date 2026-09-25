@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { formatDateRu } from '@/shared/lib/formatters';
+import { isMockDataSourceFor } from '@/shared/lib/data-source';
 import type { WorkflowOverviewItem } from '@/shared/lib/workflow-overview-repository';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import styles from './workflow-overview.module.css';
@@ -10,7 +11,7 @@ function statusLabel(status: WorkflowOverviewItem['status']) {
 }
 
 export function WorkflowCard({ item, dragHandle }: { item: WorkflowOverviewItem; dragHandle?: ReactNode }) {
-  const href = item.programKey
+  const href = isMockDataSourceFor('workflow') && item.programKey
     ? `/universities/${encodeURIComponent(item.universityId)}?tab=workflow&program=${encodeURIComponent(item.programKey)}&workflow=${encodeURIComponent(item.instanceId)}`
     : `/workflows/${encodeURIComponent(item.instanceId)}`;
   return <article className={styles.card}>

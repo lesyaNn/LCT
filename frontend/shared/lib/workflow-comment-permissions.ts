@@ -12,6 +12,6 @@ export function canEditWorkflowComment(comment: UniversityWorkflowComment, user:
   return Number.isFinite(createdAt) && now - createdAt <= WORKFLOW_COMMENT_EDIT_WINDOW_MS;
 }
 
-export function canDeleteWorkflowComment(comment: UniversityWorkflowComment, user: AuthUser | null): boolean {
-  return Boolean(hasPermission(user, 'workflow.change_status') && user && !comment.isSystem && (hasRole(user, 'admin') || comment.authorId === user.id) && comment.canDelete);
+export function canDeleteWorkflowComment(comment: UniversityWorkflowComment, user: AuthUser | null, now = Date.now()): boolean {
+  return Boolean(comment.canDelete && canEditWorkflowComment(comment, user, now));
 }

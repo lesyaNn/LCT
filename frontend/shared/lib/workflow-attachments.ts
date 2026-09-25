@@ -1,5 +1,5 @@
 import type { AuthUser } from '@/shared/types/user';
-import { hasPermission } from './access-control';
+import { hasPermission, hasRole } from './access-control';
 import { apiUploadFormData } from './api-client';
 import { ApiRequestError, ERROR_MESSAGES } from './api-errors';
 import { isMockDataSourceFor, waitForMockDelay } from './data-source';
@@ -114,7 +114,6 @@ export class WorkflowAttachmentUploadError extends ApiRequestError {
 }
 
 export async function uploadWorkflowAttachment(instanceId: string, file: File, options: { signal: AbortSignal; onProgress: (progress: number) => void }): Promise<WorkflowAttachmentApiRecord> {
-  if (!isMockDataSourceFor('workflow')) throw new WorkflowAttachmentUploadError(0, undefined, 'Загрузка будет подключена на этапе 6.');
   if (!isWorkflowApiInstanceId(instanceId)) throw new WorkflowAttachmentUploadError(0, undefined, 'Загрузка недоступна для этого Workflow.');
   if (isMockDataSourceFor('workflow')) {
     options.onProgress(15);
@@ -162,5 +161,6 @@ export function canWriteWorkflowAttachments(user: AuthUser | null): boolean {
 }
 
 export function canDeleteWorkflowAttachment(attachment: UniversityWorkflowAttachment, user: AuthUser | null): boolean {
-  return Boolean(attachment.canDelete && canWriteWorkflowAttachments(user));
+  return Boolean(attachment.canDelete && canWriteWorkflowAttachments(user) && user
+    && (hasRole(user, 'admin') || attachment.uploadedBy?.id === user.id));
 }
