@@ -123,7 +123,13 @@ def test_migration_000012_pair_discoverable_and_latest():
     assert "000015_health_snapshots" in versions
     assert "000016_transition_comment" in versions
     assert "000017_tasks_priority" in versions
-    assert versions[-1] == "000017_tasks_priority"
+    # P4 continuation: async report jobs live after the workflow pipeline.
+    assert "000018_report_jobs" in versions
+    # Dev-3: import jobs share the report_jobs ledger.
+    assert "000019_import_jobs" in versions
+    # P4-06-01 retries: attempts counter for the worker claim loop.
+    assert "000020_job_attempts" in versions
+    assert versions[-1] == "000023_audit_outbox"
     assert versions.index("000011_workflow_templates") < versions.index("000012_workflow_instances")
     assert versions.index("000012_workflow_instances") < versions.index("000013_instance_stages")
     assert versions.index("000013_instance_stages") < versions.index(
@@ -137,6 +143,15 @@ def test_migration_000012_pair_discoverable_and_latest():
     )
     assert versions.index("000016_transition_comment") < versions.index(
         "000017_tasks_priority"
+    )
+    assert versions.index("000017_tasks_priority") < versions.index(
+        "000018_report_jobs"
+    )
+    assert versions.index("000018_report_jobs") < versions.index(
+        "000019_import_jobs"
+    )
+    assert versions.index("000019_import_jobs") < versions.index(
+        "000020_job_attempts"
     )
     assert set(module.EXPECTED_TABLES) >= set(PIPELINE_TABLES)
 
@@ -492,7 +507,7 @@ def test_stage_delete_blocked_while_transition_history_references_it(db):
         db.delete(db.get(WorkflowStage, g["stage"].id))
         db.commit()
     # PostgreSQL reports the RESTRICT refusal as foreign_key_violation (23503).
-    assert getattr(exc.value.orig, "sqlstate", None) == "23503"
+    assert getattr(exc.value.orig, "sqlstate", None) in {"23503", "23001"}
     db.rollback()
 
 

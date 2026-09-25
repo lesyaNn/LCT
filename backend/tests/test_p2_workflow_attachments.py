@@ -39,7 +39,6 @@ from app.models.workflow_instances import WorkflowAttachment, WorkflowInstance
 from app.models.workflow_templates import WorkflowTemplate
 from app.modules.workflow_attachments import service as attach_service
 from app.modules.workflow_attachments.policy import (
-    FILE_TYPE_CONTRACT_STATUS,
     MAX_FILE_SIZE_BYTES,
     UPLOAD_CHUNK_SIZE_BYTES,
     content_disposition,
@@ -231,15 +230,20 @@ def test_limits_and_chunk_constants():
     assert UPLOAD_CHUNK_SIZE_BYTES == 256 * 1024
 
 
-def test_file_type_contract_blocked_not_invented():
-    assert FILE_TYPE_CONTRACT_STATUS == "PARTIAL_BLOCKED_BY_MISSING_FILE_TYPE_CONTRACT"
+def test_file_type_contract_blocked_not_invented(monkeypatch):
+    from app.config import settings
     from app.modules.workflow_attachments import policy
+    from fastapi import HTTPException
 
-    assert policy.ALLOWED_EXTENSIONS is None
-    assert policy.ALLOWED_MIME_TYPES is None
+    monkeypatch.setattr(settings, "upload_allowed_extensions", "")
+    assert policy.get_allowed_extensions() is None
     # Without a contract the declared type is recorded, never rejected.
     assert policy.check_file_type("report.pdf", "application/pdf") == "application/pdf"
     assert policy.check_file_type("weird.bin", None) == "application/octet-stream"
+    monkeypatch.setattr(settings, "upload_allowed_extensions", "pdf")
+    with pytest.raises(HTTPException) as ei:
+        policy.check_file_type("run.exe", "application/octet-stream")
+    assert ei.value.status_code == 400
 
 
 @pytest.mark.parametrize(
@@ -582,7 +586,7 @@ def test_rbac_allowed_denied_and_admin(auth_client, db):
     meta_url = f"/api/v1/workflow/instances/{iid}/attachments/{aid}"
     dl_url = meta_url + "/download"
 
-    # role `user` (university.read/catalog.read only) -> 403 everywhere.
+    # No university assignment: the user has no visible data scope.
     user_h = _auth(auth_client, ["user"])
     assert auth_client.get(meta_url, headers=user_h).status_code == 403
     assert auth_client.get(dl_url, headers=user_h).status_code == 403
@@ -596,36 +600,30 @@ def test_rbac_allowed_denied_and_admin(auth_client, db):
     )
     assert auth_client.delete(meta_url, headers=user_h).status_code == 403
 
-    # manager (workflow.read, no change_status): read OK, mutations 403.
-    mgr_h = _auth(auth_client, ["manager"])
+    # Assigned manager has read/create/delete permissions in the P5 matrix.
+    mgr_h = _auth(auth_client, ["manager"], [str(g["ua"].id)])
     assert auth_client.get(meta_url, headers=mgr_h).status_code == 200
     assert auth_client.get(dl_url, headers=mgr_h).status_code == 200
-    assert (
-        auth_client.post(
-            f"/api/v1/workflow/instances/{iid}/attachments",
-            files={"file": ("m.pdf", io.BytesIO(b"x"), "application/pdf")},
-            headers=mgr_h,
-        ).status_code
-        == 403
+    mgr_upload = auth_client.post(
+        f"/api/v1/workflow/instances/{iid}/attachments",
+        files={"file": ("m.pdf", io.BytesIO(b"x"), "application/pdf")},
+        headers=mgr_h,
     )
-    assert auth_client.delete(meta_url, headers=mgr_h).status_code == 403
+    assert mgr_upload.status_code == 201, mgr_upload.text
+    assert auth_client.delete(
+        f"/api/v1/workflow/instances/{iid}/attachments/{mgr_upload.json()['id']}",
+        headers=mgr_h,
+    ).status_code == 204
 
-    # curator (workflow.read + change_status): full access.
+    # Curator has no data scope, even where legacy permissions allow a verb.
     cur_h = _auth(auth_client, ["curator"])
-    assert auth_client.get(meta_url, headers=cur_h).status_code == 200
+    assert auth_client.get(meta_url, headers=cur_h).status_code == 403
     up = auth_client.post(
         f"/api/v1/workflow/instances/{iid}/attachments",
         files={"file": ("c.pdf", io.BytesIO(b"c"), "application/pdf")},
         headers=cur_h,
     )
-    assert up.status_code == 201, up.text
-    assert (
-        auth_client.delete(
-            f"/api/v1/workflow/instances/{iid}/attachments/{up.json()['id']}",
-            headers=cur_h,
-        ).status_code
-        == 204
-    )
+    assert up.status_code == 403, up.text
 
     # admin: full access (already demonstrated by the seed upload above).
     assert auth_client.delete(meta_url, headers=admin_headers).status_code == 204
@@ -633,8 +631,8 @@ def test_rbac_allowed_denied_and_admin(auth_client, db):
 
 def test_cross_university_isolation(auth_client, db):
     g = _seed_universe(db)
-    a_headers = _auth(auth_client, ["curator"], [str(g["ua"].id)])
-    b_headers = _auth(auth_client, ["curator"], [str(g["ub"].id)])
+    a_headers = _auth(auth_client, ["manager"], [str(g["ua"].id)])
+    b_headers = _auth(auth_client, ["manager"], [str(g["ub"].id)])
 
     ra = auth_client.post(
         f"/api/v1/workflow/instances/{g['ia'].id}/attachments",
@@ -709,7 +707,7 @@ def test_missing_physical_object_is_controlled(client, db, backend, storage_dir)
     (storage_dir / row.storage_key).unlink()
 
     d = client.get(f"/api/v1/workflow/instances/{g['ia'].id}/attachments/{aid}/download")
-    assert d.status_code == 500
+    assert d.status_code == 404  # P2-05-02: missing object is 404, not 500
     body = d.text
     assert "Traceback" not in body
     assert "/app/storage" not in body and str(storage_dir) not in body

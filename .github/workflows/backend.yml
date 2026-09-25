@@ -1,0 +1,98 @@
+name: Backend
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install ruff==0.15.13
+      - run: ruff check app scripts tests
+        working-directory: backend
+      - run: python scripts/check_legacy_quarantine.py
+        working-directory: backend
+
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -e '.[dev]'
+        working-directory: backend
+      - run: python -m pytest tests -q
+        working-directory: backend
+
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: rtk
+          POSTGRES_PASSWORD: test-only
+          POSTGRES_DB: rtk_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U rtk -d rtk_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://rtk:test-only@localhost:5432/rtk_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -e '.[dev]'
+        working-directory: backend
+      - run: python -m pytest tests -q
+        working-directory: backend
+
+  openapi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -e '.[dev]'
+        working-directory: backend
+      - run: python -m pytest tests/test_p5_openapi_docs.py -q
+        working-directory: backend
+
+  smoke:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: rtk
+          POSTGRES_PASSWORD: test-only
+          POSTGRES_DB: rtk_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U rtk -d rtk_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://rtk:test-only@localhost:5432/rtk_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -e '.[dev]'
+        working-directory: backend
+      - run: python -m pytest tests/test_p1_schema.py tests/test_p5_openapi_docs.py -q
+        working-directory: backend

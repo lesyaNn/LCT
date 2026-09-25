@@ -1,0 +1,29 @@
+{
+  "format": "xlsx",
+  "filters": {
+    "date_from": "2026-01-01",
+    "date_to": "2026-12-31",
+    "university_ids": [],
+    "direction_ids": [],
+    "program_ids": [],
+    "product_ids": [],
+    "responsible_ids": [],
+    "workflow_statuses": []
+  },
+  "columns": [
+    "university",
+    "direction",
+    "program",
+    "product",
+    "workflow_status",
+    "responsible",
+    "vendor",
+    "software",
+    "contract_number",
+    "license_signed",
+    "license_expires",
+    "transfer_status",
+    "comment",
+    "health_score"
+  ]
+}

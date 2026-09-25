@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.core.permissions import require_role
 from app.core.security import CurrentUser
-from app.db.session import get_db
+from app.modules.audit.service import get_audit_db
 from app.modules.workflow_templates import service
 from app.modules.workflow_templates.schemas import (
     StageCreate,
@@ -45,7 +45,7 @@ ADMIN = require_role("admin")
 def list_templates(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     _user: CurrentUser = Depends(ADMIN),
 ) -> PaginatedResponse[TemplateRead]:
     items, total = service.list_template_page(db, page=page, page_size=page_size)
@@ -60,7 +60,7 @@ def list_templates(
 )
 def create_template(
     data: TemplateCreate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     _user: CurrentUser = Depends(ADMIN),
 ) -> TemplateDetail:
     return service.create_template(
@@ -75,7 +75,7 @@ def create_template(
 )
 def get_template(
     template_id: uuid.UUID,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     _user: CurrentUser = Depends(ADMIN),
 ) -> TemplateDetail:
     return service.get_template_detail(db, template_id)
@@ -89,7 +89,7 @@ def get_template(
 def patch_template(
     template_id: uuid.UUID,
     data: TemplateUpdate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     _user: CurrentUser = Depends(ADMIN),
 ) -> TemplateDetail:
     fields = data.model_fields_set
@@ -115,7 +115,7 @@ def patch_template(
 def create_stage(
     template_id: uuid.UUID,
     data: StageCreate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     _user: CurrentUser = Depends(ADMIN),
 ) -> StageRead:
     return service.create_stage(
@@ -139,7 +139,7 @@ def patch_stage(
     template_id: uuid.UUID,
     stage_id: uuid.UUID,
     data: StageUpdate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     _user: CurrentUser = Depends(ADMIN),
 ) -> StageRead:
     fields = data.model_fields_set

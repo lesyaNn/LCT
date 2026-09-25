@@ -121,12 +121,16 @@ def _load_program_rows(db, teacher_id: uuid.UUID) -> list[tuple]:
     )
 
 
-def get_teacher_passport(db, teacher_id: uuid.UUID) -> TeacherPassport:
+def get_teacher_passport(db, teacher_id: uuid.UUID, *, user=None) -> TeacherPassport:
     """Compose the full teacher passport in exactly 4 SELECTs (no N+1)."""
     row = _load_teacher_row(db, teacher_id)
     if row is None:
         raise NotFound("Teacher not found")
     teacher, university_id, university_name, university_city = row
+    if user is not None:
+        from app.core.policies import ensure_university_access
+
+        ensure_university_access(teacher.university_id, user)
 
     qualifications = _load_qualifications(db, teacher_id)
     certificate_rows = _load_certificate_rows(db, teacher_id)

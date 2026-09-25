@@ -106,16 +106,54 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-rtk}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-rtk}
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
       STORAGE_ROOT: /app/storage
+      REPORTS_ROOT: /app/reports
+      # Dev-2 analytics boundary: Dev-1 filter adapter (non-empty filters
+      # in /analytics/* stop returning 503 FILTER_PROVIDER_NOT_CONFIGURED).
+      P4_FILTER_PROVIDER: ${P4_FILTER_PROVIDER:-app.modules.analytics.dev1_provider:provider}
     volumes:
       # Staging survives backend restarts (P0-4: preview -> execute).
       - import-staging:/tmp/rtk-imports
       # P2-05 workflow file objects persist across restarts (never ephemeral).
       - workflow-storage:/app/storage
+      # P4-06-01 generated reports persist across container recreation.
+      - reports-storage:/app/reports
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)\""]
       interval: 15s
       timeout: 5s
       retries: 10
+      start_period: 15s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  worker:
+    # P4-06-01: dedicated background worker (no BackgroundTasks in the API).
+    # Owns report/import execution: atomic claim (SKIP LOCKED) -> run ->
+    # ready, up to 3 attempts, then failed. Shares the backend image.
+    build: ./backend
+    restart: unless-stopped
+    networks: [rtk-net]
+    command: ["python", "-m", "app.modules.analytics.report_worker"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-rtk}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-rtk}
+      REDIS_URL: redis://redis:6379/0
+      IMPORT_STAGING_DIR: /tmp/rtk-imports
+      REPORTS_ROOT: /app/reports
+      P4_FILTER_PROVIDER: ${P4_FILTER_PROVIDER:-app.modules.analytics.dev1_provider:provider}
+    volumes:
+      - import-staging:/tmp/rtk-imports
+      - reports-storage:/app/reports
+    healthcheck:
+      test: ["CMD", "python", "-c", "from pathlib import Path; assert b'app.modules.analytics.report_worker' in Path('/proc/1/cmdline').read_bytes()"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
       start_period: 15s
     logging:
       driver: json-file
@@ -160,3 +198,4 @@ volumes:
   redisdata:
   import-staging:
   workflow-storage:
+  reports-storage:

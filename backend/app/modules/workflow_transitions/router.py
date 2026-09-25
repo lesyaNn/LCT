@@ -15,12 +15,12 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.permissions import require_permission
 from app.core.security import CurrentUser
-from app.db.session import get_db
+from app.modules.audit.service import get_audit_db
 from app.modules.workflow_instances import service as instance_service
 from app.modules.workflow_instances.schemas import InstanceDetail
 from app.modules.workflow_transitions import service
@@ -31,6 +31,7 @@ from app.modules.workflow_transitions.schemas import (
     WorkflowCommentUpdate,
     WorkflowStageTransitionRead,
 )
+from app.schemas.common import PaginatedResponse
 
 router = APIRouter(prefix="/workflow", tags=["Workflow"])
 
@@ -46,9 +47,11 @@ WRITE = require_permission("workflow.change_status")
 def transition_instance(
     instance_id: uuid.UUID,
     data: TransitionRequest,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(WRITE),
 ) -> InstanceDetail:
+    existing = service.get_instance_or_404(db, instance_id)
+    instance_service.authorize_scope(user, existing)
     instance = service.transition_instance(
         db,
         instance_id,
@@ -56,7 +59,6 @@ def transition_instance(
         data.comment,
         user.id,
     )
-    instance_service.authorize_scope(user, instance)
     return instance_service.get_instance_detail(db, instance.id)
 
 
@@ -67,7 +69,7 @@ def transition_instance(
 )
 def list_transitions(
     instance_id: uuid.UUID,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(READ),
 ) -> list[WorkflowStageTransitionRead]:
     instance = service.get_instance_or_404(db, instance_id)
@@ -77,17 +79,25 @@ def list_transitions(
 
 @router.get(
     "/instances/{instance_id}/comments",
-    response_model=list[WorkflowCommentRead],
-    summary="Instance comments (oldest first)",
+    response_model=PaginatedResponse[WorkflowCommentRead],
+    summary="Instance comments, oldest first (paginated)",
 )
 def list_comments(
     instance_id: uuid.UUID,
-    db: Session = Depends(get_db),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(READ),
-) -> list[WorkflowCommentRead]:
+) -> PaginatedResponse[WorkflowCommentRead]:
     instance = service.get_instance_or_404(db, instance_id)
     instance_service.authorize_scope(user, instance)
-    return service.list_comments(db, instance_id)
+    rows, total = service.list_comment_page(db, instance_id, page=page, page_size=page_size)
+    return PaginatedResponse(
+        items=[WorkflowCommentRead.model_validate(r) for r in rows],
+        page=page,
+        page_size=page_size,
+        total=total,
+    )
 
 
 @router.post(
@@ -99,7 +109,7 @@ def list_comments(
 def add_comment(
     instance_id: uuid.UUID,
     data: WorkflowCommentCreate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(WRITE),
 ) -> WorkflowCommentRead:
     instance = service.get_instance_or_404(db, instance_id)
@@ -115,12 +125,30 @@ def add_comment(
 def edit_comment(
     comment_id: uuid.UUID,
     data: WorkflowCommentUpdate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(WRITE),
 ) -> WorkflowCommentRead:
+    existing = service.get_comment_or_404(db, comment_id)
+    instance = service.get_instance_or_404(db, existing.instance_id)
+    instance_service.authorize_scope(user, instance)
     comment = service.edit_comment(
         db, comment_id, data, user.id, set(user.roles or ())
     )
-    instance = service.get_instance_or_404(db, comment.instance_id)
-    instance_service.authorize_scope(user, instance)
     return comment
+
+
+@router.delete(
+    "/comments/{comment_id}",
+    status_code=204,
+    response_model=None,
+    summary="Delete a comment (author within 15 minutes, admin any time)",
+)
+def delete_comment(
+    comment_id: uuid.UUID,
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(WRITE),
+) -> None:
+    existing = service.get_comment_or_404(db, comment_id)
+    instance = service.get_instance_or_404(db, existing.instance_id)
+    instance_service.authorize_scope(user, instance)
+    service.delete_comment(db, comment_id, user.id, set(user.roles or ()))

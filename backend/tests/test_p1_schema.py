@@ -36,12 +36,9 @@ from app.models.catalog import (
 )
 from app.models.interactions import (
     Document,
-    InteractionNote,
     Meeting,
     MeetingDocument,
     Student,
-    UniversityProduct,
-    UniversityProgram,
 )
 from app.models.teachers import (
     Teacher,
@@ -526,7 +523,7 @@ def test_seed_idempotent(engine):
 
 
 def test_sql_migration_single_head_chain():
-    """SQL files are the single schema source: 000001..000017, paired up/down."""
+    """SQL files are the single schema source: 000001..000023, paired up/down."""
     import re as _re
 
     versions = os.path.join(
@@ -538,8 +535,8 @@ def test_sql_migration_single_head_chain():
         assert m, f"bad migration filename: {fname}"
         (ups if m.group(2) == "up" else downs).add(m.group(1))
     assert ups == downs, f"unpaired migrations: up^down={ups ^ downs}"
-    assert sorted(ups)[-1] == "000017_tasks_priority"
-    assert len(ups) == 17
+    assert sorted(ups)[-1] == "000023_audit_outbox"
+    assert len(ups) == 23
 
 
 @pytest.mark.skipif(

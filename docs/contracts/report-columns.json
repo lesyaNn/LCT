@@ -1,0 +1,155 @@
+{
+  "consumers": [
+    "P4-02-01 dataset",
+    "P4-02-02 column selection",
+    "P4-03-01 export endpoint (xlsx/pdf/json writers)",
+    "P3 frontend checkbox UI"
+  ],
+  "data_types": {
+    "date": "ISO date value on the wire (dataset layer keeps typed date objects; writers format)",
+    "integer": "health_score int 0..100, null when missing (missing is never 0)",
+    "string": "text or null (missing LEFT relations are null, never ''/N/A/-)"
+  },
+  "defaults": {
+    "columns_omitted": "all 14 mandatory columns in documented order",
+    "duplicates": "deduped preserving first-seen order",
+    "empty_list": "422 - at least one column required",
+    "unknown_key": "422 - never silently ignored"
+  },
+  "mandatory_columns": [
+    {
+      "key": "university",
+      "title": "Наименование ВУЗа",
+      "type": "string",
+      "source": "universities.name (University.name)"
+    },
+    {
+      "key": "direction",
+      "title": "ИТ-направление",
+      "type": "string",
+      "source": "licenses.program_id -> it_programs.direction_id -> it_directions.name (COALESCE licenses.direction_id, program direction); NULL for fallback rows"
+    },
+    {
+      "key": "program",
+      "title": "ИТ-программа",
+      "type": "string",
+      "source": "licenses.program_id -> it_programs.name (ITProgram.name); NULL for fallback rows"
+    },
+    {
+      "key": "product",
+      "title": "ИТ-продукт",
+      "type": "string",
+      "source": "licenses.product_id -> it_products.name (ITProduct.name); NULL for fallback rows"
+    },
+    {
+      "key": "workflow_status",
+      "title": "Статус работы",
+      "type": "string",
+      "source": "derived: current InstanceStage.name of the latest workflow_instances row for the university; else earliest university_programs.status (by program name); else NULL. Canonical workflow_instances + instance_stages only, never legacy workflow tables"
+    },
+    {
+      "key": "responsible",
+      "title": "Ответственный",
+      "type": "string",
+      "source": "derived aggregate: university_responsibles -> responsibles.full_name, sorted ascending, joined with '; ' (one row per report row, never fan-out); NULL when no links"
+    },
+    {
+      "key": "vendor",
+      "title": "Вендор",
+      "type": "string",
+      "source": "licenses.product_id -> it_products.vendor_id -> vendors.name (Vendor.name); NULL for fallback rows"
+    },
+    {
+      "key": "software",
+      "title": "ПО",
+      "type": "string",
+      "source": "intentional alias of product: licenses.product_id -> it_products.name (no separate software model/field exists)"
+    },
+    {
+      "key": "contract_number",
+      "title": "Номер договора",
+      "type": "string",
+      "source": "licenses.contract_id -> contracts.contract_number for license rows; latest contracts row per university (signed_at DESC, expires_at DESC NULLS LAST, id ASC) for license-less fallback rows; else NULL"
+    },
+    {
+      "key": "license_signed",
+      "title": "Подписание лицензии",
+      "type": "date",
+      "source": "licenses.signed_at (License.signed_at, Date); NULL for fallback rows"
+    },
+    {
+      "key": "license_expires",
+      "title": "Срок действия",
+      "type": "date",
+      "source": "licenses.expires_at (License.expires_at, Date); NULL for fallback rows"
+    },
+    {
+      "key": "transfer_status",
+      "title": "Статус передачи",
+      "type": "string",
+      "source": "licenses.transfer_status_raw for license rows (real raw field, no new enum/constraint); latest contract transfer_status_raw for license-less fallback rows; else NULL"
+    },
+    {
+      "key": "comment",
+      "title": "Комментарий",
+      "type": "string",
+      "source": "COALESCE(licenses.comment, licenses.contract_id -> contracts.comment) for license rows; latest contract comment for license-less fallback rows; else NULL (both canonical comment fields exist)"
+    },
+    {
+      "key": "health_score",
+      "title": "Health Score",
+      "type": "integer",
+      "source": "health_score_current.score per university, materialized by the canonical calculator; NULL until backfill/refresh. int 0..100, missing is NULL (never 0)"
+    }
+  ],
+  "optional_columns_supported": [
+    {
+      "key": "city",
+      "title": "Город",
+      "type": "string",
+      "source": "universities.city (University.city); NULL when unset"
+    },
+    {
+      "key": "current_stage",
+      "title": "Текущий этап",
+      "type": "string",
+      "source": "current InstanceStage.name of the latest workflow_instances row (primary branch of workflow_status WITHOUT the university_programs fallback); NULL when no workflow"
+    },
+    {
+      "key": "last_interaction",
+      "title": "Последнее взаимодействие",
+      "type": "date",
+      "source": "frozen P4-02-02 FULL rule: latest interaction date per university = GREATEST(max(meetings.meeting_at), max(interaction_notes.created_at)); NULL when the university has neither meetings nor notes"
+    },
+    {
+      "key": "workflow_progress",
+      "title": "Прогресс workflow, %",
+      "type": "integer",
+      "source": "frozen P4-02-02 FULL rule (mirrors the Dev-2 matrix): percent of completed instance_stages over non-skipped stages across ACTIVE workflow_instances of the university, nearest integer 0..100; NULL when there are no eligible stages"
+    },
+    {
+      "key": "teacher_readiness",
+      "title": "Готовность преподавателей, %",
+      "type": "integer",
+      "source": "frozen P4-02-02 FULL rule: percent of the university teachers with canonical readiness == ready (same compute_teacher_readiness as P1 passports and the Dev-2 matrix, university grain instead of per-program), nearest integer 0..100; NULL when no teachers"
+    },
+    {
+      "key": "overdue_tasks",
+      "title": "Просроченные задачи",
+      "type": "integer",
+      "source": "frozen P4-02-02 FULL rule (P2 canonical overdue rule): count of workflow_tasks with status == open and deadline at least 1 day in the past on ACTIVE workflow_instances of the university; 0 when none"
+    }
+  ],
+  "optional_columns_unsupported": {},
+  "ordering": "University.name ASC, University.id ASC, License.license_number ASC NULLS LAST, License.id ASC (deterministic, never DB natural order)",
+  "presets": {
+    "FULL": "14 mandatory + all 6 supported optionals",
+    "MINIMAL": "14 mandatory columns",
+    "STANDARD": "14 mandatory + city + current_stage"
+  },
+  "registry": "backend/app/modules/analytics/columns.py (COLUMN_REGISTRY; single source of truth, never duplicated per exporter)",
+  "request_dto": "backend/app/modules/analytics/report_request.py (ReportRequest: format + filters: UnifiedFilter + columns)",
+  "row_grain": "one row per (University x License) via universities LEFT JOIN licenses; license-less universities produce exactly one fallback row; no programs x products x responsibles cartesian product",
+  "task": "P4-02-01 / P4-02-02",
+  "version": "1.1.0"
+}

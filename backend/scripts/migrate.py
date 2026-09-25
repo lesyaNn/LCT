@@ -19,8 +19,10 @@ Rules:
   unexpected state; idempotency comes from the version table, not DDL.
 * ``baseline`` is the ONLY adoption path for pre-existing databases at the
   old Alembic head (7f3a1c9e2b06). It verifies the legacy table set and
-  the alembic version row, then marks SQL migrations through 000010 as
-  applied WITHOUT re-running DDL. The new workflow migration remains pending.
+  the alembic version row, then marks SQL migrations through
+  ``LEGACY_SQL_HEAD`` (000010) as applied WITHOUT re-running DDL. Newer
+  migrations (000011-000021: workflow, snapshots, report/import jobs,
+  audit P5) stay pending for the normal ``up`` command.
 * Keycloak database is never touched: this runner connects only to
   ``DATABASE_URL`` (the ``rtk`` application database).
 """
@@ -47,7 +49,13 @@ LEGACY_SQL_HEAD = "000010_audit_identity"
 
 # Canonical application tables (alembic_version/schema_migrations excluded):
 # 21 P1 tables + 8 B1 workflow tables (000011-000014) + health_score_snapshots
-# (P2-09-01, 000015). Must match backend/migrations/*.up.sql exactly.
+# (P2-09-01, 000015) + report_jobs (P4-06-01, 000018) + the materialized
+# health score projection (000022) and audit outbox (000023).
+# 000019/000020 only ALTER report_jobs (no new tables); 000021 only ALTERs
+# audit_events (no new tables). Pinned by
+# tests/test_p5_migrate_expected_guard.py — keep in sync with
+# backend/migrations/*.up.sql (L8).
+# Must match backend/migrations/*.up.sql exactly.
 EXPECTED_TABLES = [
     "universities",
     "it_directions",
@@ -79,6 +87,9 @@ EXPECTED_TABLES = [
     "workflow_tasks",
     "instance_stages",
     "health_score_snapshots",
+    "health_score_current",
+    "report_jobs",
+    "audit_outbox",
 ]
 
 VERSION_RE = re.compile(r"^(?P<ver>\d{6}_[a-z0-9_]+)\.(?P<dir>up|down)\.sql$")

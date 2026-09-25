@@ -1,14 +1,21 @@
+from typing import List, Optional
+
 from sqlalchemy.orm import Session
 
 from app.modules.universities.models import University
 from app.modules.universities.schemas import UniversityCreate, UniversityUpdate
 
 
+def _escape_like(value: str) -> str:
+    """Escape LIKE wildcards so user search text can't alter matching semantics."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 class UniversityRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def list(self, q: str | None = None, region: str | None = None) -> list[University]:
+    def list(self, q: Optional[str] = None, region: Optional[str] = None) -> List["University"]:
         """List universities with optional search.
 
         P1-11-03: ``region`` is a legacy query param kept for backward
@@ -23,7 +30,7 @@ class UniversityRepository:
         _ = region  # deprecated no-op, kept in signature for compatibility
         query = self.db.query(University)
         if q:
-            query = query.filter(University.name.ilike(f"%{q}%"))
+            query = query.filter(University.name.ilike(f"%{_escape_like(q)}%", escape="\\"))
         return query.order_by(University.id.desc()).limit(200).all()
 
     def get(self, university_id: int) -> University | None:

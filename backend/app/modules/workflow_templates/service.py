@@ -34,7 +34,7 @@ import uuid
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.exceptions import NotFound
+from app.core.exceptions import Conflict, NotFound
 from app.models.workflow_templates import WorkflowStage, WorkflowTemplate
 
 from .schemas import StageRead, TemplateDetail, TemplateRead
@@ -80,6 +80,15 @@ def create_template(
 ) -> TemplateDetail:
     obj = WorkflowTemplate(name=name, description=description, is_active=is_active)
     db.add(obj)
+    if "audit_context" in db.info:
+        from app.modules.audit.service import AuditAction, AuditService, context_for
+
+        db.flush()
+        AuditService(db).log_event(
+            context=context_for(db), action=AuditAction.ADMIN_CONFIG,
+            entity_type="config", entity_id=obj.id,
+            new_value={"name": obj.name, "is_active": obj.is_active},
+        )
     db.commit()
     db.refresh(obj)
     return get_template_detail(db, obj.id)
@@ -97,12 +106,24 @@ def patch_template(
     obj = db.get(WorkflowTemplate, template_id)
     if obj is None:
         raise NotFound("Workflow template not found")
+    old = {"name": obj.name, "description": obj.description,
+           "is_active": obj.is_active}
     if "name" in fields and name is not None:
         obj.name = name
     if "description" in fields:
         obj.description = description
     if "is_active" in fields and is_active is not None:
         obj.is_active = is_active
+    if "audit_context" in db.info:
+        from app.modules.audit.service import AuditAction, AuditService, context_for
+
+        AuditService(db).log_event(
+            context=context_for(db), action=AuditAction.ADMIN_CONFIG,
+            entity_type="config", entity_id=obj.id,
+            old_value=old,
+            new_value={"name": obj.name, "description": obj.description,
+                       "is_active": obj.is_active},
+        )
     db.commit()
     return get_template_detail(db, template_id)
 
@@ -192,9 +213,38 @@ def create_stage(
         sla_days=sla_days,
     )
     db.add(obj)
+    if "audit_context" in db.info:
+        from app.modules.audit.service import AuditAction, AuditService, context_for
+
+        db.flush()
+        AuditService(db).log_event(
+            context=context_for(db), action=AuditAction.ADMIN_CONFIG,
+            entity_type="workflow_stage", entity_id=obj.id,
+            new_value={"template_id": template_id, "name": obj.name,
+                       "order_index": obj.order_index, "is_active": obj.is_active},
+        )
     db.commit()  # shift + insert atomically; UNIQUE checked at COMMIT (deferred)
     db.refresh(obj)
     return StageRead.model_validate(obj)
+
+
+def _ensure_no_active_current(db: Session, stage: WorkflowStage) -> None:
+    """P2-02-04: a template stage that is current in any active instance
+    cannot be retired — the pointer would dangle for running workflows."""
+    from app.models.workflow_instances import WorkflowInstance
+
+    hit = db.execute(
+        select(WorkflowInstance.id)
+        .where(
+            WorkflowInstance.status == "active",
+            WorkflowInstance.current_stage_id == stage.id,
+        )
+        .limit(1)
+    ).first()
+    if hit is not None:
+        raise Conflict(
+            "Stage is current in an active workflow instance and cannot be disabled"
+        )
 
 
 def patch_stage(
@@ -212,6 +262,9 @@ def patch_stage(
 ) -> StageRead:
     _lock_template(db, template_id)  # serialize same-template writers (§8)
     obj = _require_stage(db, template_id, stage_id)
+    old = {"name": obj.name, "order_index": obj.order_index,
+           "is_active": obj.is_active, "is_required": obj.is_required,
+           "sla_days": obj.sla_days}
     if "name" in fields and name is not None:
         obj.name = name
     if "description" in fields:
@@ -219,11 +272,24 @@ def patch_stage(
     if "is_required" in fields and is_required is not None:
         obj.is_required = is_required
     if "is_active" in fields and is_active is not None:
+        if not is_active:
+            _ensure_no_active_current(db, obj)
         obj.is_active = is_active
     if "sla_days" in fields:
         obj.sla_days = sla_days
     if "order_index" in fields and order_index is not None:
         _move_stage(db, obj, order_index)
+    if "audit_context" in db.info:
+        from app.modules.audit.service import AuditAction, AuditService, context_for
+
+        AuditService(db).log_event(
+            context=context_for(db), action=AuditAction.ADMIN_CONFIG,
+            entity_type="workflow_stage", entity_id=obj.id,
+            old_value=old,
+            new_value={"name": obj.name, "order_index": obj.order_index,
+                       "is_active": obj.is_active, "is_required": obj.is_required,
+                       "sla_days": obj.sla_days},
+        )
     db.commit()  # field updates + positional move atomically
     db.refresh(obj)
     return StageRead.model_validate(obj)

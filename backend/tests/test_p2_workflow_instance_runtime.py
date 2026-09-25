@@ -606,7 +606,7 @@ def test_instances_rbac_matrix(auth_client, db):
         == 403
     )
 
-    mgr_h = _auth(auth_client, ["manager"])
+    mgr_h = _auth(auth_client, ["manager"], [str(g["university"].id)])
     assert auth_client.get(url, headers=mgr_h).status_code == 200
     assert (
         auth_client.post(
@@ -614,17 +614,17 @@ def test_instances_rbac_matrix(auth_client, db):
             json={"university_id": str(g["university"].id), "template_id": str(g["template"].id)},
             headers=mgr_h,
         ).status_code
-        == 403
+        == 201
     )
 
     cur_h = _auth(auth_client, ["curator"])
-    assert auth_client.get(url, headers=cur_h).status_code == 200
+    assert auth_client.get(url, headers=cur_h).status_code == 403
     rc = auth_client.post(
         "/api/v1/workflow/instances",
         json={"university_id": str(g["university"].id), "template_id": str(g["template"].id)},
         headers=cur_h,
     )
-    assert rc.status_code == 201, rc.text
+    assert rc.status_code == 403, rc.text
     assert auth_client.get(url, headers=admin).status_code == 200
 
 
@@ -641,8 +641,8 @@ def test_cross_university_isolation(auth_client, db):
     db.add(WorkflowStage(template_id=t.id, name="S1", order_index=1))
     db.commit()
 
-    a_h = _auth(auth_client, ["curator"], [str(ua.id)])
-    b_h = _auth(auth_client, ["curator"], [str(ub.id)])
+    a_h = _auth(auth_client, ["manager"], [str(ua.id)])
+    b_h = _auth(auth_client, ["manager"], [str(ub.id)])
     admin_h = _auth(auth_client, ["admin"])
 
     ra = auth_client.post(

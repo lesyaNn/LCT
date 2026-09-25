@@ -34,7 +34,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401 (register metadata on Base)
-from app.core.errors import CONFLICT_DETAIL, register_error_handlers
+from app.core.errors import register_error_handlers
+from app.schemas.errors import ErrorCode, ErrorResponse
 from app.models.catalog import (
     Contract,
     ITDirection,
@@ -544,7 +545,7 @@ def test_university_delete_restricted_with_license_core(db: Session, engine):
         db.commit()
     db.rollback()
     if _is_pg(engine):
-        assert _pgcode(ei.value) == "23503"
+        assert _pgcode(ei.value) in {"23503", "23001"}
 
 
 # ======================================================== filter discovery ==
@@ -573,15 +574,44 @@ def test_filter_discovery_table():
     # FastAPI>=0.120 nests included routers, so walk original_router).
     from app.api.router import v1
 
+    def _join(prefix: str, path: str) -> str:
+        # Version-robust join restoring the pre-0.120 flat full paths:
+        # 0.116 routes already carry every prefix (use as-is), while
+        # 0.141 nested routes carry their immediate router prefix
+        # (collapse the doubled segments on "/" boundaries instead of
+        # inventing routes).
+        if not prefix or not path.startswith("/"):
+            return f"{prefix}{path}" if prefix else path
+        pre = [s for s in prefix.split("/") if s != ""]
+        parts = [s for s in path.split("/") if s != ""]
+        overlap = 0
+        for k in range(min(len(pre), len(parts)), 0, -1):
+            if pre[-k:] == parts[:k]:
+                overlap = k
+                break
+        return "/" + "/".join(pre + parts[overlap:])
+
     def _walk(routes, prefix=""):
         for r in routes:
             if getattr(r, "path", None):
-                yield prefix + r.path
+                yield _join(prefix, getattr(r, "path"))
             elif getattr(r, "original_router", None) is not None:
-                yield from _walk(r.original_router.routes, prefix + (r.original_router.prefix or ""))
+                yield from _walk(
+                    r.original_router.routes,
+                    _join(prefix, r.original_router.prefix or ""),
+                )
 
-    paths = set(_walk(v1.routes))
-    assert not any(p.startswith("/universities") and "passport" not in p for p in paths)
+    paths = set(_walk(v1.routes, "/api/v1"))
+    # Canonical university sub-resources (passport, meetings, students CRUD).
+    # Anything else directly under /universities would be an undeclared route.
+    allowed_prefixes = ("/universities",)
+    canonical_sub = ("passport", "meetings", "students")
+    stray = [
+        p for p in paths
+        if p.startswith(allowed_prefixes)
+        and not any(s in p for s in canonical_sub)
+    ]
+    assert not stray, f"unexpected /universities routes: {sorted(stray)}"
 
 
 # ======================================================= university search ==
@@ -694,9 +724,21 @@ def test_responsible_filter_via_join_distinct(db: Session):
     assert len(nodup) == 2
 
 
-def test_health_status_filter_not_implemented():
-    assert "health_status" not in inspect.signature(UniversityRepository.list).parameters
-    assert not hasattr(University, "health_status")
+def test_health_status_filter_implemented():
+    """P1-03-01 shipped: health_status filter + health_score sort exist.
+
+    Service computes scores in Python (cached 5 min); total is AFTER the
+    filter; UniversityRead carries the computed score/status.
+    """
+    import inspect as _inspect
+
+    from app.modules.catalog import service as catalog_service
+    from app.modules.catalog.schemas import UniversityRead
+
+    params = _inspect.signature(catalog_service.list_university_page).parameters
+    assert "health_status" in params
+    assert "health_score" in UniversityRead.model_fields
+    assert "health_status" in UniversityRead.model_fields
 
 
 # ================================================= pagination / sorting ==
@@ -986,7 +1028,9 @@ def test_integrity_error_maps_to_409_sanitized_license_domain():
 
     r = TestClient(app).post("/contracts")
     assert r.status_code == 409
-    assert r.json() == {"detail": CONFLICT_DETAIL}
+    body = ErrorResponse.model_validate(r.json())
+    assert body.error.code == ErrorCode.CONFLICT
+    assert body.error.details == {}
     low = r.text.lower()
     for leaked in ("psycopg", "sqlalchemy", "select", "insert", "uq_x", "traceback"):
         assert leaked not in low

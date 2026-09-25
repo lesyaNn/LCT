@@ -1,0 +1,173 @@
+"""P4-03-01 report creation contract (production; P4-06-01 LANDED).
+
+Frozen API (``report_jobs`` + background execution)::
+
+    POST /api/v1/reports  ->  202 Accepted  {"job_id": "uuid", "status": "queued"}
+
+:func:`create_report_job` validates the request (any of the three frozen
+formats), persists ``build_job_payload(...)`` (filters, resolved columns,
+format, actor scope) as a ``queued`` ``ReportJob`` and returns the real
+persisted id — never a fake UUID, never a silent synchronous ``200``
+file. The router schedules :func:`generate_report_task` via FastAPI
+``BackgroundTasks`` AFTER the commit, so a persistence failure never
+starts a worker.
+
+All three formats (``xlsx`` / ``pdf`` / ``json``) share one validation
+path, one job payload shape and one worker entry point
+(:func:`generate_report_file`); every generator reads ONLY from
+``ReportDatasetService`` with titles ONLY from ``COLUMN_REGISTRY``.
+
+Security note: :func:`build_job_payload` captures the actor identity
+(``sub``) AND the effective university scope alongside the serialized
+filter, so the worker re-applies the same security intersection
+instead of re-running the filter as admin/global.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Callable, Literal
+
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+
+from app.modules.analytics.filters import UnifiedFilter
+from app.modules.analytics.json_export import generate_json_report
+from app.modules.analytics.pdf import generate_pdf_report
+from app.modules.analytics.report_request import ReportRequest
+from app.modules.analytics.xlsx import generate_xlsx_report
+from app.schemas.common import ReportFormat
+
+__all__ = [
+    "FORMAT_GENERATORS",
+    "REPORTS_READ_PERMISSION",
+    "ReportQueuedResponse",
+    "build_job_payload",
+    "create_report_job",
+    "ensure_supported_format",
+    "ensure_xlsx",
+    "generate_report_file",
+]
+
+#: Frozen report/read permission contract (see ``app/core/permissions.py`` —
+#: no ``reports.write`` exists, so creation also gates on ``reports.read``;
+#: held by ``admin`` + ``manager`` — access is never widened here).
+REPORTS_READ_PERMISSION = "reports.read"
+
+
+class ReportQueuedResponse(BaseModel):
+    """Frozen ``202 Accepted`` body for ``POST /api/v1/reports``."""
+
+    job_id: str = Field(description="Persistent P4-06-01 ReportJob id (uuid).")
+    status: Literal["queued"] = Field(
+        default="queued", description="Lifecycle state right after enqueue."
+    )
+
+
+def ensure_supported_format(request: ReportRequest) -> None:
+    """Gate a request to the three frozen formats (xlsx | pdf | json)."""
+    if request.format not in (ReportFormat.XLSX, ReportFormat.PDF, ReportFormat.JSON):
+        raise ValueError(
+            f"unsupported report format: {request.format!r} (expected one of 'xlsx', 'pdf', 'json')"
+        )
+
+
+def ensure_xlsx(request: ReportRequest) -> None:
+    """Gate this work block to ``format == xlsx`` (else: never run XLSX gen)."""
+    if request.format is not ReportFormat.XLSX:
+        raise ValueError(
+            f"unsupported report format for the XLSX generator: {request.format!r} "
+            "(expected 'xlsx')"
+        )
+
+
+#: Worker-facing dispatch table (P4-06-01 seam): format -> file generator.
+#: Every generator shares the signature
+#: ``(db, filters, columns, output_path, *, user, generated_at)`` and
+#: returns ``GeneratedReport``.
+FORMAT_GENERATORS: dict[ReportFormat, Callable[..., Any]] = {
+    ReportFormat.XLSX: generate_xlsx_report,
+    ReportFormat.PDF: generate_pdf_report,
+    ReportFormat.JSON: generate_json_report,
+}
+
+
+def generate_report_file(
+    db: Session,
+    request: ReportRequest,
+    output_path: str | Path,
+    *,
+    user: Any | None = None,
+    generated_at: Any | None = None,
+) -> Any:
+    """Synchronous worker entry point for the P4-06-01 background job.
+
+    Dispatches ``request.format`` to the matching file generator (all read
+    ONLY from ``ReportDatasetService``). Pure file generation — no job
+    persistence, no queue; P4-06-01 calls this inside the worker with the
+    re-applied actor scope. Raises ``ValueError`` for unknown formats.
+    """
+    ensure_supported_format(request)
+    generate = FORMAT_GENERATORS[request.format]
+    return generate(
+        db,
+        request.filters,
+        request.resolved_columns,
+        output_path,
+        user=user,
+        generated_at=generated_at,
+    )
+
+
+def build_job_payload(request: ReportRequest, user: Any) -> dict[str, Any]:
+    """Persistence-ready job body for the future P4-06-01 ``ReportJob``.
+
+    Pure function (no DB, no queue): serializes the validated request plus
+    the actor scope the worker must re-apply. ``columns`` are the resolved
+    output columns (default 14 applied, order preserved). Identical shape
+    for ``xlsx`` / ``pdf`` / ``json`` (only ``format`` differs).
+    """
+    roles = sorted(getattr(user, "roles", None) or [])
+    from app.core.policies import get_data_scope
+
+    policy = get_data_scope(user)
+    scope = None if policy.is_all else tuple(sorted(str(v) for v in policy.university_ids))
+    return {
+        "format": request.format.value,
+        "filters": request.filters.model_dump(mode="json"),
+        "columns": request.resolved_columns,
+        "actor": {
+            "sub": getattr(user, "id", ""),
+            "roles": roles,
+            "university_ids": list(scope) if scope is not None else None,
+        },
+    }
+
+
+def create_report_job(db: Session, request: ReportRequest, user: Any) -> ReportQueuedResponse:
+    """Validate + persist a report job (``status=queued``) and return its id.
+
+    Ordering (never a fake id): validate -> persist -> commit -> return the
+    persisted ``job.id``. The caller (router) schedules the background
+    worker AFTER this commit; a persistence failure raises before any
+    worker is ever started. ``columns`` are stored already resolved
+    (default applied, order preserved, deduped) so the worker never
+    depends on a changed client request.
+    """
+    from app.modules.analytics import report_jobs as jobs
+
+    ensure_supported_format(request)
+    UnifiedFilter.model_validate(request.filters.model_dump(mode="json"))
+    payload = build_job_payload(request, user)
+    actor = payload["actor"]
+    job = jobs.create_job(
+        db,
+        format=payload["format"],
+        filters=payload["filters"],
+        columns=payload["columns"],
+        actor_sub=actor["sub"],
+        actor_name=getattr(user, "name", None) or getattr(user, "username", None) or "",
+        actor_roles=actor["roles"],
+        effective_university_ids=actor["university_ids"],
+    )
+    return ReportQueuedResponse(job_id=str(job.id), status="queued")

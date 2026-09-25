@@ -7,12 +7,14 @@ Thin routes: params -> auth/RBAC -> cache -> service -> DTO. Без SQL и
 import uuid
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.errors import BusinessException
 from app.core.permissions import require_permission
+from app.core.policies import apply_university_scope, ensure_university_visible
 from app.core.security import CurrentUser
 from app.db.session import get_db
 from app.infrastructure import redis as redis_infra
@@ -30,6 +32,7 @@ from app.modules.health_score.snapshot_schemas import (
     HealthScoreSnapshotOut,
     SnapshotTrigger,
 )
+from app.schemas.errors import ErrorCode
 
 router = APIRouter(prefix="/universities", tags=["health-score"])
 
@@ -50,13 +53,11 @@ def _parse_ids(raw: str) -> list[uuid.UUID]:
     try:
         ids = [uuid.UUID(part.strip()) for part in raw.split(",") if part.strip()]
     except ValueError:
-        raise HTTPException(status_code=422, detail="Invalid UUID in ids")
+        raise BusinessException(ErrorCode.VALIDATION_ERROR)
     if not ids:
-        raise HTTPException(status_code=422, detail="ids must not be empty")
+        raise BusinessException(ErrorCode.VALIDATION_ERROR)
     if len(ids) > BATCH_MAX_IDS:
-        raise HTTPException(
-            status_code=422, detail=f"Too many ids (max {BATCH_MAX_IDS})"
-        )
+        raise BusinessException(ErrorCode.VALIDATION_ERROR)
     return ids
 
 
@@ -82,12 +83,14 @@ def get_universities_health_score_batch(
         examples=["3fa85f64-5717-4562-b3fc-2c963f66afa6,7c9e6679-7425-40de-944b-e07fc1f90ae7"],
     ),
     db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(require_permission("university.read")),
+    user: CurrentUser = Depends(require_permission("university.read")),
 ) -> HealthScoreBatchResponse:
     wanted = _parse_ids(ids)
     existing = set(
         db.execute(
-            select(University.id).where(University.id.in_(wanted))
+            apply_university_scope(
+                select(University.id).where(University.id.in_(wanted)), University.id, user
+            )
         ).scalars().all()
     )
     items: list[HealthScoreShort] = []
@@ -120,13 +123,14 @@ def get_universities_health_score_batch(
 def get_university_health_score(
     university_id: uuid.UUID,
     db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(require_permission("university.read")),
+    user: CurrentUser = Depends(require_permission("university.read")),
 ) -> HealthScoreResponse:
     exists = db.execute(
         select(University.id).where(University.id == university_id)
     ).first()
     if exists is None:
-        raise HTTPException(status_code=404, detail="University not found")
+        raise BusinessException(ErrorCode.NOT_FOUND)
+    ensure_university_visible(university_id, user)
     cached = health_cache.get_cached(university_id)
     if cached is not None:
         return cached
@@ -153,13 +157,14 @@ def get_university_health_score(
 def get_university_attention_items(
     university_id: uuid.UUID,
     db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(require_permission("university.read")),
+    user: CurrentUser = Depends(require_permission("university.read")),
 ) -> AttentionItemsResponse:
     exists = db.execute(
         select(University.id).where(University.id == university_id)
     ).first()
     if exists is None:
-        raise HTTPException(status_code=404, detail="University not found")
+        raise BusinessException(ErrorCode.NOT_FOUND)
+    ensure_university_visible(university_id, user)
     cache_key = f"attention_items:{university_id}"
     raw = redis_infra.cache_get(cache_key)
     if raw:
@@ -193,7 +198,7 @@ def get_university_health_score_history(
         default=None, description="Фильтр по триггеру (по умолчанию — все)"
     ),
     db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(require_permission("university.read")),
+    user: CurrentUser = Depends(require_permission("university.read")),
 ) -> list[HealthScoreSnapshotOut]:
     from datetime import datetime, timezone
 
@@ -201,7 +206,8 @@ def get_university_health_score_history(
         select(University.id).where(University.id == university_id)
     ).first()
     if exists is None:
-        raise HTTPException(status_code=404, detail="University not found")
+        raise BusinessException(ErrorCode.NOT_FOUND)
+    ensure_university_visible(university_id, user)
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     stmt = (
         select(HealthScoreSnapshot)

@@ -30,7 +30,6 @@ Overdue math is never local here: consumers use
 
 from __future__ import annotations
 
-import json
 import uuid
 from datetime import datetime, timezone
 
@@ -45,7 +44,7 @@ from app.models.workflow_instances import (
     WorkflowStageTransition,
 )
 from app.models.workflow_templates import WorkflowStage
-from app.modules.audit.models import AuditEvent
+from app.modules.audit.service import AuditAction, AuditService, context_for
 from app.modules.workflow_transitions.schemas import (
     WorkflowCommentCreate,
     WorkflowCommentUpdate,
@@ -173,30 +172,30 @@ def transition_instance(
             comment=text,
         )
     )
-    db.add(
-        AuditEvent(
-            user_id=actor,
-            entity_type="workflow_instance",
-            entity_id=str(instance.id),
-            action="WORKFLOW_TRANSITION",
-            before_data=json.dumps(
-                {
-                    "stage": current.name,
-                    "order_index": current.order_index,
-                },
-                ensure_ascii=False,
-            ),
-            after_data=json.dumps(
-                {
-                    "stage": target.name,
-                    "order_index": target.order_index,
-                },
-                ensure_ascii=False,
-            ),
-            university_id=instance.university_id,
-        )
+    AuditService(db).enqueue_event(
+        context=context_for(db, actor),
+        action=AuditAction.WORKFLOW_TRANSITION,
+        entity_type="workflow_instance",
+        entity_id=instance.id,
+        university_id=instance.university_id,
+        old_value={"stage_id": current.template_stage_id, "stage_name": current.name},
+        new_value={"stage_id": target.template_stage_id, "stage_name": target.name, "comment": text},
     )
     db.commit()
+    # P2-08-01 + P2-09-01: post-commit writers (best-effort — a writer
+    # failure must never roll back the committed transition).
+    try:
+        from app.modules.health_score.cache import invalidate_health_score
+
+        invalidate_health_score(instance.university_id)
+    except Exception:
+        pass
+    try:
+        from app.modules.health_score.materialization import refresh_health_score
+        refresh_health_score(db, instance.university_id, "transition", create_snapshot=True)
+        db.commit()
+    except Exception:
+        pass
     return get_instance_or_404(db, instance.id)
 
 
@@ -230,6 +229,60 @@ def list_comments(db: Session, instance_id: uuid.UUID) -> list[WorkflowComment]:
             )
         ).scalars()
     )
+
+
+def list_comment_page(
+    db: Session, instance_id: uuid.UUID, *, page: int, page_size: int
+) -> tuple[list[WorkflowComment], int]:
+    """Paginated instance discussion, oldest first (P2-04-01)."""
+    from sqlalchemy import func as _func
+
+    get_instance_or_404(db, instance_id)
+    base = select(WorkflowComment).where(WorkflowComment.instance_id == instance_id)
+    total = db.execute(select(_func.count()).select_from(base.subquery())).scalar_one()
+    rows = (
+        db.execute(
+            base.order_by(WorkflowComment.created_at.asc(), WorkflowComment.id.asc())
+            .limit(page_size)
+            .offset((page - 1) * page_size)
+        )
+        .scalars()
+        .all()
+    )
+    return list(rows), total
+
+
+def get_comment_or_404(db: Session, comment_id: uuid.UUID) -> WorkflowComment:
+    """Fetch a comment row without mutating (for scope checks)."""
+    comment = db.get(WorkflowComment, comment_id)
+    if comment is None:
+        raise NotFound("Workflow comment not found")
+    return comment
+
+
+def delete_comment(
+    db: Session, comment_id: uuid.UUID, actor: str, actor_roles: set[str]
+) -> WorkflowComment:
+    """Delete a comment: author within 15 minutes, admins any time (P2-04-01).
+
+    Same gate as edits. Returns the deleted row (for the scope check);
+    the caller deletes after authorizing the instance.
+    """
+    comment = get_comment_or_404(db, comment_id)
+    is_admin = "admin" in (actor_roles or set())
+    if comment.author_keycloak_sub != actor and not is_admin:
+        raise BadTransition("Only the author or an admin can delete a comment")
+    if not is_admin:
+        created = comment.created_at
+        if created is not None:
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            age = (utcnow() - created).total_seconds()
+            if age > COMMENT_EDIT_WINDOW_SECONDS:
+                raise Conflict("Comment delete window has expired")
+    db.delete(comment)
+    db.commit()
+    return comment
 
 
 def add_comment(
@@ -294,8 +347,11 @@ __all__ = [
     "CLOSED_STAGE_STATUSES",
     "COMMENT_EDIT_WINDOW_SECONDS",
     "add_comment",
+    "delete_comment",
     "edit_comment",
+    "get_comment_or_404",
     "get_instance_or_404",
+    "list_comment_page",
     "list_comments",
     "list_transitions",
     "transition_instance",

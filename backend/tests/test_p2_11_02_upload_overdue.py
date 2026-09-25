@@ -51,7 +51,6 @@ from app.models.workflow_instances import (
 )
 from app.models.workflow_templates import WorkflowStage, WorkflowTemplate
 from app.modules.workflow_attachments.policy import (
-    FILE_TYPE_CONTRACT_STATUS,
     MAX_FILE_SIZE_BYTES,
     content_disposition,
 )
@@ -331,7 +330,7 @@ def test_acceptance_missing_object_controlled_and_idempotent_delete(client, db, 
     (storage_dir / db.get(WorkflowAttachment, aid).storage_key).unlink()
 
     d = client.get(f"/api/v1/workflow/instances/{g['instance'].id}/attachments/{aid}/download")
-    assert d.status_code == 500
+    assert d.status_code == 404  # P2-05-02: missing object is 404, not 500
     assert "Traceback" not in d.text  # controlled error, no leak
     assert (
         client.delete(
@@ -367,16 +366,18 @@ def test_acceptance_auth_matrix(auth_client, db):
         == 403
     )
 
-    mgr_h = _auth(auth_client, ["manager"])
+    mgr_h = _auth(auth_client, ["manager"], [str(g["university"].id)])
     assert auth_client.get(meta_url, headers=mgr_h).status_code == 200  # read OK
-    assert (
-        auth_client.post(
-            f"/api/v1/workflow/instances/{iid}/attachments",
-            files={"file": ("m.pdf", io.BytesIO(b"x"), "application/pdf")},
-            headers=mgr_h,
-        ).status_code
-        == 403  # mutation denied
+    mgr_upload = auth_client.post(
+        f"/api/v1/workflow/instances/{iid}/attachments",
+        files={"file": ("m.pdf", io.BytesIO(b"x"), "application/pdf")},
+        headers=mgr_h,
     )
+    assert mgr_upload.status_code == 201, mgr_upload.text
+    assert auth_client.delete(
+        f"/api/v1/workflow/instances/{iid}/attachments/{mgr_upload.json()['id']}",
+        headers=mgr_h,
+    ).status_code == 204
 
     cur_h = _auth(auth_client, ["curator"])
     up = auth_client.post(
@@ -384,14 +385,7 @@ def test_acceptance_auth_matrix(auth_client, db):
         files={"file": ("c.pdf", io.BytesIO(b"c"), "application/pdf")},
         headers=cur_h,
     )
-    assert up.status_code == 201, up.text
-    assert (
-        auth_client.delete(
-            f"/api/v1/workflow/instances/{iid}/attachments/{up.json()['id']}",
-            headers=cur_h,
-        ).status_code
-        == 204
-    )
+    assert up.status_code == 403, up.text
     assert auth_client.delete(meta_url, headers=admin_h).status_code == 204
 
 
@@ -440,20 +434,28 @@ def test_acceptance_50mib_plus_one_413_no_leftovers(client, db, storage_dir, tmp
     assert list((storage_dir / ".tmp").iterdir()) == []
 
 
-def test_acceptance_10_type_contract_is_partial_not_invented():
-    """P2-05-01 = PARTIAL: no source of truth for the 10 file types exists.
+def test_acceptance_10_type_contract_is_partial_not_invented(monkeypatch):
+    """P2-05-01: allowlist is env-configured, open by default (no invention).
 
-    The suite pins the blocked status and asserts the service records the
-    declared type instead of enforcing an invented allowlist.
+    Default (no env): the declared type is recorded, never rejected.
+    With ``UPLOAD_ALLOWED_EXTENSIONS`` set: other extensions -> 415.
     """
 
-    assert FILE_TYPE_CONTRACT_STATUS == "PARTIAL_BLOCKED_BY_MISSING_FILE_TYPE_CONTRACT"
+    from app.config import settings
     from app.modules.workflow_attachments import policy
+    from fastapi import HTTPException
 
-    assert policy.ALLOWED_EXTENSIONS is None
-    assert policy.ALLOWED_MIME_TYPES is None
+    monkeypatch.setattr(settings, "upload_allowed_extensions", "")
+    assert policy.get_allowed_extensions() is None
     assert policy.check_file_type("report.pdf", "application/pdf") == "application/pdf"
     assert policy.check_file_type("weird.bin", None) == "application/octet-stream"
+
+    monkeypatch.setattr(settings, "upload_allowed_extensions", "pdf,docx")
+    assert policy.get_allowed_extensions() == frozenset({"pdf", "docx"})
+    assert policy.check_file_type("report.PDF", "application/pdf") == "application/pdf"
+    with pytest.raises(HTTPException) as ei:
+        policy.check_file_type("run.exe", "application/octet-stream")
+        assert ei.value.status_code == 400
 
 
 # =================================================== overdue acceptance ==

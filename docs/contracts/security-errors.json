@@ -1,0 +1,342 @@
+{
+  "version": "2.0.0",
+  "base_api": "/api/v1",
+  "schema": "backend/app/schemas/errors.py",
+  "codes": [
+    "AUTH_REQUIRED",
+    "TOKEN_EXPIRED",
+    "TOKEN_INVALID",
+    "FORBIDDEN",
+    "ADMIN_REQUIRED",
+    "NOT_FOUND",
+    "CONFLICT",
+    "GONE",
+    "VALIDATION_ERROR",
+    "WORKFLOW_INVALID_TRANSITION",
+    "WORKFLOW_INSTANCE_NOT_ACTIVE",
+    "STAGE_ALREADY_COMPLETED",
+    "FILE_TYPE_NOT_ALLOWED",
+    "FILE_TOO_LARGE",
+    "FILE_NOT_FOUND",
+    "IMPORT_FAILED",
+    "IMPORT_VALIDATION_FAILED",
+    "REPORT_FAILED",
+    "REPORT_NOT_READY",
+    "EXTERNAL_SOURCE_UNAVAILABLE",
+    "EXTERNAL_SYNC_FAILED",
+    "RATE_LIMITED",
+    "METHOD_NOT_ALLOWED",
+    "HTTP_ERROR",
+    "INTERNAL_ERROR"
+  ],
+  "error_response": {
+    "error": {
+      "code": "VALIDATION_ERROR",
+      "message": "Описание для пользователя",
+      "request_id": "00000000-0000-4000-8000-000000000000",
+      "details": {}
+    }
+  },
+  "validation_details": {
+    "field_errors": [
+      {
+        "field": "body.email",
+        "message": "Некорректное значение",
+        "type": "value_error"
+      }
+    ]
+  },
+  "request_id": {
+    "format": "UUID",
+    "source": "request.state.request_id",
+    "response_header": "X-Request-ID",
+    "semantics": "The error field and response header contain the same UUID. A valid incoming X-Request-ID is reused; otherwise a new UUID is generated."
+  },
+  "authentication": {
+    "scheme": "BearerAuth",
+    "unauthorized_header": {
+      "WWW-Authenticate": "Bearer"
+    },
+    "codes": [
+      "AUTH_REQUIRED",
+      "TOKEN_EXPIRED",
+      "TOKEN_INVALID"
+    ],
+    "jwt_internal_errors_exposed": false
+  },
+  "http_status": {
+    "AUTH_REQUIRED": 401,
+    "TOKEN_EXPIRED": 401,
+    "TOKEN_INVALID": 401,
+    "FORBIDDEN": 403,
+    "ADMIN_REQUIRED": 403,
+    "NOT_FOUND": 404,
+    "CONFLICT": 409,
+    "GONE": 410,
+    "VALIDATION_ERROR": 422,
+    "WORKFLOW_INVALID_TRANSITION": 400,
+    "WORKFLOW_INSTANCE_NOT_ACTIVE": 409,
+    "STAGE_ALREADY_COMPLETED": 409,
+    "FILE_TYPE_NOT_ALLOWED": 400,
+    "FILE_TOO_LARGE": 413,
+    "FILE_NOT_FOUND": 404,
+    "IMPORT_FAILED": 500,
+    "IMPORT_VALIDATION_FAILED": 400,
+    "REPORT_FAILED": 500,
+    "REPORT_NOT_READY": 400,
+    "EXTERNAL_SOURCE_UNAVAILABLE": 503,
+    "EXTERNAL_SYNC_FAILED": 500,
+    "RATE_LIMITED": 429,
+    "METHOD_NOT_ALLOWED": 405,
+    "HTTP_ERROR": 500,
+    "INTERNAL_ERROR": 500
+  },
+  "messages": {
+    "AUTH_REQUIRED": "Требуется авторизация. Пожалуйста, войдите в систему.",
+    "TOKEN_EXPIRED": "Сессия истекла. Пожалуйста, войдите снова.",
+    "TOKEN_INVALID": "Недействительный токен. Пожалуйста, войдите снова.",
+    "FORBIDDEN": "У вас нет прав для выполнения этого действия.",
+    "ADMIN_REQUIRED": "Требуются права администратора.",
+    "NOT_FOUND": "Запрашиваемый ресурс не найден.",
+    "CONFLICT": "Конфликт данных.",
+    "GONE": "Ресурс больше недоступен.",
+    "VALIDATION_ERROR": "Проверьте правильность заполнения полей.",
+    "WORKFLOW_INVALID_TRANSITION": "Нельзя перейти на этот этап.",
+    "WORKFLOW_INSTANCE_NOT_ACTIVE": "Workflow неактивен. Переход невозможен.",
+    "STAGE_ALREADY_COMPLETED": "Этап уже завершён.",
+    "FILE_TYPE_NOT_ALLOWED": "Тип файла не поддерживается.",
+    "FILE_TOO_LARGE": "Файл слишком большой. Максимум 50 МБ.",
+    "FILE_NOT_FOUND": "Файл не найден.",
+    "IMPORT_FAILED": "Не удалось выполнить импорт.",
+    "IMPORT_VALIDATION_FAILED": "Импортируемые данные не прошли проверку.",
+    "REPORT_FAILED": "Не удалось сгенерировать отчёт. Попробуйте позже.",
+    "REPORT_NOT_READY": "Отчёт ещё формируется. Подождите немного.",
+    "EXTERNAL_SOURCE_UNAVAILABLE": "Внешний источник данных временно недоступен.",
+    "EXTERNAL_SYNC_FAILED": "Ошибка синхронизации с внешним источником.",
+    "RATE_LIMITED": "Слишком много запросов. Попробуйте позже.",
+    "METHOD_NOT_ALLOWED": "Метод запроса не поддерживается для этого ресурса.",
+    "HTTP_ERROR": "Не удалось обработать запрос.",
+    "INTERNAL_ERROR": "Внутренняя ошибка сервера."
+  },
+  "examples": {
+    "AUTH_REQUIRED": {
+      "error": {
+        "code": "AUTH_REQUIRED",
+        "message": "Требуется авторизация. Пожалуйста, войдите в систему.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "TOKEN_EXPIRED": {
+      "error": {
+        "code": "TOKEN_EXPIRED",
+        "message": "Сессия истекла. Пожалуйста, войдите снова.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "TOKEN_INVALID": {
+      "error": {
+        "code": "TOKEN_INVALID",
+        "message": "Недействительный токен. Пожалуйста, войдите снова.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "FORBIDDEN": {
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "У вас нет прав для выполнения этого действия.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "VALIDATION_ERROR": {
+      "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "Проверьте правильность заполнения полей.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {
+          "field_errors": []
+        }
+      }
+    },
+    "NOT_FOUND": {
+      "error": {
+        "code": "NOT_FOUND",
+        "message": "Запрашиваемый ресурс не найден.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "CONFLICT": {
+      "error": {
+        "code": "CONFLICT",
+        "message": "Конфликт данных.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "GONE": {
+      "error": {
+        "code": "GONE",
+        "message": "Ресурс больше недоступен.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "WORKFLOW_INVALID_TRANSITION": {
+      "error": {
+        "code": "WORKFLOW_INVALID_TRANSITION",
+        "message": "Нельзя перейти на этот этап.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "FILE_TOO_LARGE": {
+      "error": {
+        "code": "FILE_TOO_LARGE",
+        "message": "Файл слишком большой. Максимум 50 МБ.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "REPORT_NOT_READY": {
+      "error": {
+        "code": "REPORT_NOT_READY",
+        "message": "Отчёт ещё формируется. Подождите немного.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "INTERNAL_ERROR": {
+      "error": {
+        "code": "INTERNAL_ERROR",
+        "message": "Внутренняя ошибка сервера.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "ADMIN_REQUIRED": {
+      "error": {
+        "code": "ADMIN_REQUIRED",
+        "message": "Требуются права администратора.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "WORKFLOW_INSTANCE_NOT_ACTIVE": {
+      "error": {
+        "code": "WORKFLOW_INSTANCE_NOT_ACTIVE",
+        "message": "Workflow неактивен. Переход невозможен.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "STAGE_ALREADY_COMPLETED": {
+      "error": {
+        "code": "STAGE_ALREADY_COMPLETED",
+        "message": "Этап уже завершён.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "FILE_TYPE_NOT_ALLOWED": {
+      "error": {
+        "code": "FILE_TYPE_NOT_ALLOWED",
+        "message": "Тип файла не поддерживается.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "FILE_NOT_FOUND": {
+      "error": {
+        "code": "FILE_NOT_FOUND",
+        "message": "Файл не найден.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "IMPORT_FAILED": {
+      "error": {
+        "code": "IMPORT_FAILED",
+        "message": "Не удалось выполнить импорт.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "IMPORT_VALIDATION_FAILED": {
+      "error": {
+        "code": "IMPORT_VALIDATION_FAILED",
+        "message": "Импортируемые данные не прошли проверку.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "REPORT_FAILED": {
+      "error": {
+        "code": "REPORT_FAILED",
+        "message": "Не удалось сгенерировать отчёт. Попробуйте позже.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "EXTERNAL_SOURCE_UNAVAILABLE": {
+      "error": {
+        "code": "EXTERNAL_SOURCE_UNAVAILABLE",
+        "message": "Внешний источник данных временно недоступен.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "EXTERNAL_SYNC_FAILED": {
+      "error": {
+        "code": "EXTERNAL_SYNC_FAILED",
+        "message": "Ошибка синхронизации с внешним источником.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "RATE_LIMITED": {
+      "error": {
+        "code": "RATE_LIMITED",
+        "message": "Слишком много запросов. Попробуйте позже.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "METHOD_NOT_ALLOWED": {
+      "error": {
+        "code": "METHOD_NOT_ALLOWED",
+        "message": "Метод запроса не поддерживается для этого ресурса.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "HTTP_ERROR": {
+      "error": {
+        "code": "HTTP_ERROR",
+        "message": "Не удалось обработать запрос.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    }
+  },
+  "security": {
+    "forbidden_details": {},
+    "sensitive_values_exposed": false,
+    "unknown_route": {
+      "status": 404,
+      "code": "NOT_FOUND"
+    },
+    "method_not_allowed": {
+      "status": 405,
+      "code": "METHOD_NOT_ALLOWED"
+    },
+    "unhandled": {
+      "status": 500,
+      "code": "INTERNAL_ERROR"
+    }
+  },
+  "migration_scope": "P5-06 standardizes representation only; successful payloads and business conditions remain unchanged."
+}

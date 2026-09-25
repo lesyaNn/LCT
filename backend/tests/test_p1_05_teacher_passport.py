@@ -251,7 +251,9 @@ def test_unknown_teacher_404(db: Session):
 def test_unknown_teacher_404_http(engine, api_client):
     r = api_client.get(f"/api/v1/teachers/{uuid.uuid4()}/passport")
     assert r.status_code == 404
-    assert r.json() == {"detail": "Teacher not found"}
+    assert set(r.json()) == {"error"}
+    assert r.json()["error"]["code"] == "NOT_FOUND"
+    assert r.json()["error"]["request_id"] == r.headers["X-Request-ID"]
 
 
 def test_invalid_uuid_422_http(engine, api_client):
@@ -571,7 +573,7 @@ def _rsa_setup(monkeypatch, kid: str):
     return priv
 
 
-def _mint(priv: str, kid: str, roles: list[str]) -> str:
+def _mint(priv: str, kid: str, roles: list[str], university_ids=None) -> str:
     from jose import jwt as _jwt
 
     now = datetime.now(timezone.utc)
@@ -584,6 +586,7 @@ def _mint(priv: str, kid: str, roles: list[str]) -> str:
             "aud": settings.keycloak_audience,
             "iat": now,
             "exp": now + timedelta(minutes=5),
+            **({"university_ids": university_ids} if university_ids is not None else {}),
         },
         priv,
         algorithm="RS256",
@@ -616,7 +619,10 @@ def test_401_missing_token(engine, real_client):
         tid = str(t.id)
     r = real_client.get(f"/api/v1/teachers/{tid}/passport")
     assert r.status_code == 401, r.text
-    assert r.json() == {"detail": "Missing bearer token"}
+    assert r.json()["error"]["code"] == "AUTH_REQUIRED"
+    assert r.json()["error"]["details"] == {}
+    assert r.headers["WWW-Authenticate"] == "Bearer"
+    assert r.json()["error"]["request_id"] == r.headers["X-Request-ID"]
 
 
 def test_403_guest_without_permission(engine, real_client, monkeypatch):
@@ -634,20 +640,22 @@ def test_403_guest_without_permission(engine, real_client, monkeypatch):
 
 
 @pytest.mark.parametrize("role", ["admin", "manager", "curator", "user"])
-def test_200_allowed_roles(engine, real_client, monkeypatch, role):
-    """Frozen contract: teacher passport reuses ``university.read`` (no new permission)."""
+def test_passport_role_scope(engine, real_client, monkeypatch, role):
+    """A curator remains denied even with an explicit university claim."""
     with Session(engine) as s:
         u = _university(s, f"Uni TP5 200 {role}")
         t = _teacher(s, u, f"t200-{role}@example.local")
+        university_id = str(u.id)
         s.commit()
         tid = str(t.id)
     priv = _rsa_setup(monkeypatch, f"tp5-{role}")
-    token = _mint(priv, f"tp5-{role}", [role])
+    token = _mint(priv, f"tp5-{role}", [role], [university_id])
     r = real_client.get(
         f"/api/v1/teachers/{tid}/passport", headers={"Authorization": f"Bearer {token}"}
     )
-    assert r.status_code == 200, (role, r.text)
-    TeacherPassport.model_validate(r.json())
+    assert r.status_code == (403 if role == "curator" else 200), (role, r.text)
+    if role != "curator":
+        TeacherPassport.model_validate(r.json())
 
 
 # ============================================================ openapi ===

@@ -175,7 +175,10 @@ class WorkflowSummary(BaseModel):
 
     instance_id: str | None = None
     template_name: str | None = None
-    current_stage: str | None = None
+    # Legacy mocks carry the richer ``{code, name}`` pointer while the
+    # evolved passport service may emit a stage name.  Accept both wire
+    # shapes during the compatibility window; P2 owns the full stage DTO.
+    current_stage: str | dict[str, str] | None = None
     progress_percent: float = 0.0
     overdue_stages: int = 0
     next_due_date: date | None = None
@@ -210,14 +213,14 @@ class HealthScoreResponse(BaseModel):
 class AuditEventShort(BaseModel):
     """P1-04-05 optional block item (``?include=audit``).
 
-    Field set mirrors the real P5 ``AuditEvent`` model 1:1 (int ids —
-    the legacy columns are Integer; nothing invented).
+    Field set mirrors the P5 canonical UUID audit identity while retaining
+    the P1 optional block's field names and shape.
     """
 
-    id: int
-    user_id: int
+    id: uuid.UUID
+    user_id: str
     entity_type: str
-    entity_id: int
+    entity_id: uuid.UUID
     action: str
     created_at: datetime
 

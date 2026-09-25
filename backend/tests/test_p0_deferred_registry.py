@@ -1,12 +1,13 @@
 """P0-1 guard: one schema universe + deferred modules stay unmounted.
 
 Pins the resolution of the "two schema universes" blocker:
-* canonical ``Base.metadata`` contains exactly the 30 SQL-managed tables
+* canonical ``Base.metadata`` contains exactly the 31 SQL-managed tables
   (21 P1 tables + 8 B1 workflow tables from 000011-000014 + 1 P2 health
-  snapshot table ``health_score_snapshots`` from 000015);
+  snapshot table ``health_score_snapshots`` from 000015 + 1 P4 report job
+  table ``report_jobs`` from 000018);
 * pre-UUID / stub models live on ``DeferredBase`` metadata only;
 * deferred routers are importable but NOT mounted in the production app;
-* ``AuditEvent.user_id/entity_id`` accept Keycloak ``sub`` (TEXT, 000010).
+* ``AuditEvent.user_id`` accepts Keycloak ``sub``; entity identity is UUID (000021).
 
 The deferred-module table (reasons + reactivation checklist) lives in
 ``docs/AUDIT.md`` (§0); this test pins its enforcement side.
@@ -51,6 +52,9 @@ CANON_TABLES = frozenset(
         "workflow_tasks",
         "instance_stages",
         "health_score_snapshots",
+        "report_jobs",
+        "health_score_current",
+        "audit_outbox",
     }
 )
 
@@ -70,9 +74,13 @@ DEFERRED_TABLES = frozenset(
 # unmounted until the reactivation checklist in docs/AUDIT.md (§0) is done.
 # NOTE (P2-08-03): "/health-score" стал production (ranking) и убран отсюда;
 # legacy health_score router при этом остаётся незамаунченным.
+# NOTE (P4-06-01): "/reports" стал production (canonical async reports:
+# POST queued job + status + download, migration 000018) и убран отсюда;
+# legacy demo stub app/modules/reporting (POST /export over an in-memory
+# queue) при этом остаётся незамаунченным (см. test_legacy_reporting_stub).
 DEFERRED_API_PREFIXES = (
-    "/audit", "/dashboard", "/documents", "/users",
-    "/integrations", "/notifications", "/reports", "/workflows", "/tasks",
+    "/dashboard", "/documents", "/users",
+    "/integrations", "/notifications", "/workflows", "/tasks",
 )
 
 
@@ -135,6 +143,8 @@ def test_mounted_routers_are_only_the_production_contract():
         "/api/v1/import",
         "/api/v1/catalog",
         "/api/v1/universities",
+        "/api/v1/meetings",
+        "/api/v1/students",
         "/api/v1/directions",
         "/api/v1/programs",
         "/api/v1/products",
@@ -143,6 +153,9 @@ def test_mounted_routers_are_only_the_production_contract():
         "/api/v1/teachers",
         "/api/v1/workflow",
         "/api/v1/health-score",
+        "/api/v1/analytics",
+        "/api/v1/reports",
+        "/api/v1/audit/events",
     )
     paths = _mounted_api_paths()
     assert all(path.startswith(allowed) for path in paths), paths
@@ -153,11 +166,28 @@ def test_deferred_prefixes_absent_from_openapi_paths():
 
     Module list mirrors ``docs/AUDIT.md`` (§0): universities-CRUD,
     teachers-CRUD, programs, workflow, documents, health_score, identity,
-    audit, dashboard, reporting, integrations, notifications.
+    dashboard, reporting, integrations, notifications. P5 mounted audit events.
     """
     paths = _mounted_api_paths()
     for prefix in DEFERRED_API_PREFIXES:
         assert not [p for p in paths if p.startswith(f"/api/v1{prefix}")], prefix
+
+
+def test_legacy_reporting_stub_stays_unmounted():
+    """Legacy demo stub (``POST /export`` over an in-memory queue) is NOT
+    the production report path and must never be mounted alongside the
+    canonical P4-06-01 ``/api/v1/reports`` contract (single creation path).
+    """
+    from app.modules.reporting.router import router as legacy_router
+
+    # NOTE: route.path already carries the router prefix on some FastAPI
+    # versions (and prefix+path on others) — assert on suffixes.
+    legacy_paths = {getattr(route, "path", "") for route in legacy_router.routes}
+    assert any(p.endswith("/reports/export") or p == "/export" for p in legacy_paths)
+    assert any(p.endswith("/reports/jobs/{job_id}") for p in legacy_paths)
+    mounted = _mounted_api_paths()
+    assert not [p for p in mounted if p.endswith("/export")], mounted
+    assert not [p for p in mounted if "/jobs/" in p and "reports" in p], mounted
 
 
 def test_universities_mount_is_passport_or_catalog_crud():
@@ -188,7 +218,7 @@ def test_audit_service_coerces_identity_to_str():
             seen["ev"] = ev
 
         def commit(self):
-            pass
+            raise AssertionError("AuditService must not commit")
 
         def refresh(self, ev):
             pass
@@ -198,4 +228,4 @@ def test_audit_service_coerces_identity_to_str():
     ev = AuditService(_DB()).log("sub-abc", "university", uuid.uuid4(), "update")  # type: ignore[arg-type]
     assert isinstance(ev, AuditEvent)
     assert isinstance(seen["ev"].user_id, str)
-    assert isinstance(seen["ev"].entity_id, str)
+    assert isinstance(seen["ev"].entity_id, uuid.UUID)

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.core.permissions import require_permission
+from app.core.policies import ensure_university_access
 from app.core.security import CurrentUser
 from app.modules.universities.passport_schemas import (
     PaginatedPrograms,
@@ -39,8 +40,9 @@ def get_university_passport(
         description="Optional blocks, comma-separated: health_score, audit",
     ),
     db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(require_permission("university.read")),
+    user: CurrentUser = Depends(require_permission("university.read")),
 ) -> UniversityPassport:
+    ensure_university_access(university_id, user)
     blocks = parse_include(include)
     return get_passport(db, university_id, include=blocks)
 
@@ -55,8 +57,9 @@ def get_university_passport_programs(
     page: int = Query(default=1, ge=1, description="Page number, 1-based"),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
     db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(require_permission("university.read")),
+    user: CurrentUser = Depends(require_permission("university.read")),
 ) -> PaginatedPrograms:
+    ensure_university_access(university_id, user)
     items, total = get_programs_page(db, university_id, page, page_size)
     return PaginatedPrograms(items=items, page=page, page_size=page_size, total=total)
 
@@ -71,7 +74,8 @@ def get_university_passport_teachers(
     page: int = Query(default=1, ge=1, description="Page number, 1-based"),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
     db: Session = Depends(get_db),
-    _user: CurrentUser = Depends(require_permission("university.read")),
+    user: CurrentUser = Depends(require_permission("university.read")),
 ) -> PaginatedTeachers:
+    ensure_university_access(university_id, user)
     items, total = get_teachers_page(db, university_id, page, page_size)
     return PaginatedTeachers(items=items, page=page, page_size=page_size, total=total)

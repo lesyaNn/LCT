@@ -49,6 +49,9 @@ from app.schemas.catalog import (
 # -------------------------------------------------------------- universities
 
 
+HEALTH_STATUSES = ("green", "yellow", "red")
+
+
 def list_university_page(
     db: Session,
     *,
@@ -59,18 +62,47 @@ def list_university_page(
     responsible_id: uuid.UUID | None,
     sort_by: str,
     sort_order: str,
+    unified_filter=None,
+    unified_today=None,
+    user=None,
+    health_status: str | None = None,
 ) -> tuple[list[UniversityRead], int]:
-    rows, total = repo.list_universities(
-        db,
-        page=page,
-        page_size=page_size,
-        search=search,
-        city=city,
-        responsible_id=responsible_id,
-        sort_by=sort_by,
-        sort_order=sort_order,
+    """List universities from the materialized health projection.
+
+    Health filtering, sorting, count and pagination stay in SQL so query
+    work is independent of the number of universities. Missing projections
+    remain ``NULL`` until the deployment backfill/refresh job runs.
+    """
+    if health_status is not None and health_status not in HEALTH_STATUSES:
+        raise ValueError(f"Unknown health_status: {health_status!r}")
+    if health_status is None and sort_by != "health_score":
+        rows, total = repo.list_universities(
+            db,
+            page=page,
+            page_size=page_size,
+            search=search,
+            city=city,
+            responsible_id=responsible_id,
+            sort_by=sort_by,
+            sort_order=sort_order,
+            unified_filter=unified_filter,
+            unified_today=unified_today,
+            user=user,
+        )
+        return [UniversityRead.model_validate(r) for r in rows], total
+    rows, total = repo.list_universities_health(
+        db, page=page, page_size=page_size, search=search, city=city,
+        responsible_id=responsible_id, sort_order=sort_order,
+        health_status=health_status, unified_filter=unified_filter,
+        unified_today=unified_today, user=user,
     )
-    return [UniversityRead.model_validate(r) for r in rows], total
+    items = []
+    for u, score, status in rows:
+        dto = UniversityRead.model_validate(u)
+        dto.health_score = score
+        dto.health_status = status
+        items.append(dto)
+    return items, total
 
 
 def get_university_detail(db: Session, university_id: uuid.UUID) -> UniversityDetail:

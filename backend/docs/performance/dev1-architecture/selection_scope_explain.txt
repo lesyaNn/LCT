@@ -1,0 +1,24 @@
+DEV1 ARCH/PERF PG16 EXPLAIN ANALYZE
+Dataset: 100 universities with materialized current scores.
+
+Limit  (cost=31.34..31.47 rows=50 width=16) (actual time=0.496..0.515 rows=50 loops=1)
+  Buffers: shared hit=4
+  ->  Sort  (cost=31.34..31.67 rows=133 width=16) (actual time=0.493..0.502 rows=50 loops=1)
+        Sort Key: u.id
+        Sort Method: quicksort  Memory: 27kB
+        Buffers: shared hit=4
+        ->  Hash Join  (cost=11.57..26.92 rows=133 width=16) (actual time=0.239..0.333 rows=100 loops=1)
+              Hash Cond: (h.university_id = u.id)
+              Buffers: shared hit=4
+              ->  Seq Scan on health_score_current h  (cost=0.00..15.00 rows=133 width=16) (actual time=0.040..0.083 rows=100 loops=1)
+                    Filter: (score >= 0)
+                    Buffers: shared hit=3
+              ->  Hash  (cost=10.70..10.70 rows=70 width=16) (actual time=0.141..0.142 rows=100 loops=1)
+                    Buckets: 1024  Batches: 1  Memory Usage: 13kB
+                    Buffers: shared hit=1
+                    ->  Seq Scan on universities u  (cost=0.00..10.70 rows=70 width=16) (actual time=0.018..0.042 rows=100 loops=1)
+                          Buffers: shared hit=1
+Planning:
+  Buffers: shared hit=3
+Planning Time: 1.099 ms
+Execution Time: 0.818 ms

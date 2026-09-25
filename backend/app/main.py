@@ -13,30 +13,35 @@ from app.api.router import v1
 from app.config import settings
 from app.core.errors import register_error_handlers
 from app.core.logging import request_log_middleware
+from app.core.middleware import RequestSizeLimitMiddleware, SecurityHeadersMiddleware
+from app.schemas.errors import ERROR_MESSAGES, ErrorCode
 
 app = FastAPI(
     title="CRM ИТ-Школа Ростелеком API",
-    description=__doc__.strip(),
+    description="API для управления взаимодействием с ВУЗами",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
     openapi_tags=[
+        {"name": "Auth", "description": "Аутентификация через Keycloak"},
         {"name": "Universities", "description": "Каталог ВУЗов и паспорта"},
-        {"name": "Directions", "description": "Направления подготовки (CRUD)"},
-        {"name": "Programs", "description": "Программы (CRUD, принадлежат направлению)"},
-        {"name": "Products", "description": "Продукты вендоров (CRUD)"},
-        {"name": "Vendors", "description": "Вендоры (CRUD)"},
-        {"name": "Responsibles", "description": "Ответственные и связки с вузами (CRUD)"},
         {"name": "Teachers", "description": "Преподаватели и паспорта"},
         {"name": "Workflow", "description": "Workflow engine: шаблоны, экземпляры, переходы"},
         {"name": "Health Score", "description": "Расчёт и просмотр Health Score"},
         {"name": "Analytics", "description": "Аналитика и дашборд"},
         {"name": "Reports", "description": "Генерация отчётов (XLSX, PDF, JSON)"},
         {"name": "Audit", "description": "Аудит действий"},
-        {"name": "Import", "description": "Импорт каталогов из XLSX"},
-        {"name": "Admin", "description": "Администрирование (шаблоны, настройки)"},
-        {"name": "Auth", "description": "Аутентификация через Keycloak"},
+        {"name": "Import", "description": "Импорт данных из XLSX"},
+        {"name": "Admin", "description": "Администрирование"},
+        # Production tags retained as documented extensions for the catalog
+        # sub-resources and operational endpoints.
+        {"name": "Directions", "description": "Направления подготовки (CRUD)"},
+        {"name": "Programs", "description": "Программы (CRUD, принадлежат направлению)"},
+        {"name": "Products", "description": "Продукты вендоров (CRUD)"},
+        {"name": "Vendors", "description": "Вендоры (CRUD)"},
+        {"name": "Responsibles", "description": "Ответственные и связки с вузами (CRUD)"},
+        {"name": "Catalog", "description": "Каталожный обзор и справочники"},
         {"name": "Service", "description": "Служебные проверки состояния"},
     ],
 )
@@ -46,9 +51,12 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Request-ID"],
+    expose_headers=["X-Request-ID", "Content-Disposition"],
 )
+app.add_middleware(RequestSizeLimitMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 app.include_router(v1)
 
 
@@ -69,7 +77,7 @@ def custom_openapi():
         routes=app.routes,
         tags=app.openapi_tags,
     )
-    schemes = schema["components"].get("securitySchemes", {})
+    schemes = schema.setdefault("components", {}).setdefault("securitySchemes", {})
     if "HTTPBearer" in schemes:
         schemes["BearerAuth"] = {
             "type": "http",
@@ -81,10 +89,79 @@ def custom_openapi():
             ),
         }
         del schemes["HTTPBearer"]
-    for path_item in schema["paths"].values():
-        for operation in path_item.values():
-            if operation.get("security"):
+    canonical_tag_map = {
+        "universities-passport": "Universities",
+        "health-score": "Health Score",
+        "analytics": "Analytics",
+    }
+    error_examples = {
+        "401": ErrorCode.AUTH_REQUIRED,
+        "403": ErrorCode.FORBIDDEN,
+        "404": ErrorCode.NOT_FOUND,
+        "409": ErrorCode.CONFLICT,
+        "422": ErrorCode.VALIDATION_ERROR,
+        "500": ErrorCode.INTERNAL_ERROR,
+    }
+    error_schema = {"$ref": "#/components/schemas/ErrorResponse"}
+    for path, path_item in schema["paths"].items():
+        for method, operation in path_item.items():
+            if method not in {"get", "post", "put", "patch", "delete"}:
+                continue
+            # A small number of older routers supplied summaries only.  Keep
+            # those stable while guaranteeing a useful, non-empty description.
+            if not operation.get("description"):
+                operation["description"] = operation.get("summary") or (
+                    f"Операция {method.upper()} {path}."
+                )
+            operation["tags"] = [canonical_tag_map.get(tag, tag) for tag in operation.get("tags", [])]
+            if path.startswith("/api/v1") and operation.get("security"):
                 operation["security"] = [{"BearerAuth": []}]
+                operation.setdefault("responses", {}).setdefault("401", {
+                    "description": "Требуется действительный Bearer JWT.",
+                })
+                operation.setdefault("responses", {}).setdefault("403", {
+                    "description": "Недостаточно прав.",
+                })
+            if path.startswith("/api/v1"):
+                operation.setdefault("responses", {}).setdefault("422", {
+                    "description": "Ошибка валидации запроса.",
+                })
+            for status, response in operation.get("responses", {}).items():
+                if status not in {"400", "401", "403", "404", "409", "410", "413", "415", "422", "429", "500", "503"}:
+                    continue
+                response.setdefault("content", {})["application/json"] = {
+                    "schema": error_schema,
+                }
+                code = error_examples.get(status, ErrorCode.HTTP_ERROR)
+                message = ERROR_MESSAGES[code]
+                response["content"]["application/json"]["examples"] = {
+                    code: {"summary": code, "value": {"error": {
+                        "code": code,
+                        "message": message,
+                        "request_id": "00000000-0000-4000-8000-000000000000",
+                        "details": {},
+                    }}}
+                }
+
+    # Representative payloads make the main flows reviewable in Swagger.
+    for path, method, example in (
+        ("/api/v1/universities", "post", {"name": "МГТУ им. Н.Э. Баумана", "city": "Москва"}),
+        ("/api/v1/universities/{university_id}", "patch", {"name": "МГТУ им. Н.Э. Баумана"}),
+        ("/api/v1/workflow/instances/{instance_id}/transition", "post", {
+            "target_instance_stage_id": "00000000-0000-4000-8000-000000000001",
+            "comment": "Документы проверены",
+        }),
+    ):
+        body = schema["paths"].get(path, {}).get(method, {}).get("requestBody")
+        if body:
+            body.setdefault("content", {}).setdefault("application/json", {})["example"] = example
+
+    # Keep an explicit list of response components for consumers that prefer
+    # component-level references over inline operation responses.
+    schema["components"].setdefault("responses", {})["ErrorResponse"] = {
+        "description": "Единый формат ошибки API.",
+        "content": {"application/json": {"schema": error_schema}},
+    }
     app.openapi_schema = schema
     return app.openapi_schema
 
@@ -99,11 +176,6 @@ def health():
 
 
 @app.get("/ready", tags=["Service"], summary="Readiness-проверка",
-         description="Возвращает auth-конфигурацию (issuer, audience, dev bypass).")
+         description="Возвращает готовность API. Детали auth-конфигурации намеренно не раскрываются.")
 def ready():
-    return {
-        "status": "ready",
-        "issuer": settings.keycloak_issuer,
-        "audience": settings.keycloak_audience,
-        "dev_bypass": settings.auth_dev_bypass,
-    }
+    return {"status": "ready"}

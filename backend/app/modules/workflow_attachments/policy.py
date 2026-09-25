@@ -1,13 +1,11 @@
 """P2-05 upload policy: single place for limits, chunking and filename safety.
 
-Allowed-types contract status: the "10 types" source of truth was NOT found
-(README, docs/, API contracts, frontend, tests, mocks searched — only the
-legacy deferred 7-MIME set in ``modules/documents/router.py`` exists, which
-must NOT be reused). The allowlist therefore lives here as one explicit
-extension point (``ALLOWED_EXTENSIONS`` / ``ALLOWED_MIME_TYPES`` /
-``EXTENSION_TO_MIME``), currently disabled (``None`` = no contract, accept
-and record the declared type). Wiring a real contract later = filling these
-three constants, no service/router rewrite.
+Allowed-types contract (P2-05-01): configured via the
+``UPLOAD_ALLOWED_EXTENSIONS`` env var (comma-separated extensions,
+e.g. ``"pdf,docx,xlsx"``), parsed by :func:`get_allowed_extensions`.
+Empty/unset = open (no contract from the customer yet — accept and record
+the declared type). Wiring the real customer list later = setting one env
+var, no service/router rewrite.
 """
 
 from __future__ import annotations
@@ -22,12 +20,25 @@ MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024
 UPLOAD_CHUNK_SIZE_BYTES = 256 * 1024
 
 # --- Allowed file types (see module docstring) ---------------------------
-# Status marker for the missing contract ( surfaced in the final report ).
-FILE_TYPE_CONTRACT_STATUS = "PARTIAL_BLOCKED_BY_MISSING_FILE_TYPE_CONTRACT"
+# Contract wiring (P2-05-01): the allowlist is configured via the
+# ``UPLOAD_ALLOWED_EXTENSIONS`` env var (comma-separated, e.g. "pdf,docx").
+# Empty/unset = open (no contract from the customer yet — accept and record
+# the declared type). The legacy constants below stay None (open) unless a
+# future contract fills them in code; env config takes precedence when set.
+FILE_TYPE_CONTRACT_STATUS = "ENV_CONFIGURED_OR_OPEN_BY_DEFAULT"
 
-ALLOWED_EXTENSIONS: frozenset[str] | None = None
-ALLOWED_MIME_TYPES: frozenset[str] | None = None
-EXTENSION_TO_MIME: dict[str, frozenset[str]] = {}
+
+def get_allowed_extensions() -> frozenset[str] | None:
+    """Parse ``upload_allowed_extensions``; None = open (no contract)."""
+    from app.config import settings
+
+    raw = (settings.upload_allowed_extensions or "")
+    parsed = frozenset(
+        part.strip().lower().lstrip(".")
+        for part in raw.split(",")
+        if part.strip().strip(".")
+    )
+    return parsed or None
 
 MIME_FALLBACK = "application/octet-stream"
 MAX_MIME_LENGTH = 128  # mirrors workflow_attachments.mime_type VARCHAR(128)
@@ -43,24 +54,23 @@ def normalize_mime_type(declared: str | None) -> str:
 
 
 def check_file_type(filename: str, declared_mime: str | None) -> str:
-    """Validate extension + declared content-type against the allowlist.
+    """Validate the extension against the env allowlist (P2-05-01).
 
-    Without a contract (current state) this records the declared type
-    verbatim instead of rejecting with an invented list.
+    Open by default (no contract): records the declared type verbatim.
+    With ``UPLOAD_ALLOWED_EXTENSIONS`` set: unknown/missing extensions
+    are rejected with 415. MIME types are never allowlisted (no MIME
+    contract) — only recorded.
     """
-    mime = normalize_mime_type(declared_mime)
-    if ALLOWED_EXTENSIONS is None and ALLOWED_MIME_TYPES is None:
-        return mime
-    from fastapi import HTTPException
+    from app.core.errors import BusinessException
+    from app.schemas.errors import ErrorCode
 
+    mime = normalize_mime_type(declared_mime)
+    allowed = get_allowed_extensions()
+    if allowed is None:
+        return mime
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-    if ALLOWED_EXTENSIONS is not None and ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(status_code=415, detail=f"File extension not allowed: .{ext}")
-    if ALLOWED_MIME_TYPES is not None and mime not in ALLOWED_MIME_TYPES:
-        raise HTTPException(status_code=415, detail=f"MIME not allowed: {mime}")
-    expected = EXTENSION_TO_MIME.get(ext)
-    if expected is not None and mime not in expected:
-        raise HTTPException(status_code=415, detail="Extension/MIME mismatch")
+    if ext not in allowed:
+        raise BusinessException(ErrorCode.FILE_TYPE_NOT_ALLOWED)
     return mime
 
 

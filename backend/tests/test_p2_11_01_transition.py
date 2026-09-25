@@ -32,6 +32,8 @@ from app.models.workflow_instances import (
 )
 from app.models.workflow_templates import WorkflowStage, WorkflowTemplate
 from app.modules.audit.models import AuditEvent
+from app.models.audit_outbox import AuditOutbox
+from app.modules.audit.relay import relay_audit_events
 from app.modules.workflow_transitions import service
 from app.modules.workflow_transitions.schemas import (
     WorkflowCommentCreate,
@@ -143,12 +145,20 @@ def test_transition_skips_optional_records_history_and_audit(db):
     assert last.comment == "идём дальше"
     assert last.created_at is not None
 
-    events = list(db.execute(
-        select(AuditEvent).where(
-            AuditEvent.entity_id == str(instance.id),
-            AuditEvent.action == "WORKFLOW_TRANSITION",
-        )
-    ).scalars())
+    pending = list(db.execute(select(AuditOutbox).where(
+        AuditOutbox.aggregate_id == instance.id,
+        AuditOutbox.event_type == "WORKFLOW_TRANSITION",
+    )).scalars())
+    assert len(pending) == 1
+    assert db.execute(select(AuditEvent).where(
+        AuditEvent.entity_id == instance.id,
+        AuditEvent.action == "WORKFLOW_TRANSITION",
+    )).scalars().all() == []
+    assert relay_audit_events(db) == 1
+    events = db.execute(select(AuditEvent).where(
+        AuditEvent.entity_id == instance.id,
+        AuditEvent.action == "WORKFLOW_TRANSITION",
+    )).scalars().all()
     assert len(events) == 1
     assert events[0].user_id == "actor-1"
     assert events[0].university_id == moved.university_id

@@ -23,11 +23,13 @@ from __future__ import annotations
 import uuid
 from typing import BinaryIO
 
-from fastapi import HTTPException
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFound
-from app.core.permissions import user_permissions
+from app.core.errors import BusinessException
+from app.schemas.errors import ErrorCode
+from app.core.policies import ensure_university_access
 from app.models.workflow_instances import WorkflowAttachment, WorkflowInstance
 
 from .policy import (
@@ -52,18 +54,8 @@ def get_instance_or_404(db: Session, instance_id: uuid.UUID) -> WorkflowInstance
 
 
 def authorize_scope(user, instance: WorkflowInstance) -> None:
-    """University-scope gate for one instance (permission checked by router).
-
-    Admins (``*``) skip scoping; other roles are confined to
-    ``user.university_ids`` when the token carries that optional claim.
-    Tokens without the claim keep the pre-existing global RBAC behaviour.
-    """
-    perms = user_permissions(user)
-    if "*" in perms:
-        return
-    scope = getattr(user, "university_ids", None)
-    if scope is not None and str(instance.university_id) not in set(scope):
-        raise HTTPException(status_code=403, detail="Forbidden: other university")
+    """Compatibility adapter for existing P2 call sites."""
+    ensure_university_access(instance.university_id, user)
 
 
 def get_bound_attachment(
@@ -77,6 +69,29 @@ def get_bound_attachment(
     return attachment
 
 
+def list_attachments(
+    db: Session, instance_id: uuid.UUID, *, page: int, page_size: int
+) -> tuple[list[WorkflowAttachment], int]:
+    """Attachment metadata for one instance, oldest first (P2-05-02)."""
+    get_instance_or_404(db, instance_id)
+    base = select(WorkflowAttachment).where(
+        WorkflowAttachment.instance_id == instance_id
+    )
+    total = db.execute(select(func.count()).select_from(base.subquery())).scalar_one()
+    rows = (
+        db.execute(
+            base.order_by(
+                WorkflowAttachment.created_at.asc(), WorkflowAttachment.id.asc()
+            )
+            .limit(page_size)
+            .offset((page - 1) * page_size)
+        )
+        .scalars()
+        .all()
+    )
+    return list(rows), total
+
+
 def _limited_chunks(stream: BinaryIO):
     """Sync chunk generator with the hard 50 MiB cap (413 mid-stream)."""
     total = 0
@@ -86,7 +101,7 @@ def _limited_chunks(stream: BinaryIO):
             return
         total += len(piece)
         if total > MAX_FILE_SIZE_BYTES:
-            raise HTTPException(status_code=413, detail="File too large (limit 50 MiB)")
+            raise BusinessException(ErrorCode.FILE_TOO_LARGE)
         yield piece
 
 
@@ -107,10 +122,10 @@ def upload_attachment(
     key = new_storage_key()
     try:
         size = storage.save_stream(key, _limited_chunks(stream))
-    except HTTPException:
+    except BusinessException:
         raise
     except StorageError as exc:
-        raise HTTPException(status_code=500, detail="File storage unavailable") from exc
+        raise BusinessException(ErrorCode.INTERNAL_ERROR) from exc
     attachment = WorkflowAttachment(
         instance_id=instance.id,
         original_filename=safe_name,
@@ -134,15 +149,15 @@ def upload_attachment(
 
 
 def open_download(db: Session, storage: StorageBackend, *, attachment: WorkflowAttachment):
-    """Authorize-first download handle; missing object -> controlled 500."""
+    """Authorize-first download handle; missing object -> 404 (P2-05-02)."""
     _ = db  # metadata already resolved by the caller via get_bound_attachment
     try:
         opener = storage.open_stream(attachment.storage_key)
         handle = opener.__enter__()
     except StorageObjectNotFound:
-        raise HTTPException(status_code=500, detail="File content unavailable") from None
+        raise NotFound("Attachment file not found") from None
     except StorageError as exc:
-        raise HTTPException(status_code=500, detail="File storage unavailable") from exc
+        raise BusinessException(ErrorCode.INTERNAL_ERROR) from exc
     return attachment, opener, handle
 
 
@@ -155,6 +170,6 @@ def delete_attachment(
     except StorageObjectNotFound:
         pass  # idempotent: row cleanup below still happens
     except StorageError as exc:
-        raise HTTPException(status_code=500, detail="File storage unavailable") from exc
+        raise BusinessException(ErrorCode.INTERNAL_ERROR) from exc
     db.delete(attachment)
     db.commit()
