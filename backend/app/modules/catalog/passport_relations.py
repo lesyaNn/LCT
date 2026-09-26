@@ -29,6 +29,15 @@ def _lock_university(db: Session, university_id: uuid.UUID) -> None:
         raise NotFound("University not found")
 
 
+def _display_or_none(db: Session, model, pk, attr: str = "name"):
+    try:
+        row = db.get(model, pk)
+        value = getattr(row, attr, None) if row is not None else None
+        return value if isinstance(value, str) and value.strip() else None
+    except Exception:
+        return None
+
+
 def attach_program(
     db: Session, university_id: uuid.UUID, data: UniversityProgramAttach
 ) -> UniversityProgramRead:
@@ -49,10 +58,20 @@ def attach_program(
     db.add(link)
     db.flush()
     if "audit_context" in db.info:
+        new_value: dict = {
+            "audit_object_type": "university_program",
+            "program_id": str(data.program_id), "status": data.status,
+        }
+        program_name = _display_or_none(db, ITProgram, data.program_id)
+        if program_name:
+            new_value["program_name"] = program_name
+        university_name = _display_or_none(db, University, university_id)
+        if university_name:
+            new_value["university_name"] = university_name
         AuditService(db).log_event(
             context=context_for(db), action=AuditAction.CREATE,
             entity_type="program", entity_id=link.id, university_id=university_id,
-            new_value={"program_id": str(data.program_id), "status": data.status},
+            new_value=new_value,
         )
     db.commit()
     db.refresh(link)
@@ -79,10 +98,20 @@ def attach_product(
     db.add(link)
     db.flush()
     if "audit_context" in db.info:
+        new_value = {
+            "audit_object_type": "university_product",
+            "product_id": str(data.product_id), "status": data.status,
+        }
+        product_name = _display_or_none(db, ITProduct, data.product_id)
+        if product_name:
+            new_value["product_name"] = product_name
+        university_name = _display_or_none(db, University, university_id)
+        if university_name:
+            new_value["university_name"] = university_name
         AuditService(db).log_event(
             context=context_for(db), action=AuditAction.CREATE,
             entity_type="product", entity_id=link.id, university_id=university_id,
-            new_value={"product_id": str(data.product_id), "status": data.status},
+            new_value=new_value,
         )
     db.commit()
     db.refresh(link)
@@ -125,12 +154,30 @@ def change_primary_responsible(
         selected.is_primary = True
     db.flush()
     if "audit_context" in db.info:
+        old_value: dict = {
+            "audit_object_type": "responsible_assignment",
+            "responsible_id": str(old_id) if old_id else None,
+        }
+        if old_id:
+            old_name = _display_or_none(db, Responsible, old_id, "full_name")
+            if old_name:
+                old_value["responsible_name"] = old_name
+        new_value = {
+            "audit_object_type": "responsible_assignment",
+            "responsible_id": str(data.responsible_id), "reason": data.reason,
+        }
+        new_name = _display_or_none(db, Responsible, data.responsible_id, "full_name")
+        if new_name:
+            new_value["responsible_name"] = new_name
+        university_name = _display_or_none(db, University, university_id)
+        if university_name:
+            new_value["university_name"] = university_name
         AuditService(db).log_event(
             context=context_for(db), action=AuditAction.ASSIGN_RESPONSIBLE,
             entity_type="responsible", entity_id=selected.id,
             university_id=university_id,
-            old_value={"responsible_id": str(old_id) if old_id else None},
-            new_value={"responsible_id": str(data.responsible_id), "reason": data.reason},
+            old_value=old_value,
+            new_value=new_value,
         )
     db.commit()
     db.refresh(selected)

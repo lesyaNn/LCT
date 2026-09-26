@@ -210,6 +210,7 @@ def context_for(db: Session, actor: str = "system") -> AuditContext:
 
 def _comment_snapshot(comment) -> dict[str, Any]:
     return {
+        "audit_object_type": "workflow_comment",
         "instance_id": comment.instance_id,
         "stage_id": comment.stage_id,
         "author_keycloak_sub": comment.author_keycloak_sub,

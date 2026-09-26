@@ -124,12 +124,34 @@ def _last_admin_guard(db: Session, kc: KeycloakAdminClient, target: dict, role: 
         raise ConflictError(field="role")
 
 
-def _audit(db: Session, actor: CurrentUser, target_id: str, kind: str, before=None, after=None) -> None:
+def _target_display_name(user: dict | None, fallback: str = "") -> str | None:
+    """Human name for a Keycloak user dict. Never returns a UUID alone."""
+    if not isinstance(user, dict):
+        return None
+    first = str(user.get("firstName") or "").strip()
+    last = str(user.get("lastName") or "").strip()
+    full = f"{first} {last}".strip()
+    if full:
+        return full
+    for key in ("username", "email"):
+        value = user.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return fallback or None
+
+
+def _audit(db: Session, actor: CurrentUser, target_id: str, kind: str, before=None, after=None,
+           target_name: str | None = None) -> None:
+    old_value: dict = {"audit_object_type": "user", "kind": kind, "value": before}
+    new_value: dict = {"audit_object_type": "user", "kind": kind, "value": after}
+    if target_name:
+        old_value["target_name"] = target_name
+        new_value["target_name"] = target_name
     AuditService(db).log_event(
         context=context_for(db, actor.id), action=AuditAction.ADMIN_CONFIG,
         entity_type="config", entity_id=uuid.UUID(target_id),
-        old_value={"kind": kind, "value": before},
-        new_value={"kind": kind, "value": after},
+        old_value=old_value,
+        new_value=new_value,
     )
 
 
@@ -182,11 +204,12 @@ def update_user(db: Session, kc: KeycloakAdminClient, actor: CurrentUser,
             raise BusinessException(ErrorCode.EXTERNAL_SYNC_FAILED) from exc
         raise
     # Already issued access tokens expire at the realm's 300-second TTL.
+    target_name = _target_display_name(before)
     if role_changed:
-        _audit(db, actor, user_id, "role", old_role, change.role)
+        _audit(db, actor, user_id, "role", old_role, change.role, target_name)
     if scope_changed:
         _audit(db, actor, user_id, "scope", old_attributes.get("university_ids", []),
-               next_attributes["university_ids"])
+               next_attributes["university_ids"], target_name)
     db.commit()
     return _dto({**before, "attributes": next_attributes}, change.role)
 
@@ -213,7 +236,7 @@ def set_blocked(db: Session, kc: KeycloakAdminClient, actor: CurrentUser,
                 raise BusinessException(ErrorCode.EXTERNAL_SYNC_FAILED) from exc
             raise
     _audit(db, actor, user_id, "status", "active" if was_enabled else "blocked",
-           "blocked" if blocked else "active")
+           "blocked" if blocked else "active", _target_display_name(target))
     db.commit()
     return _dto({**target, "enabled": not blocked}, old_role)
 
@@ -248,14 +271,16 @@ def invite_user(db: Session, kc: KeycloakAdminClient, actor: CurrentUser,
     except BusinessException:
         # SMTP is optional in dev: account exists but no email was sent.
         status = "invite_email_unavailable"
-    _audit(db, actor, user_id, "invite", None, {"role": data.role, "email_status": status})
+    _audit(db, actor, user_id, "invite", None, {"role": data.role, "email_status": status},
+           data.name.strip() or None)
     db.commit()
     return _dto({"id": user_id, **payload}, data.role), status
 
 
 def reset_password(db: Session, kc: KeycloakAdminClient, actor: CurrentUser,
                    user_id: str) -> None:
-    kc.user(user_id)
+    target = kc.user(user_id)
     kc.execute_actions_email(user_id, ["UPDATE_PASSWORD"])
-    _audit(db, actor, user_id, "password_reset_requested")
+    _audit(db, actor, user_id, "password_reset_requested",
+           target_name=_target_display_name(target))
     db.commit()

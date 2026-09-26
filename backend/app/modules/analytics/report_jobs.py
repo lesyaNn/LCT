@@ -217,8 +217,10 @@ def create_job(
                     else AuditAction.REPORT_GENERATE),
             entity_type="report", entity_id=job.id,
             university_id=one_university,
-            new_value={"format": format, "columns": columns, "status": "queued",
-                       "job_type": job_type},
+            new_value={"audit_object_type": "import" if job_type == "xlsx_import" else "report",
+                       "format": format, "columns": columns, "status": "queued",
+                       "job_type": job_type,
+                       "university_count": len(effective_university_ids)},
         )
     db.commit()
     db.refresh(job)

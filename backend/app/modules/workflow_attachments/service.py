@@ -111,11 +111,26 @@ def _audit_attachment_event(db: Session, *, action: str, attachment: WorkflowAtt
     from app.modules.audit.service import AuditService, context_for
 
     snapshot = {
+        "audit_object_type": "workflow_attachment",
         "instance_id": str(attachment.instance_id),
         "original_filename": attachment.original_filename,
         "file_size": attachment.file_size,
         "mime_type": attachment.mime_type,
     }
+    try:
+        from app.models.workflow_instances import WorkflowInstance
+        from app.models.workflow_templates import WorkflowTemplate
+
+        instance = db.get(WorkflowInstance, attachment.instance_id)
+        if instance is not None:
+            if university_id is None:
+                university_id = instance.university_id
+            if instance.template_id is not None:
+                template = db.get(WorkflowTemplate, instance.template_id)
+                if template is not None and template.name:
+                    snapshot["template_name"] = template.name
+    except Exception:
+        pass
     AuditService(db).log_event(
         context=context_for(db, attachment.uploaded_by_keycloak_sub or "system"),
         action=action,
