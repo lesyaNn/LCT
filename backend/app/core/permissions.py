@@ -1,4 +1,4 @@
-"""Canonical action permissions for public roles and legacy curator."""
+"""Canonical action permissions for public roles (user/manager/admin)."""
 
 from types import MappingProxyType
 
@@ -20,17 +20,13 @@ MANAGER_PERMISSIONS = USER_PERMISSIONS | frozenset({
     "university.edit", "university_responsible.manage", "analytics.extended",
     "audit.read", "import.write",
 })
-CURATOR_PERMISSIONS = frozenset({
-    "university.read", "university.edit", "catalog.read",
-    "workflow.read", "workflow.change_status", "import.read",
-})
-ADMIN_PERMISSIONS = MANAGER_PERMISSIONS | CURATOR_PERMISSIONS | frozenset({
+ADMIN_PERMISSIONS = MANAGER_PERMISSIONS | frozenset({
     "university.create", "university.delete", "workflow_template.manage",
     "admin.users", "admin.settings", "*",
 })
 ROLE_PERMISSIONS = MappingProxyType({
     "user": USER_PERMISSIONS, "manager": MANAGER_PERMISSIONS,
-    "admin": ADMIN_PERMISSIONS, "curator": CURATOR_PERMISSIONS,
+    "admin": ADMIN_PERMISSIONS,
 })
 ALL_PERMISSIONS = ADMIN_PERMISSIONS
 
@@ -38,7 +34,7 @@ ALL_PERMISSIONS = ADMIN_PERMISSIONS
 def effective_role(user: CurrentUser) -> str:
     """One P5 precedence for the role stored with business audit events."""
     roles = user.roles or set()
-    for role in ("admin", "manager", "curator", "user"):
+    for role in ("admin", "manager", "user"):
         if role in roles:
             return role
     return "user"

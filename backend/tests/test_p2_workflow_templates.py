@@ -521,7 +521,7 @@ def test_templates_rbac_admin_only(auth_client):
     assert c.get("/api/v1/workflow/templates").status_code == 401
 
     assert c.get("/api/v1/workflow/templates", headers=_auth(c, ("guest",))).status_code == 403
-    for roles in (("user",), ("manager",), ("curator",)):
+    for roles in (("user",), ("manager",)):
         assert c.get("/api/v1/workflow/templates", headers=_auth(c, roles)).status_code == 403, (
             roles
         )
@@ -558,7 +558,7 @@ def test_templates_rbac_admin_only(auth_client):
         c.post(
             f"/api/v1/workflow/templates/{tid}/stages",
             json={"name": "s"},
-            headers=_auth(c, ("curator",)),
+            headers=_auth(c, ("user",)),
         ).status_code
         == 403
     )

@@ -15,7 +15,7 @@ from app.modules.admin_users.schemas import AdminUserOut, AdminUsersPage, UserIn
 from app.modules.audit.service import AuditAction, AuditService, context_for
 from app.schemas.errors import ErrorCode
 
-PUBLIC_ROLES = ("admin", "manager", "curator", "user")
+PUBLIC_ROLES = ("admin", "manager", "user")
 MAX_LIST_USERS = 10_000
 
 
@@ -30,7 +30,7 @@ def _all_role_users(kc: KeycloakAdminClient, role: str) -> list[dict]:
 
 
 def _role_memberships(kc: KeycloakAdminClient) -> dict[str, str]:
-    # Four batch reads for the four existing realm roles, never a per-user
+    # Three batch reads for the three existing realm roles, never a per-user
     # Admin API call for a table page.
     memberships: dict[str, str] = {}
     for role in PUBLIC_ROLES:

@@ -56,7 +56,7 @@ test.describe('auth foundation adapters', () => {
     expect(user).toMatchObject({
       id: 'subject-1',
       role: 'manager',
-      roleLabel: 'Менеджер',
+      roleLabel: 'Руководитель',
       permissions: ['audit.read', 'workflow.read'],
       scope: { kind: 'group', universityIds: ['11111111-1111-4111-8111-111111111111'] },
       authSource: 'keycloak',
@@ -111,7 +111,7 @@ test.describe('auth foundation adapters', () => {
   });
 });
 
-type RuntimeRole = 'admin' | 'manager' | 'curator' | 'user';
+type RuntimeRole = 'admin' | 'manager' | 'user';
 
 function credentials(role: RuntimeRole): { username: string; password: string } | null {
   const prefix = `E2E_${role.toUpperCase()}`;
@@ -147,7 +147,7 @@ async function login(page: Page, role: RuntimeRole, username: string, password: 
   return { authorization, me, user, apiOrigin: new URL(meResponse.url()).origin };
 }
 
-for (const role of ['admin', 'manager', 'curator', 'user'] as const) {
+for (const role of ['admin', 'manager', 'user'] as const) {
   test(`real Keycloak + /auth/me for ${role}`, async ({ page }) => {
     const account = credentials(role);
     test.skip(!account, `Set E2E_${role.toUpperCase()}_USERNAME and E2E_${role.toUpperCase()}_PASSWORD.`);
@@ -156,7 +156,7 @@ for (const role of ['admin', 'manager', 'curator', 'user'] as const) {
     const { authorization, me, user, apiOrigin } = await login(page, role, account.username, account.password);
     const displayName = me.name || me.username || 'Пользователь';
     await expect(page.getByText(displayName, { exact: true }).first()).toBeVisible();
-    expect(user.scope.kind).toBe(role === 'admin' ? 'all' : role === 'manager' ? 'group' : role === 'user' ? 'own' : 'deny');
+    expect(user.scope.kind).toBe(role === 'admin' ? 'all' : role === 'manager' ? 'group' : 'own');
 
     if (role === 'admin') {
       await expect(page.getByRole('button', { name: /Администрирование/ })).toBeVisible();
@@ -168,7 +168,7 @@ for (const role of ['admin', 'manager', 'curator', 'user'] as const) {
 
     if (role === 'user') {
       await expect(page.getByRole('button', { name: /Администрирование/ })).toHaveCount(0);
-    } else if (role === 'manager' || role === 'curator') {
+    } else if (role === 'manager') {
       const forbiddenStatus = await page.evaluate(async ({ header, origin }) => {
         const response = await fetch(`${origin}/api/v1/auth/test/admin`, { headers: { Authorization: header } });
         return response.status;

@@ -739,8 +739,8 @@ def test_migration_chain_latest_is_report_jobs():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     versions = [v for v, _, _ in module._discover()]
-    assert versions[-1] == "000029_drop_students_teachers_health"
-    assert len(versions) == 29
+    assert versions[-1] == "000031_workflow_instances_product_unique"
+    assert len(versions) == 31
     assert "report_jobs" in module.EXPECTED_TABLES
     assert module.EXPECTED_TABLES[-1] == "product_directions"
 

@@ -25,7 +25,7 @@ a process command check. The worker does not serve HTTP.
 ## P5 integration gate
 
 P5-07/08/09 require their own integration review. The Dev-2 policy denies
-curator data scope and uses the approved foreign-object 404 contract; this
+unknown-role data scope and uses the approved foreign-object 404 contract; this
 integration adds a PG16 CI gate. No LMS/Website adapter or Student external-reference schema is
 introduced until those prerequisites are proven on the active develop line.
 

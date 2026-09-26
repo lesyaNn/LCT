@@ -4,7 +4,7 @@ Thin routes: params -> frozen RBAC -> university scope -> service -> DTO.
 No SQL here.
 
 RBAC (frozen permission names, no invented ones):
-* ``GET`` instance needs ``workflow.read`` (manager/curator/admin read path,
+* ``GET`` instance needs ``workflow.read`` (manager/admin read path,
   same as the P2-05 attachments read gate).
 * ``POST`` instance needs ``workflow.change_status`` (mutation gate, same as
   the P2-05 attachments write gate).
@@ -27,6 +27,7 @@ from app.modules.workflow_instances import service
 from app.modules.workflow_instances.schemas import (
     InstanceCreate,
     InstanceDetail,
+    InstanceResponsibleUpdate,
     WorkflowTaskRead,
     AllowedTransitionRead,
 )
@@ -54,7 +55,7 @@ def create_workflow_instance(
     if (
         data.responsible_id is not None
         and "university_responsible.manage" not in user_permissions(user)
-        and not (user.roles or set()).intersection({"admin", "curator"})
+        and not (user.roles or set()).intersection({"admin", "manager"})
     ):
         raise SecurityError(ErrorCode.FORBIDDEN)
     return service.create_instance(
@@ -62,6 +63,7 @@ def create_workflow_instance(
         university_id=data.university_id,
         template_id=data.template_id,
         program_id=data.program_id,
+        product_id=data.product_id,
         responsible_id=data.responsible_id,
         actor_sub=user.id,
     )
@@ -105,6 +107,24 @@ def get_workflow_instance(
     detail = service.get_instance_detail(db, instance_id)
     service.authorize_scope(user, detail)
     return detail
+
+
+@router.patch(
+    "/instances/{instance_id}",
+    response_model=InstanceDetail,
+    summary="Assign or clear the workflow instance responsible",
+)
+def update_workflow_instance_responsible(
+    instance_id: uuid.UUID,
+    data: InstanceResponsibleUpdate,
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(WRITE),
+) -> InstanceDetail:
+    detail = service.get_instance_detail(db, instance_id)
+    service.authorize_scope(user, detail)
+    return service.set_instance_responsible(
+        db, instance_id, data.responsible_id, actor_sub=user.id
+    )
 
 
 @router.get("/instances/{instance_id}/tasks", response_model=PaginatedResponse[WorkflowTaskRead])

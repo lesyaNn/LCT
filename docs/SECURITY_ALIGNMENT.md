@@ -15,7 +15,7 @@
 | Требование / область | Реализация в прототипе | Статус | Ограничения |
 |---|---|---|---|
 | Идентификация и аутентификация | Keycloak OIDC, JWT RS256, JWKS, issuer/audience/exp checks, BearerAuth | Implemented | HTTPS и эксплуатация IdP находятся за пределами backend |
-| Разграничение доступа | RBAC (user/curator/manager/admin), централизованные policies и university data scope | Implemented | региональный scope менеджера не реализован |
+| Разграничение доступа | RBAC (user/manager/admin), централизованные policies и university data scope | Implemented | региональный scope менеджера не реализован |
 | Регистрация событий | Транзакционный append-only Audit Log для CRUD, workflow, reports, imports и admin | Partial | LOGIN/LOGOUT не эмитятся текущим OIDC flow |
 | Контроль целостности | SQL constraints, валидация путей и атомарная запись файлов | Partial | криптографическая неизменяемость аудита не реализована |
 | Защита от НСД | secure headers, CORS allowlist, request/file limits, path containment, SQLAlchemy binding | Implemented | инфраструктурный perimeter не входит в репозиторий |

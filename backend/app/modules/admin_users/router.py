@@ -37,7 +37,7 @@ def live_admin(
 @router.get("", response_model=AdminUsersPage)
 def list_admin_users(
     search: str = Query(default="", max_length=256),
-    role: Literal["user", "manager", "curator", "admin"] | None = None,
+    role: Literal["user", "manager", "admin"] | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     _actor: CurrentUser = Depends(live_admin),

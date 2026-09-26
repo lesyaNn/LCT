@@ -848,13 +848,13 @@ def test_rbac_matrix_all_entities(auth_client, db):
         path = f"/api/v1/{entity}"
         assert c.get(path).status_code == 401, entity  # no token
         assert c.get(path, headers=_auth(c, ("guest",))).status_code == 403, entity
-        for roles in (("user",), ("manager",)):
+        for roles in (("user",),):
             assert c.get(path, headers=_auth(c, roles)).status_code == 200, (entity, roles)
             assert c.post(path, json=payload, headers=_auth(c, roles)).status_code == 403, (
                 entity,
                 roles,
             )
-        for roles in (("curator",), ("admin",)):
+        for roles in (("manager",), ("admin",)):
             assert c.get(path, headers=_auth(c, roles)).status_code == 200, (entity, roles)
             # unique payloads: the second writer bumps the identifying field
             # after a 409 on the already-taken value.
@@ -898,19 +898,19 @@ def test_rbac_write_verbs_university(auth_client, db):
         == 403
     )
 
-    curator = _auth(c, ("curator",))
+    manager = _auth(c, ("manager",))
     assert (
-        c.patch(f"/api/v1/universities/{uid}", json={"city": "Y"}, headers=curator).status_code
+        c.patch(f"/api/v1/universities/{uid}", json={"city": "Y"}, headers=manager).status_code
         == 404
     )
     assert c.post(
-        f"/api/v1/universities/{uid}/responsibles/{r1.id}", json={}, headers=curator
+        f"/api/v1/universities/{uid}/responsibles/{r1.id}", json={}, headers=manager
     ).status_code == 404
     assert (
-        c.delete(f"/api/v1/universities/{uid}/responsibles/{r1.id}", headers=curator).status_code
+        c.delete(f"/api/v1/universities/{uid}/responsibles/{r1.id}", headers=manager).status_code
         == 404
     )
-    assert c.delete(f"/api/v1/universities/{uid}", headers=curator).status_code == 404
+    assert c.delete(f"/api/v1/universities/{uid}", headers=manager).status_code == 404
 
 
 # ================================================================ openapi

@@ -12,10 +12,22 @@
 .programSelector select { width: 100%; }
 .programName { margin: 0; overflow-wrap: anywhere; }
 .programName strong { color: var(--rtk-color-text-primary); }
+.instancesHeader { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); justify-content: space-between; }
+.instancesHeader h2 { font-size: 18px; letter-spacing: -.02em; margin: 0; }
+.instancesHeader p { color: var(--rtk-color-text-secondary); font-size: 12px; margin: var(--rtk-space-1) 0 0; }
+.instanceList { display: flex; flex-direction: column; gap: var(--rtk-space-2); list-style: none; margin: var(--rtk-space-4) 0 0; padding: 0; }
+.instanceItem { margin: 0; }
+.instanceButton { align-items: flex-start; background: transparent; border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); color: inherit; cursor: pointer; display: flex; flex-direction: column; gap: var(--rtk-space-1); padding: var(--rtk-space-3); text-align: left; text-decoration: none; width: 100%; }
+.instanceButton:hover { background: var(--rtk-color-surface-hover); }
+.instanceButton:focus-visible { border-color: var(--rtk-color-brand); outline: 2px solid var(--rtk-color-brand); outline-offset: 1px; }
+.instanceItemSelected .instanceButton { background: var(--rtk-color-brand-soft); border-color: var(--rtk-color-brand); }
+.instanceButton strong { font-size: 14px; overflow-wrap: anywhere; }
+.instanceMeta { align-items: center; color: var(--rtk-color-text-secondary); display: flex; flex-wrap: wrap; font-size: 12px; gap: var(--rtk-space-2); }
 .externalHint { color: var(--rtk-color-text-secondary); font-size: 12px; margin: 0; }
 @media (max-width: 480px) { .programSelector { max-width: none; width: 100%; } }
 .headerMain h1 { font-size: clamp(26px, 3vw, 38px); letter-spacing: -.035em; line-height: 1.12; margin: 0; }
 .headerContext { color: var(--rtk-color-text-secondary); font-size: 14px; margin: var(--rtk-space-3) 0 0; overflow-wrap: anywhere; }
+.responsibleRow { align-items: flex-end; display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); margin-top: var(--rtk-space-3); }
 .headerCurrent { composes: surface from '../../shared/ui/rtk/section-surface.module.css'; display: flex; flex-direction: column; gap: var(--rtk-space-2); }
 .headerCurrent > span { color: var(--rtk-color-text-tertiary); font-size: 11px; }
 .headerCurrent strong { font-size: 15px; line-height: 1.35; overflow-wrap: anywhere; }

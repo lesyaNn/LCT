@@ -23,6 +23,7 @@ export const queryKeys = {
     workflowAttachments: (instanceId: string) => ['workflow', instanceId, 'attachments'] as const,
     workflowHistory: (instanceId: string) => ['workflow', instanceId, 'history'] as const,
     workflowAllowed: (instanceId: string) => ['workflow', instanceId, 'allowed'] as const,
+    workflowRollbackTargets: (instanceId: string) => ['workflow', instanceId, 'rollback-targets'] as const,
     workflowOverview: ['workflow-overview'] as const,
     workflowComments: (instanceId: string) => ['workflow', instanceId, 'comments'] as const,
     historyFamily: (id: string) => ['university-history', id] as const,

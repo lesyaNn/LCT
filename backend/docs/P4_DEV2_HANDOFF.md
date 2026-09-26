@@ -84,8 +84,8 @@ GET /api/v1/reports/{job_id}/download
 
 Poll every 3s only while queued/building; stop on ready/failed/unmount. On failed,
 display the safe message and retry by a NEW POST; completed artifacts are not
-overwritten. Access: user/curator only own jobs within their explicit university
-scope, manager/admin all within any explicit scope. Scope-less user/curator is
+overwritten. Access: user only own jobs within their explicit university
+scope, manager/admin all within any explicit scope. Scope-less user is
 403 (fail closed). A removed/narrowed scope cannot read an earlier broader job.
 Cross-user access is 404; expired is 410; pending download is 409.
 

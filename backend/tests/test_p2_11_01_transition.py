@@ -234,3 +234,84 @@ def test_comments_create_edit_windows(db):
     # Oldest first: the backdated comment sorts before the newer one.
     assert [c.content for c in listed] == ["админ", "правка"]
     assert all(isinstance(c, WorkflowComment) for c in listed)
+
+
+# ---------------------------------------------------------------- rollback
+
+
+def test_rollback_reopens_stages_and_records_history(db):
+    instance, rows, stages = _graph(db)
+    service.transition_instance(db, instance.id, rows[1].id, "шаг", "a")
+    service.transition_instance(db, instance.id, rows[2].id, "ещё шаг", "a")
+
+    targets = service.rollback_targets(
+        service.get_instance_or_404(db, instance.id),
+        service._ordered_stages(instance.id, db),
+    )
+    assert [t.order_index for t in targets] == [2, 1]
+
+    moved = service.rollback_instance(db, instance.id, rows[0].id, "возврат", "actor-2")
+    assert moved.current_instance_stage_id == rows[0].id
+    assert moved.current_stage_id == stages[0].id
+
+    db.expire_all()
+    by_order = {r.order_index: r for r in db.execute(
+        select(InstanceStage).where(InstanceStage.instance_id == instance.id)
+    ).scalars()}
+    assert by_order[1].status == "pending"
+    assert by_order[1].completed_at is None
+    assert by_order[2].status == "pending"
+    assert by_order[2].completed_at is None
+    assert by_order[3].status == "pending"
+
+    history = service.list_transitions(db, instance.id)
+    assert len(history) == 4  # creation + 2 forward + rollback
+    last = history[-1]
+    assert last.from_stage_id == stages[2].id
+    assert last.to_stage_id == stages[0].id
+    assert last.actor_keycloak_sub == "actor-2"
+    assert last.comment == "возврат"
+
+    pending = list(db.execute(select(AuditOutbox).where(
+        AuditOutbox.aggregate_id == instance.id,
+        AuditOutbox.event_type == "WORKFLOW_TRANSITION",
+    )).scalars())
+    assert len(pending) == 3
+    assert relay_audit_events(db) == 3
+    events = db.execute(select(AuditEvent).where(
+        AuditEvent.entity_id == instance.id,
+        AuditEvent.action == "WORKFLOW_TRANSITION",
+    )).scalars().all()
+    assert len(events) == 3
+    assert events[-1].new_value["rollback"] is True
+
+
+def test_rollback_validation_denied(db):
+    instance, rows, _ = _graph(db)
+    # Nothing closed yet: no targets, rollback anywhere denied.
+    assert service.rollback_targets(
+        service.get_instance_or_404(db, instance.id),
+        service._ordered_stages(instance.id, db),
+    ) == []
+    with pytest.raises(BadTransition, match="previous stage"):
+        service.rollback_instance(db, instance.id, rows[0].id, "назад", "a")
+    db.rollback()
+    with pytest.raises(BadTransition, match="comment"):
+        service.rollback_instance(db, instance.id, rows[0].id, "   ", "a")
+    db.rollback()
+
+    service.transition_instance(db, instance.id, rows[2].id, "вперёд", "a")
+    # Forward-or-current target denied for rollback.
+    with pytest.raises(BadTransition, match="previous stage"):
+        service.rollback_instance(db, instance.id, rows[2].id, "не туда", "a")
+    db.rollback()
+    # Behind but never visited (pending) stage denied: flip the skipped
+    # middle row back to pending to simulate the gap.
+    middle = db.get(InstanceStage, rows[1].id)
+    assert middle is not None
+    middle.status = "pending"
+    middle.completed_at = None
+    db.flush()
+    with pytest.raises(BadTransition, match="completed stage"):
+        service.rollback_instance(db, instance.id, rows[1].id, "не было", "a")
+    db.rollback()

@@ -6,7 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field, model_validator
 
 
-Role = Literal["user", "manager", "curator", "admin"]
+Role = Literal["user", "manager", "admin"]
 
 
 class UserScope(BaseModel):

@@ -21,6 +21,7 @@ from app.models.catalog import (
     ITProduct,
     ITProgram,
     License,
+    ProductDirection,
     Responsible,
     University,
     UniversityResponsible,
@@ -482,6 +483,7 @@ def list_products(
     page_size: int,
     search: str | None,
     vendor_id: uuid.UUID | None,
+    direction_id: uuid.UUID | None = None,
     sort_by: str,
     sort_order: str,
 ) -> tuple[list[tuple], int]:
@@ -491,7 +493,15 @@ def list_products(
         conds.append(ITProduct.name.ilike(like_pattern(search), escape="\\"))
     if vendor_id is not None:
         conds.append(ITProduct.vendor_id == vendor_id)
-    total = db.execute(select(func.count()).select_from(ITProduct).where(*conds)).scalar() or 0
+    from_clause = ITProduct
+    if direction_id is not None:
+        conds.append(
+            exists().where(
+                (ProductDirection.product_id == ITProduct.id)
+                & (ProductDirection.direction_id == direction_id)
+            )
+        )
+    total = db.execute(select(func.count()).select_from(from_clause).where(*conds)).scalar() or 0
     rows = list(
         db.execute(
             select(ITProduct, Vendor.name)

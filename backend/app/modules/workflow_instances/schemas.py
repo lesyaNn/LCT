@@ -17,6 +17,11 @@ class InstanceCreate(BaseModel):
     university_id: uuid.UUID
     template_id: uuid.UUID
     program_id: uuid.UUID | None = None
+    product_id: uuid.UUID | None = None
+    responsible_id: uuid.UUID | None = Field(default=None)
+
+
+class InstanceResponsibleUpdate(BaseModel):
     responsible_id: uuid.UUID | None = Field(default=None)
 
 
@@ -47,6 +52,7 @@ class InstanceRead(BaseModel):
     university_id: uuid.UUID
     template_id: uuid.UUID
     program_id: uuid.UUID | None = None
+    product_id: uuid.UUID | None = None
     current_stage_id: uuid.UUID | None
     current_instance_stage_id: uuid.UUID | None
     responsible_id: uuid.UUID | None
@@ -64,6 +70,10 @@ class InstanceDetail(InstanceRead):
     university_name: str | None = None
     university_city: str | None = None
     program_name: str | None = None
+    product_name: str | None = None
+    responsible_name: str | None = None
+    responsible_email: str | None = None
+    responsible_phone: str | None = None
 
 
 class WorkflowTaskRead(BaseModel):

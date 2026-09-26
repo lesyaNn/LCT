@@ -54,8 +54,8 @@ function stubReads(page: Page) {
       { id: firstProgram, name: 'Программа А', direction_name: 'ИТ', status: 'active', launch_date: null, responsible_name: null },
       { id: secondProgram, name: 'Программа Б', direction_name: 'ИТ', status: 'planned', launch_date: null, responsible_name: null },
     ], page: 1, page_size: 100, total: 2 };
-    else if (path === `/api/v1/workflow/instances/by-program/${firstProgram}`) body = instance();
-    else if (path === `/api/v1/workflow/instances/by-program/${secondProgram}`) body = null;
+    else if (path === '/api/v1/workflow/instances') body = { items: [instance()], page: 1, page_size: 100, total: 1 };
+    else if (path === `/api/v1/workflow/instances/${instanceId}`) body = instance();
     else if (path === `/api/v1/workflow/instances/${instanceId}/tasks`) body = { items: [
       { id: 'aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaaa', instance_id: instanceId, stage_id: firstTemplateStage, title: 'Завершённая задача', status: 'done', responsible_id: null, deadline: null, completed_at: now },
       { id: 'aaaaaaa2-aaaa-4aaa-8aaa-aaaaaaaaaaaa', instance_id: instanceId, stage_id: secondTemplateStage, title: 'Открытая задача', status: 'open', responsible_id: null, deadline: null, completed_at: null },
@@ -70,6 +70,7 @@ function stubReads(page: Page) {
       { id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', instance_id: instanceId, from_stage_id: firstTemplateStage, to_stage_id: secondTemplateStage, actor_keycloak_sub: 'author-sub', comment: 'Этап завершён', created_at: now },
     ];
     else if (path === `/api/v1/workflow/instances/${instanceId}/allowed-transitions`) body = [];
+    else if (path === `/api/v1/workflow/instances/${instanceId}/rollback-targets`) body = [];
     else if (path === `/api/v1/workflow/instances/${instanceId}/attachments/cccccccc-cccc-4ccc-8ccc-cccccccccccc/download`) {
       return route.fulfill({ status: 200, contentType: 'application/pdf', headers: { 'access-control-allow-origin': new URL(page.url()).origin, 'content-disposition': 'attachment; filename="workflow.pdf"' }, body: '%PDF-1.4 test' });
     } else return route.continue();
@@ -79,11 +80,13 @@ function stubReads(page: Page) {
   return calls;
 }
 
-test('Workflow reads the selected real program and never commits mock mutations', async ({ page }) => {
+test('Workflow lists university instances and never commits mock mutations', async ({ page }) => {
   await login(page);
   const calls = stubReads(page);
   await page.goto(`/universities/${universityId}?tab=workflow`);
-  await expect(page.getByRole('combobox', { name: 'Программа' })).toHaveValue(firstProgram);
+  await expect(page.getByRole('heading', { name: 'Воркфлоу вуза' })).toBeVisible();
+  await page.getByRole('link', { name: /Программа А/ }).click();
+  await page.waitForURL((url) => url.pathname === `/workflows/${instanceId}`);
   await expect(page.getByText('Запуск', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('Открытая задача')).toBeVisible();
   await expect(page.getByText('Реальный комментарий')).toBeVisible();
@@ -97,9 +100,5 @@ test('Workflow reads the selected real program and never commits mock mutations'
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Скачать workflow.pdf' }).click();
   expect((await download).suggestedFilename()).toBe('workflow.pdf');
-  await page.getByRole('combobox', { name: 'Программа' }).selectOption(secondProgram);
-  await expect(page.getByText('Workflow ещё не создан')).toBeVisible();
-  await expect(page.getByText('Открытая задача')).toHaveCount(0);
-  expect(calls.get(`/api/v1/workflow/instances/by-program/${firstProgram}`)).toBe(1);
-  expect(calls.get(`/api/v1/workflow/instances/by-program/${secondProgram}`)).toBe(1);
+  expect(calls.get('/api/v1/workflow/instances')).toBe(1);
 });

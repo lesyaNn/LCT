@@ -771,8 +771,8 @@ def _auth(client, roles):
     return {"Authorization": f"Bearer {client._mint(roles)}"}
 
 
-def test_rbac_write_curator_allowed(jwt_client):
-    r = jwt_client.post("/write", headers=_auth(jwt_client, ("curator",)))
+def test_rbac_write_manager_allowed(jwt_client):
+    r = jwt_client.post("/write", headers=_auth(jwt_client, ("manager",)))
     assert r.status_code == 200, r.text
 
 

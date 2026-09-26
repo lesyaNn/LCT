@@ -3,7 +3,7 @@
 Thin routes: query params -> RBAC -> service -> DTO. No SQL and no business
 logic here. RBAC reuses the frozen permission names: ``university.read``
 for GET, ``university.edit`` for mutations (there are no separate
-create/update/delete permissions in the frozen model — curator and admin
+create/update/delete permissions in the frozen model — manager and admin
 can write, manager/user can only read). Includes the read-only
 ``/catalog/overview`` import viewer.
 """
@@ -63,7 +63,7 @@ router = APIRouter()
 
 READ = require_permission("university.read")
 WRITE = require_permission("university.edit")
-LEGACY_CATALOG_WRITE = require_role("admin", "curator")
+LEGACY_CATALOG_WRITE = require_role("admin", "manager")
 
 
 UniversitySortBy = Literal["name", "city", "created_at"]
@@ -96,7 +96,7 @@ def _norm(search: str | None) -> str | None:
 def create_university(
     data: UniversityCreate,
     db: Session = Depends(get_audit_db),
-    _user: CurrentUser = Depends(require_role("admin", "curator")),
+    _user: CurrentUser = Depends(require_role("admin", "manager")),
 ) -> UniversityDetail:
     return service.create_university(db, name=data.name, city=data.city)
 
@@ -194,7 +194,7 @@ def patch_university(
 def delete_university(
     university_id: uuid.UUID,
     db: Session = Depends(get_audit_db),
-    user: CurrentUser = Depends(require_role("admin", "curator")),
+    user: CurrentUser = Depends(require_role("admin", "manager")),
 ) -> None:
     ensure_university_visible(university_id, user)
     service.delete_university(db, university_id)
@@ -261,7 +261,7 @@ def assign_responsible(
     responsible_id: uuid.UUID,
     data: ResponsibleAssign | None = Body(default=None),
     db: Session = Depends(get_audit_db),
-    user: CurrentUser = Depends(require_role("admin", "manager", "curator")),
+    user: CurrentUser = Depends(require_role("admin", "manager")),
 ):
     ensure_university_visible(university_id, user)
     link, created = service.assign_responsible(db, university_id, responsible_id, data)
@@ -282,7 +282,7 @@ def unassign_responsible(
     university_id: uuid.UUID,
     responsible_id: uuid.UUID,
     db: Session = Depends(get_audit_db),
-    user: CurrentUser = Depends(require_role("admin", "manager", "curator")),
+    user: CurrentUser = Depends(require_role("admin", "manager")),
 ) -> None:
     ensure_university_visible(university_id, user)
     service.unassign_responsible(db, university_id, responsible_id)
@@ -505,6 +505,7 @@ def list_products(
     page_size: int = Query(default=20, ge=1, le=100),
     search: str | None = Query(default=None, description="Case-insensitive match on name"),
     vendor_id: uuid.UUID | None = Query(default=None, description="Filter by vendor"),
+    direction_id: uuid.UUID | None = Query(default=None, description="Filter by direction (via product_directions)"),
     sort_by: ProductSortBy = Query(default="name"),
     sort_order: SortOrder = Query(default="asc"),
     db: Session = Depends(get_audit_db),
@@ -516,6 +517,7 @@ def list_products(
         page_size=page_size,
         search=_norm(search),
         vendor_id=vendor_id,
+        direction_id=direction_id,
         sort_by=sort_by,
         sort_order=sort_order,
     )

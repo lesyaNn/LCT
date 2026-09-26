@@ -31,7 +31,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.core.exceptions import NotFound
 from app.core.policies import apply_university_scope, ensure_university_access
-from app.models.catalog import ITProgram, Responsible, University
+from app.models.catalog import ITProduct, ITProgram, Responsible, University, UniversityResponsible
 from app.models.external import ExternalApplication
 from app.models.interactions import UniversityProgram
 from app.models.workflow_instances import (
@@ -110,9 +110,11 @@ def get_instance_detail(
     """Instance + runtime stages in stable order (no N+1 via selectinload)."""
     day = today if today is not None else today_utc()
     result = db.execute(
-        select(WorkflowInstance, University.name, University.city, ITProgram.name)
+        select(WorkflowInstance, University.name, University.city, ITProgram.name, ITProduct.name, Responsible.full_name, Responsible.email, Responsible.phone)
         .join(University, University.id == WorkflowInstance.university_id)
         .outerjoin(ITProgram, ITProgram.id == WorkflowInstance.program_id)
+        .outerjoin(ITProduct, ITProduct.id == WorkflowInstance.product_id)
+        .outerjoin(Responsible, Responsible.id == WorkflowInstance.responsible_id)
         .options(
             selectinload(WorkflowInstance.instance_stages),
             selectinload(WorkflowInstance.tasks),
@@ -121,12 +123,14 @@ def get_instance_detail(
     ).first()
     if result is None:
         raise NotFound("Workflow instance not found")
-    instance, university_name, university_city, program_name = result
-    return _to_detail(instance, university_name, university_city, program_name, day)
+    instance, university_name, university_city, program_name, product_name, responsible_name, responsible_email, responsible_phone = result
+    return _to_detail(instance, university_name, university_city, program_name, product_name, responsible_name, responsible_email, responsible_phone, day)
 
 
 def _to_detail(instance: WorkflowInstance, university_name: str,
                university_city: str | None, program_name: str | None,
+               product_name: str | None, responsible_name: str | None,
+               responsible_email: str | None, responsible_phone: str | None,
                day: date) -> InstanceDetail:
     rows = sorted(instance.instance_stages, key=lambda r: r.order_index)
     task_counts: dict[uuid.UUID | None, tuple[int, int]] = {}
@@ -139,6 +143,7 @@ def _to_detail(instance: WorkflowInstance, university_name: str,
         university_id=instance.university_id,
         template_id=instance.template_id,
         program_id=instance.program_id,
+        product_id=instance.product_id,
         current_stage_id=instance.current_stage_id,
         current_instance_stage_id=instance.current_instance_stage_id,
         responsible_id=instance.responsible_id,
@@ -153,6 +158,10 @@ def _to_detail(instance: WorkflowInstance, university_name: str,
         university_name=university_name,
         university_city=university_city,
         program_name=program_name,
+        product_name=product_name,
+        responsible_name=responsible_name,
+        responsible_email=responsible_email,
+        responsible_phone=responsible_phone,
     )
 
 
@@ -176,9 +185,11 @@ def list_instance_page(db: Session, user, page: int, page_size: int, university_
     if not ids:
         return [], total
     rows = db.execute(
-        select(WorkflowInstance, University.name, University.city, ITProgram.name)
+        select(WorkflowInstance, University.name, University.city, ITProgram.name, ITProduct.name, Responsible.full_name, Responsible.email, Responsible.phone)
         .join(University, University.id == WorkflowInstance.university_id)
         .outerjoin(ITProgram, ITProgram.id == WorkflowInstance.program_id)
+        .outerjoin(ITProduct, ITProduct.id == WorkflowInstance.product_id)
+        .outerjoin(Responsible, Responsible.id == WorkflowInstance.responsible_id)
         .options(
             selectinload(WorkflowInstance.instance_stages),
             selectinload(WorkflowInstance.tasks),
@@ -186,8 +197,8 @@ def list_instance_page(db: Session, user, page: int, page_size: int, university_
         .where(WorkflowInstance.id.in_(ids))
     ).all()
     day = today_utc()
-    details = {instance.id: _to_detail(instance, name, city, program_name, day)
-               for instance, name, city, program_name in rows}
+    details = {instance.id: _to_detail(instance, name, city, program_name, product_name, responsible_name, responsible_email, responsible_phone, day)
+               for instance, name, city, program_name, product_name, responsible_name, responsible_email, responsible_phone in rows}
     return [details[instance_id] for instance_id in ids], total
 
 
@@ -205,6 +216,7 @@ def create_instance(
     university_id: uuid.UUID,
     template_id: uuid.UUID,
     program_id: uuid.UUID | None = None,
+    product_id: uuid.UUID | None = None,
     responsible_id: uuid.UUID | None = None,
     actor_sub: str = "",
     today: date | None = None,
@@ -224,6 +236,8 @@ def create_instance(
     template = db.get(WorkflowTemplate, template_id)
     if template is None:
         raise NotFound("Workflow template not found")
+    if product_id is not None and db.get(ITProduct, product_id) is None:
+        raise NotFound("Product not found")
     if responsible_id is not None and db.get(Responsible, responsible_id) is None:
         raise NotFound("Responsible not found")
 
@@ -246,6 +260,7 @@ def create_instance(
     instance = WorkflowInstance(
         university_id=university.id,
         program_id=program_id,
+        product_id=product_id,
         template_id=template.id,
         responsible_id=responsible_id,
         status="active",
@@ -302,9 +317,53 @@ def create_instance(
                 "template_id": str(template.id),
                 "template_name": template.name,
                 "university_name": university.name,
+                "program_id": str(program_id) if program_id else None,
+                "product_id": str(product_id) if product_id else None,
                 "stages": len(snapshots),
                 "external_application_id": str(external_application.id) if external_application else None,
             },
         )
         db.commit()
     return get_instance_detail(db, instance.id, today=day)
+
+
+def set_instance_responsible(
+    db: Session,
+    instance_id: uuid.UUID,
+    responsible_id: uuid.UUID | None,
+    actor_sub: str = "",
+) -> InstanceDetail:
+    """Assign (or clear) the instance responsible.
+
+    Only a responsible linked to the instance university
+    (``university_responsibles``) can be assigned; ``None`` clears it.
+    """
+    instance = get_instance_or_404(db, instance_id)
+    old_responsible_id = instance.responsible_id
+    if responsible_id is not None:
+        if db.get(Responsible, responsible_id) is None:
+            raise NotFound("Responsible not found")
+        linked = db.scalar(
+            select(UniversityResponsible.id).where(
+                UniversityResponsible.university_id == instance.university_id,
+                UniversityResponsible.responsible_id == responsible_id,
+            )
+        )
+        if linked is None:
+            raise NotFound("Responsible is not linked to university")
+    instance.responsible_id = responsible_id
+    db.commit()
+    if "audit_context" in db.info:
+        from app.modules.audit.service import AuditService, context_for
+
+        AuditService(db).log_event(
+            context=context_for(db, actor_sub or "system"),
+            action="UPDATE",
+            entity_type="workflow_instance",
+            entity_id=instance.id,
+            university_id=instance.university_id,
+            old_value={"responsible_id": str(old_responsible_id) if old_responsible_id else None},
+            new_value={"responsible_id": str(responsible_id) if responsible_id else None},
+        )
+        db.commit()
+    return get_instance_detail(db, instance.id)

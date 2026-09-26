@@ -22,7 +22,6 @@
     "realm": [
       { "name": "admin", "description": "Администратор платформы" },
       { "name": "manager", "description": "Руководитель" },
-      { "name": "curator", "description": "Куратор" },
       { "name": "user", "description": "Пользователь" }
     ],
     "client": {}
@@ -144,19 +143,6 @@
       "lastName": "Manager",
       "credentials": [{ "type": "password", "value": "manager123", "temporary": false }],
       "realmRoles": ["manager", "offline_access", "uma_authorization"],
-      "clientRoles": {},
-      "requiredActions": [],
-      "groups": []
-    },
-    {
-      "username": "curator",
-      "enabled": true,
-      "email": "curator@example.local",
-      "emailVerified": true,
-      "firstName": "Demo",
-      "lastName": "Curator",
-      "credentials": [{ "type": "password", "value": "curator123", "temporary": false }],
-      "realmRoles": ["curator", "offline_access", "uma_authorization"],
       "clientRoles": {},
       "requiredActions": [],
       "groups": []

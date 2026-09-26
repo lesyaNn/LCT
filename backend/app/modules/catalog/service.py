@@ -299,6 +299,7 @@ def list_product_page(
     page_size: int,
     search: str | None,
     vendor_id: uuid.UUID | None,
+    direction_id: uuid.UUID | None = None,
     sort_by: str,
     sort_order: str,
 ) -> tuple[list[ProductRead], int]:
@@ -308,6 +309,7 @@ def list_product_page(
         page_size=page_size,
         search=search,
         vendor_id=vendor_id,
+        direction_id=direction_id,
         sort_by=sort_by,
         sort_order=sort_order,
     )

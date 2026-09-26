@@ -123,7 +123,6 @@ class TransitionAction(str, enum.Enum):
 
 class UserRole(str, enum.Enum):
     USER = "user"
-    CURATOR = "curator"
     MANAGER = "manager"
     ADMIN = "admin"
 
