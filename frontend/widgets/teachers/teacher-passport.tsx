@@ -3,12 +3,9 @@
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import Download from '@atomaro/icons/24/action/Download';
-import Education from '@atomaro/icons/24/culture/Education';
 import DocumentText from '@atomaro/icons/24/document/DocumentText';
 import TimeStroke from '@atomaro/icons/24/alert/TimeStroke';
-import Edit from '@atomaro/icons/24/editor/Edit';
 import ArrowRight from '@atomaro/icons/24/navigation/ArrowRight';
-import { useAuth } from '@/shared/auth/AuthProvider';
 import { formatDateRu, formatDaysUntilRu, getUpcomingDateStatus } from '@/shared/lib/formatters';
 import { expirationStatusIntent, expirationStatusLabels } from '@/shared/lib/status-semantics';
 import {
@@ -18,7 +15,6 @@ import {
   type TeacherPassportProfile,
   type TeacherTraining,
 } from '@/shared/lib/universities-repository';
-import { Button } from '@/shared/ui/rtk/button';
 import { Avatar } from '@/shared/ui/rtk/avatar';
 import { ReadinessBadge } from '@/shared/ui/rtk/readiness-badge';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
@@ -88,9 +84,6 @@ function TrainingsSection({ rows }: { rows: TeacherTraining[] }) {
 }
 
 function TeacherHeader({ teacher }: { teacher: TeacherPassportProfile }) {
-  const { user } = useAuth();
-  const canEdit = user?.role === 'admin';
-  const canReport = user?.role === 'admin' || user?.role === 'manager';
   const nextTrainingStatus = getUpcomingDateStatus(teacher.nextTrainingDate);
   return (
     <header className={styles.header}>
@@ -109,10 +102,6 @@ function TeacherHeader({ teacher }: { teacher: TeacherPassportProfile }) {
           <div className={styles.statusPanelTop}><span className={styles.overline}>Готовность</span><ReadinessBadge readiness={teacher.readiness} size="md" /></div>
           {teacher.readinessReason ? <p className={styles.readinessReason}>{teacher.readinessReason}</p> : null}
           <div className={styles.nextTraining}><TimeStroke size={18} fill="currentColor" aria-hidden="true" /><div><span>Следующее повышение квалификации</span>{!teacher.qualificationRequired ? <strong>Повышение не требуется</strong> : teacher.nextTrainingDate ? <><strong>{formatDateRu(teacher.nextTrainingDate)}</strong><small className={nextTrainingStatus === 'overdue' ? styles.expiredText : undefined}>{formatDaysUntilRu(teacher.nextTrainingDate)}</small></> : <strong>Данные отсутствуют</strong>}</div></div>
-          <div className={styles.headerActions} aria-label="Действия с преподавателем">
-            {canEdit ? <Button variant="secondary" size="s" type="button" disabled title="Редактирование подключится после появления API"><Edit size={16} fill="currentColor" />Редактировать</Button> : null}
-            {canReport ? <Button variant="primary" size="s" type="button" disabled title="Формирование отчёта подключится после появления API"><Education size={16} fill="currentColor" />Отчёт</Button> : null}
-          </div>
         </div>
       </div>
     </header>

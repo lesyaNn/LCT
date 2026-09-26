@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/shared/auth/AuthProvider';
+import { authService } from '@/shared/lib/auth-service';
 import { Avatar } from '@/shared/ui/rtk/avatar';
 import { Icon } from '@/shared/ui/rtk/icon';
 import styles from './user-menu.module.css';
@@ -41,10 +42,7 @@ export function UserMenu() {
             <div><strong>{user.name}</strong><span>{user.email}</span><small>{user.roleLabel}</small></div>
           </div>
           <div className={styles.divider} />
-          <button className={styles.menuItem} role="menuitem" type="button"><Icon name="user" size={18} />Профиль</button>
-          <button className={styles.menuItem} role="menuitem" type="button"><Icon name="settings" size={18} />Настройки</button>
-          <div className={styles.divider} />
-          <button className={`${styles.menuItem} ${styles.danger}`} role="menuitem" type="button" onClick={() => { void logout().then(() => router.replace('/login')); }}><Icon name="logout" size={18} />Выйти</button>
+          <button className={`${styles.menuItem} ${styles.danger}`} role="menuitem" type="button" onClick={() => { void logout().then(() => { if (authService.mode() === 'mock') router.replace('/login'); }); }}><Icon name="logout" size={18} />Выйти</button>
         </div>
       )}
     </div>

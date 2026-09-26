@@ -110,7 +110,7 @@ function HeaderHealth({ score, status, onDetails }: { score: number | null; stat
   );
 }
 
-function PassportHeader({ passport, healthScore, healthStatus, canEdit, canReport, onTabChange }: { passport: UniversityPassport; healthScore: number | null; healthStatus: HealthStatus | null; canEdit: boolean; canReport: boolean; onTabChange: (tab: PassportTabId) => void }) {
+function PassportHeader({ passport, healthScore, healthStatus, onTabChange }: { passport: UniversityPassport; healthScore: number | null; healthStatus: HealthStatus | null; onTabChange: (tab: PassportTabId) => void }) {
   return (
     <header className={styles.header}>
       <div className={styles.headerMain}>
@@ -121,8 +121,6 @@ function PassportHeader({ passport, healthScore, healthStatus, canEdit, canRepor
         <div className={styles.headerSide}>
           <HeaderHealth score={healthScore} status={healthStatus} onDetails={() => onTabChange('health-score')} />
           <div className={styles.headerActions} aria-label="Действия с вузом">
-            {canEdit ? <Button variant="secondary" size="s" type="button" disabled title="Редактирование подключится после появления API"><Edit size={16} fill="currentColor" />Редактировать</Button> : null}
-            {canReport ? <Button variant="secondary" size="s" type="button" disabled title="Формирование отчёта подключится после появления API"><DocumentText size={16} fill="currentColor" />Отчёт</Button> : null}
             <Button variant="primary" size="s" type="button" onClick={() => onTabChange('workflow')}><Checklist size={16} fill="currentColor" />Workflow</Button>
           </div>
         </div>
@@ -166,7 +164,7 @@ function WorkflowOverview({ passport, canAdvance, onTabChange }: { passport: Uni
           <div className={styles.progressLabel}><span>Прогресс</span><strong>{workflow.completedSteps} из {workflow.totalSteps} этапов</strong></div>
           <div className={styles.progressTrack} role="progressbar" aria-label={`Пройдено ${workflow.completedSteps} из ${workflow.totalSteps} этапов`} aria-valuemin={0} aria-valuemax={workflow.totalSteps} aria-valuenow={workflow.completedSteps}><span style={{ width: `${progress}%` }} /></div>
         </div>
-        {canAdvance && workflow.nextStage ? <div className={styles.workflowAction}><Button variant="secondary" size="s" type="button" disabled title="Переход подключится после появления API">Перевести на следующий этап <ArrowRight size={16} fill="currentColor" /></Button><span>Следующий этап: {workflow.nextStage.name}</span></div> : null}
+        {canAdvance && workflow.nextStage ? <div className={styles.workflowAction}><Button variant="secondary" size="s" type="button" onClick={() => onTabChange('workflow')}>Открыть переход <ArrowRight size={16} fill="currentColor" /></Button><span>Следующий этап: {workflow.nextStage.name}</span></div> : null}
       </div>
     </section>
   );
@@ -214,7 +212,6 @@ export function UniversityPassport({ id }: { id: string }) {
   const activeTab = parseTab(searchParams.get('tab'));
   const query = useQuery({ queryKey: universityPassportQueryKey(id), queryFn: () => getUniversityPassport(id, queryClient), staleTime: 30_000 });
   const healthQuery = useQuery({ queryKey: universityHealthScoreQueryKey(id), queryFn: ({ signal }) => getUniversityHealthScore(id, signal), enabled: query.isSuccess, staleTime: 30_000 });
-  const canEdit = user?.role === 'admin';
   const canReport = user?.role === 'admin' || user?.role === 'manager';
   const canAdvance = canReport && UNIVERSITY_PASSPORT_CAPABILITIES.mutations;
   const activeTabDefinition = useMemo(() => tabDefinitions.find((tab) => tab.id === activeTab) ?? tabDefinitions[0], [activeTab]);
@@ -259,7 +256,7 @@ export function UniversityPassport({ id }: { id: string }) {
 
   return (
     <div className={styles.page}>
-      <PassportHeader passport={passport} healthScore={healthQuery.data?.currentScore ?? null} healthStatus={healthQuery.data?.status ?? null} canEdit={canEdit && UNIVERSITY_PASSPORT_CAPABILITIES.mutations} canReport={canReport} onTabChange={selectTab} />
+      <PassportHeader passport={passport} healthScore={healthQuery.data?.currentScore ?? null} healthStatus={healthQuery.data?.status ?? null} onTabChange={selectTab} />
       <TabbedSurface tabs={!mobileLayout ? <Tabs items={tabDefinitions} activeId={activeTab} onChange={(id) => selectTab(id as PassportTabId)} label="Разделы паспорта вуза" prefix="passport-tab" /> : undefined}>
       {!mobileLayout ? <div className={styles.desktopPanel} id="passport-panel" role="tabpanel" aria-labelledby={`passport-tab-${activeTab}`}>{renderContent(activeTab)}</div> : null}
       {mobileLayout ? <div className={styles.mobileAccordion} aria-label="Разделы паспорта вуза">

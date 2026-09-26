@@ -115,7 +115,7 @@ type ProgramViewRow = UniversityProgramRow & {
 };
 
 function ProgramRow({ row }: { row: ProgramViewRow }) {
-  return <><strong className={styles.primaryCell}>{row.name}</strong><span className={styles.secondaryCell}>{row.id.split('-').at(-1) ? `Программа ${row.id.split('-').at(-1)}` : 'Программа'}</span></>;
+  return <strong className={styles.primaryCell}>{row.name}</strong>;
 }
 
 function SyncMeta({ source, syncedAt, mode }: { source: 'LMS' | 'Сайт' | 'Ручные данные'; syncedAt: string | null; mode?: 'real' | 'mock' | 'import' }) {
@@ -192,7 +192,7 @@ function ProgramsSection({ id }: { id: string }) {
     { id: 'demand', label: 'Спрос', sortable: true, sortValue: (row) => row.externalApplication?.demandScore ?? -1, render: (row) => demandLabel(row.externalApplication?.demandScore ?? null) },
     { id: 'source', label: 'Источник', render: (row) => row.externalApplication ? <StatusBadge intent="brand">{websiteQuery.data?.mode === 'import' ? 'Импорт' : 'Сайт'}</StatusBadge> : <StatusBadge intent="neutral">Ручные данные</StatusBadge> },
     { id: 'sync', label: 'Синхронизация', render: (row) => row.externalApplication ? <time dateTime={row.externalApplication.syncedAt ?? undefined}>{row.externalApplication.syncedAt ? formatDate(row.externalApplication.syncedAt) : '—'}</time> : '—' },
-    { id: 'actions', label: 'Действия', render: (row) => row.externalApplication ? applicationAction(row.externalApplication) : <Button variant="ghost" size="s" type="button" disabled title="Детали программы появятся после подключения маршрута">Открыть</Button> },
+    { id: 'actions', label: 'Workflow', render: (row) => row.externalApplication ? applicationAction(row.externalApplication) : '—' },
   ];
   const mobileFields: PassportMobileField<ProgramViewRow>[] = [
     { label: 'Программа', render: (row) => <ProgramRow row={row} /> },
@@ -202,7 +202,7 @@ function ProgramsSection({ id }: { id: string }) {
     { label: 'Спрос', render: (row) => demandLabel(row.externalApplication?.demandScore ?? null) },
     { label: 'Источник', render: (row) => row.externalApplication ? <StatusBadge intent="brand">{websiteQuery.data?.mode === 'import' ? 'Импорт' : 'Сайт'}</StatusBadge> : <StatusBadge intent="neutral">Ручные данные</StatusBadge> },
     { label: 'Синхронизация', render: (row) => row.externalApplication?.syncedAt ? formatDate(row.externalApplication.syncedAt) : '—' },
-    { label: 'Действия', render: (row) => row.externalApplication ? applicationAction(row.externalApplication) : null },
+    { label: 'Workflow', render: (row) => row.externalApplication ? applicationAction(row.externalApplication) : '—' },
   ];
 
   if (query.isPending) return <section className={styles.section} aria-label="Программы"><PassportTableSkeleton /></section>;
@@ -278,7 +278,7 @@ function StudentsSection({ id }: { id: string }) {
     mutationFn: (studentId: string) => deleteUniversityStudent(studentId),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['university-students', id] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.universities.studentsFamily(id) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.universities.passport(id) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.universities.historyFamily(id) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.audit.all }),
@@ -340,14 +340,12 @@ function ProductsSection({ id }: { id: string }) {
     { id: 'vendor', label: 'Поставщик', sortable: true, sortValue: (row) => row.vendor, render: (row) => row.vendor },
     { id: 'status', label: 'Статус', sortable: true, sortValue: (row) => productStatusLabels[row.status], render: (row) => <ProductStatusBadge status={row.status} /> },
     { id: 'license', label: 'Лицензия', sortable: true, sortValue: (row) => row.expiresAt, render: (row) => <ProductLicense row={row} /> },
-    { id: 'actions', label: 'Действия', render: () => <Button variant="ghost" size="s" type="button" disabled title="Карточка продукта появится после подключения маршрута">Просмотреть</Button> },
   ];
   const mobileFields: PassportMobileField<UniversityProductRow>[] = [
     { label: 'Продукт', render: (row) => <><strong className={styles.primaryCell}>{row.name}</strong><span className={styles.secondaryCell}>{row.version}</span></> },
     { label: 'Поставщик', render: (row) => row.vendor },
     { label: 'Статус', render: (row) => <ProductStatusBadge status={row.status} /> },
     { label: 'Лицензия', render: (row) => <ProductLicense row={row} /> },
-    { label: 'Действия', render: () => <Button variant="ghost" size="s" type="button" disabled title="Карточка продукта появится после подключения маршрута">Просмотреть</Button> },
   ];
 
   if (query.isPending) return <section className={styles.section} aria-label="Продукты"><PassportTableSkeleton /></section>;
@@ -418,14 +416,14 @@ function DocumentsSection({ id }: { id: string }) {
     { id: 'status', label: 'Статус', render: (row) => <DocumentStatusBadge status={row.status} /> },
     { id: 'uploadedBy', label: 'Загрузил', render: (row) => row.uploadedBy },
     { id: 'uploadedAt', label: 'Дата', sortable: true, sortValue: (row) => row.uploadedAt, render: (row) => formatDate(row.uploadedAt) },
-    { id: 'download', label: 'Файл', render: (row) => row.downloadUrl ? <a className={styles.iconAction} href={row.downloadUrl} download aria-label={`Скачать ${row.fileName}`}><Download size={18} fill="currentColor" /></a> : <button className={styles.iconAction} type="button" disabled aria-label={`Скачивание ${row.fileName} станет доступно после подключения API`}><Download size={18} fill="currentColor" /></button> },
+    { id: 'download', label: 'Файл', render: (row) => row.downloadUrl ? <a className={styles.iconAction} href={row.downloadUrl} download aria-label={`Скачать ${row.fileName}`}><Download size={18} fill="currentColor" /></a> : <span aria-label="Файл недоступен">—</span> },
   ];
   const mobileFields: PassportMobileField<UniversityDocumentRow>[] = [
     { label: 'Документ', render: (row) => <><strong className={styles.primaryCell}>{row.name}</strong><span className={styles.secondaryCell}>{row.type}</span></> },
     { label: 'Файл', render: (row) => <DocumentFile row={row} /> },
     { label: 'Статус', render: (row) => <DocumentStatusBadge status={row.status} /> },
     { label: 'Дата', render: (row) => formatDate(row.uploadedAt) },
-    { label: 'Скачать', render: (row) => row.downloadUrl ? <a className={styles.iconAction} href={row.downloadUrl} download aria-label={`Скачать ${row.fileName}`}><Download size={18} fill="currentColor" /></a> : <button className={styles.iconAction} type="button" disabled aria-label="Скачивание станет доступно после подключения API"><Download size={18} fill="currentColor" /></button> },
+    { label: 'Скачать', render: (row) => row.downloadUrl ? <a className={styles.iconAction} href={row.downloadUrl} download aria-label={`Скачать ${row.fileName}`}><Download size={18} fill="currentColor" /></a> : <span aria-label="Файл недоступен">—</span> },
   ];
   if (query.isPending) return <section className={styles.section} aria-label="Документы"><PassportTableSkeleton /></section>;
   if (query.isError || !query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
@@ -448,7 +446,7 @@ function MeetingsSection({ id, canAdd }: { id: string; canAdd: boolean }) {
     mutationFn: (meetingId: string) => deleteUniversityMeeting(meetingId),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['university-meetings', id] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.universities.meetingsFamily(id) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.universities.passport(id) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.universities.historyFamily(id) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.audit.all }),

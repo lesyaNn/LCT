@@ -18,11 +18,7 @@ export function Topbar({ pathname, mobileOpen, onMenuOpen }: TopbarProps) {
         <IconButton icon="menu" label="Открыть меню" aria-expanded={mobileOpen} className={styles.menuButton} onClick={onMenuOpen} />
         <Breadcrumbs pathname={pathname} />
       </div>
-      <div className={styles.actions}>
-        <IconButton icon="bell" label="Уведомления" className={styles.notificationButton} />
-        <div className={styles.separator} aria-hidden="true" />
-        <UserMenu />
-      </div>
+      <div className={styles.actions}><UserMenu /></div>
     </header>
   );
 }
