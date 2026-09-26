@@ -105,10 +105,10 @@ function AuditFilters({ query, result, options, onPatch, onReset }: { query: Aud
   const universities = options?.universities ?? [];
   const controls = () => <>
       <DateRangeField presets from={query.filters.dateFrom} to={query.filters.dateTo} disabled={!capabilities?.dateRange} onFromChange={(dateFrom) => onPatch({ dateFrom })} onToChange={(dateTo) => onPatch({ dateTo })} onRangeChange={(dateFrom, dateTo) => onPatch({ dateFrom, dateTo })} />
-      <MultiSelect label="Пользователь" values={query.filters.userIds} options={users} disabled={!capabilities?.users || !options} onChange={(values) => onPatch({ userIds: values })} />
-      <MultiSelect label="ВУЗ" values={query.filters.universityIds} options={universities} disabled={!capabilities?.universities || !options} onChange={(values) => onPatch({ universityIds: values })} />
-      <MultiSelect label="Тип действия" values={query.filters.actions} options={actionOptions} disabled={!capabilities?.actions || !options} onChange={(values) => onPatch({ actions: values })} />
-      <MultiSelect label="Тип сущности" values={query.filters.entityTypes} options={entityOptions} disabled={!capabilities?.entityTypes || !options} onChange={(values) => onPatch({ entityTypes: values })} />
+      <MultiSelect labelPlacement="outside" label="Пользователь" values={query.filters.userIds} options={users} disabled={!capabilities?.users || !options} onChange={(values) => onPatch({ userIds: values })} />
+      <MultiSelect labelPlacement="outside" label="ВУЗ" values={query.filters.universityIds} options={universities} disabled={!capabilities?.universities || !options} onChange={(values) => onPatch({ universityIds: values })} />
+      <MultiSelect labelPlacement="outside" label="Тип действия" values={query.filters.actions} options={actionOptions} disabled={!capabilities?.actions || !options} onChange={(values) => onPatch({ actions: values })} />
+      <MultiSelect labelPlacement="outside" label="Тип сущности" values={query.filters.entityTypes} options={entityOptions} disabled={!capabilities?.entityTypes || !options} onChange={(values) => onPatch({ entityTypes: values })} />
     </>;
 
   const chips = [

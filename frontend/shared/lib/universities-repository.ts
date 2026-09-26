@@ -888,7 +888,7 @@ const historyEvents = (id: string, university: UniversityListItem): UniversityHi
 };
 
 export function getUniversityHistoryFilterOptions(id: string): UniversityHistoryFilterOptions {
-  if (!isMockDataSource) return { users: [], entities: [] };
+  if (!isMockDataSourceFor('passport')) return { users: [], entities: [] };
   const university = getUniversityOrThrow(id);
   const events = historyEvents(id, university);
   return {
@@ -912,7 +912,7 @@ async function getMockUniversityHistory(id: string, filters: UniversityHistoryFi
 }
 
 export async function getUniversityHistory(id: string, filters: UniversityHistoryFilters): Promise<UniversityHistoryEvent[]> {
-  return fromDataSource({ mock: () => getMockUniversityHistory(id, filters), real: () => realGetUniversityHistory(id, filters) });
+  return fromDataSource({ domain: 'passport', mock: () => getMockUniversityHistory(id, filters), real: () => realGetUniversityHistory(id, filters) });
 }
 
 export type HealthScoreReasonSeverity = 'high' | 'medium' | 'low';

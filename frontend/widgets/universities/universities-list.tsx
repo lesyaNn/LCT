@@ -20,6 +20,7 @@ import SortDown from '@atomaro/icons/24/editor/SortDown';
 import SortUp from '@atomaro/icons/24/editor/SortUp';
 import { Button } from '@/shared/ui/rtk/button';
 import { FilterToolbar } from '@/shared/ui/rtk/filter-surface';
+import { SearchField } from '@/shared/ui/rtk/filter-field';
 import type { ActiveFilterItem } from '@/shared/ui/rtk/active-filters';
 import { DateRangeField } from '@/shared/ui/rtk/date-range-field';
 import { Select } from '@/shared/ui/rtk/form-controls';
@@ -283,7 +284,7 @@ function SortIndicator({ sorted }: { sorted: false | 'asc' | 'desc' }) {
   return <ChevronSort size={16} fill="currentColor" />;
 }
 
-function Filters({ state, options, catalogsLoading, catalogsUnavailable, searchInput, setSearchInput, onPatch, compact = false }: {
+function Filters({ state, options, catalogsLoading, catalogsUnavailable, searchInput, setSearchInput, onPatch }: {
   state: UniversityUrlState;
   options: UniversityFilterOptions;
   catalogsLoading: boolean;
@@ -291,10 +292,8 @@ function Filters({ state, options, catalogsLoading, catalogsUnavailable, searchI
   searchInput: string;
   setSearchInput: (value: string) => void;
   onPatch: (patch: QueryPatch) => void;
-  compact?: boolean;
 }) {
   const filters = filtersFromState(state);
-  const searchId = compact ? 'universities-search-mobile' : 'universities-search';
   const updateDateRange = (key: 'date_from' | 'date_to', value: string) => {
     if (key === 'date_from' && value && filters.dateTo && value > filters.dateTo) {
       onPatch({ date_from: value, date_to: value, page: 1 });
@@ -309,13 +308,7 @@ function Filters({ state, options, catalogsLoading, catalogsUnavailable, searchI
 
   return (
     <section className={styles.filters} aria-label="Фильтры списка вузов">
-      <div className={`${styles.field} ${styles.searchField}`}>
-        <label htmlFor={searchId}>Поиск по названию вуза</label>
-        <div className={styles.inputWrap}>
-          <Search size={18} fill="currentColor" />
-          <input id={searchId} type="search" value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Поиск по названию вуза" />
-        </div>
-      </div>
+      <SearchField label="Поиск по названию вуза" value={searchInput} onChange={setSearchInput} placeholder="Поиск по названию вуза" />
       <MultiSelect label="Вуз" labelPlacement="outside" options={options.universities} values={filters.universityIds} onChange={(values) => onPatch({ university: values, page: 1 })} searchable loading={catalogsLoading} disabled={catalogsUnavailable} />
       <MultiSelect label="Программа" labelPlacement="outside" options={options.programs} values={filters.programIds} onChange={(values) => onPatch({ program: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
       <MultiSelect label="Продукт" labelPlacement="outside" options={options.products} values={filters.productIds} onChange={(values) => onPatch({ product: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
@@ -567,7 +560,7 @@ export function UniversitiesList() {
         </div>
       </header>
       <div className={styles.filterArea}>
-        <FilterToolbar label="Фильтры списка вузов" collapsible desktopGridClassName={styles.filterGrid} controls={(mobile) => <Filters compact={mobile} state={state} options={filterOptions} catalogsLoading={catalogsQuery.isPending} catalogsUnavailable={catalogsQuery.isError} searchInput={searchInput} setSearchInput={setSearchInput} onPatch={goToState} />} onReset={resetFilters} resetDisabled={!hasFilters} mobileCount={activeFilterCount} activeFilters={universityActiveFilters(state.filters, filterOptions, goToState)} />
+        <FilterToolbar label="Фильтры списка вузов" collapsible controls={() => <Filters state={state} options={filterOptions} catalogsLoading={catalogsQuery.isPending} catalogsUnavailable={catalogsQuery.isError} searchInput={searchInput} setSearchInput={setSearchInput} onPatch={goToState} />} onReset={resetFilters} resetDisabled={!hasFilters} mobileCount={activeFilterCount} activeFilters={universityActiveFilters(state.filters, filterOptions, goToState)} />
         {catalogsQuery.isError ? <RouteErrorState compact onRetry={() => void catalogsQuery.refetch()} /> : null}
       </div>
       {query.isPending ? <TableSkeleton rows={6} columns={7} label="Загрузка списка вузов" /> : !query.data ? <RouteErrorState onRetry={() => void query.refetch()} /> : query.data.total === 0 ? <EmptyState icon={<Search size={20} fill="currentColor" />} title={hasFilters ? 'По заданным фильтрам ничего не найдено' : 'Вузы пока не добавлены'} description={hasFilters ? 'Измените условия поиска или сбросьте фильтры.' : 'Когда появятся записи, они будут отображены в этом списке.'} primaryAction={hasFilters ? { label: 'Сбросить фильтры', onClick: resetFilters, variant: 'secondary' } : undefined} /> : (

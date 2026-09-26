@@ -26,7 +26,6 @@
 .license { display: flex; flex-direction: column; gap: 2px; }
 .license strong { font-size: 12px; }
 .license span { color: var(--rtk-color-text-tertiary); font-size: 11px; }
-.filtersRow { align-items: flex-end; display: flex; gap: var(--rtk-space-3); }
 .fileCell { align-items: center; display: flex; gap: var(--rtk-space-2); min-width: 180px; }
 .fileCell > svg { color: var(--rtk-color-brand); flex: 0 0 auto; }
 .fileCell > div { flex: 1 1 auto; min-width: 0; }
@@ -39,7 +38,6 @@
 .inlineDetails summary { cursor: pointer; font-weight: 700; }
 .inlineDetails span { color: var(--rtk-color-text-secondary); display: block; margin-top: var(--rtk-space-1); }
 .meetingSurface { background: var(--rtk-color-surface); border-radius: var(--rtk-radius-medium); box-shadow: var(--rtk-shadow-elevation-2); padding: var(--rtk-space-5); }
-.meetingTitle { font-size: 18px; letter-spacing: -.02em; margin: 0; }
 .meetingTimeline { list-style: none; margin: 0; padding: 0; }
 .meetingItem { display: grid; gap: var(--rtk-space-4); grid-template-columns: 16px minmax(0, 1fr); min-width: 0; position: relative; }
 .meetingItem:not(:last-child) .meetingMarker::after { background: var(--rtk-color-border); content: ''; height: calc(100% + var(--rtk-space-4)); left: 7px; position: absolute; top: 16px; width: 1px; }
@@ -81,7 +79,6 @@
   .actionLink, .iconAction, .inlineDetails summary { align-items: center; display: inline-flex; min-height: 44px; }
   .iconAction { min-width: 44px; }
   .studentSummary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .filtersRow { align-items: stretch; flex-direction: column; }
   .meetingDetails summary { align-items: center; display: flex; min-height: 44px; }
   .responsiblesGrid { grid-template-columns: 1fr; }
   .assignmentActions { flex-direction: column-reverse; }

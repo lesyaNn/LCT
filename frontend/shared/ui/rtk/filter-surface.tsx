@@ -14,7 +14,7 @@ export function FilterSurface({ children, className, label = 'Фильтры', m
 }
 
 /** Shared list-filter presentation. Domain controls and their state remain with the page. */
-export function FilterToolbar({ label, controls, onReset, resetDisabled = false, actions, mobileCount = 0, embedded = false, collapsible = false, desktopGridClassName, activeFilters = [] }: {
+export function FilterToolbar({ label, controls, onReset, resetDisabled = false, actions, mobileCount = 0, embedded = false, collapsible = false, compact = false, activeFilters = [] }: {
   label: string;
   controls: (mobile: boolean) => ReactNode;
   onReset?: () => void;
@@ -23,17 +23,17 @@ export function FilterToolbar({ label, controls, onReset, resetDisabled = false,
   mobileCount?: number;
   embedded?: boolean;
   collapsible?: boolean;
-  desktopGridClassName?: string;
+  compact?: boolean;
   activeFilters?: ActiveFilterItem[];
 }) {
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(true);
   const panelId = useId();
-  const reset = onReset ? <Button variant="ghost" size="s" type="button" disabled={resetDisabled} onClick={onReset}>Сбросить</Button> : null;
+  const reset = onReset && !resetDisabled ? <Button variant="ghost" size="s" type="button" onClick={onReset}>Сбросить</Button> : null;
   return <>
     <FilterSurface mobileDrawer={false} className={`${styles.desktop} ${embedded ? styles.embedded : ''}`} label={label}>
       {collapsible ? <Button variant="secondary" size="s" type="button" className={styles.collapseTrigger} aria-expanded={expanded} aria-controls={panelId} onClick={() => setExpanded((value) => !value)}><Filter size={16} fill="currentColor" />{expanded ? 'Скрыть фильтры' : 'Показать фильтры'}{mobileCount ? ` (${mobileCount})` : ''}</Button> : null}
-      <div id={panelId} className={styles.panel} hidden={collapsible && !expanded}><div className={styles.desktopLayout}><div className={`${styles.grid} ${desktopGridClassName ?? ''}`}>{controls(false)}</div>{reset || actions ? <div className={styles.desktopActions}>{reset}{actions}</div> : null}</div></div>
+      <div id={panelId} className={styles.panel} hidden={collapsible && !expanded}><div className={`${styles.desktopLayout} ${compact ? styles.compact : ''}`}><div className={styles.grid}>{controls(false)}</div>{reset || actions ? <div className={styles.desktopActions}>{reset}{actions}</div> : null}</div></div>
     </FilterSurface>
     <Button className={styles.mobileTrigger} variant="secondary" size="s" type="button" onClick={() => setOpen(true)}><Filter size={16} fill="currentColor" />Фильтры{mobileCount ? ` (${mobileCount})` : ''}</Button>
     {open ? <Drawer title="Фильтры" onClose={() => setOpen(false)}><div className={`${styles.grid} ${styles.mobileGrid}`}>{controls(true)}</div><div className={styles.actions}>{reset}{actions}<Button variant="primary" size="s" type="button" onClick={() => setOpen(false)}>Показать результаты</Button></div></Drawer> : null}

@@ -26,6 +26,7 @@ import { listWorkflowTemplates, workflowTemplateListQueryKey } from '@/shared/li
 import { normalizeApiError } from '@/shared/lib/api-errors';
 import { getUniversityExternalData, universityExternalDataQueryKey } from '@/shared/lib/external-integrations-repository';
 import { Select } from '@/shared/ui/rtk/form-controls';
+import { FilterField } from '@/shared/ui/rtk/filter-field';
 import { Avatar } from '@/shared/ui/rtk/avatar';
 import { Button } from '@/shared/ui/rtk/button';
 import { EmptyState } from '@/shared/ui/empty-state';
@@ -303,7 +304,7 @@ export function UniversityWorkflow({ id, canAdvance }: { id: string; canAdvance:
   if (programsQuery.isPending || (!realWorkflow && externalQuery.isPending)) return <WorkflowSkeleton mode="embedded" />;
   if (!programsQuery.data) return <RouteErrorState compact onRetry={() => void programsQuery.refetch()} />;
   return <div className={styles.programWorkflow}>
-    {programs.length > 1 ? <label className={styles.programSelector}><span>Программа</span><Select value={selected?.key ?? ''} onChange={(event) => selectProgram(event.target.value)}>{programs.map((program) => <option key={program.key} value={program.key}>{program.name}</option>)}</Select></label> : selected ? <p className={styles.programName}>Программа: <strong>{selected.name}</strong></p> : null}
+    {programs.length > 1 ? <FilterField className={styles.programSelector} label="Программа"><Select value={selected?.key ?? ''} onChange={(event) => selectProgram(event.target.value)}>{programs.map((program) => <option key={program.key} value={program.key}>{program.name}</option>)}</Select></FilterField> : selected ? <p className={styles.programName}>Программа: <strong>{selected.name}</strong></p> : null}
     {realWorkflow && workflowByProgram.isPending && selected ? <WorkflowSkeleton mode="embedded" /> : realWorkflow && workflowByProgram.isError && !workflowByProgram.data ? <RouteErrorState compact onRetry={() => void workflowByProgram.refetch()} /> : instanceId ? <WorkflowView key={instanceId} instanceId={instanceId} mode="embedded" canAdvance={canAdvance} /> : <>
       <EmptyState title="Workflow ещё не создан" description={realWorkflow ? 'Для выбранной программы процесс пока не создан.' : 'Создать его можно из заявки с сайта в разделе «Программы».'} primaryAction={realWorkflow ? undefined : { label: 'Открыть программы', onClick: () => { const next = new URLSearchParams(searchParams.toString()); next.set('tab', 'programs'); router.push(`${pathname}?${next.toString()}`, { scroll: false }); } }} />
       {canCreate && selected ? <>
