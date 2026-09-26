@@ -21,6 +21,7 @@
 | Catalog | `/directions /programs /products /vendors /responsibles` |
 | Analytics/Reports | `GET /analytics/...`, `POST /reports` (202) → `GET /reports/{job}` → `GET /reports/{job}/download` |
 | Import | `POST /import/...` (staging + worker) |
+| External (Stage 11) | `GET /universities/{id}/external-data?source=lms\|website`, `POST /integrations/sync`, `GET /integrations/metrics`, `POST /workflow/instances/from-external` |
 
 ## Пример (Python, stdlib)
 ```python
@@ -34,4 +35,11 @@ print(json.load(urllib.request.urlopen(req))[0]["id"])
 ```
 
 ## Webhooks / Rate limiting
-Не реализованы (deferred). Внешних LMS/сайта нет — интеграции отсутствуют.
+Live LMS/Website API-контракты пока не настроены. По умолчанию external endpoints возвращают
+`EXTERNAL_SOURCE_UNAVAILABLE` (503), без подмены данных. Заявки, загруженные через
+общий `/admin/import` из XLS/XLSX (`catalog_type=applications`), доступны как
+`mode=import` и могут создавать Workflow без live-адаптера. Только в непроизводственном окружении
+`EXTERNAL_ADAPTER_MODE=mock` включает явные тестовые adapters; `POST /integrations/sync`
+записывает тестовый snapshot в БД. У студентов источник и время синхронизации хранятся в
+`students`, заявки сайта — в `external_applications` с уникальным `(source, external_id)`.
+Создание Workflow из заявки атомарно и повторный запрос возвращает существующий instance.

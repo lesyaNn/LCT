@@ -65,7 +65,7 @@ type ApiProduct = { id: string; name: string; version: string; vendor_name: stri
 type ApiDocument = { id: string; document_type: string; title: string; file_name: string; file_size: number; signed_at: string | null; expires_at: string | null; status: string; uploaded_by: string; created_at: string };
 type ApiMeeting = { id: string; meeting_type: string; subject: string; participants: string[]; outcome: string | null; next_action: string | null; next_action_due: string | null; meeting_at: string; created_by: string };
 type ApiMeetingRead = Omit<ApiMeeting, 'participants' | 'created_by'> & { participants: unknown[]; created_by_keycloak_sub: string };
-type ApiStudent = { id: string; external_id: string; university_id: string; program_id: string; full_name: string; group_name: string | null; status: string; started_at: string; finished_at: string | null };
+type ApiStudent = { id: string; external_id: string; university_id: string; program_id: string; full_name: string; group_name: string | null; status: string; started_at: string; finished_at: string | null; source: 'manual' | 'lms' | 'website' | 'import'; progress: number | null; synced_at: string | null };
 type ApiResponsible = { id: string; full_name: string; email: string; phone: string | null; role: string; is_primary?: boolean };
 type ApiTimeline = { id: string; type: string; title: string; description: string | null; author: string; created_at: string };
 type ApiWorkflowSummary = { instance_id: string | null; template_name: string | null; current_stage: string | { code: string; name: string } | null; progress_percent: number; overdue_stages: number; next_due_date: string | null };
@@ -155,6 +155,7 @@ export function serializeUniversityListQuery(params: UniversityListQuery): URLSe
   const filters: UniversityFilters = params.filters;
   if (filters.search.trim()) search.set('search', filters.search.trim());
   if (filters.city) search.set('city', filters.city);
+  if (filters.externalSource) search.set('external_source', filters.externalSource);
   appendRepeated(search, 'university_ids', filters.universityIds);
   appendRepeated(search, 'program_ids', filters.programIds);
   appendRepeated(search, 'product_ids', filters.productIds);
@@ -258,123 +259,57 @@ export async function realGetUniversityStudentsSummary(id: string, queryClient?:
 export async function realGetUniversityStudents(id: string, page = 1, pageSize = 20, signal?: AbortSignal): Promise<PaginatedResult<UniversityStudentListRow>> {
   const data = unwrap(await apiFetch<ApiPage<ApiStudent>>(`/api/v1/universities/${encodeURIComponent(id)}/students?page=${page}&page_size=${pageSize}`, { signal }), 'Не удалось загрузить студентов ВУЗа.');
   return {
-    items: data.items.map((item) => ({ id: item.id, externalId: item.external_id, studentName: item.full_name, programId: item.program_id, programName: 'Программа не указана', active: item.status === 'active' ? 1 : 0, graduated: item.status === 'graduated' ? 1 : 0, total: 1, flow: item.group_name, status: item.status, startedAt: item.started_at, finishedAt: item.finished_at })),
+    items: data.items.map((item) => ({ id: item.id, externalId: item.external_id, studentName: item.full_name, programId: item.program_id, programName: 'Программа не указана', active: item.status === 'active' ? 1 : 0, graduated: item.status === 'graduated' ? 1 : 0, total: 1, flow: item.group_name, status: item.status, startedAt: item.started_at, finishedAt: item.finished_at, source: item.source, progress: item.progress, syncedAt: item.synced_at })),
     page: data.page, pageSize: data.page_size, total: data.total,
   };
 }
 
-function externalRows(value: unknown, keys: string[]): unknown[] {
-  if (Array.isArray(value)) return value;
-  if (!isRecord(value)) return [];
-  for (const key of keys) {
-    const candidate = value[key];
-    if (Array.isArray(candidate)) return candidate;
-    if (isRecord(candidate) && Array.isArray(candidate.items)) return candidate.items;
-  }
-  if (isRecord(value.data)) return externalRows(value.data, keys);
-  return [];
-}
-
-function externalSyncAt(value: unknown): string | null {
-  if (!isRecord(value)) return null;
-  const candidate = value.synced_at ?? value.sync_at ?? value.last_sync_at ?? value.synchronized_at;
-  return typeof candidate === 'string' && candidate.trim() ? candidate : null;
-}
-
-function externalNumber(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string' && value.trim() && Number.isFinite(Number(value))) return Number(value);
-  return null;
-}
-
-function externalPayload(value: unknown): Record<string, unknown> {
-  if (!isRecord(value)) return {};
-  if (isRecord(value.data)) return externalPayload(value.data);
-  return value;
-}
-
-function workflowInstanceIdFrom(value: unknown): string {
-  if (!isRecord(value)) return '';
-  const direct = stringValue(value.instance_id ?? value.workflow_instance_id ?? value.workflow_id ?? value.id);
-  if (direct) return direct;
-  for (const key of ['data', 'detail', 'error', 'result', 'instance', 'workflow']) {
-    const nested = workflowInstanceIdFrom(value[key]);
-    if (nested) return nested;
-  }
-  return '';
-}
-
-function normalizeExternalData(value: unknown, universityId: string, source: ExternalDataSource): UniversityExternalData {
-  const payload = externalPayload(value);
-  const syncedAt = externalSyncAt(payload);
-  const students: ExternalStudent[] = source === 'lms'
-    ? externalRows(payload, ['students', 'learners', 'items']).flatMap((raw, index) => {
-      const item = isRecord(raw) ? raw : {};
-      const id = stringValue(item.id ?? item.student_id ?? item.external_id, `${universityId}-lms-${index + 1}`);
-      return [{
-        id,
-        name: stringValue(item.name ?? item.full_name ?? item.student_name, 'Обучающийся'),
-        programName: stringValue(item.program_name ?? item.program ?? item.direction_name) || null,
-        flow: stringValue(item.flow ?? item.flow_name ?? item.cohort) || null,
-        progress: externalNumber(item.progress ?? item.progress_percent ?? item.completion_percent),
-        source: 'lms' as const,
-        syncedAt: externalSyncAt(item) ?? syncedAt,
-      }];
-    })
-    : [];
-  const applications: ExternalApplication[] = source === 'website'
-    ? externalRows(payload, ['applications', 'website_applications', 'items']).flatMap((raw, index) => {
-      const item = isRecord(raw) ? raw : {};
-      const id = stringValue(item.id ?? item.application_id ?? item.external_id, `${universityId}-website-${index + 1}`);
-      const count = externalNumber(item.applications_count ?? item.application_count ?? item.count ?? item.total) ?? 0;
-      return [{
-        id,
-        universityId,
-        programId: stringValue(item.program_id) || null,
-        programName: stringValue(item.program_name ?? item.program ?? item.name, 'Программа'),
-        applicationsCount: count,
-        demandScore: externalNumber(item.demand_score ?? item.demand ?? item.score),
-        source: 'website' as const,
-        syncedAt: externalSyncAt(item) ?? syncedAt,
-        workflowInstanceId: stringValue(item.workflow_instance_id ?? item.workflow_id) || null,
-      }];
-    })
-    : [];
-  return { universityId, source, syncedAt, students, applications };
-}
+type ExternalDataDto = {
+  university_id: string;
+  source: ExternalDataSource;
+  mode: 'real' | 'mock' | 'import';
+  synced_at: string | null;
+  students: Array<{ id: string; name: string; program_id: string; flow: string | null; progress: number | null; source: 'lms'; synced_at: string | null }>;
+  applications: Array<{ id: string; university_id: string; program_id: string; program_name: string; applications_count: number; demand_score: number | null; source: 'website'; synced_at: string | null; workflow_instance_id: string | null }>;
+};
 
 export async function realGetUniversityExternalData(
   universityId: string,
   source: ExternalDataSource,
   signal?: AbortSignal,
 ): Promise<UniversityExternalData> {
-  const result = await apiFetch<unknown>(`/api/v1/universities/${encodeURIComponent(universityId)}/external-data?source=${source}`, { signal });
-  return normalizeExternalData(unwrap(result, 'Не удалось загрузить данные внешнего источника.'), universityId, source);
+  const result = await apiFetch<ExternalDataDto>(`/api/v1/universities/${encodeURIComponent(universityId)}/external-data?source=${source}`, { signal });
+  const data = unwrap(result, 'Не удалось загрузить данные внешнего источника.');
+  return {
+    universityId: data.university_id,
+    source: data.source,
+    mode: data.mode,
+    syncedAt: data.synced_at,
+    students: data.students.map((row): ExternalStudent => ({ id: row.id, name: row.name, programName: null, flow: row.flow, progress: row.progress, source: row.source, syncedAt: row.synced_at })),
+    applications: data.applications.map((row): ExternalApplication => ({ id: row.id, universityId: row.university_id, programId: row.program_id, programName: row.program_name, applicationsCount: row.applications_count, demandScore: row.demand_score, source: row.source, syncedAt: row.synced_at, workflowInstanceId: row.workflow_instance_id })),
+  };
 }
 
 export async function realCreateWorkflowFromExternal(
   input: CreateWorkflowFromExternalInput,
 ): Promise<CreateWorkflowFromExternalResult> {
-  const result = await apiFetch<unknown>('/api/v1/workflow/instances/from-external', {
+  const result = await apiFetch<{ instance_id: string; university_id: string; program_id: string; external_id: string; existing: boolean }>('/api/v1/workflow/instances/from-external', {
     method: 'POST',
     body: { university_id: input.universityId, source: input.source, external_id: input.externalId },
   });
-  if (!result.ok && result.status !== 409) {
-    throw new ApiRequestError(result.status, result.body, 'Не удалось создать Workflow из внешней заявки.', result.error);
-  }
-  const rawPayload: unknown = result.ok ? result.data : result.body;
-  const rawBody: unknown = result.ok ? undefined : result.body;
-  const payload = isRecord(rawPayload) ? rawPayload : {};
-  const instanceId = workflowInstanceIdFrom(payload);
-  if (!instanceId) {
-    throw new ApiRequestError(result.status, rawBody, 'Backend не вернул идентификатор Workflow.');
-  }
+  const payload = unwrap(result, 'Не удалось создать Workflow из внешней заявки.');
   return {
-    instanceId,
-    universityId: input.universityId,
-    externalId: input.externalId,
-    existing: result.status === 409 || payload.existing === true || payload.already_exists === true,
+    instanceId: payload.instance_id,
+    universityId: payload.university_id,
+    programId: payload.program_id,
+    externalId: payload.external_id,
+    existing: payload.existing,
   };
+}
+
+export async function realGetExternalDashboardMetrics(): Promise<{ mode: 'real' | 'mock' | 'import'; websiteApplications7d: number | null; lmsStudents: number | null; websiteSyncedAt: string | null; lmsSyncedAt: string | null }> {
+  const data = unwrap(await apiFetch<{ mode: 'real' | 'mock' | 'import'; website_applications_7d: number | null; lms_students: number | null; website_synced_at: string | null; lms_synced_at: string | null }>('/api/v1/integrations/metrics'), 'Не удалось загрузить показатели интеграций.');
+  return { mode: data.mode, websiteApplications7d: data.website_applications_7d, lmsStudents: data.lms_students, websiteSyncedAt: data.website_synced_at, lmsSyncedAt: data.lms_synced_at };
 }
 
 export async function realGetUniversityProducts(id: string, queryClient?: QueryClient): Promise<UniversityProductRow[]> {
@@ -812,7 +747,7 @@ async function allReferencePages(
 function universityReferenceQuery(page: number): UniversityListQuery {
   return {
     filters: {
-      search: '', city: '', universityIds: [], programIds: [], productIds: [],
+      search: '', city: '', externalSource: '', universityIds: [], programIds: [], productIds: [],
       responsibleIds: [], healthStatuses: [], workflowStageId: '', dateFrom: '', dateTo: '',
     },
     sort: 'name',

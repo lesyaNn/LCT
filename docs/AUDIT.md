@@ -37,7 +37,7 @@
 | dashboard | Агрегаты по отложенным таблицам | Будущие endpoints на каноне |
 | reporting | Генерация XLSX/PDF вне P1 | Будущий `workers/reports.py` |
 | reporting (P4-06-01, 2026-09-23) | Legacy demo stub `app/modules/reporting` (`POST /export` поверх in-memory очереди, поля `region/status` вне P1-схемы) остаётся НЕСМОНТИРОВАННЫМ/deprecated — не удалён, чтобы не ломать историю, но production-путём не является | Канон: `POST /api/v1/reports → 202 {job_id, queued}` + `GET /reports/{job_id}` + `GET /reports/{job_id}/download` (`app/modules/analytics/reports_router.py`, persistent `report_jobs`, миграция `000018_report_jobs`, worker `generate_report_task` на FastAPI BackgroundTasks). Guard: `tests/test_p0_deferred_registry.py::test_legacy_reporting_stub_stays_unmounted` |
-| integrations | Интеграции LMS/сайт — стаб (требование кейса) | Будущий `workers/integrations` |
+| integrations | Legacy stub заменён в Stage 11 canonical router/service; live LMS/сайт ещё требуют контракты поставщиков | `EXTERNAL_ADAPTER_MODE=mock` только для test/demo, в real mode typed 503 |
 | notifications | Стаб рассылок | Будущая очередь + шаблоны |
 
 Чек-лист реактивации модуля: 1) PK/FK → UUID; 2) `user_id` → `keycloak_sub: str`; 3) SQL-миграция + down; 4) монтирование + `require_permission`; 5) пагинация + `ErrorResponse`; 6) тесты (PG-путь). Для Б2 этот чек-лист выполнен отдельным каноническим модулем; legacy-пакет не включался. Guard: `tests/test_p0_deferred_registry.py` (канон ровно 29 таблиц, legacy-префиксы отсутствуют в API).
@@ -70,7 +70,7 @@
 
 ### 3.1. Две вселенные схем: канон (UUID) vs legacy (int)
 * Канон: `app/models/*` (UUID). Legacy: `app/modules/{audit,documents,health_score,identity,workflow}/models.py` — `id/user_id/entity_id: Integer`, `health_score/models.py:12` — `FK("universities.id")` int против UUID-родителя. Схемы/роутеры тоже int: `modules/{programs,teachers,universities,workflow}/schemas.py` (`university_id: int`, `direction_id: str`).
-* `app/api/router.py` монтирует production-контракт `auth, imports, passport, catalog` и новый канонический `interaction_pipeline`. Остальные legacy-модули (`audit, dashboard, documents, health_score, identity, integrations, notifications, programs, teachers, universities-CRUD, workflow`) остаются мертвым кодом, выглядящим готовым. Включение legacy без переписывания = 500/422 на типах FK.
+* Исторический P0-аудит ниже описывал ранний mount `auth, imports, passport, catalog`. К Stage 11 подключены также канонические Workflow, Audit, Analytics, Admin Users и integrations router; старый integration stub заменён, но live LMS/Website adapters всё ещё требуют контрактов поставщиков. Остальные legacy-модули нельзя монтировать без проверки UUID/FK.
 * Бонус-расщепление: два файловых реестра (`modules/documents` пишет в `files`, паспорт читает `models/interactions.py:175 documents`); активный источник схемы — 11 SQL-миграций, а `alembic/versions/` остаётся read-only архивом.
 * **Фикс до включения домена**: удалить legacy `modules/*/models.py + schemas.py`, переписать `router+service+repository` на `app.models + app.schemas` (UUID, `keycloak_sub: str` вместо `user_id: int`); `alembic/` — удалить или заморозить как read-only архив; добавить тесты «все PK — Uuid» и «все роутеры смонтированы».
 

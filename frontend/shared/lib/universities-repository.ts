@@ -77,6 +77,7 @@ export type UniversitySortColumn = 'name' | 'responsible' | 'programs' | 'stage'
 export type SortOrder = 'asc' | 'desc';
 
 export interface UniversityFilters {
+  externalSource: 'lms' | 'website' | '';
   search: string;
   city: string;
   universityIds: string[];
@@ -131,7 +132,7 @@ export const UNIVERSITY_LIST_CAPABILITIES = isMockDataSourceFor('universities')
 
 export const UNIVERSITY_PASSPORT_CAPABILITIES = isMockDataSourceFor('passport')
   ? { programStatusFilter: true, teacherReadinessFilter: true, documentFilters: true, externalData: true, mutations: true }
-  : { programStatusFilter: false, teacherReadinessFilter: false, documentFilters: false, externalData: false, mutations: false };
+  : { programStatusFilter: false, teacherReadinessFilter: false, documentFilters: false, externalData: true, mutations: false };
 // External LMS/website methods share the same Mock ↔ Real repository boundary.
 export {
   createWorkflowFromExternal,
@@ -1114,6 +1115,9 @@ export interface UniversityStudentListRow extends UniversityStudentsByProgram {
   status?: string;
   startedAt?: string;
   finishedAt?: string | null;
+  source?: 'manual' | 'lms' | 'website' | 'import';
+  progress?: number | null;
+  syncedAt?: string | null;
 }
 
 export interface UniversityStudentInput {

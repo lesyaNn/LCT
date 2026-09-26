@@ -32,6 +32,7 @@ export const queryKeys = {
     workflowPrograms: (id: string) => ['university-programs', id, 'workflow-selector'] as const,
     programsAll: ['university-programs'] as const,
     externalData: (id: string, source: 'lms' | 'website') => ['university-external-data', id, source] as const,
+    externalAll: ['university-external-data'] as const,
     teachers: (id: string, page = 1, pageSize = 20) => ['university-teachers', id, page, pageSize] as const,
     students: (id: string, page = 1, pageSize = 20) => ['university-students', id, page, pageSize] as const,
     studentsSummary: (id: string) => ['university-students', id, 'summary'] as const,

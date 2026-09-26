@@ -16,7 +16,7 @@ import {
   realUploadImportPreview,
 } from './real-api-adapter';
 
-export type ImportCatalogType = 'universities' | 'products' | 'directions' | 'responsibles' | 'licenses' | 'vendor_contacts';
+export type ImportCatalogType = 'universities' | 'products' | 'directions' | 'responsibles' | 'licenses' | 'vendor_contacts' | 'applications';
 export type ImportJobStatus = 'queued' | 'processing' | 'done' | 'failed';
 
 export interface ImportCatalogOption {
@@ -32,6 +32,7 @@ export const importCatalogOptions: ImportCatalogOption[] = [
   { id: 'responsibles', label: 'Ответственные', description: 'Менеджеры и представители ВУЗа' },
   { id: 'licenses', label: 'Лицензии', description: 'Лицензии, договоры и сроки действия' },
   { id: 'vendor_contacts', label: 'Контакты поставщиков', description: 'Контакты существующих вендоров и их ИТ-продуктов' },
+  { id: 'applications', label: 'Внешние заявки', description: 'Заявки сайта с точным ID, ВУЗом и связанной программой' },
 ];
 
 export function isImportCatalogType(value: unknown): value is ImportCatalogType {
@@ -69,6 +70,12 @@ export const importTargetFields: ImportTargetField[] = [
   { id: 'responsible.phone', label: 'Телефон ответственного' },
   { id: 'responsible.role', label: 'Роль ответственного' },
   { id: 'university_responsibles', label: 'Ответственные от ВУЗа' },
+  { id: 'application.external_id', label: 'ID внешней заявки' },
+  { id: 'application.student_external_id', label: 'Внешний ID обучающегося' },
+  { id: 'application.status', label: 'Статус заявки' },
+  { id: 'application.flow_name', label: 'Поток заявки' },
+  { id: 'application.person_name', label: 'ФИО заявителя' },
+  { id: 'application.created_at', label: 'Дата создания заявки' },
 ];
 
 /** The import service validates these values for every catalog row. */
@@ -79,6 +86,7 @@ export const requiredImportFields: Record<ImportCatalogType, readonly string[]> 
   responsibles: ['responsible.full_name', 'responsible.email'],
   licenses: ['university.name', 'contract.contract_number', 'license.expires_at'],
   vendor_contacts: ['vendor.name', 'product.name', 'vendor_contact.full_name', 'vendor_contact.email'],
+  applications: ['application.external_id', 'university.name', 'program.name'],
 };
 
 const importFieldPrefixes: Record<ImportCatalogType, readonly string[]> = {
@@ -88,6 +96,7 @@ const importFieldPrefixes: Record<ImportCatalogType, readonly string[]> = {
   responsibles: ['responsible.'],
   vendor_contacts: ['vendor.', 'product.', 'vendor_contact.'],
   licenses: ['university.', 'vendor.', 'product.', 'direction.', 'program.', 'contract.', 'license.', 'responsible.', 'university_responsibles'],
+  applications: ['application.', 'university.name', 'program.name'],
 };
 
 export function targetFieldsForCatalog(type: ImportCatalogType): ImportTargetField[] {
@@ -330,6 +339,12 @@ const importHeaderAliases: Record<string, string[]> = {
   'responsible.phone': ['телефон ответственного', 'телефон'],
   'responsible.role': ['роль ответственного', 'роль', 'должность'],
   university_responsibles: ['ответственные от вуза', 'контакты вуза', 'представители вуза', 'university responsibles'],
+  'application.external_id': ['id заявки', 'external application id', 'application id'],
+  'application.student_external_id': ['id обучающегося', 'student external id'],
+  'application.status': ['статус заявки', 'application status'],
+  'application.flow_name': ['поток заявки', 'поток', 'cohort'],
+  'application.person_name': ['фио заявителя', 'заявитель', 'person'],
+  'application.created_at': ['дата заявки', 'дата создания заявки', 'created at'],
 };
 
 export function autoMapImportHeaders(headers: string[], catalogType: ImportCatalogType = 'licenses'): Record<string, string> {
@@ -384,6 +399,7 @@ export async function invalidateImportedDomains(queryClient: QueryClient, type: 
   }
   if (type === 'universities') keys.push(queryKeys.catalogs.family('universities'));
   if (type === 'licenses') keys.push(queryKeys.universities.licensesAll, queryKeys.universities.documentsAll);
+  if (type === 'applications') keys.push(queryKeys.universities.all, queryKeys.universities.programsAll, queryKeys.universities.externalAll, queryKeys.universities.passports, queryKeys.dashboard.overview);
   await Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
 }
 

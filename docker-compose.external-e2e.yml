@@ -1,0 +1,21 @@
+# Disposable Stage 11 runtime. Always combine with -p team26-stage11-e2e.
+services:
+  keycloak:
+    ports: !override
+      - "28081:8080"
+  backend:
+    ports: !override
+      - "28000:8000"
+    environment:
+      APP_ENV: test
+      EXTERNAL_ADAPTER_MODE: mock
+      KEYCLOAK_ISSUER: http://localhost:28081/realms/rtk
+      FRONTEND_ORIGIN: http://localhost:23000
+      CORS_ORIGINS: http://localhost:23000
+  frontend:
+    ports: !override
+      - "23000:3000"
+    build:
+      args:
+        NEXT_PUBLIC_KEYCLOAK_URL: http://localhost:28081
+        NEXT_PUBLIC_API_URL: http://localhost:28000

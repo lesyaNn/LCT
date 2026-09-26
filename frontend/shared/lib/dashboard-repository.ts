@@ -2,8 +2,10 @@ import { apiFetch } from './api-client';
 import { ApiRequestError } from './api-errors';
 import { fromDataSource } from './data-source';
 import { queryKeys } from './query-keys';
+import { getExternalDashboardMetrics } from './external-integrations-repository';
 
 export interface DashboardOverview {
+  mode?: 'real' | 'mock' | 'import';
   universitiesTotal: number | null;
   averageHealthScore: number | null;
   redUniversities: number | null;
@@ -83,6 +85,7 @@ export const dashboardDataQueryKey = (filters: DashboardFilters) => queryKeys.da
 
 /** Fixture used only when the application is configured for mock data. */
 const dashboardOverviewMock: DashboardOverview = {
+  mode: 'mock',
   universitiesTotal: 42,
   averageHealthScore: 78.4,
   redUniversities: 5,
@@ -193,9 +196,12 @@ export async function getDashboardData(filters: DashboardFilters = EMPTY_DASHBOA
     mock: () => ({ overview: dashboardOverviewMock, analytics: dashboardAnalyticsMock }),
     real: async () => {
       const query = analyticsParams(filters);
-      const result = await apiFetch<AnalyticsOverviewDto>(`/api/v1/analytics/overview${query ? `?${query}` : ''}`);
+      const [result, integration] = await Promise.all([
+        apiFetch<AnalyticsOverviewDto>(`/api/v1/analytics/overview${query ? `?${query}` : ''}`),
+        query ? Promise.resolve(null) : getExternalDashboardMetrics().catch(() => null),
+      ]);
       if (!result.ok) throw new ApiRequestError(result.status, result.body, 'Не удалось загрузить аналитику Dashboard.', result.error);
-      return { overview: mapDashboardOverview(result.data), analytics: mapDashboardAnalytics(result.data) };
+      return { overview: { ...mapDashboardOverview(result.data), ...(integration ?? {}) }, analytics: mapDashboardAnalytics(result.data) };
     },
   });
 }

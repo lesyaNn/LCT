@@ -74,3 +74,30 @@ mutation flags, the destructive scenario is skipped. The mutation test restores
 the seeded user's role/scope, but creates uniquely named test records.
 Afterward, `docker compose -p team26-admin-users-e2e -f docker-compose.yml -f
 docker-compose.admin-users-e2e.yml down -v` removes only the disposable stand.
+
+## External integrations (Stage 11)
+
+`external-integrations-real.spec.ts` uses the actual backend endpoints with
+the explicit server-side mock LMS/Website adapters, not frontend fixtures.
+It needs a disposable realm and DB. Start the dedicated Compose project:
+
+```bash
+docker compose -p team26-stage11-e2e -f docker-compose.yml -f docker-compose.external-e2e.yml up -d --build frontend
+```
+
+The imported realm requires HTTPS by default. For localhost HTTP testing,
+change `sslRequired` to `NONE` **only** inside this isolated realm, and set
+the `rtk-frontend` client's redirect URI/web origin to
+`http://localhost:23000/*` / `http://localhost:23000`. Then run:
+
+```bash
+E2E_STAGE11_ISOLATED=1 E2E_BASE_URL=http://localhost:23000 E2E_API_URL=http://localhost:28000 \
+  npx playwright test e2e/external-integrations-real.spec.ts --workers=1
+```
+
+The test creates its own catalog/Workflow fixtures, verifies persisted LMS
+students, website aggregate, KPI filter, Workflow repeat, and degraded LMS
+section. It uses the realm's disposable admin fixture unless
+`E2E_STAGE11_ADMIN_USERNAME` / `E2E_STAGE11_ADMIN_PASSWORD` are supplied.
+Afterward, `docker compose -p team26-stage11-e2e -f docker-compose.yml -f
+docker-compose.external-e2e.yml down -v` removes only its temporary volumes.

@@ -646,16 +646,17 @@ function mockWebsiteApplications(universityId: string): ExternalApplication[] {
 
 export function mockGetUniversityExternalData(universityId: string, source: ExternalDataSource): UniversityExternalData {
   if (source === 'lms') {
-    return { universityId, source, syncedAt: mockExternalSyncAt, students: mockLmsStudents(universityId), applications: [] };
+    return { universityId, source, mode: 'mock', syncedAt: mockExternalSyncAt, students: mockLmsStudents(universityId), applications: [] };
   }
-  return { universityId, source, syncedAt: mockExternalSyncAt, students: [], applications: mockWebsiteApplications(universityId) };
+  return { universityId, source, mode: 'mock', syncedAt: mockExternalSyncAt, students: [], applications: mockWebsiteApplications(universityId) };
 }
 
 export function mockCreateWorkflowFromExternal(input: CreateWorkflowFromExternalInput): CreateWorkflowFromExternalResult {
   const storageKey = `external-workflow:${input.universityId}:${input.externalId}`;
+  const programId = mockWebsiteApplications(input.universityId).find((row) => row.id === input.externalId)?.programId ?? null;
   const existing = readSession<string | null>(storageKey, null);
   if (existing) {
-    return { instanceId: existing, universityId: input.universityId, externalId: input.externalId, existing: true };
+    return { instanceId: existing, universityId: input.universityId, programId, externalId: input.externalId, existing: true };
   }
 
   const instanceId = id('mock-external-workflow');
@@ -668,11 +669,12 @@ export function mockCreateWorkflowFromExternal(input: CreateWorkflowFromExternal
     stages: ['Инициация проекта', 'Проверка заявки', 'Согласование программы', 'Запуск обучения']
       .map((name, index) => ({ id: `${instanceId}-workflow-stage-${index + 1}`, name, orderIndex: index + 1, isRequired: true })),
   });
-  return { instanceId, universityId: input.universityId, externalId: input.externalId, existing: false };
+  return { instanceId, universityId: input.universityId, programId, externalId: input.externalId, existing: false };
 }
 
 export function mockGetExternalDashboardMetrics(): ExternalDashboardMetrics {
   return {
+    mode: 'mock',
     websiteApplications7d: 38,
     lmsStudents: 126,
     websiteSyncedAt: mockExternalSyncAt,

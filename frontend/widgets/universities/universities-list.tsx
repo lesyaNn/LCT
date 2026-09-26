@@ -106,6 +106,7 @@ function parseUrlState(searchParams: SearchParamsLike): UniversityUrlState {
       filters: normalizeFilters({
       search: searchParams.get('search') ?? '',
       city: searchParams.get('city') ?? '',
+      externalSource: searchParams.get('external_source') === 'lms' || searchParams.get('external_source') === 'website' ? searchParams.get('external_source') as 'lms' | 'website' : '',
       universityIds: parseList('university'),
       programIds: parseList('program'),
       productIds: parseList('product'),
@@ -128,6 +129,7 @@ function parseUrlState(searchParams: SearchParamsLike): UniversityUrlState {
 const EMPTY_FILTERS: UniversityFilters = {
   search: '',
   city: '',
+  externalSource: '',
   universityIds: [],
   programIds: [],
   productIds: [],
@@ -146,7 +148,7 @@ function filtersFromState(state: UniversityUrlState): UniversityFilters {
 
 function hasActiveFilters(filters: UniversityFilters): boolean {
   return Boolean(
-    filters.search || filters.city || filters.universityIds.length || filters.programIds.length ||
+    filters.search || filters.city || filters.externalSource || filters.universityIds.length || filters.programIds.length ||
     filters.productIds.length || filters.responsibleIds.length || filters.healthStatuses.length ||
     filters.workflowStageId || filters.dateFrom || filters.dateTo,
   );
@@ -167,6 +169,7 @@ function parseStoredFilters(value: string | null): UniversityFilters | null {
       healthStatuses: Array.isArray(parsed.healthStatuses) ? parsed.healthStatuses.filter((item): item is HealthStatus => HEALTH_STATUSES.has(item as HealthStatus)) : [],
       search: typeof parsed.search === 'string' ? parsed.search : '',
       city: typeof parsed.city === 'string' ? parsed.city : '',
+      externalSource: parsed.externalSource === 'lms' || parsed.externalSource === 'website' ? parsed.externalSource : '',
       workflowStageId: typeof parsed.workflowStageId === 'string' ? parsed.workflowStageId : '',
       dateFrom: typeof parsed.dateFrom === 'string' ? parsed.dateFrom : '',
       dateTo: typeof parsed.dateTo === 'string' ? parsed.dateTo : '',
@@ -184,6 +187,7 @@ function filtersPatch(filters: UniversityFilters): QueryPatch {
   return {
     search: filters.search || null,
     city: filters.city || null,
+    external_source: filters.externalSource || null,
     university: filters.universityIds,
     program: filters.programIds,
     product: filters.productIds,
@@ -196,7 +200,7 @@ function filtersPatch(filters: UniversityFilters): QueryPatch {
   };
 }
 
-const URL_FILTER_KEYS = ['search', 'city', 'university', 'program', 'product', 'responsible', 'health_status', 'stage', 'date_from', 'date_to'];
+const URL_FILTER_KEYS = ['search', 'city', 'external_source', 'university', 'program', 'product', 'responsible', 'health_status', 'stage', 'date_from', 'date_to'];
 
 function hasUrlFilterParams(searchParams: SearchParamsLike): boolean {
   return URL_FILTER_KEYS.some((key) => searchParams.get(key) !== null);
@@ -349,6 +353,7 @@ function ActiveFilterChips({ filters, options, onPatch, onReset }: { filters: Un
   if (filters.programIds.length) chips.push({ key: 'program', label: `Программа: ${selectedNames(filters.programIds, options.programs)}`, patch: { program: null, page: 1 } });
   if (filters.productIds.length) chips.push({ key: 'product', label: `Продукт: ${selectedNames(filters.productIds, options.products)}`, patch: { product: null, page: 1 } });
   if (filters.city) chips.push({ key: 'city', label: `Город: ${filters.city}`, patch: { city: null, page: 1 } });
+  if (filters.externalSource) chips.push({ key: 'external_source', label: filters.externalSource === 'lms' ? 'Источник: LMS' : 'Источник: сайт', patch: { external_source: null, page: 1 } });
   if (filters.responsibleIds.length) chips.push({ key: 'responsible', label: `Ответственный: ${selectedNames(filters.responsibleIds, options.responsibles)}`, patch: { responsible: null, page: 1 } });
   if (filters.healthStatuses.length) chips.push({ key: 'health_status', label: `Health Score: ${selectedNames(filters.healthStatuses, HEALTH_STATUS_OPTIONS.map((option) => ({ id: option.value, name: option.label })))}`, patch: { health_status: null, page: 1 } });
   if (filters.workflowStageId) chips.push({ key: 'stage', label: `Этап: ${options.stages.find((item) => item.id === filters.workflowStageId)?.name ?? filters.workflowStageId}`, patch: { stage: null, page: 1 } });
@@ -549,6 +554,7 @@ export function UniversitiesList() {
   const activeFilterCount = [
     state.filters.search,
     state.filters.city,
+    state.filters.externalSource,
     state.filters.universityIds.length,
     state.filters.programIds.length,
     state.filters.productIds.length,

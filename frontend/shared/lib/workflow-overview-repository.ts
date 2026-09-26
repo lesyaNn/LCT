@@ -39,7 +39,7 @@ export function workflowStageKey(workflow: UniversityWorkflow, stage: University
 }
 
 const emptyFilters = {
-  search: '', city: '', universityIds: [], programIds: [], productIds: [], responsibleIds: [],
+  search: '', city: '', externalSource: '' as const, universityIds: [], programIds: [], productIds: [], responsibleIds: [],
   healthStatuses: [], workflowStageId: '', dateFrom: '', dateTo: '',
 };
 
