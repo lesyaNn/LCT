@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
 
-test('real import wizard: upload, mapping, dry-run, execute, persisted result', async ({ page }) => {
+test('real import: upload, sheet select, dry-run, execute, persisted result', async ({ page }) => {
   const username = process.env.E2E_MANAGER_USERNAME?.trim();
   const password = process.env.E2E_MANAGER_PASSWORD?.trim();
   test.skip(!username || !password, 'Set E2E_MANAGER_USERNAME and E2E_MANAGER_PASSWORD for the real import smoke.');
@@ -15,12 +15,15 @@ test('real import wizard: upload, mapping, dry-run, execute, persisted result', 
   await page.waitForURL((url) => url.pathname === '/dashboard');
   await page.goto('/admin/import');
 
-  await page.getByRole('combobox', { name: 'Тип справочника' }).selectOption('universities');
+  const uploadResponse = page.waitForResponse((response) => response.request().method() === 'POST'
+    && new URL(response.url()).pathname === '/api/v1/import/upload');
+  await page.locator('input[type="file"]').setInputFiles(resolve(process.cwd(), '../Импорт_CRM.xlsx'));
+  expect((await uploadResponse).status()).toBe(200);
+
   const previewResponse = page.waitForResponse((response) => response.request().method() === 'POST'
-    && new URL(response.url()).pathname === '/api/v1/import/preview');
-  await page.locator('input[type="file"]').setInputFiles(resolve(process.cwd(), '../docs/import-example-20.xlsx'));
+    && new URL(response.url()).pathname === '/api/v1/import/sheets/preview');
+  await page.getByTestId('sheet-select').selectOption('ВУЗы');
   expect((await previewResponse).status()).toBe(200);
-  await expect(page.getByTestId('mapping-select-0')).toHaveValue('university.name');
   await expect(page.getByTestId('preview-table')).toBeVisible();
 
   const dryResponse = page.waitForResponse((response) => response.request().method() === 'POST'
@@ -43,5 +46,5 @@ test('real import wizard: upload, mapping, dry-run, execute, persisted result', 
 
   await page.reload();
   await expect(page.getByTestId('import-job-row').first()).toBeVisible();
-  await expect(page.getByText('import-example-20.xlsx').first()).toBeVisible();
+  await expect(page.getByText('Импорт_CRM.xlsx').first()).toBeVisible();
 });

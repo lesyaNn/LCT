@@ -1,60 +1,68 @@
-"""XLSX/XLS import endpoints (P4-10-01) on the shared job ledger (P4-06-01).
+"""``/api/v1/import`` router (production, mounted): file upload + one-sheet import.
 
-``POST /import/preview`` stages the workbook and returns headers + first
-rows (no DB writes). ``POST /import/execute`` persists an ``xlsx_import``
-row in ``report_jobs`` (migration 000019) and answers ``202 + {job_id}``;
-the frontend polls ``GET /import/jobs/{id}`` until ``ready | failed``
-(P4-06-02 contract) and downloads the XLSX error report via
-``GET /import/jobs/{id}/report`` (P4-10-02). Repeated POSTs with the same
-file + mapping + options reuse the live job (``idempotency_key``).
+Contract (frozen for the frontend)::
 
-Execution is owned by the dedicated worker container.  The request only
-persists the queued ledger row and returns; the worker claims it with
-``FOR UPDATE SKIP LOCKED`` and drives ``queued -> building -> ready | failed``.
+    POST /api/v1/import/upload          -> 201 {file_id, filename, sheets[]}
+    POST /api/v1/import/sheets/preview -> 200 {file_id, sheet, headers, preview, row_count}
+    POST /api/v1/import/execute        -> 202 {job_id} (async xlsx_import job)
+    GET  /api/v1/import/jobs           -> 200 [ImportJobRead] (import jobs only)
+    GET  /api/v1/import/jobs/{job_id}  -> 200 ImportJobRead (no filesystem path)
+    GET  /api/v1/import/jobs/{job_id}/report -> 200 errors-only xlsx (or 404/409/410)
+
+RBAC: ``import.write`` gates upload + execute, ``import.read`` gates
+preview + journal. Execution owns the worker container
+(``python -m app.modules.analytics.report_worker``); the API only stages
+files and creates jobs — BackgroundTasks are banned.
 """
 
-import hashlib
-import json
-from datetime import datetime, timezone
+from __future__ import annotations
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+import uuid
+from datetime import datetime, timezone
+from typing import Any
+
+from fastapi import APIRouter, Depends, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.errors import BusinessException, SecurityError
 from app.core.permissions import require_permission, user_permissions
 from app.core.security import CurrentUser
-from app.core.errors import BusinessException, SecurityError
-from app.schemas.errors import ErrorCode
+from app.models.report_job import JOB_TYPE_XLSX_IMPORT, ReportJob
+from app.modules.analytics import report_jobs as jobs
 from app.modules.audit.service import get_audit_db
-from app.models.report_job import (    JOB_TYPE_XLSX_IMPORT,
-    STATUS_BUILDING,
-    STATUS_READY,
-    ReportJob,
-)
-from app.modules.analytics import report_jobs as ledger
 from app.modules.imports import service
 from app.modules.imports.schemas import (
     ImportExecuteRequest,
     ImportExecuteResponse,
-    ImportJobStatus,
-    ImportPreview,
+    ImportJobRead,
+    ImportSheetInfo,
+    ImportSheetPreview,
+    ImportSummary,
+    ImportUploadResponse,
+    SheetPreviewRequest,
 )
 from app.schemas.common import ErrorResponse
+from app.schemas.errors import ErrorCode
+
+__all__ = ["router"]
 
 router = APIRouter(prefix="/import", tags=["Import"])
 
-#: Re-POST with the same key reuses a job in one of these states (a
-#: ``failed`` job is resurrected by ``mark_building`` into a fresh attempt).
-REUSABLE_STATUSES = ("queued", "building", "ready")
+ERROR_RESPONSES: dict[int, dict[str, Any]] = {
+    401: {"model": ErrorResponse, "description": "AUTH_REQUIRED — нет Bearer токена"},
+    403: {"model": ErrorResponse, "description": "FORBIDDEN"},
+    404: {"model": ErrorResponse, "description": "Job/file not found"},
+    422: {"model": ErrorResponse, "description": "Ошибка валидации"},
+}
+
+_ERROR_CODES = {code.value for code in ErrorCode}
 
 
-def _idempotency_key(file_id: str, mapping: dict, update_existing: bool, dry_run: bool, catalog_type: str = "licenses") -> str:
-    raw = json.dumps(
-        {"f": file_id, "m": mapping, "u": update_existing, "d": dry_run, "t": catalog_type},
-        sort_keys=True, ensure_ascii=False,
-    )
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+def _service_error(exc: service.ImportValidationError) -> BusinessException:
+    code = ErrorCode(exc.code) if exc.code in _ERROR_CODES else ErrorCode.VALIDATION_ERROR
+    return BusinessException(code, message=str(exc) or None)
 
 
 def _is_admin(user: CurrentUser) -> bool:
@@ -62,250 +70,212 @@ def _is_admin(user: CurrentUser) -> bool:
 
 
 def _get_visible_job(db: Session, job_id: str, user: CurrentUser) -> ReportJob:
-    job = ledger.get_job(db, job_id)
+    job = jobs.get_job(db, job_id)
     if job is None or job.job_type != JOB_TYPE_XLSX_IMPORT:
         raise BusinessException(ErrorCode.NOT_FOUND)
-    if not ledger.job_visible_to(job, user, is_admin=_is_admin(user)):
+    if not jobs.job_visible_to(job, user, is_admin=_is_admin(user)):
         raise SecurityError(ErrorCode.FORBIDDEN)
     return job
 
 
-def _job_status(job: ReportJob) -> ImportJobStatus:
+def _read_model(job: ReportJob) -> ImportJobRead:
     payload = job.payload or {}
-    return ImportJobStatus(
-        id=str(job.id), type=job.job_type, status=job.status,
-        progress=int(job.progress or 0), result=job.result,
-        error=job.error_message, created_at=job.created_at.isoformat(),
-        created_by=job.actor_name, filename=payload.get("filename"),
-        catalog_type=payload.get("catalog_type", "licenses"),
+    result = ImportSummary(**job.result) if isinstance(job.result, dict) else None
+    has_errors = bool(result and result.errors_total > 0)
+    return ImportJobRead(
+        id=job.id,
+        type=JOB_TYPE_XLSX_IMPORT,
+        status=job.status,
+        progress=int(job.progress or 0),
         dry_run=bool(payload.get("dry_run", False)),
-        error_report_url=f"/api/v1/import/jobs/{job.id}/report" if job.status == STATUS_READY and job.file_path else None,
+        created_at=job.created_at,
+        created_by=job.actor_name or job.actor_sub,
+        filename=payload.get("filename"),
+        sheet=payload.get("sheet"),
+        result=result,
+        error=job.error_message,
+        error_report_url=f"/api/v1/import/jobs/{job.id}/report" if has_errors else None,
     )
-
-
-def _get_or_create_job(
-    db: Session, req: ImportExecuteRequest, user: CurrentUser, key: str
-) -> ReportJob:
-    """Idempotent submit: reuse a live job for the key, else persist one."""
-    existing = db.execute(
-        select(ReportJob)
-        .where(
-            ReportJob.job_type == JOB_TYPE_XLSX_IMPORT,
-            ReportJob.idempotency_key == key,
-            ReportJob.status.in_(REUSABLE_STATUSES),
-        )
-        .order_by(ReportJob.created_at.desc())
-        .limit(1)
-    ).scalar_one_or_none()
-    if existing is not None and ledger.job_visible_to(
-        existing, user, is_admin=_is_admin(user)
-    ):
-        return existing
-    return ledger.create_job(
-        db,
-        format="xlsx",  # the job artifact (error report) is an XLSX file
-        filters={},
-        columns=[],
-        actor_sub=user.id or "",
-        actor_name=user.name or user.username or "",
-        actor_roles=sorted(user.roles or set()),
-        job_type=JOB_TYPE_XLSX_IMPORT,
-        payload={
-            "file_id": req.file_id,
-            "filename": req.filename.rsplit("/", 1)[-1].rsplit("\\", 1)[-1] if req.filename else None,
-            "mapping": req.mapping,
-            "update_existing": req.options.update_existing,
-            "dry_run": req.options.dry_run,
-            "catalog_type": req.catalog_type,
-        },
-        idempotency_key=key,
-    )
-
-
-ERROR_RESPONSES = {
-    400: {"model": ErrorResponse, "description": "Ошибка валидации файла/маппинга"},
-    401: {"model": ErrorResponse, "description": "AUTH_REQUIRED — нет Bearer токена"},
-    422: {"model": ErrorResponse, "description": "Ошибка валидации запроса"},
-}
 
 
 @router.post(
-    "/preview",
-    response_model=ImportPreview,
-    summary="Загрузка XLSX/XLS и предпросмотр",
-    description=(
-        "Принимает .xlsx/.xls (multipart/form-data), сохраняет его под file_id "
-        "и возвращает заголовки, первые 10 строк и число строк. "
-        "file_id используется в POST /import/execute."
-    ),
-    responses=ERROR_RESPONSES,
+    "/upload",
+    response_model=ImportUploadResponse,
+    status_code=201,
+    summary="Загрузить XLSX и прочитать листы",
+    responses={401: ERROR_RESPONSES[401], 403: ERROR_RESPONSES[403], 422: ERROR_RESPONSES[422]},
 )
-def import_preview(
-    file: UploadFile = File(..., description="XLSX/XLS файл каталогов (до 10 МБ)"),
-    catalog_type: str = Form(default="licenses"),
+def upload_file(
+    file: UploadFile,
     db: Session = Depends(get_audit_db),
-    _u: CurrentUser = Depends(require_permission("import.write")),
-):
-    _ = db  # audit context for the staging side-effect (H3); no DB writes here.
-    if catalog_type not in service.IMPORT_REQUIRED_FIELDS:
-        raise BusinessException(ErrorCode.VALIDATION_ERROR)
-    allowed_mimes = {
-        ".xlsx": {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/octet-stream", ""},
-        ".xls": {"application/vnd.ms-excel", "application/octet-stream", ""},
-    }
-    extension = "." + (file.filename or "").rsplit(".", 1)[-1].lower()
-    if extension not in allowed_mimes or (file.content_type or "") not in allowed_mimes[extension]:
-        raise BusinessException(ErrorCode.IMPORT_VALIDATION_FAILED)
+    user: CurrentUser = Depends(require_permission("import.write")),
+) -> ImportUploadResponse:
+    _ = db  # audit context for the staging side-effect; no DB writes here.
+    _ = user
     try:
-        # Стриминг чанками с лимитом mid-stream (C2): никогда не буферизуем
-        # больше MAX_FILE_BYTES+chunk, вместо file.file.read() целиком.
-        chunks: list[bytes] = []
-        total = 0
-        while True:
-            chunk = file.file.read(256 * 1024)
-            if not chunk:
-                break
-            total += len(chunk)
-            if total > service.MAX_FILE_BYTES:
-                raise BusinessException(ErrorCode.FILE_TOO_LARGE)
-            chunks.append(chunk)
-        content = b"".join(chunks)
+        content = file.file.read()
+    except Exception as exc:
+        raise BusinessException(ErrorCode.IMPORT_FAILED) from exc
+    try:
         file_id = service.stage_upload(file.filename or "", content)
-        parsed = service.parse_preview(file_id)
+        sheets = service.list_sheets(file_id)
     except service.ImportValidationError as exc:
-        raise BusinessException(ErrorCode.IMPORT_VALIDATION_FAILED) from exc
-    contract = service.mapping_contract(parsed["headers"], catalog_type)
-    unmatched = [header for header in parsed["headers"] if header not in contract["suggested_mapping"]]
-    return ImportPreview(
+        raise _service_error(exc) from exc
+    return ImportUploadResponse(
         file_id=file_id,
         filename=file.filename or "",
-        headers=parsed["headers"],
-        preview=parsed["preview"],
-        row_count=parsed["row_count"],
-        detected_sheet=parsed["detected_sheet"],
-        **contract,
-        warnings=[f"Не сопоставлены колонки: {', '.join(unmatched[:10])}"] if unmatched else [],
+        sheets=[ImportSheetInfo(**item) for item in sheets],
     )
+
+
+@router.post(
+    "/sheets/preview",
+    response_model=ImportSheetPreview,
+    summary="Предпросмотр одного листа",
+    responses={401: ERROR_RESPONSES[401], 403: ERROR_RESPONSES[403], 404: ERROR_RESPONSES[404]},
+)
+def preview_sheet(
+    request: SheetPreviewRequest,
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(require_permission("import.read")),
+) -> ImportSheetPreview:
+    _ = db
+    _ = user
+    try:
+        data = service.preview_sheet(request.file_id, request.sheet)
+    except service.ImportValidationError as exc:
+        raise _service_error(exc) from exc
+    return ImportSheetPreview(**data)
 
 
 @router.post(
     "/execute",
     response_model=ImportExecuteResponse,
     status_code=202,
-    summary="Запуск импорта по маппингу",
+    summary="Запустить импорт листа (async)",
     description=(
-        "Создаёт job в report_jobs (P4-06-01) и возвращает job_id (202). "
-        "Применяет mapping (колонка файла → поле БД) к сохранённому файлу; "
-        "плохие строки пропускаются с ошибками (не роняют импорт). "
-        "Итог — polling GET /import/jobs/{job_id} до ready | failed (P4-06-02), "
-        "детали — в XLSX-отчёте GET /import/jobs/{job_id}/report (P4-10-02)."
+        "Сохраняет ``xlsx_import``-задачу со статусом queued и возвращает "
+        "job_id. Один ``sheet`` — импорт листа, ``sheets`` — пачка листов "
+        "в каноническом порядке одной транзакцией (dry-run пачки видит "
+        "межлистовые зависимости). Исполнением владеет worker-контейнер; "
+        "API только создаёт jobs — BackgroundTasks запрещены."
     ),
-    responses={
-        **ERROR_RESPONSES,
-        202: {"description": "Job создан/переиспользован, импорт выполняется"},
-    },
+    responses={401: ERROR_RESPONSES[401], 403: ERROR_RESPONSES[403], 422: ERROR_RESPONSES[422]},
 )
-def import_execute(
-    req: ImportExecuteRequest,
+def execute_import(
+    request: ImportExecuteRequest,
     db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(require_permission("import.write")),
-):
-    key = _idempotency_key(
-        f"{user.id}:{req.file_id}", req.mapping,
-        req.options.update_existing, req.options.dry_run,
-        req.catalog_type,
-    )
-    if not req.options.skip_header:
-        raise BusinessException(ErrorCode.VALIDATION_ERROR)
+) -> ImportExecuteResponse:
+    sheets = [s for s in (request.sheets or []) if s and s.strip()]
+    if sheets:
+        for sheet in sheets:
+            try:
+                service.resolve_sheet_kind(sheet)
+            except service.ImportValidationError as exc:
+                raise _service_error(exc) from exc
+        payload = {"sheets": sheets, "sheet": "Все листы"}
+        columns = list(sheets)
+    else:
+        if not request.sheet:
+            raise BusinessException(ErrorCode.VALIDATION_ERROR)
+        try:
+            service.resolve_sheet_kind(request.sheet)
+            service._staged_path(request.file_id)
+        except service.ImportValidationError as exc:
+            raise _service_error(exc) from exc
+        payload = {"sheet": request.sheet}
+        columns = [request.sheet]
     try:
-        _, headers, _ = service.read_sheet(req.file_id)
-        service.validate_mapping(headers, req.mapping, req.catalog_type)
+        service._staged_path(request.file_id)
     except service.ImportValidationError as exc:
-        raise BusinessException(ErrorCode.IMPORT_VALIDATION_FAILED) from exc
-    job = _get_or_create_job(db, req, user, key)
-    if job.status == STATUS_READY:
-        return ImportExecuteResponse(job_id=str(job.id))
-    if job.status == STATUS_BUILDING:
-        # Another runner owns it — the client just polls.
-        return ImportExecuteResponse(job_id=str(job.id))
-    # The persisted queued job is the sole hand-off. Only report_worker may
-    # claim it and call execute_import; HTTP never runs the import body.
-    return ImportExecuteResponse(job_id=str(job.id))
+        raise _service_error(exc) from exc
+    try:
+        job = jobs.create_job(
+            db,
+            format="xlsx",
+            filters={},
+            columns=columns,
+            actor_sub=user.id or "",
+            actor_name=getattr(user, "name", "") or "",
+            actor_roles=sorted(user.roles or []),
+            job_type=JOB_TYPE_XLSX_IMPORT,
+            payload={
+                "file_id": request.file_id,
+                **payload,
+                "dry_run": request.dry_run,
+                "update_existing": request.update_existing,
+                "filename": request.filename or "",
+            },
+        )
+    except ValueError as exc:
+        raise BusinessException(ErrorCode.VALIDATION_ERROR) from exc
+    return ImportExecuteResponse(job_id=job.id)
 
 
 @router.get(
     "/jobs",
-    response_model=list[ImportJobStatus],
+    response_model=list[ImportJobRead],
     summary="Журнал импортов",
 )
-def import_jobs(
-    user: CurrentUser = Depends(require_permission("import.read")),
+def list_import_jobs(
     db: Session = Depends(get_audit_db),
-) -> list[ImportJobStatus]:
-    stmt = select(ReportJob).where(ReportJob.job_type == JOB_TYPE_XLSX_IMPORT)
-    if not _is_admin(user) and "manager" not in (user.roles or set()):
+    user: CurrentUser = Depends(require_permission("import.read")),
+) -> list[ImportJobRead]:
+    stmt = (
+        select(ReportJob)
+        .where(ReportJob.job_type == JOB_TYPE_XLSX_IMPORT)
+        .order_by(ReportJob.created_at.desc(), ReportJob.id.desc())
+        .limit(100)
+    )
+    if not _is_admin(user) and "manager" not in set(user.roles or ()):
         stmt = stmt.where(ReportJob.actor_sub == (user.id or ""))
-    stmt = stmt.order_by(ReportJob.created_at.desc()).limit(100)
-    return [_job_status(job) for job in db.scalars(stmt)]
+    return [_read_model(job) for job in db.scalars(stmt).all()]
 
 
 @router.get(
     "/jobs/{job_id}",
-    response_model=ImportJobStatus,
-    summary="Статус import job",
-    description=(
-        "Polling-эндпоинт (P4-06-02): статусы queued → building → "
-        "ready | failed из общей таблицы report_jobs. "
-        "Готовый результат — в result (inserted/updated/skipped/errors), "
-        "причина неуспеха — в error. Видимость: свои jobs; admin — все."
-    ),
-    responses={
-        401: ERROR_RESPONSES[401],
-        403: {"model": ErrorResponse, "description": "Чужой job"},
-        404: {"model": ErrorResponse, "description": "Job не найден"},
-        422: ERROR_RESPONSES[422],
-    },
+    response_model=ImportJobRead,
+    summary="Статус импорта",
+    responses={401: ERROR_RESPONSES[401], 403: ERROR_RESPONSES[403], 404: ERROR_RESPONSES[404]},
 )
-def import_job_status(
+def get_import_job(
     job_id: str,
-    user: CurrentUser = Depends(require_permission("import.read")),
     db: Session = Depends(get_audit_db),
-):
-    job = _get_visible_job(db, job_id, user)
-    return _job_status(job)
+    user: CurrentUser = Depends(require_permission("import.read")),
+) -> ImportJobRead:
+    try:
+        uuid.UUID(str(job_id))
+    except (ValueError, AttributeError, TypeError) as exc:
+        raise BusinessException(ErrorCode.NOT_FOUND) from exc
+    return _read_model(_get_visible_job(db, job_id, user))
 
 
 @router.get(
     "/jobs/{job_id}/report",
-    summary="Скачать XLSX-отчёт об ошибках импорта",
-    description=(
-        "P4-10-02: файловый артефакт job (листы «Итог» и «Ошибки»). "
-        "410 — срок скачивания истёк (24 часа)."
-    ),
-    responses={
-        401: ERROR_RESPONSES[401],
-        403: {"model": ErrorResponse, "description": "Чужой job"},
-        400: {"model": ErrorResponse, "description": "REPORT_NOT_READY — отчёт ещё формируется"},
-        404: {"model": ErrorResponse, "description": "Файл отчёта не найден"},
-        410: {"model": ErrorResponse, "description": "Срок скачивания истёк"},
-        422: ERROR_RESPONSES[422],
-    },
+    summary="Скачать отчёт об ошибках",
+    description="XLSX со списком построчных ошибок. 404 — ошибок нет или отчёта нет.",
+    responses={401: ERROR_RESPONSES[401], 403: ERROR_RESPONSES[403], 404: ERROR_RESPONSES[404]},
 )
-def import_job_report(
+def download_import_report(
     job_id: str,
-    user: CurrentUser = Depends(require_permission("import.read")),
     db: Session = Depends(get_audit_db),
-):
+    user: CurrentUser = Depends(require_permission("import.read")),
+) -> FileResponse:
+    try:
+        uuid.UUID(str(job_id))
+    except (ValueError, AttributeError, TypeError) as exc:
+        raise BusinessException(ErrorCode.NOT_FOUND) from exc
     job = _get_visible_job(db, job_id, user)
-    if job.status != STATUS_READY or not job.file_path:
+    now = datetime.now(timezone.utc)
+    if job.expires_at is not None and now >= job.expires_at:
+        raise BusinessException(ErrorCode.GONE)
+    if job.status != jobs.STATUS_READY:
         raise BusinessException(ErrorCode.REPORT_NOT_READY)
-    expires_at = job.expires_at
-    if expires_at is not None:
-        if expires_at.tzinfo is None:  # sqlite-тесты отдают naive
-            expires_at = expires_at.replace(tzinfo=timezone.utc)
-        if expires_at < datetime.now(timezone.utc):
-            raise BusinessException(ErrorCode.GONE)
-    path = ledger.contained_job_path(job.file_path)
+    result = job.result if isinstance(job.result, dict) else {}
+    if not result.get("errors"):
+        raise BusinessException(ErrorCode.NOT_FOUND)
+    path = jobs.contained_job_path(job.file_path)
     if path is None or not path.is_file():
         raise BusinessException(ErrorCode.FILE_NOT_FOUND)
     return FileResponse(

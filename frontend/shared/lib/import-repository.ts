@@ -1,138 +1,69 @@
 import { ApiRequestError } from './api-errors';
 import type { QueryClient } from '@tanstack/react-query';
 import { apiDownload } from './api-client';
-import { fromDataSource, isMockDataSource } from './data-source';
+import { fromDataSource } from './data-source';
 import { queryKeys } from './query-keys';
 import {
-  mockExecuteImport,
+  mockExecuteSheetImport,
+  mockExecuteSheetsImport,
   mockGetImportJob,
   mockListImportJobs,
-  mockUploadImportPreview,
+  mockPreviewImportSheet,
+  mockUploadImportFile,
 } from '@/shared/mocks/api-adapter';
 import {
-  realExecuteImport,
+  realExecuteSheetImport,
+  realExecuteSheetsImport,
   realGetImportJob,
   realListImportJobs,
-  realUploadImportPreview,
+  realPreviewImportSheet,
+  realUploadImportFile,
 } from './real-api-adapter';
 
-export type ImportCatalogType = 'universities' | 'products' | 'directions' | 'responsibles' | 'licenses' | 'vendor_contacts' | 'applications';
+/**
+ * Import v2: файл целиком загружается на сервер, дальше пользователь
+ * выбирает ОДИН лист из выпадающего списка и запускает его импорт.
+ * Маппинг колонок держит сервер (структура листов фиксирована),
+ * поэтому шагов сопоставления на клиенте больше нет.
+ *
+ * Контракт backend (реализовать при перестройке API):
+ * - POST /api/v1/import/upload (multipart: file)
+ *     -> { file_id, filename, sheets: [{ id, label, row_count }] }
+ * - POST /api/v1/import/sheets/preview { file_id, sheet }
+ *     -> { file_id, sheet, headers, preview, row_count }
+ * - POST /api/v1/import/execute { file_id, sheet?, sheets?, dry_run, update_existing, filename }
+ *     -> { job_id } (sheets = пачка одной транзакцией, sheets-итоги в result.sheets)
+ * - GET /api/v1/import/jobs, GET /api/v1/import/jobs/{id},
+ *   GET /api/v1/import/jobs/{id}/report — без изменений.
+ */
+
 export type ImportJobStatus = 'queued' | 'processing' | 'done' | 'failed';
 
-export interface ImportCatalogOption {
-  id: ImportCatalogType;
-  label: string;
-  description: string;
-}
-
-export const importCatalogOptions: ImportCatalogOption[] = [
-  { id: 'universities', label: 'ВУЗы', description: 'Названия и реквизиты образовательных организаций' },
-  { id: 'products', label: 'Продукты', description: 'ИТ-продукты, версии и поставщики' },
-  { id: 'directions', label: 'Направления', description: 'ИТ-направления и программы' },
-  { id: 'responsibles', label: 'Ответственные', description: 'Менеджеры и представители ВУЗа' },
-  { id: 'licenses', label: 'Лицензии', description: 'Лицензии, договоры и сроки действия' },
-  { id: 'vendor_contacts', label: 'Контакты поставщиков', description: 'Контакты существующих вендоров и их ИТ-продуктов' },
-  { id: 'applications', label: 'Внешние заявки', description: 'Заявки сайта с точным ID, ВУЗом и связанной программой' },
-];
-
-export function isImportCatalogType(value: unknown): value is ImportCatalogType {
-  return importCatalogOptions.some((option) => option.id === value);
-}
-
-export interface ImportTargetField {
+export interface ImportSheet {
   id: string;
   label: string;
-  description?: string;
+  row_count: number;
 }
 
-/** Demo-only field definitions. Real previews carry the server-owned contract. */
-export const importTargetFields: ImportTargetField[] = [
-  { id: 'university.name', label: 'Название ВУЗа' },
-  { id: 'university.city', label: 'Город ВУЗа' },
-  { id: 'vendor.name', label: 'Вендор' },
-  { id: 'product.name', label: 'Название продукта' },
-  { id: 'product.version', label: 'Версия продукта' },
-  { id: 'vendor_contact.full_name', label: 'ФИО контакта вендора' },
-  { id: 'vendor_contact.phone', label: 'Телефон контакта вендора' },
-  { id: 'vendor_contact.email', label: 'Почта контакта вендора' },
-  { id: 'vendor_contact.communication_method', label: 'Способ связи' },
-  { id: 'direction.code', label: 'Код направления' },
-  { id: 'direction.name', label: 'Название направления' },
-  { id: 'program.name', label: 'Название программы' },
-  { id: 'program.description', label: 'Описание программы' },
-  { id: 'contract.contract_number', label: 'Номер договора' },
-  { id: 'license.signed_at', label: 'Дата подписания лицензии' },
-  { id: 'license.expires_at', label: 'Срок действия лицензии' },
-  { id: 'license.transfer_status', label: 'Статус передачи' },
-  { id: 'license.comment', label: 'Комментарий к лицензии' },
-  { id: 'responsible.full_name', label: 'ФИО ответственного' },
-  { id: 'responsible.email', label: 'Почта ответственного' },
-  { id: 'responsible.phone', label: 'Телефон ответственного' },
-  { id: 'responsible.role', label: 'Роль ответственного' },
-  { id: 'university_responsibles', label: 'Ответственные от ВУЗа' },
-  { id: 'application.external_id', label: 'ID внешней заявки' },
-  { id: 'application.student_external_id', label: 'Внешний ID обучающегося' },
-  { id: 'application.status', label: 'Статус заявки' },
-  { id: 'application.flow_name', label: 'Поток заявки' },
-  { id: 'application.person_name', label: 'ФИО заявителя' },
-  { id: 'application.created_at', label: 'Дата создания заявки' },
-];
-
-/** The import service validates these values for every catalog row. */
-export const requiredImportFields: Record<ImportCatalogType, readonly string[]> = {
-  universities: ['university.name'],
-  directions: ['direction.code'],
-  products: ['vendor.name', 'product.name'],
-  responsibles: ['responsible.full_name', 'responsible.email'],
-  licenses: ['university.name', 'contract.contract_number', 'license.expires_at'],
-  vendor_contacts: ['vendor.name', 'product.name', 'vendor_contact.full_name', 'vendor_contact.email'],
-  applications: ['application.external_id', 'university.name', 'program.name'],
-};
-
-const importFieldPrefixes: Record<ImportCatalogType, readonly string[]> = {
-  universities: ['university.'],
-  directions: ['direction.'],
-  products: ['vendor.', 'product.'],
-  responsibles: ['responsible.'],
-  vendor_contacts: ['vendor.', 'product.', 'vendor_contact.'],
-  licenses: ['university.', 'vendor.', 'product.', 'direction.', 'program.', 'contract.', 'license.', 'responsible.', 'university_responsibles'],
-  applications: ['application.', 'university.name', 'program.name'],
-};
-
-export function targetFieldsForCatalog(type: ImportCatalogType): ImportTargetField[] {
-  return importTargetFields.filter((field) => importFieldPrefixes[type].some((prefix) => field.id.startsWith(prefix)));
-}
-
-export interface ImportPreviewResponse {
+export interface ImportUploadResponse {
   file_id: string;
   filename: string;
+  sheets: ImportSheet[];
+}
+
+export type ImportPreviewCell = string | number | boolean | null;
+
+export interface ImportSheetPreview {
+  file_id: string;
+  sheet: string;
   headers: string[];
-  preview: Array<Record<string, string | number | boolean | null>>;
+  preview: Array<Record<string, ImportPreviewCell>>;
   row_count: number;
-  detected_sheet?: string;
-  target_fields?: Array<ImportTargetField & { required?: boolean }>;
-  required_fields?: string[];
-  suggested_mapping?: Record<string, string>;
-  warnings?: string[];
 }
 
-export function previewTargetFields(preview: ImportPreviewResponse, type: ImportCatalogType): ImportTargetField[] {
-  return preview.target_fields ?? (isMockDataSource ? targetFieldsForCatalog(type) : []);
-}
-
-export function previewRequiredFields(preview: ImportPreviewResponse, type: ImportCatalogType): readonly string[] {
-  return preview.required_fields ?? (isMockDataSource ? requiredImportFields[type] : []);
-}
-
-export function previewSuggestedMapping(preview: ImportPreviewResponse, type: ImportCatalogType): Record<string, string> {
-  return preview.suggested_mapping ?? (isMockDataSource ? autoMapImportHeaders(preview.headers, type) : {});
-}
-
-export interface ImportOptions {
-  skip_header: boolean;
-  update_existing: boolean;
+export interface ImportRunOptions {
   dry_run: boolean;
-  catalog_type: ImportCatalogType;
+  update_existing: boolean;
   filename?: string;
 }
 
@@ -144,6 +75,12 @@ export interface ImportRowError {
   error: string;
 }
 
+export interface ImportSheetResult {
+  sheet: string;
+  summary: ImportSummary | null;
+  error?: string;
+}
+
 export interface ImportSummary {
   total_rows: number;
   inserted: number;
@@ -153,6 +90,7 @@ export interface ImportSummary {
   dry_run: boolean;
   errors_total?: number;
   truncated?: boolean;
+  sheets?: ImportSheetResult[];
 }
 
 export interface ImportJob {
@@ -164,7 +102,7 @@ export interface ImportJob {
   createdAt: string;
   createdBy?: string;
   filename?: string;
-  catalogType?: ImportCatalogType;
+  sheet?: string;
   result?: ImportSummary;
   error?: string;
   errorReportUrl?: string;
@@ -193,6 +131,46 @@ function numberValue(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
+function sheetList(value: unknown): ImportSheet[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!isRecord(item)) return [];
+    const id = stringValue(item.id ?? item.sheet ?? item.name);
+    if (!id) return [];
+    return [{
+      id,
+      label: stringValue(item.label ?? item.title ?? item.name) ?? id,
+      row_count: numberValue(item.row_count ?? item.rowCount ?? item.rows),
+    }];
+  });
+}
+
+export function adaptUploadResponse(raw: unknown): ImportUploadResponse {
+  const item = isRecord(raw) ? raw : {};
+  return {
+    file_id: stringValue(item.file_id ?? item.fileId) ?? '',
+    filename: stringValue(item.filename ?? item.file_name ?? item.fileName) ?? '',
+    sheets: sheetList(item.sheets),
+  };
+}
+
+export function adaptSheetPreview(raw: unknown): ImportSheetPreview {
+  const item = isRecord(raw) ? raw : {};
+  const headers = Array.isArray(item.headers)
+    ? item.headers.filter((header): header is string => typeof header === 'string')
+    : [];
+  const preview = Array.isArray(item.preview)
+    ? item.preview.filter(isRecord) as Array<Record<string, ImportPreviewCell>>
+    : [];
+  return {
+    file_id: stringValue(item.file_id ?? item.fileId) ?? '',
+    sheet: stringValue(item.sheet ?? item.sheet_id ?? item.sheetId) ?? '',
+    headers,
+    preview,
+    row_count: numberValue(item.row_count ?? item.rowCount),
+  };
+}
+
 function rowErrors(value: unknown): ImportRowError[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item) => {
@@ -207,6 +185,14 @@ export function adaptImportSummary(raw: unknown): ImportSummary | undefined {
   if (!isRecord(raw)) return undefined;
   const source = isRecord(raw.result) ? raw.result : raw;
   if (!('total_rows' in source) && !('totalRows' in source) && !('inserted' in source) && !('errors' in source)) return undefined;
+  const sheets = Array.isArray(source.sheets)
+    ? source.sheets.flatMap((item): ImportSheetResult[] => {
+        if (!isRecord(item)) return [];
+        const sheet = stringValue(item.sheet) ?? '';
+        if (!sheet) return [];
+        return [{ sheet, summary: adaptImportSummary(item.summary) ?? null, error: stringValue(item.error) }];
+      })
+    : undefined;
   return {
     total_rows: numberValue(source.total_rows ?? source.totalRows),
     inserted: numberValue(source.inserted),
@@ -216,6 +202,7 @@ export function adaptImportSummary(raw: unknown): ImportSummary | undefined {
     dry_run: Boolean(source.dry_run ?? source.dryRun),
     errors_total: numberValue(source.errors_total),
     truncated: Boolean(source.truncated),
+    ...(sheets ? { sheets } : {}),
   };
 }
 
@@ -233,10 +220,6 @@ export function adaptImportJob(raw: unknown, fallbackId?: string): ImportJob {
   const createdAt = typeof timestamp === 'number'
     ? new Date(timestamp * 1000).toISOString()
     : stringValue(timestamp) ?? new Date().toISOString();
-  const rawCatalogType = stringValue(item.catalog_type ?? item.catalogType);
-  const catalogType = importCatalogOptions.some((option) => option.id === rawCatalogType)
-    ? rawCatalogType as ImportCatalogType
-    : undefined;
   const errorValue = isRecord(item.error) ? item.error.message : item.error ?? item.message;
   return {
     id: stringValue(item.id ?? item.job_id) ?? fallbackId ?? 'unknown',
@@ -247,7 +230,7 @@ export function adaptImportJob(raw: unknown, fallbackId?: string): ImportJob {
     createdAt,
     createdBy: stringValue(item.created_by ?? item.createdBy ?? item.user_name ?? item.userName),
     filename: stringValue(item.filename ?? item.file_name ?? item.fileName),
-    catalogType,
+    sheet: stringValue(item.sheet ?? item.sheet_id ?? item.sheetId ?? item.catalog_type ?? item.catalogType),
     result,
     error: stringValue(errorValue),
     errorReportUrl: stringValue(item.error_report_url ?? item.errorReportUrl ?? (isRecord(item.result) ? item.result.error_report_url ?? item.result.errorReportUrl : undefined)),
@@ -264,23 +247,39 @@ export function validateImportFile(file: File): string | null {
   return null;
 }
 
-export async function uploadImportPreview(file: File, catalogType: ImportCatalogType, signal?: AbortSignal, onProgress?: (value: number) => void): Promise<ImportPreviewResponse> {
+export async function uploadImportFile(file: File, signal?: AbortSignal, onProgress?: (value: number) => void): Promise<ImportUploadResponse> {
   const validationError = validateImportFile(file);
   if (validationError) throw new ApiRequestError(400, { detail: validationError }, validationError);
   onProgress?.(0);
-  const result = await fromDataSource({
-    mock: () => mockUploadImportPreview(file),
-    real: () => realUploadImportPreview(file, catalogType, signal, onProgress),
+  const raw = await fromDataSource({
+    mock: () => mockUploadImportFile(file),
+    real: () => realUploadImportFile(file, signal, onProgress),
     signal,
   });
   onProgress?.(100);
-  return result;
+  return adaptUploadResponse(raw);
 }
 
-export async function executeImport(fileId: string, mapping: Record<string, string>, options: ImportOptions): Promise<ImportExecuteResponse> {
+export async function previewImportSheet(fileId: string, sheet: string, signal?: AbortSignal): Promise<ImportSheetPreview> {
+  const raw = await fromDataSource({
+    mock: () => mockPreviewImportSheet(fileId, sheet),
+    real: () => realPreviewImportSheet(fileId, sheet, signal),
+    signal,
+  });
+  return adaptSheetPreview(raw);
+}
+
+export async function executeSheetImport(fileId: string, sheet: string, options: ImportRunOptions): Promise<ImportExecuteResponse> {
   return fromDataSource({
-    mock: () => mockExecuteImport(fileId, mapping, options),
-    real: () => realExecuteImport(fileId, mapping, options),
+    mock: () => mockExecuteSheetImport(fileId, sheet, options),
+    real: () => realExecuteSheetImport(fileId, sheet, options),
+  });
+}
+
+export async function executeSheetsImport(fileId: string, sheets: string[], options: ImportRunOptions): Promise<ImportExecuteResponse> {
+  return fromDataSource({
+    mock: () => mockExecuteSheetsImport(fileId, sheets, options),
+    real: () => realExecuteSheetsImport(fileId, sheets, options),
   });
 }
 
@@ -300,106 +299,66 @@ export async function downloadImportReport(jobId: string): Promise<Blob> {
   return result.data;
 }
 
-export function importTargetLabel(id: string, preview?: ImportPreviewResponse): string {
-  return preview?.target_fields?.find((field) => field.id === id)?.label
-    ?? (isMockDataSource ? importTargetFields.find((field) => field.id === id)?.label : undefined)
-    ?? id;
-}
-
-export function normalizeImportHeader(value: string): string {
-  return value
-    .toLocaleLowerCase('ru-RU')
-    .replace(/[ё]/g, 'е')
-    .trim()
-    .replace(/[._-]+/g, ' ')
-    .replace(/\s+/g, ' ');
-}
-
-const importHeaderAliases: Record<string, string[]> = {
-  'university.name': ['вуз', 'название вуз', 'название вуза', 'университет', 'наименование вуза', 'university name', 'university'],
-  'university.city': ['город вуза', 'город университета', 'university city'],
-  'vendor.name': ['вендор', 'поставщик', 'компания', 'vendor', 'vendor name'],
-  'product.name': ['продукт', 'по', 'название продукта', 'программное обеспечение', 'product', 'product name'],
-  'product.version': ['версия', 'версия продукта', 'product version', 'version'],
-  'vendor_contact.full_name': ['фио контакта', 'контактное лицо', 'фио', 'contact name'],
-  'vendor_contact.phone': ['телефон контакта', 'телефон', 'contact phone'],
-  'vendor_contact.email': ['почта контакта', 'почта', 'email', 'contact email'],
-  'vendor_contact.communication_method': ['способ связи', 'канал связи', 'communication method'],
-  'direction.code': ['код направления', 'код ит направления', 'direction code'],
-  'direction.name': ['направление', 'ит направление', 'название направления', 'direction', 'direction name'],
-  'program.name': ['программа', 'ит программа', 'название программы', 'program', 'program name'],
-  'program.description': ['описание программы', 'описание', 'program description'],
-  'contract.contract_number': ['номер договора', 'договор', 'contract number', 'contract'],
-  'license.signed_at': ['подписание лицензии', 'дата подписания', 'дата лицензии', 'license signed at', 'signed at'],
-  'license.expires_at': ['срок действия лицензии', 'срок действия', 'год окончания', 'год действия лицензии', 'license expires at', 'expires at'],
-  'license.transfer_status': ['статус передачи', 'статус по передаче', 'статус лицензии', 'transfer status'],
-  'license.comment': ['комментарий', 'комментарий к лицензии', 'примечание', 'comment'],
-  'responsible.full_name': ['фио', 'фио менеджера', 'ответственный', 'ответственный менеджер', 'responsible', 'responsible full name'],
-  'responsible.email': ['email ответственного', 'почта ответственного', 'email', 'почта'],
-  'responsible.phone': ['телефон ответственного', 'телефон'],
-  'responsible.role': ['роль ответственного', 'роль', 'должность'],
-  university_responsibles: ['ответственные от вуза', 'контакты вуза', 'представители вуза', 'university responsibles'],
-  'application.external_id': ['id заявки', 'external application id', 'application id'],
-  'application.student_external_id': ['id обучающегося', 'student external id'],
-  'application.status': ['статус заявки', 'application status'],
-  'application.flow_name': ['поток заявки', 'поток', 'cohort'],
-  'application.person_name': ['фио заявителя', 'заявитель', 'person'],
-  'application.created_at': ['дата заявки', 'дата создания заявки', 'created at'],
-};
-
-export function autoMapImportHeaders(headers: string[], catalogType: ImportCatalogType = 'licenses'): Record<string, string> {
-  const mapping: Record<string, string> = {};
-  const usedTargets = new Set<string>();
-  const fields = targetFieldsForCatalog(catalogType);
-  for (const header of headers) {
-    const normalized = normalizeImportHeader(header);
-    if (!normalized) continue;
-    let candidate: string | undefined;
-    for (const field of fields) {
-      if (usedTargets.has(field.id)) continue;
-      const fieldName = normalizeImportHeader(field.id.replace('.', ' '));
-      const aliases = (importHeaderAliases[field.id] ?? []).map(normalizeImportHeader);
-      if (normalized === fieldName || aliases.includes(normalized)) {
-        candidate = field.id;
-        break;
-      }
-      if (!candidate && (normalized.includes(fieldName) || aliases.some((alias) => alias.length > 3 && (normalized.includes(alias) || alias.includes(normalized))))) candidate = field.id;
-    }
-    if (candidate) {
-      mapping[header] = candidate;
-      usedTargets.add(candidate);
-    }
-  }
-  return mapping;
-}
-
 export function isImportJobActive(job: ImportJob): boolean {
   return job.status === 'queued' || job.status === 'processing';
 }
 
-/** Refresh only server-state families affected by a completed real import. */
-export async function invalidateImportedDomains(queryClient: QueryClient, type: ImportCatalogType | undefined): Promise<void> {
-  const affected = [
+/**
+ * Канонический порядок импорта листов (зависимости: направления раньше
+ * программ, вузы/продукты раньше связей). Неизвестные листы идут в конце.
+ */
+export const importSheetOrder = [
+  'Направления',
+  'Программы',
+  'ВУЗы',
+  'ИТ-продукты',
+  'Ответственные ВУЗа',
+  'Договоры и лицензии',
+  'Продукт_Направление',
+];
+
+export function sortSheetsForImport(sheets: ImportSheet[]): ImportSheet[] {
+  const rank = new Map(importSheetOrder.map((id, index) => [id, index]));
+  return [...sheets].sort((a, b) => {
+    const ra = rank.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+    const rb = rank.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+    return ra - rb || a.label.localeCompare(b.label, 'ru');
+  });
+}
+
+/** Ждать терминального статуса задачи (готово/ошибка) с опросом сервера. */
+export async function waitForImportJob(
+  jobId: string,
+  options?: { intervalMs?: number; timeoutMs?: number; signal?: AbortSignal },
+): Promise<ImportJob> {
+  const intervalMs = options?.intervalMs ?? 2000;
+  const timeoutMs = options?.timeoutMs ?? 5 * 60 * 1000;
+  const startedAt = Date.now();
+  for (;;) {
+    if (options?.signal?.aborted) throw new DOMException('Ожидание прервано', 'AbortError');
+    const job = await getImportJob(jobId);
+    if (!isImportJobActive(job)) return job;
+    if (Date.now() - startedAt > timeoutMs) throw new Error('Превышено время ожидания задачи импорта.');
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+}
+
+/** Refresh every server-state family a completed import may affect. */
+export async function invalidateImportedDomains(queryClient: QueryClient): Promise<void> {
+  const keys: Array<readonly unknown[]> = [
     queryKeys.catalogs.references,
     queryKeys.reports.filterOptions,
     queryKeys.audit.all,
-  ] as readonly (readonly unknown[])[];
-  const keys: Array<readonly unknown[]> = [...affected];
-  if (type === 'universities' || type === 'licenses') {
-    keys.push(queryKeys.universities.all, queryKeys.universities.passports, queryKeys.dashboard.overview, queryKeys.dashboard.analytics);
-  }
-  if (type === 'products' || type === 'vendor_contacts' || type === 'licenses') {
-    keys.push(queryKeys.catalogs.family('products'), queryKeys.universities.productsAll, queryKeys.universities.passports);
-  }
-  if (type === 'directions' || type === 'licenses') {
-    keys.push(queryKeys.catalogs.family('directions'), queryKeys.universities.programsAll, queryKeys.universities.passports, queryKeys.dashboard.overview, queryKeys.dashboard.analytics);
-  }
-  if (type === 'responsibles' || type === 'licenses') {
-    keys.push(queryKeys.catalogs.family('responsibles'), queryKeys.universities.responsiblesAll, queryKeys.universities.passports);
-  }
-  if (type === 'universities') keys.push(queryKeys.catalogs.family('universities'));
-  if (type === 'licenses') keys.push(queryKeys.universities.licensesAll, queryKeys.universities.documentsAll);
-  if (type === 'applications') keys.push(queryKeys.universities.all, queryKeys.universities.programsAll, queryKeys.universities.externalAll, queryKeys.universities.passports, queryKeys.dashboard.overview);
+    queryKeys.universities.all,
+    queryKeys.universities.passports,
+    queryKeys.universities.licensesAll,
+    queryKeys.universities.documentsAll,
+    queryKeys.universities.productsAll,
+    queryKeys.universities.programsAll,
+    queryKeys.universities.responsiblesAll,
+    queryKeys.dashboard.overview,
+    queryKeys.dashboard.analytics,
+  ];
   await Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
 }
 

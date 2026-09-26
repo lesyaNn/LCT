@@ -1,137 +1,97 @@
-"""XLSX/XLS import DTOs (P4-10-01).
+"""Import v2 DTOs: whole-file upload, single-sheet preview/execute, journal.
 
-Flow: ``POST /import/preview`` (multipart) -> mapping on the frontend ->
-``POST /import/execute`` (returns ``job_id``) -> ``GET /import/jobs/{id}``.
-Mapping UI itself is P3-owned (P3-11-01); the backend only accepts the
-``mapping`` dict. Detailed per-row validation rules live in P4-10-02.
+Flow: ``POST /upload`` (file -> sheets) -> user picks ONE sheet ->
+``POST /sheets/preview`` (headers + first rows) -> ``POST /execute``
+(async ``xlsx_import`` job, dry-run supported) -> journal polling.
+Column mapping is server-owned (sheet structures are fixed), so the
+client never sends a mapping.
 """
 
 from __future__ import annotations
 
-from typing import Literal
+import uuid
+from datetime import datetime
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
-
-#: Ключи — заголовки колонок файла, значения — поля БД (см. TARGET_FIELDS).
-#: Заголовки — канонические имена из ТЗ (P4-10-03), чтобы дефолтный маппинг
-#: срабатывал на файле от заказчика без ручного сопоставления.
-#: Swagger подставляет этот пример в "Try it out" целиком.
-EXAMPLE_MAPPING: dict[str, str] = {
-    "ВУЗ": "university.name",
-    "Вендор": "vendor.name",
-    "ПО": "product.name",
-    "Номер договора": "contract.contract_number",
-    "Подписание лицензии": "license.signed_at",
-    "Срок лицензии": "license.expires_at",
-    "Статус передачи": "license.transfer_status",
-    "ФИО менеджера": "responsible.full_name",
-    "Ответственные от ВУЗа": "university_responsibles",
-    "Комментарий": "license.comment",
-    "IT направление": "direction.name",
-}
+from pydantic import BaseModel, Field
 
 
-class ImportPreview(BaseModel):
+class ImportSheetInfo(BaseModel):
+    id: str = Field(description="Sheet identifier (workbook sheet title).")
+    label: str = Field(description="Human-readable sheet label.")
+    row_count: int = Field(description="Non-empty data rows (header excluded).")
+
+
+class ImportUploadResponse(BaseModel):
+    file_id: str = Field(description="Staging id for preview/execute calls.")
+    filename: str = Field(description="Original client filename.")
+    sheets: list[ImportSheetInfo] = Field(description="Sheets with data.")
+
+
+class SheetPreviewRequest(BaseModel):
     file_id: str
-    filename: str
+    sheet: str
+
+
+class ImportSheetPreview(BaseModel):
+    file_id: str
+    sheet: str
     headers: list[str]
-    preview: list[dict[str, str | int | float | bool | None]]
+    preview: list[dict[str, Any]]
     row_count: int
-    detected_sheet: str
-    target_fields: list[dict[str, str | bool]] = Field(default_factory=list)
-    required_fields: list[str] = Field(default_factory=list)
-    suggested_mapping: dict[str, str] = Field(default_factory=dict)
-    warnings: list[str] = Field(default_factory=list)
-
-
-class ImportOptions(BaseModel):
-    skip_header: bool = True
-    update_existing: bool = True
-    dry_run: bool = False
 
 
 class ImportExecuteRequest(BaseModel):
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "file_id": "вставьте file_id из POST /import/preview",
-                "mapping": EXAMPLE_MAPPING,
-                "options": {
-                    "skip_header": True,
-                    "update_existing": True,
-                    "dry_run": False,
-                },
-            }
-        }
-    )
-
-    file_id: str = Field(pattern=r"^[0-9a-f]{32}$")
-    filename: str | None = Field(default=None, max_length=256)
-    catalog_type: Literal["licenses", "universities", "directions", "products", "responsibles", "vendor_contacts", "applications"] = "licenses"
-    mapping: dict[str, str] = Field(examples=[EXAMPLE_MAPPING])
-    options: ImportOptions = Field(default_factory=ImportOptions)
+    file_id: str
+    sheet: str | None = None
+    sheets: list[str] | None = None
+    dry_run: bool = False
+    update_existing: bool = True
+    filename: str | None = None
 
 
 class ImportExecuteResponse(BaseModel):
-    job_id: str
+    job_id: uuid.UUID
 
 
-class RowError(BaseModel):
-    """P4-10-02: построчная ошибка с машиночитаемым кодом.
-
-    Коды: REQUIRED | INVALID_FORMAT | NOT_FOUND | DUPLICATE |
-    FK_VIOLATION | ROW_ERROR (прочее).
-    """
-
+class ImportRowError(BaseModel):
     row: int
     field: str
-    source_field: str | None = None
-    code: str = "ROW_ERROR"
-    message: str
+    error: str
 
 
 class ImportSummary(BaseModel):
-    total_rows: int
+    total_rows: int = 0
     inserted: int = 0
     updated: int = 0
     skipped: int = 0
-    errors: list[RowError] = Field(default_factory=list)
+    errors: list[ImportRowError] = Field(default_factory=list)
     dry_run: bool = False
-    truncated: bool = False
     errors_total: int = 0
+    truncated: bool = False
+    sheets: list[ImportSheetResult] = Field(default_factory=list)
 
 
-class ImportJobStatus(BaseModel):
-    """Polling payload for ``GET /import/jobs/{id}`` (P4-06-02).
-
-    Statuses come from the shared ``report_jobs`` ledger (P4-06-01):
-    ``queued`` → ``building`` → ``ready`` | ``failed``. The frontend polls
-    until a terminal status; ``progress`` drives the progress-bar,
-    ``error`` carries the sanitized failure reason, ``result`` the
-    terminal summary (inserted/updated/skipped/errors with codes).
-    """
-
-    id: str
-    type: str
-    status: str
-    progress: int = 0
-    result: dict | None = None
+class ImportSheetResult(BaseModel):
+    sheet: str
+    summary: ImportSummary | None = None
     error: str | None = None
-    created_at: str | None = None
+
+
+class ImportJobRead(BaseModel):
+    """Journal view of an ``xlsx_import`` job (never a filesystem path)."""
+
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    type: str = "xlsx_import"
+    status: str
+    progress: int | None = None
+    dry_run: bool = False
+    created_at: datetime
     created_by: str | None = None
     filename: str | None = None
-    catalog_type: str | None = None
-    dry_run: bool = False
+    sheet: str | None = None
+    result: ImportSummary | None = None
+    error: str | None = None
     error_report_url: str | None = None
-
-
-__all__ = [
-    "EXAMPLE_MAPPING",
-    "ImportExecuteRequest",
-    "ImportExecuteResponse",
-    "ImportJobStatus",
-    "ImportOptions",
-    "ImportPreview",
-    "ImportSummary",
-    "RowError",
-]
