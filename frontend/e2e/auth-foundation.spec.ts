@@ -3,6 +3,39 @@ import { ApiRequestError, normalizeApiError } from '../shared/lib/api-errors';
 import { currentUserFromDto, type CurrentUserDto } from '../shared/lib/current-user-repository';
 import { getVisibleNavigationItems } from '../shared/config/navigation';
 
+test('same-origin auth API reaches backend, not a Next.js 404 page', async ({ request }) => {
+  const response = await request.get('/api/v1/auth/me');
+  expect(response.status()).toBe(401);
+  expect(response.headers()['content-type']).toContain('application/json');
+});
+
+test('Retry recovers admin access after a transient /auth/me error', async ({ page }) => {
+  const account = credentials('admin');
+  test.skip(!account, 'Set E2E_ADMIN_USERNAME and E2E_ADMIN_PASSWORD.');
+  let attempts = 0;
+  await page.route('**/api/v1/auth/me', async (route) => {
+    attempts += 1;
+    if (attempts === 1) {
+      await route.fulfill({
+        status: 404,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: { code: 'ENTITY_NOT_FOUND', message: 'Test-only transient response' } }),
+      });
+    } else {
+      await route.continue();
+    }
+  });
+  await page.goto('/login');
+  await page.locator('input[name="username"]').fill(account!.username);
+  await page.locator('input[name="password"]').fill(account!.password);
+  await page.getByRole('button', { name: /Вход|Войти|Sign in|Log in/i }).click();
+  await expect(page.getByRole('heading', { name: 'Не удалось проверить доступ' })).toBeVisible();
+  await page.getByRole('button', { name: 'Повторить' }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page.getByRole('button', { name: /Администрирование/ })).toBeVisible();
+  expect(attempts).toBe(2);
+});
+
 test.describe('auth foundation adapters', () => {
   test('adapts backend MeOut and Keycloak assignment scope once', () => {
     const dto: CurrentUserDto = {
