@@ -112,6 +112,10 @@ test('desktop dashboard presets occupy one row', async ({ page }) => {
   expect(filterBounds).not.toBeNull();
   expect(kpiBounds).not.toBeNull();
   expect(kpiBounds!.y - filterBounds!.y - filterBounds!.height).toBeLessThanOrEqual(40);
+  await page.getByRole('button', { name: 'Скрыть фильтры' }).click();
+  await expect(period).toBeHidden();
+  await page.getByRole('button', { name: 'Показать фильтры' }).click();
+  await expect(period).toBeVisible();
   for (const label of ['Текущий месяц', 'Текущий квартал', 'Текущий год', 'Прошлый год']) {
     const filtered = page.waitForResponse((response) => {
       const url = new URL(response.url());
@@ -152,6 +156,14 @@ test('filter surfaces stay inside the viewport on desktop, tablet and mobile', a
         expect(search).not.toBeNull();
         expect(university).not.toBeNull();
         expect(university!.x).toBeGreaterThan(search!.x + search!.width);
+        const searchField = await filters.locator('input[type="search"]').first().locator('..').boundingBox();
+        expect(searchField).not.toBeNull();
+        expect(Math.abs(searchField!.y + searchField!.height - university!.y - university!.height)).toBeLessThanOrEqual(2);
+        const city = await filters.locator('select').first().boundingBox();
+        const responsible = await filters.locator('details summary').nth(3).boundingBox();
+        expect(city).not.toBeNull();
+        expect(responsible).not.toBeNull();
+        expect(Math.abs(city!.y + city!.height - responsible!.y - responsible!.height)).toBeLessThanOrEqual(2);
         const toggle = page.getByRole('button', { name: 'Скрыть фильтры' });
         await toggle.click();
         await expect(filters.locator('input[type="search"]').first()).toBeHidden();
@@ -256,7 +268,7 @@ test('university list filters send supported parameters and reset', async ({ pag
     ['Вуз', 'university_ids'], ['Программа', 'program_ids'], ['Продукт', 'product_ids'],
     ['Ответственный', 'responsible_ids'], ['Health Score', 'health_status'],
   ]) {
-    const details = surface.locator('details').filter({ has: page.locator('summary strong', { hasText: new RegExp(`^${label}$`, 'i') }) }).first();
+    const details = surface.locator('details').filter({ has: page.locator(`summary[aria-label="${label}"]`) }).first();
     await details.locator('summary').click();
     await expect(details.locator('input[type="checkbox"]').first()).toBeVisible();
     const filtered = expectParam(key);

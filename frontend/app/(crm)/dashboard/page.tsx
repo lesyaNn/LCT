@@ -87,7 +87,7 @@ export default function DashboardPage() {
     staleTime: 60_000,
   });
 
-  const filterBar = <FilterToolbar label="Фильтры аналитики" controls={() => <>
+  const filterBar = <FilterToolbar label="Фильтры аналитики" collapsible controls={() => <>
         <DateRangeField presets from={filters.dateFrom} to={filters.dateTo} onFromChange={(dateFrom) => setFilters((current) => ({ ...current, dateFrom }))} onToChange={(dateTo) => setFilters((current) => ({ ...current, dateTo }))} onRangeChange={(dateFrom, dateTo) => setFilters((current) => ({ ...current, dateFrom, dateTo }))} />
         <MultiSelect label="ВУЗ" values={filters.universityIds} options={references.data?.universities ?? []} disabled={references.isPending || references.isError} onChange={(universityIds) => setFilters((current) => ({ ...current, universityIds }))} />
         <MultiSelect label="Направление" values={filters.directionIds} options={references.data?.directions ?? []} disabled={references.isPending || references.isError} onChange={(directionIds) => setFilters((current) => ({ ...current, directionIds }))} />

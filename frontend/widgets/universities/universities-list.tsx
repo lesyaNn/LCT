@@ -316,9 +316,9 @@ function Filters({ state, options, catalogsLoading, catalogsUnavailable, searchI
           <input id={searchId} type="search" value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Поиск по названию вуза" />
         </div>
       </div>
-      <MultiSelect label="Вуз" options={options.universities} values={filters.universityIds} onChange={(values) => onPatch({ university: values, page: 1 })} searchable loading={catalogsLoading} disabled={catalogsUnavailable} />
-      <MultiSelect label="Программа" options={options.programs} values={filters.programIds} onChange={(values) => onPatch({ program: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
-      <MultiSelect label="Продукт" options={options.products} values={filters.productIds} onChange={(values) => onPatch({ product: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
+      <MultiSelect label="Вуз" labelPlacement="outside" options={options.universities} values={filters.universityIds} onChange={(values) => onPatch({ university: values, page: 1 })} searchable loading={catalogsLoading} disabled={catalogsUnavailable} />
+      <MultiSelect label="Программа" labelPlacement="outside" options={options.programs} values={filters.programIds} onChange={(values) => onPatch({ program: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
+      <MultiSelect label="Продукт" labelPlacement="outside" options={options.products} values={filters.productIds} onChange={(values) => onPatch({ product: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
       <label className={styles.field}>
         <span>Город</span>
         <Select disabled={catalogsLoading || catalogsUnavailable} value={filters.city} onChange={(event) => onPatch({ city: event.target.value, page: 1 })}>
@@ -326,8 +326,8 @@ function Filters({ state, options, catalogsLoading, catalogsUnavailable, searchI
           {options.cities.map((city) => <option key={city} value={city}>{city}</option>)}
         </Select>
       </label>
-      <MultiSelect label="Ответственный" options={options.responsibles.map((person) => ({ id: person.id, name: person.name, description: person.role }))} values={filters.responsibleIds} onChange={(values) => onPatch({ responsible: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
-      <MultiSelect label="Health Score" options={HEALTH_STATUS_OPTIONS.map((option) => ({ id: option.value, name: option.label }))} values={filters.healthStatuses} onChange={(values) => onPatch({ health_status: UNIVERSITY_LIST_CAPABILITIES.healthStatusSelection === 'single' ? values.slice(-1) : values, page: 1 })} renderOption={(option) => <StatusBadge status={option.id as HealthStatus} />} hint={UNIVERSITY_LIST_CAPABILITIES.healthStatusSelection === 'single' ? 'Backend поддерживает выбор одного статуса.' : undefined} />
+      <MultiSelect label="Ответственный" labelPlacement="outside" options={options.responsibles.map((person) => ({ id: person.id, name: person.name, description: person.role }))} values={filters.responsibleIds} onChange={(values) => onPatch({ responsible: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
+      <MultiSelect label="Health Score" labelPlacement="outside" options={HEALTH_STATUS_OPTIONS.map((option) => ({ id: option.value, name: option.label }))} values={filters.healthStatuses} onChange={(values) => onPatch({ health_status: UNIVERSITY_LIST_CAPABILITIES.healthStatusSelection === 'single' ? values.slice(-1) : values, page: 1 })} renderOption={(option) => <StatusBadge status={option.id as HealthStatus} />} hint={UNIVERSITY_LIST_CAPABILITIES.healthStatusSelection === 'single' ? 'Backend поддерживает выбор одного статуса.' : undefined} />
       <label className={styles.field} title={!UNIVERSITY_LIST_CAPABILITIES.filters.stage ? 'Backend пока не публикует фильтр по текущему этапу.' : undefined}>
         <span>Текущий этап</span>
         <Select disabled={!UNIVERSITY_LIST_CAPABILITIES.filters.stage} value={filters.workflowStageId} onChange={(event) => onPatch({ stage: event.target.value, page: 1 })}>

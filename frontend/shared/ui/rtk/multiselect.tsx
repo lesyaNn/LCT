@@ -12,7 +12,7 @@ export interface MultiSelectOption {
   description?: string;
 }
 
-export function MultiSelect({ label, options, values, onChange, searchable = false, loading = false, disabled = false, placeholder = 'Не выбрано', renderOption, hint, className = '' }: { label: string; options: MultiSelectOption[]; values: string[]; onChange: (values: string[]) => void; searchable?: boolean; loading?: boolean; disabled?: boolean; placeholder?: string; renderOption?: (option: MultiSelectOption) => ReactNode; hint?: string; className?: string }) {
+export function MultiSelect({ label, options, values, onChange, searchable = false, loading = false, disabled = false, placeholder = 'Не выбрано', renderOption, hint, className = '', labelPlacement = 'inside' }: { label: string; options: MultiSelectOption[]; values: string[]; onChange: (values: string[]) => void; searchable?: boolean; loading?: boolean; disabled?: boolean; placeholder?: string; renderOption?: (option: MultiSelectOption) => ReactNode; hint?: string; className?: string; labelPlacement?: 'inside' | 'outside' }) {
   const [search, setSearch] = useState('');
   const selectedOptions = options.filter((option) => values.includes(option.id));
   const visibleOptions = useMemo(() => {
@@ -20,10 +20,10 @@ export function MultiSelect({ label, options, values, onChange, searchable = fal
     return term ? options.filter((option) => `${option.name} ${option.description ?? ''}`.toLocaleLowerCase('ru-RU').includes(term)) : options;
   }, [options, search]);
 
-  return (
+  const select = (
     <details className={`${styles.root} ${disabled ? styles.disabled : ''} ${className}`}>
-      <summary onClick={(event) => { if (disabled) event.preventDefault(); }} aria-disabled={disabled || undefined}>
-        <span className={styles.summaryText}><strong>{label}</strong><small>{selectedOptions.length ? selectedOptions.map((option) => option.name).slice(0, 2).join(', ') + (selectedOptions.length > 2 ? ` +${selectedOptions.length - 2}` : '') : placeholder}</small></span>
+      <summary onClick={(event) => { if (disabled) event.preventDefault(); }} aria-label={labelPlacement === 'outside' ? label : undefined} aria-disabled={disabled || undefined}>
+        <span className={styles.summaryText}>{labelPlacement === 'inside' ? <strong>{label}</strong> : null}<small>{selectedOptions.length ? selectedOptions.map((option) => option.name).slice(0, 2).join(', ') + (selectedOptions.length > 2 ? ` +${selectedOptions.length - 2}` : '') : placeholder}</small></span>
         <ChevronDown size={16} fill="currentColor" aria-hidden="true" />
       </summary>
       <div className={styles.menu}>
@@ -36,4 +36,5 @@ export function MultiSelect({ label, options, values, onChange, searchable = fal
       </div>
     </details>
   );
+  return labelPlacement === 'outside' ? <div className={styles.labeled}><span>{label}</span>{select}</div> : select;
 }

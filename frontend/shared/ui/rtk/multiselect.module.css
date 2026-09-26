@@ -1,4 +1,6 @@
 .root { min-width: 0; position: relative; }
+.labeled { color: var(--rtk-color-text-secondary); display: flex; flex-direction: column; font-size: 12px; gap: var(--rtk-space-2); min-width: 0; }
+.labeled > span { font-weight: 600; }
 .root summary { align-items: center; background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border-strong); border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-primary); cursor: pointer; display: flex; gap: var(--rtk-space-2); justify-content: space-between; list-style: none; min-height: 46px; padding: 6px 12px; }
 .root summary::-webkit-details-marker { display: none; }
 .root[open] summary { border-color: var(--rtk-color-brand); box-shadow: 0 0 0 3px var(--atmr-accent-container-default); outline: none; }
@@ -6,6 +8,7 @@
 .summaryText { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .summaryText strong { font-size: 12px; font-weight: 700; }
 .summaryText small { color: var(--rtk-color-text-secondary); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.labeled .summaryText small { font-size: 12px; }
 .disabled { opacity: .55; }
 .disabled summary { cursor: not-allowed; }
 .menu { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border-strong); border-radius: var(--rtk-radius-small); box-shadow: var(--rtk-shadow-elevation-2); display: flex; flex-direction: column; gap: 4px; left: 0; max-height: 280px; min-width: 100%; overflow: auto; padding: 8px; position: absolute; top: calc(100% + 5px); z-index: 30; }
