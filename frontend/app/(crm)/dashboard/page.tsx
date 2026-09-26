@@ -101,13 +101,9 @@ export default function DashboardPage() {
     <div className={styles.page}>
       <PageIntro title="Обзор" description="Ключевые показатели состояния образовательной сети и операционных задач команды." />
       {filterBar}
-      <div style={{ minHeight: 20 }} aria-live="polite">
-        {data && overviewQuery.isFetching ? <span role="status">Обновляем показатели…</span> : null}
-        {data && overviewQuery.isError ? <BackgroundRefreshNotice onRetry={() => void overviewQuery.refetch()} /> : null}
-      </div>
       {!data ? overviewQuery.isPending ? <PageSkeleton cardCount={9} variant="dashboard" /> : <RouteErrorState onRetry={() => void overviewQuery.refetch()} /> : <>
       <section className={styles.section} aria-labelledby="dashboard-kpi-title" data-testid="dashboard-kpi">
-        <h2 className={styles.sectionTitle} id="dashboard-kpi-title">Ключевые показатели</h2>
+        <div className={styles.sectionHeader}><h2 className={styles.sectionTitle} id="dashboard-kpi-title">Ключевые показатели</h2><div className={styles.refreshStatus} aria-live="polite">{overviewQuery.isFetching ? <span role="status">Обновляем показатели…</span> : null}{overviewQuery.isError ? <BackgroundRefreshNotice onRetry={() => void overviewQuery.refetch()} /> : null}</div></div>
         <div className={styles.grid}>
           {kpiDefinitions.map((definition) => {
             const card = <KpiCard

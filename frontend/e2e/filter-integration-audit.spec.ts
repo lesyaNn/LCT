@@ -106,6 +106,12 @@ test('desktop dashboard presets occupy one row', async ({ page }) => {
     expect(bounds!.height).toBeLessThanOrEqual(34);
     expect(bounds!.y).toBeGreaterThan(buttonBottom);
   }
+  await expect(page.getByTestId('dashboard-kpi')).toBeVisible();
+  const filterBounds = await page.locator('section[aria-label="Фильтры аналитики"]').boundingBox();
+  const kpiBounds = await page.getByTestId('dashboard-kpi').boundingBox();
+  expect(filterBounds).not.toBeNull();
+  expect(kpiBounds).not.toBeNull();
+  expect(kpiBounds!.y - filterBounds!.y - filterBounds!.height).toBeLessThanOrEqual(40);
   for (const label of ['Текущий месяц', 'Текущий квартал', 'Текущий год', 'Прошлый год']) {
     const filtered = page.waitForResponse((response) => {
       const url = new URL(response.url());
@@ -146,6 +152,11 @@ test('filter surfaces stay inside the viewport on desktop, tablet and mobile', a
         expect(search).not.toBeNull();
         expect(university).not.toBeNull();
         expect(university!.x).toBeGreaterThan(search!.x + search!.width);
+        const toggle = page.getByRole('button', { name: 'Скрыть фильтры' });
+        await toggle.click();
+        await expect(filters.locator('input[type="search"]').first()).toBeHidden();
+        await page.getByRole('button', { name: 'Показать фильтры' }).click();
+        await expect(filters.locator('input[type="search"]').first()).toBeVisible();
       }
     }
   }

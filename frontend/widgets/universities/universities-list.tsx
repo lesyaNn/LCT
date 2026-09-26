@@ -335,7 +335,7 @@ function Filters({ state, options, catalogsLoading, catalogsUnavailable, searchI
           {options.stages.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </Select>
       </label>
-      <DateRangeField presets label={UNIVERSITY_LIST_CAPABILITIES.dateMeaning === 'created-at' ? 'Период создания' : 'Период последнего взаимодействия'} from={filters.dateFrom} to={filters.dateTo} onFromChange={(value) => updateDateRange('date_from', value)} onToChange={(value) => updateDateRange('date_to', value)} onRangeChange={(dateFrom, dateTo) => onPatch({ date_from: dateFrom, date_to: dateTo, page: 1 })} />
+      <div className={styles.periodField}><DateRangeField presets inline label={UNIVERSITY_LIST_CAPABILITIES.dateMeaning === 'created-at' ? 'Период создания' : 'Период последнего взаимодействия'} from={filters.dateFrom} to={filters.dateTo} onFromChange={(value) => updateDateRange('date_from', value)} onToChange={(value) => updateDateRange('date_to', value)} onRangeChange={(dateFrom, dateTo) => onPatch({ date_from: dateFrom, date_to: dateTo, page: 1 })} /></div>
     </section>
   );
 }
@@ -577,7 +577,7 @@ export function UniversitiesList() {
         </div>
       </header>
       <div className={styles.filterArea}>
-        <FilterToolbar label="Фильтры списка вузов" controls={(mobile) => <Filters compact={mobile} state={state} options={filterOptions} catalogsLoading={catalogsQuery.isPending} catalogsUnavailable={catalogsQuery.isError} searchInput={searchInput} setSearchInput={setSearchInput} onPatch={goToState} />} onReset={resetFilters} resetDisabled={!hasFilters} mobileCount={activeFilterCount} />
+        <FilterToolbar label="Фильтры списка вузов" collapsible desktopGridClassName={styles.filterGrid} controls={(mobile) => <Filters compact={mobile} state={state} options={filterOptions} catalogsLoading={catalogsQuery.isPending} catalogsUnavailable={catalogsQuery.isError} searchInput={searchInput} setSearchInput={setSearchInput} onPatch={goToState} />} onReset={resetFilters} resetDisabled={!hasFilters} mobileCount={activeFilterCount} />
         <ActiveFilterChips filters={state.filters} options={filterOptions} onPatch={goToState} onReset={resetFilters} />
         {catalogsQuery.isError ? <RouteErrorState compact onRetry={() => void catalogsQuery.refetch()} /> : null}
       </div>
