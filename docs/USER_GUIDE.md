@@ -4,7 +4,7 @@
 - Откройте `http://localhost:3000` → **Войти**.
 - Логин проходит через Keycloak (realm `rtk`): введите логин/пароль
   демо-пользователя (`admin/admin123`, `manager/manager123`,
-  `curator/curator123`, `user/user123`).
+  `user/user123`).
 - После возврата в React доступны профиль, роль и кнопки
   **Проверить Backend** / **Проверить Admin доступ**.
 

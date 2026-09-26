@@ -111,7 +111,7 @@ export const catalogQueryKeys = {
 
 export const CATALOG_API_CAPABILITIES = isMockDataSourceFor('catalogs')
   ? { softActivation: true, inactiveFilter: true, mutationRoles: ['admin', 'manager'] as UserRole[] }
-  : { softActivation: false, inactiveFilter: false, mutationRoles: ['admin', 'curator'] as UserRole[] };
+  : { softActivation: false, inactiveFilter: false, mutationRoles: ['admin', 'manager'] as UserRole[] };
 
 export function canMutateCatalog(role: UserRole | undefined): boolean {
   return Boolean(role && CATALOG_API_CAPABILITIES.mutationRoles.includes(role));

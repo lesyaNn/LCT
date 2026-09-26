@@ -39,9 +39,6 @@ def get_data_scope(user: CurrentUser) -> DataScope:
     roles = user.roles or set()
     if "admin" in roles:
         return DataScope(ScopeKind.ALL, frozenset())
-    # ``curator`` is a legacy authorization role, not a data-scope role.  It
-    # must never turn an absent university assignment into global visibility.
-    # A mixed token still follows the stronger public role deterministically.
     kind = (ScopeKind.GROUP if "manager" in roles else
             ScopeKind.OWN if "user" in roles else ScopeKind.DENY)
     if kind is ScopeKind.DENY:

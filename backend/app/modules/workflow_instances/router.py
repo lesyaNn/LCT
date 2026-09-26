@@ -4,7 +4,7 @@ Thin routes: params -> frozen RBAC -> university scope -> service -> DTO.
 No SQL here.
 
 RBAC (frozen permission names, no invented ones):
-* ``GET`` instance needs ``workflow.read`` (manager/curator/admin read path,
+* ``GET`` instance needs ``workflow.read`` (manager/admin read path,
   same as the P2-05 attachments read gate).
 * ``POST`` instance needs ``workflow.change_status`` (mutation gate, same as
   the P2-05 attachments write gate).
@@ -55,7 +55,7 @@ def create_workflow_instance(
     if (
         data.responsible_id is not None
         and "university_responsible.manage" not in user_permissions(user)
-        and not (user.roles or set()).intersection({"admin", "curator"})
+        and not (user.roles or set()).intersection({"admin", "manager"})
     ):
         raise SecurityError(ErrorCode.FORBIDDEN)
     return service.create_instance(

@@ -100,8 +100,7 @@ export const auditEntityLabels: Record<string, string> = {
 
 export const auditRoleLabels: Record<string, string> = {
   admin: 'Администратор',
-  manager: 'Менеджер',
-  curator: 'Куратор',
+  manager: 'Руководитель',
   user: 'Пользователь',
 };
 

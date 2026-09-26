@@ -289,8 +289,8 @@ const seededAuditEvents: AuditEvent[] = [
   {
     id: 'audit-demo-002',
     occurredAt: '2026-09-22T13:10:00.000Z',
-    user: { id: 'mock-curator', name: 'Анна Иванова', email: 'curator@example.test' },
-    role: 'curator',
+    user: { id: 'mock-manager', name: 'Мария Менеджер', email: 'manager@example.test' },
+    role: 'manager',
     action: 'CREATE',
     entity: { id: 'document-001', type: 'document', label: 'Дорожная карта' },
     university: { id: 'university-001', name: 'Московский технический университет связи и информатики' },

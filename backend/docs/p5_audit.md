@@ -55,7 +55,7 @@ those actions are registered but no synthetic events are emitted.
 `GET /api/v1/audit/events` is the only public audit route. Managers see only
 events for assigned universities. Explicit foreign university filters return
 403. Admins see all events, including global config and multi-scope report
-events. Users and compatibility curators have no `audit.read` permission.
+events. Users have no `audit.read` permission.
 
 Snapshots are recursively redacted and capped at 8 KiB. Request IDs reuse the
 request middleware value; IP comes from `request.client.host`, without trusting

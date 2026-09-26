@@ -1,4 +1,4 @@
-export type UserRole = 'user' | 'manager' | 'curator' | 'admin';
+export type UserRole = 'user' | 'manager' | 'admin';
 
 export type KeycloakRole = UserRole;
 
@@ -11,8 +11,7 @@ export interface DataScope {
 
 export const roleLabels: Record<UserRole, string> = {
   user: 'Пользователь',
-  manager: 'Менеджер',
-  curator: 'Куратор',
+  manager: 'Руководитель',
   admin: 'Администратор',
 };
 

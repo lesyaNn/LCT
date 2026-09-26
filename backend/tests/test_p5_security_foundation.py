@@ -97,7 +97,7 @@ def test_valid_roles_audience_list_and_optional_email(auth_fixture):
     response = client.get("/me", headers=bearer(mint(priv, roles=("manager", "curator"),
                                                      aud=["other", "rtk-api"], email=False)))
     assert response.status_code == 200, response.text
-    assert response.json() == {"id": "person-1", "roles": ["curator", "manager"], "email": None}
+    assert response.json() == {"id": "person-1", "roles": ["manager"], "email": None}
     assert client.get("/admin", headers=bearer(mint(priv, roles=("admin",)))).status_code == 200
 
 
@@ -243,7 +243,8 @@ def test_demo_users_and_keycloak_audience_static():
         assert role in role_names
         assert users[role]["enabled"] is True
         assert role in users[role]["realmRoles"]
-    assert "curator" in role_names
+    assert "curator" not in role_names
+    assert "curator" not in users
     assert any(client["clientId"] == "rtk-frontend" and client["enabled"]
                for client in realm["clients"])
     audience_mappers = [mapper for scope in realm["clientScopes"]

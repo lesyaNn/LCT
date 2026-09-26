@@ -628,7 +628,7 @@ def test_rbac_allowed_denied_and_admin(auth_client, db):
         headers=mgr_h,
     ).status_code == 204
 
-    # Curator has no data scope, even where legacy permissions allow a verb.
+    # Unknown legacy role grants nothing, even where old permissions allowed a verb.
     cur_h = _auth(auth_client, ["curator"])
     assert auth_client.get(meta_url, headers=cur_h).status_code == 403
     up = auth_client.post(

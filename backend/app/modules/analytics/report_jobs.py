@@ -240,7 +240,7 @@ def job_visible_to(job: ReportJob, user: Any, *, is_admin: bool = False) -> bool
 
     ``is_admin`` is resolved by the caller from the canonical permission
     system (``*`` in ``user_permissions``); realm ``manager``s see all jobs
-    too (spec: "manager/admin — все"). Plain users/curators see only their
+    too (spec: "manager/admin — все"). Plain users see only their
     own (``actor_sub`` match). Rendered data stays confined by the snapshot
     ``effective_university_ids`` taken at submit time.
     """

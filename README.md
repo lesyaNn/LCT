@@ -130,7 +130,6 @@ docker compose up --build
 |-----------|-----------------------|------------|---------|
 | `admin`   | admin@example.local   | `admin123` | admin   |
 | `manager` | manager@example.local | `manager123` | manager |
-| `curator` | curator@example.local | `curator123` | curator |
 | `user`    | user@example.local    | `user123`  | user    |
 
 Realm `rtk` импортируется автоматически из `keycloak/realm-export.json`

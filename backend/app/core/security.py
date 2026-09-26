@@ -30,7 +30,7 @@ JWKS_TTL_SECONDS = 600
 
 # Realm roles of the rtk realm (§8). Technical roles (offline_access,
 # uma_authorization, ...) are ignored so /auth/me matches the spec.
-KNOWN_ROLES = {"admin", "manager", "curator", "user"}
+KNOWN_ROLES = {"admin", "manager", "user"}
 IGNORED_TECHNICAL_ROLES = {"offline_access", "uma_authorization", "default-roles-rtk"}
 
 logger = logging.getLogger("rtk.security")

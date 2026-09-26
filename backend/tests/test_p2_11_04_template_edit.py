@@ -525,7 +525,7 @@ def test_template_edit_rbac_matrix(auth_client):
 
     assert c.post(create_url, json={"name": "x"}).status_code == 401
     assert c.patch(stage_url, json={"name": "x"}).status_code == 401
-    for roles in (("user",), ("manager",), ("curator",)):
+    for roles in (("user",), ("manager",)):
         assert c.post(create_url, json={"name": "x"}, headers=_auth(c, roles)).status_code == 403
         assert c.patch(stage_url, json={"name": "x"}, headers=_auth(c, roles)).status_code == 403
     assert c.post(create_url, json={"name": "ok"}, headers=admin).status_code == 201

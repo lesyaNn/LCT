@@ -4,10 +4,10 @@
 - Admin console: `http://localhost:8081` (логин из `KEYCLOAK_ADMIN`).
 - Realm `rtk` импортируется из `keycloak/realm-export.json` на пустых данных
   (`start-dev --import-realm`, стратегия IGNORE_EXISTING).
-- Роли realm: `admin`, `manager`, `curator`, `user`.
+- Роли realm: `admin`, `manager` (Руководитель), `user`.
 - Клиент `rtk-frontend` (public, PKCE S256). Токен содержит `aud=rtk-api`
   через scope `rtk-api-audience`; backend проверяет подпись/exp/iss/aud по JWKS.
-- Демо-пользователи: admin/manager/curator/user (пароли `*123`).
+- Демо-пользователи: admin/manager/user (пароли `*123`).
 
 ## 2. Шаблоны workflow
 - CRUD шаблонов/этапов через `/api/v1/workflow/*` (права admin/manager).

@@ -97,13 +97,18 @@ def test_me_valid_admin(client):
     assert body["id"]
 
 
-def test_me_curator_permissions(client):
-    r = client.get("/api/v1/auth/me", headers=auth(mint(client, ("curator",))))
+def test_me_manager_permissions(client):
+    r = client.get("/api/v1/auth/me", headers=auth(mint(client, ("manager",))))
     assert r.status_code == 200
-    assert r.json()["permissions"] == [
-        "catalog.read", "import.read", "university.edit", "university.read",
-        "workflow.change_status", "workflow.read",
-    ]
+    assert r.json()["permissions"] == sorted({
+        "university.read", "catalog.read", "workflow.read",
+        "workflow.change_status", "workflow.comment.create", "workflow.comment.update",
+        "workflow.attachment.read", "workflow.attachment.create",
+        "workflow.attachment.delete", "workflow.task.read", "workflow.task.update",
+        "reports.read", "reports.create", "analytics.read", "import.read",
+        "university.edit", "university_responsible.manage", "analytics.extended",
+        "audit.read", "import.write",
+    })
 
 
 def test_expired_is_401(client):
@@ -170,7 +175,7 @@ def test_admin_endpoint_rbac(client):
 
 def test_workflow_change_permission(client):
     ok = client.get("/api/v1/auth/test/workflow-change",
-                    headers=auth(mint(client, ("curator",))))
+                    headers=auth(mint(client, ("admin",))))
     assert ok.status_code == 200
     denied = client.get("/api/v1/auth/test/workflow-change",
                         headers=auth(mint(client, ("user",))))

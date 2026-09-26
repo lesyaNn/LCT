@@ -12,7 +12,6 @@ from app.core.errors import SecurityError, register_error_handlers
 from app.core.logging import request_log_middleware
 from app.core.permissions import (
     ADMIN_PERMISSIONS,
-    CURATOR_PERMISSIONS,
     MANAGER_PERMISSIONS,
     PUBLIC_ROLE_NAMES,
     USER_PERMISSIONS,
@@ -38,16 +37,13 @@ def actor(*roles, ids=None):
     return CurrentUser(id="actor", roles=set(roles), university_ids=ids)
 
 
-def test_registry_and_curator_compatibility():
+def test_registry_and_role_compatibility():
     assert PUBLIC_ROLE_NAMES == {"user", "manager", "admin"}
     assert USER_PERMISSIONS <= MANAGER_PERMISSIONS <= ADMIN_PERMISSIONS
     assert user_permissions(actor("user")) == USER_PERMISSIONS
     assert user_permissions(actor("manager")) == MANAGER_PERMISSIONS
     assert user_permissions(actor("admin")) == ADMIN_PERMISSIONS
-    assert user_permissions(actor("curator")) == CURATOR_PERMISSIONS
-    assert "audit.read" not in CURATOR_PERMISSIONS
-    assert "university_responsible.manage" not in CURATOR_PERMISSIONS
-    assert "admin.users" not in CURATOR_PERMISSIONS
+    assert user_permissions(actor("curator")) == set()
     assert "audit.read" not in USER_PERMISSIONS
     assert {"workflow.task.read", "workflow.task.update", "reports.create"} <= USER_PERMISSIONS
     assert {"university_responsible.manage", "analytics.extended", "audit.read"} <= MANAGER_PERMISSIONS
@@ -68,8 +64,6 @@ def test_registry_and_curator_compatibility():
         (("admin", "user"), (str(A),), ScopeKind.ALL, set()),
         (("manager", "user"), (str(B),), ScopeKind.GROUP, {B}),
         (("curator",), (str(A),), ScopeKind.DENY, set()),
-        (("curator",), None, ScopeKind.DENY, set()),
-        (("curator", "user"), (str(A),), ScopeKind.OWN, {A}),
         (("unknown",), (str(A),), ScopeKind.DENY, set()),
     ],
 )
