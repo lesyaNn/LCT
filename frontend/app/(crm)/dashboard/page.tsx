@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import Education from '@atomaro/icons/24/culture/Education';
 import Book from '@atomaro/icons/24/culture/Book';
@@ -17,6 +17,7 @@ import { FilterToolbar } from '@/shared/ui/rtk/filter-surface';
 import { MultiSelect } from '@/shared/ui/rtk/multiselect';
 import { PageIntro } from '@/shared/ui/page-intro';
 import { PageSkeleton } from '@/shared/ui/page-skeleton';
+import { BackgroundRefreshNotice } from '@/shared/ui/background-refresh-notice';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { KpiCard, type KpiTone } from '@/widgets/dashboard/kpi-card';
 import { DashboardAnalytics } from '@/widgets/dashboard/dashboard-charts';
@@ -82,6 +83,7 @@ export default function DashboardPage() {
   const overviewQuery = useQuery({
     queryKey: dashboardDataQueryKey(filters),
     queryFn: () => getDashboardData(filters),
+    placeholderData: keepPreviousData,
     staleTime: 60_000,
   });
 
@@ -93,18 +95,17 @@ export default function DashboardPage() {
         <MultiSelect label="Ответственный" values={filters.responsibleIds} options={references.data?.responsibles ?? []} disabled={references.isPending || references.isError} onChange={(responsibleIds) => setFilters((current) => ({ ...current, responsibleIds }))} />
       </>} onReset={() => setFilters(EMPTY_DASHBOARD_FILTERS)} resetDisabled={!filters.dateFrom && !filters.dateTo && !filters.universityIds.length && !filters.directionIds.length && !filters.productIds.length && !filters.responsibleIds.length} mobileCount={[filters.dateFrom, filters.dateTo, ...filters.universityIds, ...filters.directionIds, ...filters.productIds, ...filters.responsibleIds].filter(Boolean).length} />;
 
-  if (overviewQuery.isPending) {
-    return <div className={styles.page}>{filterBar}<PageSkeleton cardCount={9} variant="dashboard" /></div>;
-  }
-
-  if (overviewQuery.isError || !overviewQuery.data) {
-    return <div className={styles.page}>{filterBar}<RouteErrorState onRetry={() => void overviewQuery.refetch()} /></div>;
-  }
+  const data = overviewQuery.data;
 
   return (
     <div className={styles.page}>
       <PageIntro title="Обзор" description="Ключевые показатели состояния образовательной сети и операционных задач команды." />
       {filterBar}
+      <div style={{ minHeight: 20 }} aria-live="polite">
+        {data && overviewQuery.isFetching ? <span role="status">Обновляем показатели…</span> : null}
+        {data && overviewQuery.isError ? <BackgroundRefreshNotice onRetry={() => void overviewQuery.refetch()} /> : null}
+      </div>
+      {!data ? overviewQuery.isPending ? <PageSkeleton cardCount={9} variant="dashboard" /> : <RouteErrorState onRetry={() => void overviewQuery.refetch()} /> : <>
       <section className={styles.section} aria-labelledby="dashboard-kpi-title" data-testid="dashboard-kpi">
         <h2 className={styles.sectionTitle} id="dashboard-kpi-title">Ключевые показатели</h2>
         <div className={styles.grid}>
@@ -117,15 +118,16 @@ export default function DashboardPage() {
                 key={definition.title}
                 title={definition.title}
                 tone={definition.tone}
-                value={definition.value(overviewQuery.data.overview)}
+                value={definition.value(data.overview)}
               />;
             return definition.tooltip
-              ? <div className={styles.kpiTooltip} key={definition.title}><Tooltip content={<span style={{ whiteSpace: 'pre-line' }}>{definition.tooltip(overviewQuery.data.overview)}</span>}>{card}</Tooltip></div>
+              ? <div className={styles.kpiTooltip} key={definition.title}><Tooltip content={<span style={{ whiteSpace: 'pre-line' }}>{definition.tooltip(data.overview)}</span>}>{card}</Tooltip></div>
               : card;
           })}
         </div>
       </section>
-      <DashboardAnalytics data={overviewQuery.data.analytics} />
+      <DashboardAnalytics data={data.analytics} />
+      </>}
     </div>
   );
 }

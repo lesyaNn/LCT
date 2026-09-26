@@ -162,7 +162,7 @@ function HealthScoreSkeleton() {
 export function UniversityHealthScore({ id }: { id: string }) {
   const query = useQuery({ queryKey: universityHealthScoreQueryKey(id), queryFn: ({ signal }) => getUniversityHealthScore(id, signal), staleTime: 30_000 });
   if (query.isPending) return <HealthScoreSkeleton />;
-  if (query.isError || !query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
+  if (!query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
 
   const data = query.data;
   const status = data.status;

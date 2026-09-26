@@ -197,14 +197,16 @@ def university_data(db: Session, university_id: uuid.UUID, source: str) -> dict:
     if not mock:
         statement = statement.where(ExternalApplication.ingest_channel == "file")
     rows = db.execute(statement.group_by(ExternalApplication.program_id, ITProgram.name).order_by(ITProgram.name)).all()
-    if not mock and not rows:
+    # A previously synced source that is now disabled is unavailable. A
+    # university without any source state is simply not configured.
+    if not mock and not rows and state is not None:
         raise BusinessException(ErrorCode.EXTERNAL_SOURCE_UNAVAILABLE)
     applications = [{"id": str(representative), "university_id": university_id,
                      "program_id": program_id, "program_name": name, "applications_count": count,
                      "demand_score": None, "source": "website", "synced_at": latest,
                      "workflow_instance_id": workflow_id}
                     for program_id, name, count, representative, latest, workflow_id in rows]
-    return {"university_id": university_id, "source": source, "mode": "mock" if mock else "import",
+    return {"university_id": university_id, "source": source, "mode": "mock" if mock else "import" if rows else "unconfigured",
             "synced_at": state.synced_at if mock and state else max((item[4] for item in rows), default=None),
             "students": [], "applications": applications}
 

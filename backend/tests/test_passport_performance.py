@@ -426,6 +426,30 @@ def test_teachers_pagination_pages_and_total(db: Session):
         assert isinstance(t.programs, list)
 
 
+def test_program_status_filter_applies_before_pagination(db: Session):
+    u = _seed_large(db)
+    all_items, all_total = ps.get_programs_page(db, u.id, 1, 100)
+    assert all_total == len(all_items)
+    for status in {item.status.value for item in all_items}:
+        filtered, total = ps.get_programs_page(db, u.id, 1, 5, status=status)
+        expected = sum(item.status.value == status for item in all_items)
+        assert total == expected
+        assert len(filtered) == min(5, expected)
+        assert all(item.status.value == status for item in filtered)
+
+
+def test_teacher_readiness_filter_applies_before_pagination(db: Session):
+    u = _seed_large(db)
+    all_items, all_total = ps.get_teachers_page(db, u.id, 1, 100)
+    assert all_total == len(all_items)
+    for readiness in TeacherReadiness:
+        filtered, total = ps.get_teachers_page(db, u.id, 1, 5, readiness=readiness.value)
+        expected = sum(item.readiness == readiness for item in all_items)
+        assert total == expected
+        assert len(filtered) == min(5, expected)
+        assert all(item.readiness == readiness for item in filtered)
+
+
 def test_pagination_query_count_constant(db: Session, select_counter):
     u = _seed_large(db)
     _, n5 = _counted(db, select_counter, ps.get_programs_page, db, u.id, 1, 5)

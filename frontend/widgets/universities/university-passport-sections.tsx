@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useState, type ReactNode } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Download from '@atomaro/icons/24/action/Download';
 import DocumentText from '@atomaro/icons/24/document/DocumentText';
 import Calendar from '@atomaro/icons/24/communication/Calendar';
@@ -13,6 +13,7 @@ import { isMockDataSourceFor } from '@/shared/lib/data-source';
 import Mail from '@atomaro/icons/24/communication/Mail';
 import Phone from '@atomaro/icons/24/technology/Phone';
 import { Button } from '@/shared/ui/rtk/button';
+import { FilterToolbar } from '@/shared/ui/rtk/filter-surface';
 import { Avatar } from '@/shared/ui/rtk/avatar';
 import { Drawer } from '@/shared/ui/rtk/drawer';
 import { Modal } from '@/shared/ui/rtk/modal';
@@ -21,6 +22,7 @@ import { Select, TextArea } from '@/shared/ui/rtk/form-controls';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { MetricCard } from '@/shared/ui/rtk/metric-card';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
+import { BackgroundRefreshNotice } from '@/shared/ui/background-refresh-notice';
 import { Toast } from '@/shared/ui/rtk/toast';
 import { Tooltip } from '@/shared/ui/rtk/tooltip';
 import { normalizeApiError } from '@/shared/lib/api-errors';
@@ -83,8 +85,8 @@ import styles from './university-passport-sections.module.css';
 
 const formatDate = formatDateRu;
 
-function SectionToolbar({ title, children }: { title?: string; children: ReactNode }) {
-  return <div className={styles.sectionToolbar}>{title ? <h2>{title}</h2> : null}<div className={styles.toolbarControls}>{children}</div></div>;
+function SectionToolbar({ title, children }: { title?: string; children?: ReactNode }) {
+  return <div className={styles.sectionToolbar}>{title ? <h2>{title}</h2> : null}{children ? <div className={styles.toolbarControls}>{children}</div> : null}</div>;
 }
 
 const productStatusLabels: Record<UniversityProductStatus, string> = {
@@ -103,11 +105,11 @@ function ProductStatusBadge({ status }: { status: UniversityProductStatus }) {
 }
 
 function ProgramFilter({ value, onChange }: { value: ProgramStatus | 'all'; onChange: (value: ProgramStatus | 'all') => void }) {
-  return <label className={styles.filter} title={!UNIVERSITY_PASSPORT_CAPABILITIES.programStatusFilter ? 'Backend пока не поддерживает фильтр по статусу программы' : undefined}><span>Статус</span><select disabled={!UNIVERSITY_PASSPORT_CAPABILITIES.programStatusFilter} value={value} onChange={(event) => onChange(event.target.value as ProgramStatus | 'all')}><option value="all">Все статусы</option>{Object.entries(programStatusLabels).map(([status, label]) => <option value={status} key={status}>{label}</option>)}</select></label>;
+  return <label className={styles.filter}><span>Статус</span><Select value={value} onChange={(event) => onChange(event.target.value as ProgramStatus | 'all')}><option value="all">Все статусы</option>{Object.entries(programStatusLabels).map(([status, label]) => <option value={status} key={status}>{label}</option>)}</Select></label>;
 }
 
 function TeacherFilter({ value, onChange }: { value: TeacherReadiness | 'all'; onChange: (value: TeacherReadiness | 'all') => void }) {
-  return <label className={styles.filter} title={!UNIVERSITY_PASSPORT_CAPABILITIES.teacherReadinessFilter ? 'Backend пока не поддерживает фильтр по готовности преподавателя' : undefined}><span>Готовность</span><select disabled={!UNIVERSITY_PASSPORT_CAPABILITIES.teacherReadinessFilter} value={value} onChange={(event) => onChange(event.target.value as TeacherReadiness | 'all')}><option value="all">Все статусы</option>{Object.entries(readinessSemantics).map(([status, meta]) => <option value={status} key={status}>{meta.label}</option>)}</select></label>;
+  return <label className={styles.filter}><span>Готовность</span><Select value={value} onChange={(event) => onChange(event.target.value as TeacherReadiness | 'all')}><option value="all">Все статусы</option>{Object.entries(readinessSemantics).map(([status, meta]) => <option value={status} key={status}>{meta.label}</option>)}</Select></label>;
 }
 
 type ProgramViewRow = UniversityProgramRow & {
@@ -118,7 +120,8 @@ function ProgramRow({ row }: { row: ProgramViewRow }) {
   return <strong className={styles.primaryCell}>{row.name}</strong>;
 }
 
-function SyncMeta({ source, syncedAt, mode }: { source: 'LMS' | 'Сайт' | 'Ручные данные'; syncedAt: string | null; mode?: 'real' | 'mock' | 'import' }) {
+function SyncMeta({ source, syncedAt, mode }: { source: 'LMS' | 'Сайт' | 'Ручные данные'; syncedAt: string | null; mode?: 'real' | 'mock' | 'import' | 'unconfigured' }) {
+  if (mode === 'unconfigured') return <StatusBadge intent="neutral">Данные сайта не подключены</StatusBadge>;
   return <div className={styles.integrationMeta}><StatusBadge data-testid={source === 'LMS' ? 'external-badge' : undefined} intent={source === 'Ручные данные' ? 'neutral' : 'brand'}>{source}{mode === 'mock' ? ' · тест' : mode === 'import' ? ' · импорт' : ''}</StatusBadge><Tooltip content={<span>{syncedAt ? formatDateTimeRu(syncedAt) : 'Дата синхронизации недоступна'}</span>}><time data-testid="sync-date" dateTime={syncedAt ?? undefined}>Синхронизировано: {syncedAt ? formatDate(syncedAt) : 'недоступно'}</time></Tooltip></div>;
 }
 
@@ -139,14 +142,21 @@ function ProgramsSection({ id }: { id: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [statusFilter, setStatusFilter] = useState<ProgramStatus | 'all'>('all');
+  const statusParam = searchParams.get('program_status');
+  const statusFilter: ProgramStatus | 'all' = statusParam && statusParam in programStatusLabels ? statusParam as ProgramStatus : 'all';
   const [page, setPage] = useState(1);
   const [toast, setToast] = useState<{ intent: 'success' | 'error' | 'info'; title: string; message?: ReactNode } | null>(null);
   const [assignmentOpen, setAssignmentOpen] = useState(false);
+  const changeStatusFilter = (value: ProgramStatus | 'all') => {
+    const next = new URLSearchParams(searchParams.toString());
+    if (value === 'all') next.delete('program_status'); else next.set('program_status', value);
+    setPage(1);
+    router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+  };
   const canAttach = !isMockDataSourceFor('passport') && hasPermission(user, 'university.edit');
   const canCreateWorkflow = hasPermission(user, 'workflow.change_status');
   const queryClient = useQueryClient();
-  const query = useQuery({ queryKey: universityProgramsQueryKey(id, page), queryFn: ({ signal }) => getUniversityPrograms(id, page, 20, signal), staleTime: 30_000 });
+  const query = useQuery({ queryKey: universityProgramsQueryKey(id, page, 20, statusFilter), queryFn: ({ signal }) => getUniversityPrograms(id, page, 20, signal, statusFilter), placeholderData: keepPreviousData, staleTime: 30_000 });
   const websiteQuery = useQuery({ queryKey: universityExternalDataQueryKey(id, 'website'), queryFn: () => getUniversityExternalData(id, 'website'), enabled: UNIVERSITY_PASSPORT_CAPABILITIES.externalData, staleTime: 30_000 });
   const createMutation = useMutation({
     mutationFn: (externalId: string) => createWorkflowFromExternal({ universityId: id, source: 'website', externalId }),
@@ -180,8 +190,8 @@ function ProgramsSection({ id }: { id: string }) {
     const base = query.data?.items ?? [];
     const applications = websiteQuery.data?.applications ?? [];
     const byId = new Map(applications.filter((application) => application.programId).map((application) => [application.programId, application]));
-    return base.map((row) => ({ ...row, externalApplication: byId.get(row.id) })).filter((row) => statusFilter === 'all' || row.status === statusFilter);
-  }, [query.data, statusFilter, websiteQuery.data]);
+    return base.map((row) => ({ ...row, externalApplication: byId.get(row.id) }));
+  }, [query.data, websiteQuery.data]);
   const columns: PassportTableColumn<ProgramViewRow>[] = [
     { id: 'direction', label: 'Направление', sortable: true, sortValue: (row) => row.direction, render: (row) => row.direction },
     { id: 'name', label: 'Программа', sortable: true, sortValue: (row) => row.name, render: (row) => <ProgramRow row={row} /> },
@@ -206,9 +216,8 @@ function ProgramsSection({ id }: { id: string }) {
   ];
 
   if (query.isPending) return <section className={styles.section} aria-label="Программы"><PassportTableSkeleton /></section>;
-  if (query.isError || !query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
-  const externalToast = websiteQuery.isError ? <div className={styles.toastViewport}><Toast intent="error" title="Источник сайта недоступен" message="Показаны доступные локальные данные." /></div> : null;
-  return <section className={styles.section} aria-label="Программы"><SectionToolbar title="Программы"><div className={styles.integrationControls}>{websiteQuery.data ? <SyncMeta source="Сайт" syncedAt={websiteQuery.data.syncedAt} mode={websiteQuery.data.mode} /> : <StatusBadge intent="neutral">Ручные данные</StatusBadge>}<ProgramFilter value={statusFilter} onChange={setStatusFilter} />{canAttach ? <Button variant="primary" size="s" type="button" onClick={() => setAssignmentOpen(true)}>Добавить программу</Button> : null}</div></SectionToolbar>{websiteQuery.isError ? <ExternalUnavailableNotice source="сайта" error={websiteQuery.error} onRetry={() => void websiteQuery.refetch()} /> : null}<PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Нет программ с выбранным статусом" serverPagination={{ page, pageSize: 20, total: query.data.total, onPageChange: setPage }} />{assignmentOpen ? <ProgramAssignmentForm universityId={id} existingProgramIds={query.data.items.map((program) => program.id)} onClose={() => setAssignmentOpen(false)} onSaved={() => { setAssignmentOpen(false); setToast({ intent: 'success', title: 'Программа добавлена' }); }} /> : null}{toast ? <div className={styles.toastViewport}><Toast intent={toast.intent} title={toast.title} message={toast.message} onClose={() => setToast(null)} /></div> : externalToast}</section>;
+  if (!query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
+  return <section className={styles.section} aria-label="Программы"><SectionToolbar title="Программы"><div className={styles.integrationControls}>{websiteQuery.isError && isExternalSourceUnavailable(websiteQuery.error) ? <StatusBadge intent="neutral">Данные сайта сейчас недоступны</StatusBadge> : websiteQuery.data ? <SyncMeta source="Сайт" syncedAt={websiteQuery.data.syncedAt} mode={websiteQuery.data.mode} /> : <StatusBadge intent="neutral">Ручные данные</StatusBadge>}{canAttach ? <Button variant="primary" size="s" type="button" onClick={() => setAssignmentOpen(true)}>Добавить программу</Button> : null}</div></SectionToolbar><FilterToolbar embedded label="Фильтры программ" controls={() => <ProgramFilter value={statusFilter} onChange={changeStatusFilter} />} onReset={() => changeStatusFilter('all')} resetDisabled={statusFilter === 'all'} mobileCount={statusFilter === 'all' ? 0 : 1} />{websiteQuery.isError && !isExternalSourceUnavailable(websiteQuery.error) ? <ExternalUnavailableNotice source="сайта" error={websiteQuery.error} onRetry={() => void websiteQuery.refetch()} /> : null}<div className={styles.refreshStatus} aria-live="polite">{query.isFetching ? <span role="status">Обновляем программы…</span> : null}{query.isError ? <BackgroundRefreshNotice onRetry={() => void query.refetch()} /> : null}</div><PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Нет программ с выбранным статусом" serverPagination={{ page, pageSize: 20, total: query.data.total, onPageChange: setPage }} />{assignmentOpen ? <ProgramAssignmentForm universityId={id} existingProgramIds={query.data.items.map((program) => program.id)} onClose={() => setAssignmentOpen(false)} onSaved={() => { setAssignmentOpen(false); setToast({ intent: 'success', title: 'Программа добавлена' }); }} /> : null}{toast ? <div className={styles.toastViewport}><Toast intent={toast.intent} title={toast.title} message={toast.message} onClose={() => setToast(null)} /></div> : null}</section>;
 }
 
 function ProgramChips({ programs }: { programs: string[] }) {
@@ -218,10 +227,20 @@ function ProgramChips({ programs }: { programs: string[] }) {
 }
 
 function TeachersSection({ id }: { id: string }) {
-  const [readinessFilter, setReadinessFilter] = useState<TeacherReadiness | 'all'>('all');
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const readinessParam = searchParams.get('teacher_readiness');
+  const readinessFilter: TeacherReadiness | 'all' = readinessParam && readinessParam in readinessSemantics ? readinessParam as TeacherReadiness : 'all';
   const [page, setPage] = useState(1);
-  const query = useQuery({ queryKey: universityTeachersQueryKey(id, page), queryFn: ({ signal }) => getUniversityTeachers(id, page, 20, signal), staleTime: 30_000 });
-  const rows = useMemo(() => (query.data?.items.filter((row) => readinessFilter === 'all' || row.readiness === readinessFilter) ?? []).sort((left, right) => ({ expired: 0, attention: 1, ready: 2 }[left.readiness] - { expired: 0, attention: 1, ready: 2 }[right.readiness])), [query.data, readinessFilter]);
+  const changeReadinessFilter = (value: TeacherReadiness | 'all') => {
+    const next = new URLSearchParams(searchParams.toString());
+    if (value === 'all') next.delete('teacher_readiness'); else next.set('teacher_readiness', value);
+    setPage(1);
+    router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+  };
+  const query = useQuery({ queryKey: universityTeachersQueryKey(id, page, 20, readinessFilter), queryFn: ({ signal }) => getUniversityTeachers(id, page, 20, signal, readinessFilter), placeholderData: keepPreviousData, staleTime: 30_000 });
+  const rows = useMemo(() => [...(query.data?.items ?? [])].sort((left, right) => ({ expired: 0, attention: 1, ready: 2 }[left.readiness] - { expired: 0, attention: 1, ready: 2 }[right.readiness])), [query.data]);
   const columns: PassportTableColumn<UniversityTeacherRow>[] = [
     { id: 'name', label: 'ФИО', sortable: true, sortValue: (row) => row.name, render: (row) => <strong className={styles.primaryCell}>{row.name}</strong> },
     { id: 'position', label: 'Должность', sortable: true, sortValue: (row) => row.position, render: (row) => row.position },
@@ -240,9 +259,9 @@ function TeachersSection({ id }: { id: string }) {
   ];
 
   if (query.isPending) return <section className={styles.section} aria-label="Преподаватели"><PassportTableSkeleton /></section>;
-  if (query.isError || !query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
+  if (!query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
 
-  return <section className={styles.section} aria-label="Преподаватели"><SectionToolbar title="Преподаватели"><TeacherFilter value={readinessFilter} onChange={setReadinessFilter} /></SectionToolbar><PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Нет преподавателей с выбранным статусом" serverPagination={{ page, pageSize: 20, total: query.data.total, onPageChange: setPage }} /></section>;
+  return <section className={styles.section} aria-label="Преподаватели"><SectionToolbar title="Преподаватели" /><FilterToolbar embedded label="Фильтры преподавателей" controls={() => <TeacherFilter value={readinessFilter} onChange={changeReadinessFilter} />} onReset={() => changeReadinessFilter('all')} resetDisabled={readinessFilter === 'all'} mobileCount={readinessFilter === 'all' ? 0 : 1} /><div className={styles.refreshStatus} aria-live="polite">{query.isFetching ? <span role="status">Обновляем преподавателей…</span> : null}{query.isError ? <BackgroundRefreshNotice onRetry={() => void query.refetch()} /> : null}</div><PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Нет преподавателей с выбранным статусом" serverPagination={{ page, pageSize: 20, total: query.data.total, onPageChange: setPage }} /></section>;
 }
 
 function StudentSummary({ total, active, graduated, academicLeave }: { total: number; active: number; graduated: number; academicLeave: number }) {
@@ -271,7 +290,7 @@ function StudentsSection({ id }: { id: string }) {
   const [deleteCandidate, setDeleteCandidate] = useState<UniversityStudentListRow | null>(null);
   const canWrite = !isMockDataSourceFor('passport') && hasPermission(user, 'university.edit');
   const query = useQuery({ queryKey: universityStudentsSummaryQueryKey(id), queryFn: () => getUniversityStudentsSummary(id, queryClient), staleTime: 30_000 });
-  const listQuery = useQuery({ queryKey: universityStudentsQueryKey(id, page), queryFn: ({ signal }) => getUniversityStudents(id, page, 20, signal), staleTime: 30_000 });
+  const listQuery = useQuery({ queryKey: universityStudentsQueryKey(id, page), queryFn: ({ signal }) => getUniversityStudents(id, page, 20, signal), placeholderData: keepPreviousData, staleTime: 30_000 });
   const lmsQuery = useQuery({ queryKey: universityExternalDataQueryKey(id, 'lms'), queryFn: () => getUniversityExternalData(id, 'lms'), enabled: UNIVERSITY_PASSPORT_CAPABILITIES.externalData, staleTime: 30_000 });
   const [toast, setToast] = useState<{ intent: 'success' | 'error' | 'info'; title: string; message?: ReactNode } | null>(null);
   const remove = useMutation({
@@ -316,8 +335,8 @@ function StudentsSection({ id }: { id: string }) {
   ];
 
   if (query.isPending || listQuery.isPending) return <section className={styles.section} aria-label="Студенты"><PassportTableSkeleton /></section>;
-  if (query.isError || !query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
-  if (listQuery.isError || !listQuery.data) return <RouteErrorState compact onRetry={() => void listQuery.refetch()} />;
+  if (!query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
+  if (!listQuery.data) return <RouteErrorState compact onRetry={() => void listQuery.refetch()} />;
   const syncedAt = lmsQuery.data?.syncedAt ?? rows.find((row) => row.syncedAt)?.syncedAt ?? null;
   const summary = query.data;
   const externalToast = lmsQuery.isError ? <div className={styles.toastViewport}><Toast intent="error" title="LMS недоступна" message="Показаны доступные локальные данные." /></div> : null;
@@ -349,7 +368,7 @@ function ProductsSection({ id }: { id: string }) {
   ];
 
   if (query.isPending) return <section className={styles.section} aria-label="Продукты"><PassportTableSkeleton /></section>;
-  if (query.isError || !query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
+  if (!query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
 
   return <section className={styles.section} aria-label="Продукты"><SectionToolbar title="Продукты">{canAttach ? <Button variant="primary" size="s" type="button" onClick={() => setAssignmentOpen(true)}>Добавить продукт</Button> : null}</SectionToolbar><PassportDataTable rows={query.data} columns={columns} mobileFields={mobileFields} emptyMessage="Нет подключённых продуктов" />{assignmentOpen ? <ProductAssignmentForm universityId={id} existingProductIds={query.data.map((product) => product.id)} onClose={() => setAssignmentOpen(false)} onSaved={() => { setAssignmentOpen(false); setSaved(true); }} /> : null}{saved ? <div className={styles.toastViewport}><Toast intent="success" title="Продукт добавлен" onClose={() => setSaved(false)} /></div> : null}</section>;
 }
@@ -392,7 +411,7 @@ function LicensesSection({ id }: { id: string }) {
     { label: 'Договор', render: (row) => <details className={styles.inlineDetails}><summary>Подробнее</summary><span>{row.contract}</span></details> },
   ];
   if (query.isPending) return <section className={styles.section} aria-label="Лицензии"><PassportTableSkeleton /></section>;
-  if (query.isError || !query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
+  if (!query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
   return <section className={styles.section} aria-label="Лицензии"><SectionToolbar title="Лицензии"><label className={styles.filter}><span>Статус</span><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as UniversityLicenseStatus | 'all')}><option value="all">Все статусы</option>{Object.entries(licenseStatusLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label></SectionToolbar><PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Лицензии пока не добавлены" /></section>;
 }
 
@@ -426,7 +445,7 @@ function DocumentsSection({ id }: { id: string }) {
     { label: 'Скачать', render: (row) => row.downloadUrl ? <a className={styles.iconAction} href={row.downloadUrl} download aria-label={`Скачать ${row.fileName}`}><Download size={18} fill="currentColor" /></a> : <span aria-label="Файл недоступен">—</span> },
   ];
   if (query.isPending) return <section className={styles.section} aria-label="Документы"><PassportTableSkeleton /></section>;
-  if (query.isError || !query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
+  if (!query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
   return <section className={styles.section} aria-label="Документы"><SectionToolbar title="Документы"><div className={styles.filtersRow}><label className={styles.filter}><span>Тип</span><select disabled={!UNIVERSITY_PASSPORT_CAPABILITIES.documentFilters} title={!UNIVERSITY_PASSPORT_CAPABILITIES.documentFilters ? "Backend пока не поддерживает фильтры документов" : undefined} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option value="all">Все типы</option>{types.map((type) => <option value={type} key={type}>{type}</option>)}</select></label><label className={styles.filter}><span>Статус</span><select disabled={!UNIVERSITY_PASSPORT_CAPABILITIES.documentFilters} title={!UNIVERSITY_PASSPORT_CAPABILITIES.documentFilters ? "Backend пока не поддерживает фильтры документов" : undefined} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as UniversityDocumentStatus | 'all')}><option value="all">Все статусы</option>{Object.entries(documentStatusLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label></div></SectionToolbar><PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Документы пока не добавлены" /></section>;
 }
 
@@ -441,7 +460,7 @@ function MeetingsSection({ id, canAdd }: { id: string; canAdd: boolean }) {
   const [deleteCandidate, setDeleteCandidate] = useState<UniversityMeetingRow | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const canWrite = canAdd && !isMockDataSourceFor('passport');
-  const query = useQuery({ queryKey: universityMeetingsQueryKey(id, page), queryFn: ({ signal }) => getUniversityMeetings(id, page, 20, signal), staleTime: 30_000 });
+  const query = useQuery({ queryKey: universityMeetingsQueryKey(id, page), queryFn: ({ signal }) => getUniversityMeetings(id, page, 20, signal), placeholderData: keepPreviousData, staleTime: 30_000 });
   const remove = useMutation({
     mutationFn: (meetingId: string) => deleteUniversityMeeting(meetingId),
     onSuccess: async () => {
@@ -457,7 +476,7 @@ function MeetingsSection({ id, canAdd }: { id: string; canAdd: boolean }) {
     onError: (cause) => setMessage(normalizeApiError(cause).message),
   });
   if (query.isPending) return <section className={styles.section} aria-label="Встречи"><PassportTableSkeleton /></section>;
-  if (query.isError || !query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
+  if (!query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
   return <section className={`${styles.section} ${styles.meetingSurface}`} aria-label="Встречи">
     {canWrite ? <SectionToolbar title="Встречи"><Button variant="primary" size="s" type="button" onClick={() => setEditor(null)}><Calendar size={16} fill="currentColor" />Добавить встречу</Button></SectionToolbar> : <h2 className={styles.meetingTitle}>Встречи</h2>}
     {query.data.items.length ? <ol className={styles.meetingTimeline}>{query.data.items.slice().sort((left, right) => right.occurredAt.localeCompare(left.occurredAt)).map((meeting) => <li className={styles.meetingItem} key={meeting.id}><div className={styles.meetingMarker} aria-hidden="true" /><article className={styles.meetingContent}><div className={styles.meetingMeta}><time dateTime={meeting.occurredAt}>{formatDateTimeRu(meeting.occurredAt)}</time><span className={styles.meetingType}>{meetingTypeLabels[meeting.type]}</span></div><h3>{meeting.subject}</h3><MeetingParticipants participants={meeting.participants} /><details className={styles.meetingDetails}><summary>Итог и следующее действие</summary><p><strong>Итог:</strong> {meeting.outcome}</p><p><strong>Следующее действие:</strong> {meeting.nextAction}{meeting.dueDate ? ` до ${formatDateRu(meeting.dueDate)}` : ''}</p></details><span className={styles.meetingAuthor}>Автор: {meeting.author}</span>{canWrite ? <div className={styles.assignmentActions}><Button variant="ghost" size="s" type="button" onClick={() => setEditor(meeting)}>Изменить</Button><Button variant="ghost" size="s" type="button" onClick={() => setDeleteCandidate(meeting)}>Удалить</Button></div> : null}</article></li>)}</ol> : <EmptyState icon={<Calendar size={20} fill="currentColor" />} title="Встреч пока нет" description="Записи появятся здесь после первого взаимодействия." headingLevel={3} />}
@@ -499,7 +518,7 @@ function ResponsiblesSection({ id, canEdit }: { id: string; canEdit: boolean }) 
   const [toast, setToast] = useState(false);
   const query = useQuery({ queryKey: universityResponsiblesQueryKey(id), queryFn: () => getUniversityResponsibles(id, queryClient), staleTime: 30_000 });
   if (query.isPending) return <section className={styles.section} aria-label="Ответственные"><PassportTableSkeleton /></section>;
-  if (query.isError || !query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
+  if (!query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
   const currentName = query.data.find((person) => person.isPrimary)?.name ?? 'Не назначен';
   return <><section className={styles.section} aria-label="Ответственные">{canEdit ? <SectionToolbar title="Ответственные"><Button variant="primary" size="s" type="button" onClick={() => setAssignmentOpen(true)}>Сменить ответственного</Button></SectionToolbar> : null}{query.data.length ? <div className={styles.responsiblesGrid}>{query.data.map((person) => <article className={styles.responsibleCard} key={person.id}><Avatar initials={person.initials} size="m" /><div className={styles.responsibleInfo}><h3>{person.name}</h3><p>{person.role}</p><a href={`mailto:${person.email}`}><Mail size={16} fill="currentColor" />{person.email}</a><a href={`tel:${person.phone.replace(/[^+\d]/g, '')}`}><Phone size={16} fill="currentColor" />{person.phone}</a></div>{person.isPrimary ? <StatusBadge intent="brand">Основной</StatusBadge> : null}</article>)}</div> : <EmptyState icon={<Mail size={20} fill="currentColor" />} title="Ответственные не назначены" description="Контактные лица появятся здесь после назначения." headingLevel={3} />}</section>{assignmentOpen ? <ResponsibleAssignmentDrawer id={id} currentName={currentName} onClose={() => setAssignmentOpen(false)} onSuccess={() => { setAssignmentOpen(false); setToast(true); }} /> : null}{toast ? <Toast intent="success" title="Ответственный изменён" message="Паспорт, история и связанные списки обновляются." onClose={() => setToast(false)} /> : null}</>;
 }

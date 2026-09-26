@@ -132,7 +132,7 @@ export const UNIVERSITY_LIST_CAPABILITIES = isMockDataSourceFor('universities')
 
 export const UNIVERSITY_PASSPORT_CAPABILITIES = isMockDataSourceFor('passport')
   ? { programStatusFilter: true, teacherReadinessFilter: true, documentFilters: true, externalData: true, mutations: true }
-  : { programStatusFilter: false, teacherReadinessFilter: false, documentFilters: false, externalData: true, mutations: false };
+  : { programStatusFilter: true, teacherReadinessFilter: true, documentFilters: false, externalData: true, mutations: false };
 // External LMS/website methods share the same Mock ↔ Real repository boundary.
 export {
   createWorkflowFromExternal,
@@ -1201,11 +1201,11 @@ async function getMockUniversityPrograms(id: string): Promise<UniversityProgramR
   }));
 }
 
-export async function getUniversityPrograms(id: string, page = 1, pageSize = 20, signal?: AbortSignal): Promise<PaginatedResult<UniversityProgramRow>> {
+export async function getUniversityPrograms(id: string, page = 1, pageSize = 20, signal?: AbortSignal, status: ProgramStatus | 'all' = 'all'): Promise<PaginatedResult<UniversityProgramRow>> {
   return fromDataSource({ domain: 'passport', signal, mock: async () => {
-    const items = await getMockUniversityPrograms(id);
+    const items = (await getMockUniversityPrograms(id)).filter((item) => status === 'all' || item.status === status);
     return { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: items.length };
-  }, real: () => realGetUniversityPrograms(id, page, pageSize, signal) });
+  }, real: () => realGetUniversityPrograms(id, page, pageSize, signal, status) });
 }
 
 export async function getWorkflowSelectorPrograms(id: string, signal?: AbortSignal): Promise<UniversityProgramRow[]> {
@@ -1225,11 +1225,11 @@ async function getMockUniversityTeachers(id: string): Promise<UniversityTeacherR
   return universityTeachersFixture(id);
 }
 
-export async function getUniversityTeachers(id: string, page = 1, pageSize = 20, signal?: AbortSignal): Promise<PaginatedResult<UniversityTeacherRow>> {
+export async function getUniversityTeachers(id: string, page = 1, pageSize = 20, signal?: AbortSignal, readiness: TeacherReadiness | 'all' = 'all'): Promise<PaginatedResult<UniversityTeacherRow>> {
   return fromDataSource({ domain: 'passport', signal, mock: async () => {
-    const items = await getMockUniversityTeachers(id);
+    const items = (await getMockUniversityTeachers(id)).filter((item) => readiness === 'all' || item.readiness === readiness);
     return { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: items.length };
-  }, real: () => realGetUniversityTeachers(id, page, pageSize, signal) });
+  }, real: () => realGetUniversityTeachers(id, page, pageSize, signal, readiness) });
 }
 
 function getTeacherPassportContext(id: string): { teacher: UniversityTeacherRow; university: UniversityListItem } {

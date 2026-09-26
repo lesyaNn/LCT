@@ -225,7 +225,7 @@ export function UniversityPassport({ id }: { id: string }) {
   if (query.isPending) return <PassportSkeleton />;
   if (query.isError && normalizeApiError(query.error).kind === 'not-found') return <NotFoundState />;
   if (query.isError && normalizeApiError(query.error).kind === 'permission') return <ForbiddenState />;
-  if (query.isError || !query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
+  if (!query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
 
   const passport = query.data;
   const renderContent = (tab: PassportTabId) => tab === 'overview'

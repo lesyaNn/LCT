@@ -45,7 +45,7 @@ export interface ExternalApplication {
 export interface UniversityExternalData {
   universityId: string;
   source: ExternalDataSource;
-  mode: 'real' | 'mock' | 'import';
+  mode: 'real' | 'mock' | 'import' | 'unconfigured';
   syncedAt: string | null;
   students: ExternalStudent[];
   applications: ExternalApplication[];

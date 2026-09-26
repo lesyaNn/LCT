@@ -11,6 +11,7 @@
 .multiSelectMenu label:hover { background: var(--rtk-color-surface-hover); }
 .drawerContent { min-width: 0; }
 .loadingHint { color: var(--rtk-color-text-tertiary); font-size: 12px; margin: 0; }
+.refreshStatus { min-height: 20px; }
 .desktopTable { overflow-x: auto; }
 .desktopTable table { border-collapse: collapse; min-width: 1180px; table-layout: fixed; width: 100%; }
 .desktopTable th, .desktopTable td { border-bottom: 1px solid var(--rtk-color-border); padding: var(--rtk-space-3); text-align: left; vertical-align: top; }

@@ -136,6 +136,15 @@ def test_unavailable_never_falls_back_to_mock(engine):
         assert db.scalar(select(func.count(Student.id))) == 0
 
 
+def test_website_without_source_state_is_unconfigured(engine):
+    university_id, _ = seed(engine)
+    settings.external_adapter_mode = "disabled"
+    with Session(engine) as db:
+        result = service.university_data(db, university_id, "website")
+        assert result["mode"] == "unconfigured"
+        assert result["applications"] == []
+
+
 def test_external_workflow_repeat_and_concurrent_requests(engine):
     university_id, program_id = seed(engine)
     with Session(engine) as db:

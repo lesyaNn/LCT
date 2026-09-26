@@ -1,5 +1,7 @@
 'use client';
 
+import { visibleWorkflowDescription } from '@/shared/lib/visible-workflow-description';
+
 import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -32,14 +34,14 @@ export function WorkflowTemplatesList() {
     router.push(`/admin/workflow/templates/${template.id}/edit`);
   };
 
-  if (query.isError) return <RouteErrorState onRetry={() => void query.refetch()} />;
+  if (query.isError && !query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
 
   return <div className={styles.page}>
     <header className={styles.editorHeader}><div><h1>Шаблоны Workflow</h1><p className={styles.description}>Управляйте набором и порядком этапов для новых процессов.</p></div><Button type="button" variant="primary" size="m" onClick={() => setCreateOpen(true)}><AddLarge size={18} fill="currentColor" />Новый шаблон</Button></header>
     <section className={styles.templateSurface} aria-labelledby="templates-heading">
       <div className={styles.surfaceHeader}><div><h2 id="templates-heading">Все шаблоны</h2><p>{query.data ? `Всего: ${query.data.total}` : 'Загрузка…'}</p></div></div>
       {query.isPending ? <ListSkeleton items={4} withAvatar={false} /> : query.data?.items.length ? <ul className={styles.templateList}>{query.data.items.map((template) => <li key={template.id}>
-        <div><div className={styles.templateTitle}><h3>{template.name}</h3><span className={template.isActive ? styles.activeBadge : styles.inactiveBadge}>{template.isActive ? 'Активен' : 'Отключён'}</span></div>{template.description ? <p>{template.description}</p> : <p className={styles.muted}>Без описания</p>}</div>
+        <div><div className={styles.templateTitle}><h3>{template.name}</h3><span className={template.isActive ? styles.activeBadge : styles.inactiveBadge}>{template.isActive ? 'Активен' : 'Отключён'}</span></div>{visibleWorkflowDescription(template.description) ? <p>{template.description}</p> : null}</div>
         <div className={styles.headerActions}>
           {!demoMode ? <Button type="button" variant="ghost" size="s" disabled={updateTemplate.isPending} onClick={() => void updateTemplate.mutateAsync({ templateId: template.id, patch: { isActive: !template.isActive } }).catch((cause) => setNotification(normalizeApiError(cause)))}>{template.isActive ? 'Отключить' : 'Активировать'}</Button> : null}
           <Link className={styles.editLink} href={`/admin/workflow/templates/${template.id}/edit`}>Редактировать<ArrowRight size={18} fill="currentColor" /></Link>

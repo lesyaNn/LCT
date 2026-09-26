@@ -32,6 +32,7 @@ import { Button } from '@/shared/ui/rtk/button';
 import { FilterToolbar } from '@/shared/ui/rtk/filter-surface';
 import { DateRangeField } from '@/shared/ui/rtk/date-range-field';
 import { EmptyState } from '@/shared/ui/empty-state';
+import { BackgroundRefreshNotice } from '@/shared/ui/background-refresh-notice';
 import { ErrorState } from '@/shared/ui/error-state';
 import { Modal } from '@/shared/ui/rtk/modal';
 import { MultiSelect } from '@/shared/ui/rtk/multiselect';
@@ -165,7 +166,8 @@ export function AuditPage() {
     <AuditFilters query={query} result={auditQuery.data} options={optionsQuery.data} onPatch={patchFilters} onReset={resetFilters} />
     {filterHint ? <p className={styles.loadingHint}>{filterHint}</p> : null}
     {optionsQuery.isError ? <ErrorState title="Не удалось загрузить фильтры журнала" description="Журнал доступен; повторите загрузку фильтров." onRetry={() => void optionsQuery.refetch()} /> : null}
-    {auditQuery.isPending ? <TableSkeleton rows={6} columns={8} label="Загрузка журнала аудита" /> : auditQuery.isError || !auditQuery.data ? <ErrorState title={normalizedError?.message ?? 'Не удалось загрузить журнал аудита'} description="Повторите попытку или обратитесь к администратору." onRetry={retry} /> : auditQuery.data.items.length ? <AuditTable events={auditQuery.data.items} onOpen={setSelectedEvent} /> : <EmptyState icon={<SecurityCheck size={24} fill="currentColor" />} title={filtered ? 'По заданным фильтрам события не найдены' : 'Событий пока нет'} description={filtered ? 'Измените условия поиска или сбросьте фильтры.' : 'Когда появятся записи, они будут отображены в этом журнале.'} primaryAction={filtered ? { label: 'Сбросить фильтры', onClick: resetFilters, variant: 'secondary' } : undefined} />}
+    <div className={styles.refreshStatus} aria-live="polite">{auditQuery.isFetching && auditQuery.data ? <span className={styles.loadingHint} role="status">Обновляем журнал…</span> : null}{auditQuery.isError && auditQuery.data ? <BackgroundRefreshNotice onRetry={retry} /> : null}</div>
+    {auditQuery.isPending ? <TableSkeleton rows={6} columns={8} label="Загрузка журнала аудита" /> : !auditQuery.data ? <ErrorState title={normalizedError?.message ?? 'Не удалось загрузить журнал аудита'} description="Повторите попытку или обратитесь к администратору." onRetry={retry} /> : auditQuery.data.items.length ? <AuditTable events={auditQuery.data.items} onOpen={setSelectedEvent} /> : <EmptyState icon={<SecurityCheck size={24} fill="currentColor" />} title={filtered ? 'По заданным фильтрам события не найдены' : 'Событий пока нет'} description={filtered ? 'Измените условия поиска или сбросьте фильтры.' : 'Когда появятся записи, они будут отображены в этом журнале.'} primaryAction={filtered ? { label: 'Сбросить фильтры', onClick: resetFilters, variant: 'secondary' } : undefined} />}
     {auditQuery.data ? <Pagination result={auditQuery.data} pageSize={query.pageSize} onPage={(page) => setQuery((current) => ({ ...current, page }))} onPageSize={(pageSize) => setQuery((current) => ({ ...current, page: 1, pageSize }))} /> : null}
     {selectedEvent ? <DetailsModal event={selectedEvent} onClose={() => setSelectedEvent(null)} /> : null}
   </div>;

@@ -32,9 +32,8 @@ from app.config import settings
 from app.models.workflow_templates import WorkflowStage, WorkflowTemplate
 
 TEMPLATE_NAME = "Стандартный маршрут взаимодействия с вузом"
-TEMPLATE_DESCRIPTION = (
-    "Канонический маршрут из 14 этапов (README: текущий workflow взаимодействия с вузом)"
-)
+TEMPLATE_DESCRIPTION = None
+LEGACY_TEMPLATE_DESCRIPTION = "Канонический маршрут из 14 этапов (README: текущий workflow взаимодействия с вузом)"
 
 # (name, is_required) in canonical order; order_index = position (1-based).
 STAGES_14: list[tuple[str, bool]] = [
@@ -72,7 +71,7 @@ def seed_workflow_templates(session: Session) -> dict:
         template = WorkflowTemplate(name=TEMPLATE_NAME, description=TEMPLATE_DESCRIPTION)
         session.add(template)
         session.flush()
-    elif template.description != TEMPLATE_DESCRIPTION:
+    elif template.description == LEGACY_TEMPLATE_DESCRIPTION:
         template.description = TEMPLATE_DESCRIPTION
 
     for position, (name, is_required) in enumerate(STAGES_14, start=1):

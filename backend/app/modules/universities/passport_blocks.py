@@ -855,17 +855,20 @@ def get_passport(
 
 
 def get_programs_page(
-    db, university_id: uuid.UUID, page: int, page_size: int
+    db, university_id: uuid.UUID, page: int, page_size: int, status: str | None = None
 ) -> tuple[list[ProgramShort], int]:
     """Paginated university programs (SQL LIMIT/OFFSET + COUNT, no N+1)."""
     row = _load_university_row(db, university_id)
     if row is None:
         raise NotFound("University not found")
+    conditions = [UniversityProgram.university_id == university_id]
+    if status is not None:
+        conditions.append(UniversityProgram.status == status)
     total = (
         db.execute(
             select(func.count())
             .select_from(UniversityProgram)
-            .where(UniversityProgram.university_id == university_id)
+            .where(*conditions)
         ).scalar()
         or 0
     )
@@ -880,7 +883,7 @@ def get_programs_page(
         .join(ITProgram, ITProgram.id == UniversityProgram.program_id)
         .join(ITDirection, ITDirection.id == ITProgram.direction_id)
         .outerjoin(Responsible, Responsible.id == UniversityProgram.responsible_id)
-        .where(UniversityProgram.university_id == university_id)
+        .where(*conditions)
         .order_by(UniversityProgram.created_at)
         .limit(page_size)
         .offset((page - 1) * page_size)
@@ -903,22 +906,35 @@ def get_programs_page(
 
 
 def get_teachers_page(
-    db, university_id: uuid.UUID, page: int, page_size: int
+    db, university_id: uuid.UUID, page: int, page_size: int, readiness: str | None = None
 ) -> tuple[list[TeacherShort], int]:
     """Paginated university teachers (SQL LIMIT/OFFSET + COUNT, no N+1)."""
     row = _load_university_row(db, university_id)
     if row is None:
         raise NotFound("University not found")
+    today = date.today()
+    soon = today + timedelta(days=EXPIRY_WARNING_DAYS)
+    exp_c, soon_c, min_c = _readiness_scalar(TeacherCertificate.expires_at, TeacherCertificate.teacher_id, True, today, soon)
+    exp_q, soon_q, min_q = _readiness_scalar(TeacherQualification.expires_at, TeacherQualification.teacher_id, False, today, soon)
+    expired = (exp_c + exp_q) > 0
+    attention = (soon_c + soon_q) > 0
+    conditions = [Teacher.university_id == university_id]
+    if readiness == "expired":
+        conditions.append(expired)
+    elif readiness == "attention":
+        conditions.extend((~expired, attention))
+    elif readiness == "ready":
+        conditions.extend((~expired, ~attention))
     total = (
         db.execute(
-            select(func.count()).select_from(Teacher).where(Teacher.university_id == university_id)
+            select(func.count()).select_from(Teacher).where(*conditions)
         ).scalar()
         or 0
     )
     page_ids = list(
         db.execute(
             select(Teacher.id)
-            .where(Teacher.university_id == university_id)
+            .where(*conditions)
             .order_by(Teacher.full_name, Teacher.id)
             .limit(page_size)
             .offset((page - 1) * page_size)
@@ -928,14 +944,6 @@ def get_teachers_page(
     )
     if not page_ids:
         return [], int(total)
-    today = date.today()
-    soon = today + timedelta(days=EXPIRY_WARNING_DAYS)
-    exp_c, soon_c, min_c = _readiness_scalar(
-        TeacherCertificate.expires_at, TeacherCertificate.teacher_id, True, today, soon
-    )
-    exp_q, soon_q, min_q = _readiness_scalar(
-        TeacherQualification.expires_at, TeacherQualification.teacher_id, False, today, soon
-    )
     stmt = (
         select(
             Teacher,

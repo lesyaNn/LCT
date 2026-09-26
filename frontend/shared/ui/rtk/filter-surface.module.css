@@ -1,11 +1,13 @@
 .root { background: var(--rtk-color-surface-elevated); border-radius: var(--rtk-radius-medium); box-shadow: var(--rtk-shadow-elevation-1); min-width: 0; padding: var(--rtk-space-4); }
 .embedded { background: transparent; border-radius: 0; box-shadow: none; padding: 0; }
-.grid { align-items: end; display: grid; gap: var(--rtk-space-3); grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); }
+.grid { align-items: end; display: grid; gap: var(--rtk-space-3); grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); min-width: 0; }
 .grid > * { min-width: 0; }
+.grid:has(> :only-child) { grid-template-columns: minmax(min(100%, 180px), 280px); }
 .grid > label { display: flex; flex-direction: column; gap: var(--rtk-space-1); }
 .grid > label > span { color: var(--rtk-color-text-secondary); font-size: 11px; font-weight: 700; }
 .actions { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); justify-content: flex-end; margin-top: var(--rtk-space-3); }
 .mobileTrigger { display: none; }
 .mobileContent { min-width: 0; }
 .mobileGrid { grid-template-columns: 1fr; }
+.mobileGrid:has(> :only-child) { grid-template-columns: 1fr; }
 @media (max-width: 768px) { .desktop { display: none; } .mobileTrigger { display: inline-flex; justify-self: start; } .mobileGrid { grid-template-columns: 1fr; } .actions { justify-content: stretch; } .actions > * { flex: 1 1 auto; } }

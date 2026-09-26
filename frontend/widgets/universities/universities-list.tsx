@@ -581,9 +581,9 @@ export function UniversitiesList() {
         <ActiveFilterChips filters={state.filters} options={filterOptions} onPatch={goToState} onReset={resetFilters} />
         {catalogsQuery.isError ? <RouteErrorState compact onRetry={() => void catalogsQuery.refetch()} /> : null}
       </div>
-      {query.isPending ? <TableSkeleton rows={6} columns={7} label="Загрузка списка вузов" /> : query.isError || !query.data ? <RouteErrorState onRetry={() => void query.refetch()} /> : query.data.total === 0 ? <EmptyState icon={<Search size={20} fill="currentColor" />} title={hasFilters ? 'По заданным фильтрам ничего не найдено' : 'Вузы пока не добавлены'} description={hasFilters ? 'Измените условия поиска или сбросьте фильтры.' : 'Когда появятся записи, они будут отображены в этом списке.'} primaryAction={hasFilters ? { label: 'Сбросить фильтры', onClick: resetFilters, variant: 'secondary' } : undefined} /> : (
+      {query.isPending ? <TableSkeleton rows={6} columns={7} label="Загрузка списка вузов" /> : !query.data ? <RouteErrorState onRetry={() => void query.refetch()} /> : query.data.total === 0 ? <EmptyState icon={<Search size={20} fill="currentColor" />} title={hasFilters ? 'По заданным фильтрам ничего не найдено' : 'Вузы пока не добавлены'} description={hasFilters ? 'Измените условия поиска или сбросьте фильтры.' : 'Когда появятся записи, они будут отображены в этом списке.'} primaryAction={hasFilters ? { label: 'Сбросить фильтры', onClick: resetFilters, variant: 'secondary' } : undefined} /> : (
         <>
-          {query.isFetching ? <p className={styles.fetching} role="status">Обновляем список…</p> : null}
+          <p className={styles.fetching} role="status">{query.isFetching ? 'Обновляем список…' : '\u00a0'}</p>
           <TableShell>
             <div className={styles.desktopOnly}><DesktopTable table={table} /></div>
             <div className={styles.mobileOnly}><MobileUniversityCards items={query.data.items} /></div>

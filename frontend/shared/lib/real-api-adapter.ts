@@ -235,13 +235,17 @@ export async function realGetUniversityPassport(id: string, queryClient?: QueryC
   };
 }
 
-export async function realGetUniversityPrograms(id: string, page = 1, pageSize = 20, signal?: AbortSignal): Promise<PaginatedResult<UniversityProgramRow>> {
-  const data = unwrap(await apiFetch<ApiPage<ApiProgram>>(`/api/v1/universities/${encodeURIComponent(id)}/passport/programs?page=${page}&page_size=${pageSize}`, { signal }), 'Не удалось загрузить программы ВУЗа.');
+export async function realGetUniversityPrograms(id: string, page = 1, pageSize = 20, signal?: AbortSignal, status: ProgramStatus | 'all' = 'all'): Promise<PaginatedResult<UniversityProgramRow>> {
+  const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+  if (status !== 'all') params.set('status', status);
+  const data = unwrap(await apiFetch<ApiPage<ApiProgram>>(`/api/v1/universities/${encodeURIComponent(id)}/passport/programs?${params}`, { signal }), 'Не удалось загрузить программы ВУЗа.');
   return { items: data.items.map(mapProgram), page: data.page, pageSize: data.page_size, total: data.total };
 }
 
-export async function realGetUniversityTeachers(id: string, page = 1, pageSize = 20, signal?: AbortSignal): Promise<PaginatedResult<UniversityTeacherRow>> {
-  const data = unwrap(await apiFetch<ApiPage<ApiTeacher>>(`/api/v1/universities/${encodeURIComponent(id)}/passport/teachers?page=${page}&page_size=${pageSize}`, { signal }), 'Не удалось загрузить преподавателей ВУЗа.');
+export async function realGetUniversityTeachers(id: string, page = 1, pageSize = 20, signal?: AbortSignal, readiness: TeacherReadiness | 'all' = 'all'): Promise<PaginatedResult<UniversityTeacherRow>> {
+  const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+  if (readiness !== 'all') params.set('readiness', readiness);
+  const data = unwrap(await apiFetch<ApiPage<ApiTeacher>>(`/api/v1/universities/${encodeURIComponent(id)}/passport/teachers?${params}`, { signal }), 'Не удалось загрузить преподавателей ВУЗа.');
   return { items: data.items.map(mapTeacher), page: data.page, pageSize: data.page_size, total: data.total };
 }
 
@@ -267,7 +271,7 @@ export async function realGetUniversityStudents(id: string, page = 1, pageSize =
 type ExternalDataDto = {
   university_id: string;
   source: ExternalDataSource;
-  mode: 'real' | 'mock' | 'import';
+  mode: 'real' | 'mock' | 'import' | 'unconfigured';
   synced_at: string | null;
   students: Array<{ id: string; name: string; program_id: string; flow: string | null; progress: number | null; source: 'lms'; synced_at: string | null }>;
   applications: Array<{ id: string; university_id: string; program_id: string; program_name: string; applications_count: number; demand_score: number | null; source: 'website'; synced_at: string | null; workflow_instance_id: string | null }>;

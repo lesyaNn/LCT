@@ -115,6 +115,6 @@ function TeacherPassportSkeleton() {
 export function TeacherPassport({ id }: { id: string }) {
   const query = useQuery({ queryKey: teacherPassportQueryKey(id), queryFn: () => getTeacherPassport(id), staleTime: 30_000 });
   if (query.isPending) return <TeacherPassportSkeleton />;
-  if (query.isError || !query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
+  if (!query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
   return <div className={styles.page}><TeacherHeader teacher={query.data.teacher} /><div className={styles.sections}><QualificationsSection rows={query.data.qualifications} /><TrainingsSection rows={query.data.trainings} /><TeacherCertificatesSection rows={query.data.certificates} /><TeacherProgramsSection rows={query.data.allowedPrograms} /></div><Link className={styles.backLink} href="/teachers"><ArrowRight size={16} fill="currentColor" />Вернуться к списку преподавателей</Link></div>;
 }

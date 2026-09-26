@@ -5,6 +5,7 @@ logic here (architecture rule API -> Service -> Model/Repository).
 """
 
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
@@ -56,11 +57,12 @@ def get_university_passport_programs(
     university_id: uuid.UUID,
     page: int = Query(default=1, ge=1, description="Page number, 1-based"),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
+    status: Literal["planned", "active", "launched", "archived"] | None = None,
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(require_permission("university.read")),
 ) -> PaginatedPrograms:
     ensure_university_access(university_id, user)
-    items, total = get_programs_page(db, university_id, page, page_size)
+    items, total = get_programs_page(db, university_id, page, page_size, status=status)
     return PaginatedPrograms(items=items, page=page, page_size=page_size, total=total)
 
 
@@ -73,9 +75,10 @@ def get_university_passport_teachers(
     university_id: uuid.UUID,
     page: int = Query(default=1, ge=1, description="Page number, 1-based"),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
+    readiness: Literal["ready", "attention", "expired"] | None = None,
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(require_permission("university.read")),
 ) -> PaginatedTeachers:
     ensure_university_access(university_id, user)
-    items, total = get_teachers_page(db, university_id, page, page_size)
+    items, total = get_teachers_page(db, university_id, page, page_size, readiness=readiness)
     return PaginatedTeachers(items=items, page=page, page_size=page_size, total=total)

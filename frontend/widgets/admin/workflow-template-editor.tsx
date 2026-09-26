@@ -1,5 +1,7 @@
 'use client';
 
+import { visibleWorkflowDescription } from '@/shared/lib/visible-workflow-description';
+
 import { useEffect, useRef, useState } from 'react';
 import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -27,7 +29,7 @@ function EditorSkeleton() {
 }
 
 function EditorHeader({ template, dirty, savingOrder, onAdd, onSaveOrder, onCancelOrder }: { template: WorkflowTemplate; dirty: boolean; savingOrder: boolean; onAdd: () => void; onSaveOrder: () => void; onCancelOrder: () => void }) {
-  return <header className={styles.editorHeader}><div><h1>{template.name}</h1>{template.description ? <p className={styles.description}>{template.description}</p> : null}</div><div className={styles.headerActions}>{dirty ? <><span className={styles.dirtyStatus} role="status">Порядок изменён</span><Button type="button" variant="ghost" size="m" disabled={savingOrder} onClick={onCancelOrder}>Отменить</Button><Button type="button" variant="primary" size="m" loading={savingOrder} disabled={savingOrder} onClick={onSaveOrder}><CheckLarge size={18} fill="currentColor" />Сохранить порядок</Button></> : <Button type="button" variant="primary" size="m" onClick={onAdd}><AddLarge size={18} fill="currentColor" />Добавить этап</Button>}</div></header>;
+  return <header className={styles.editorHeader}><div><h1>{template.name}</h1>{visibleWorkflowDescription(template.description) ? <p className={styles.description}>{template.description}</p> : null}</div><div className={styles.headerActions}>{dirty ? <><span className={styles.dirtyStatus} role="status">Порядок изменён</span><Button type="button" variant="ghost" size="m" disabled={savingOrder} onClick={onCancelOrder}>Отменить</Button><Button type="button" variant="primary" size="m" loading={savingOrder} disabled={savingOrder} onClick={onSaveOrder}><CheckLarge size={18} fill="currentColor" />Сохранить порядок</Button></> : <Button type="button" variant="primary" size="m" onClick={onAdd}><AddLarge size={18} fill="currentColor" />Добавить этап</Button>}</div></header>;
 }
 
 export function WorkflowTemplateEditor({ templateId }: { templateId: string }) {
@@ -52,7 +54,7 @@ export function WorkflowTemplateEditor({ templateId }: { templateId: string }) {
   }, [orderDirty, query.data]);
 
   if (query.isPending) return <EditorSkeleton />;
-  if (query.isError || !query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
+  if (!query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
 
   const template = query.data;
   const stages = template.stages;
