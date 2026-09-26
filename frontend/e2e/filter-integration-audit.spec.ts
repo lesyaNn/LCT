@@ -93,10 +93,18 @@ test('desktop dashboard presets occupy one row', async ({ page }) => {
   await page.locator('input[name="password"]').fill(process.env.E2E_ADMIN_PASSWORD ?? '');
   await page.getByRole('button', { name: /Вход|Войти|Sign in|Log in/i }).click();
   await page.waitForURL((url) => url.pathname === '/dashboard');
-  const buttons = page.getByRole('group', { name: 'Период' }).first().getByRole('button');
+  const period = page.getByRole('group', { name: 'Период' }).first();
+  const buttons = period.getByRole('button');
   await expect(buttons).toHaveCount(4);
   const tops = await buttons.evaluateAll((elements) => elements.map((element) => Math.round(element.getBoundingClientRect().top)));
   expect(new Set(tops).size).toBe(1);
+  const buttonBottom = await buttons.last().evaluate((element) => element.getBoundingClientRect().bottom);
+  for (const label of ['От', 'До']) {
+    const bounds = await period.getByLabel(label, { exact: true }).boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds!.width).toBeLessThanOrEqual(150);
+    expect(Math.abs(bounds!.y + bounds!.height - buttonBottom)).toBeLessThanOrEqual(1);
+  }
   for (const label of ['Текущий месяц', 'Текущий квартал', 'Текущий год', 'Прошлый год']) {
     const filtered = page.waitForResponse((response) => {
       const url = new URL(response.url());

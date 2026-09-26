@@ -27,10 +27,12 @@ export function DateRangeField({ label = 'Период', from, to, onFromChange,
   };
   return <div className={styles.root} role="group" aria-label={label}>
     <span className={styles.label}>{label}</span>
-    {presets ? <div className={styles.presets}>{periodPresetOptions.map(({ id: preset, label: text }) => <Button key={preset} variant={selectedPreset === preset ? (preset === 'current_year' ? 'orange' : 'primary') : 'secondary'} size="s" type="button" disabled={disabled} aria-pressed={selectedPreset === preset} onClick={() => selectPreset(preset)}>{text}</Button>)}</div> : null}
-    <div className={styles.fields}>
-      <label htmlFor={`${id}-from`}>От<Input id={`${id}-from`} type="date" value={from} max={to || undefined} disabled={disabled} aria-invalid={Boolean(fromError)} onChange={(event) => onFromChange(event.target.value)} />{fromError ? <small role="alert">{fromError}</small> : null}</label>
-      <label htmlFor={`${id}-to`}>До<Input id={`${id}-to`} type="date" value={to} min={from || undefined} disabled={disabled} aria-invalid={Boolean(toError)} onChange={(event) => onToChange(event.target.value)} />{toError ? <small role="alert">{toError}</small> : null}</label>
+    <div className={styles.controls}>
+      {presets ? <div className={styles.presets}>{periodPresetOptions.map(({ id: preset, label: text }) => <Button key={preset} variant={selectedPreset === preset ? (preset === 'current_year' ? 'orange' : 'primary') : 'secondary'} size="s" type="button" disabled={disabled} aria-pressed={selectedPreset === preset} onClick={() => selectPreset(preset)}>{text}</Button>)}</div> : null}
+      <div className={styles.fields}>
+        <label htmlFor={`${id}-from`}>От<Input id={`${id}-from`} type="date" value={from} max={to || undefined} disabled={disabled} aria-invalid={Boolean(fromError)} onChange={(event) => onFromChange(event.target.value)} />{fromError ? <small role="alert">{fromError}</small> : null}</label>
+        <label htmlFor={`${id}-to`}>До<Input id={`${id}-to`} type="date" value={to} min={from || undefined} disabled={disabled} aria-invalid={Boolean(toError)} onChange={(event) => onToChange(event.target.value)} />{toError ? <small role="alert">{toError}</small> : null}</label>
+      </div>
     </div>
   </div>;
 }
