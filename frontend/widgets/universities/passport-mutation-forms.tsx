@@ -88,7 +88,7 @@ export function StudentMutationForm({ universityId, student, onClose, onSaved }:
     mutationFn: (input: UniversityStudentInput) => student ? updateUniversityStudent(student.id, input) : createUniversityStudent(universityId, input),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['university-students', universityId] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.universities.studentsFamily(universityId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.universities.passport(universityId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.universities.historyFamily(universityId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.audit.all }),
@@ -144,7 +144,7 @@ export function MeetingMutationForm({ universityId, meeting, onClose, onSaved }:
     mutationFn: (input: UniversityMeetingInput) => meeting ? updateUniversityMeeting(meeting.id, input) : createUniversityMeeting(universityId, input),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['university-meetings', universityId] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.universities.meetingsFamily(universityId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.universities.passport(universityId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.universities.historyFamily(universityId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.audit.all }),

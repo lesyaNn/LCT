@@ -81,6 +81,12 @@ export interface CreateWorkflowTemplateInput {
   description: string | null;
 }
 
+export interface UpdateWorkflowTemplateInput {
+  name?: string;
+  description?: string | null;
+  isActive?: boolean;
+}
+
 export interface CreateWorkflowStageInput {
   name: string;
   description: string | null;
@@ -168,6 +174,16 @@ async function createRealWorkflowTemplate(input: CreateWorkflowTemplateInput): P
   return templateFromApi(result.data);
 }
 
+async function updateRealWorkflowTemplate(templateId: string, input: UpdateWorkflowTemplateInput): Promise<WorkflowTemplate> {
+  const body: Record<string, unknown> = {};
+  if (input.name !== undefined) body.name = input.name;
+  if (input.description !== undefined) body.description = input.description;
+  if (input.isActive !== undefined) body.is_active = input.isActive;
+  const result = await apiFetch<WorkflowTemplateDetailApiRecord>(`/api/v1/workflow/templates/${encodeURIComponent(templateId)}`, { method: 'PATCH', body });
+  if (!result.ok) return fail(result.status, result.body, result.error, 'Не удалось изменить шаблон Workflow.');
+  return templateFromApi(result.data);
+}
+
 async function addRealWorkflowStage(templateId: string, input: CreateWorkflowStageInput): Promise<WorkflowTemplateStage> {
   const result = await apiFetch<WorkflowTemplateStageApiRecord>(`/api/v1/workflow/templates/${encodeURIComponent(templateId)}/stages`, {
     method: 'POST',
@@ -215,16 +231,18 @@ export async function getWorkflowTemplate(templateId: string, signal?: AbortSign
 }
 
 export async function createWorkflowTemplate(input: CreateWorkflowTemplateInput): Promise<WorkflowTemplate> {
-  if (!isMockDataSourceFor('workflow')) throw new WorkflowTemplateApiError(0, undefined, 'Изменение шаблонов будет подключено на этапе 6.');
   return fromDataSource({ domain: 'workflow', mock: () => mockCreateWorkflowTemplate(input), real: () => createRealWorkflowTemplate(input) });
 }
 
+export async function updateWorkflowTemplate(templateId: string, input: UpdateWorkflowTemplateInput): Promise<WorkflowTemplate> {
+  if (isMockDataSourceFor('workflow')) throw new WorkflowTemplateApiError(0, undefined, 'Изменение статуса шаблона недоступно в деморежиме.');
+  return updateRealWorkflowTemplate(templateId, input);
+}
+
 export async function addWorkflowStage(templateId: string, input: CreateWorkflowStageInput): Promise<WorkflowTemplateStage> {
-  if (!isMockDataSourceFor('workflow')) throw new WorkflowTemplateApiError(0, undefined, 'Изменение шаблонов будет подключено на этапе 6.');
   return fromDataSource({ domain: 'workflow', mock: () => mockAddWorkflowStage(templateId, input), real: () => addRealWorkflowStage(templateId, input) });
 }
 
 export async function updateWorkflowStage(templateId: string, stageId: string, input: UpdateWorkflowStageInput): Promise<WorkflowTemplateStage> {
-  if (!isMockDataSourceFor('workflow')) throw new WorkflowTemplateApiError(0, undefined, 'Изменение шаблонов будет подключено на этапе 6.');
   return fromDataSource({ domain: 'workflow', mock: () => mockUpdateWorkflowStage(templateId, stageId, input), real: () => updateRealWorkflowStage(templateId, stageId, input) });
 }

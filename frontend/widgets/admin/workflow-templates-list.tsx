@@ -6,8 +6,8 @@ import { useRouter } from 'next/navigation';
 import AddLarge from '@atomaro/icons/24/action/AddLarge';
 import ArrowRight from '@atomaro/icons/24/navigation/ArrowRight';
 import { useQuery } from '@tanstack/react-query';
-import { useCreateWorkflowTemplate } from '@/shared/lib/workflow-template-mutations';
-import { type NormalizedApiError } from '@/shared/lib/api-errors';
+import { useCreateWorkflowTemplate, useUpdateWorkflowTemplate } from '@/shared/lib/workflow-template-mutations';
+import { normalizeApiError, type NormalizedApiError } from '@/shared/lib/api-errors';
 import { isMockDataSourceFor } from '@/shared/lib/data-source';
 import { listWorkflowTemplates, workflowTemplateListQueryKey, type CreateWorkflowTemplateInput } from '@/shared/lib/workflow-templates-repository';
 import { Button } from '@/shared/ui/rtk/button';
@@ -19,10 +19,11 @@ import { CreateTemplateModal } from './workflow-template-modals';
 import styles from './workflow-template-editor.module.css';
 
 export function WorkflowTemplatesList() {
-  const readOnly = !isMockDataSourceFor('workflow');
+  const demoMode = isMockDataSourceFor('workflow');
   const router = useRouter();
   const query = useQuery({ queryKey: workflowTemplateListQueryKey(), queryFn: ({ signal }) => listWorkflowTemplates(1, 100, signal), staleTime: 30_000 });
   const createTemplate = useCreateWorkflowTemplate();
+  const updateTemplate = useUpdateWorkflowTemplate();
   const [createOpen, setCreateOpen] = useState(false);
   const [notification, setNotification] = useState<NormalizedApiError | null>(null);
 
@@ -33,5 +34,19 @@ export function WorkflowTemplatesList() {
 
   if (query.isError) return <RouteErrorState onRetry={() => void query.refetch()} />;
 
-  return <div className={styles.page}><header className={styles.editorHeader}><div><h1>Шаблоны Workflow</h1><p className={styles.description}>{readOnly ? 'Шаблоны доступны для просмотра; изменение будет подключено на этапе 6.' : 'Управляйте набором и порядком этапов для новых процессов.'}</p></div><Button type="button" variant="primary" size="m" disabled={readOnly} title={readOnly ? 'Создание будет подключено на этапе 6' : undefined} onClick={() => setCreateOpen(true)}><AddLarge size={18} fill="currentColor" />Новый шаблон</Button></header><section className={styles.templateSurface} aria-labelledby="templates-heading"><div className={styles.surfaceHeader}><div><h2 id="templates-heading">Все шаблоны</h2><p>{query.data ? `Всего: ${query.data.total}` : 'Загрузка…'}</p></div></div>{query.isPending ? <ListSkeleton items={4} withAvatar={false} /> : query.data?.items.length ? <ul className={styles.templateList}>{query.data.items.map((template) => <li key={template.id}><div><div className={styles.templateTitle}><h3>{template.name}</h3><span className={template.isActive ? styles.activeBadge : styles.inactiveBadge}>{template.isActive ? 'Активен' : 'Отключён'}</span></div>{template.description ? <p>{template.description}</p> : <p className={styles.muted}>Без описания</p>}</div><Link className={styles.editLink} href={`/admin/workflow/templates/${template.id}/edit`}>{readOnly ? 'Просмотреть' : 'Редактировать'}<ArrowRight size={18} fill="currentColor" /></Link></li>)}</ul> : <EmptyState title="Шаблонов пока нет" description={readOnly ? 'Шаблоны ещё не созданы.' : 'Создайте первый шаблон и добавьте в него этапы.'} headingLevel={3} primaryAction={readOnly ? undefined : { label: 'Новый шаблон', onClick: () => setCreateOpen(true) }} />}</section>{createOpen && !readOnly ? <CreateTemplateModal pending={createTemplate.isPending} onClose={() => { if (!createTemplate.isPending) setCreateOpen(false); }} onSubmit={create} onError={(error) => setNotification(error)} /> : null}{notification ? <div className={styles.toastViewport}><Toast intent="error" title="Шаблон не создан" message={notification.message} onClose={() => setNotification(null)} /></div> : null}</div>;
+  return <div className={styles.page}>
+    <header className={styles.editorHeader}><div><h1>Шаблоны Workflow</h1><p className={styles.description}>Управляйте набором и порядком этапов для новых процессов.</p></div><Button type="button" variant="primary" size="m" onClick={() => setCreateOpen(true)}><AddLarge size={18} fill="currentColor" />Новый шаблон</Button></header>
+    <section className={styles.templateSurface} aria-labelledby="templates-heading">
+      <div className={styles.surfaceHeader}><div><h2 id="templates-heading">Все шаблоны</h2><p>{query.data ? `Всего: ${query.data.total}` : 'Загрузка…'}</p></div></div>
+      {query.isPending ? <ListSkeleton items={4} withAvatar={false} /> : query.data?.items.length ? <ul className={styles.templateList}>{query.data.items.map((template) => <li key={template.id}>
+        <div><div className={styles.templateTitle}><h3>{template.name}</h3><span className={template.isActive ? styles.activeBadge : styles.inactiveBadge}>{template.isActive ? 'Активен' : 'Отключён'}</span></div>{template.description ? <p>{template.description}</p> : <p className={styles.muted}>Без описания</p>}</div>
+        <div className={styles.headerActions}>
+          {!demoMode ? <Button type="button" variant="ghost" size="s" disabled={updateTemplate.isPending} onClick={() => void updateTemplate.mutateAsync({ templateId: template.id, patch: { isActive: !template.isActive } }).catch((cause) => setNotification(normalizeApiError(cause)))}>{template.isActive ? 'Отключить' : 'Активировать'}</Button> : null}
+          <Link className={styles.editLink} href={`/admin/workflow/templates/${template.id}/edit`}>Редактировать<ArrowRight size={18} fill="currentColor" /></Link>
+        </div>
+      </li>)}</ul> : <EmptyState title="Шаблонов пока нет" description="Создайте первый шаблон и добавьте в него этапы." headingLevel={3} primaryAction={{ label: 'Новый шаблон', onClick: () => setCreateOpen(true) }} />}
+    </section>
+    {createOpen ? <CreateTemplateModal pending={createTemplate.isPending} onClose={() => { if (!createTemplate.isPending) setCreateOpen(false); }} onSubmit={create} onError={(error) => setNotification(error)} /> : null}
+    {notification ? <div className={styles.toastViewport}><Toast intent="error" title="Не удалось сохранить шаблон" message={notification.message} onClose={() => setNotification(null)} /></div> : null}
+  </div>;
 }

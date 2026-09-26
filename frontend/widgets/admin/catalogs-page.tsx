@@ -7,6 +7,7 @@ import Trash from '@atomaro/icons/24/action/Trash';
 import RefreshSmall from '@atomaro/icons/24/action/RefreshSmall';
 import { useAuth } from '@/shared/auth/AuthProvider';
 import { normalizeApiError } from '@/shared/lib/api-errors';
+import { queryKeys } from '@/shared/lib/query-keys';
 import {
   CATALOG_API_CAPABILITIES,
   canMutateCatalog,
@@ -92,7 +93,7 @@ export function CatalogsPage() {
   const listQuery: CatalogListQuery = useMemo(() => ({ type, search: debouncedSearch, showInactive, page, pageSize }), [debouncedSearch, page, showInactive, type]);
   const query = useQuery({ queryKey: catalogQueryKeys.list(type, listQuery), queryFn: ({ signal }) => listCatalogItems(listQuery, signal), placeholderData: (previous) => previous, staleTime: 15_000 });
   const referencesQuery = useQuery({ queryKey: catalogQueryKeys.references, queryFn: ({ signal }) => getCatalogReferenceData(signal), staleTime: 5 * 60_000 });
-  const contactsQuery = useQuery({ queryKey: contactsProduct ? catalogQueryKeys.detail('products', contactsProduct.id) : ['catalog-contacts-idle'], queryFn: ({ signal }) => getCatalogItem('products', contactsProduct!.id, signal), enabled: Boolean(contactsProduct) });
+  const contactsQuery = useQuery({ queryKey: contactsProduct ? catalogQueryKeys.detail('products', contactsProduct.id) : queryKeys.catalogs.contactsIdle, queryFn: ({ signal }) => getCatalogItem('products', contactsProduct!.id, signal), enabled: Boolean(contactsProduct) });
   const pageCount = Math.max(1, Math.ceil((query.data?.total ?? 0) / pageSize));
 
   const invalidateRelated = async (itemType: CatalogType, id?: string) => {
