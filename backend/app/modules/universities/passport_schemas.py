@@ -1,16 +1,4 @@
-"""P1-04 university passport DTOs (frozen + additive extensions).
-
-Source of truth for ``GET /api/v1/universities/{id}/passport`` response shape.
-
-Backward-compatibility policy (P1-04-02/03/04):
-* never remove or rename a field once added here;
-* ``StudentsSummary`` keeps BOTH ``by_status`` (frozen) and
-  ``active``/``graduated``/``by_program`` (P1-04-01/02 requirement);
-* ``UniversityPassport`` includes ``contracts`` as an additive field
-  (P1-04-03); empty list is ``[]``;
-* derived fields (readiness, days_to_expiry, license/contract status) are
-  computed in the service layer and never stored in the DB.
-"""
+"""University passport DTOs."""
 
 import uuid
 from datetime import date, datetime
@@ -18,7 +6,6 @@ from datetime import date, datetime
 from pydantic import BaseModel, Field
 
 from app.models.enums import (
-    TeacherReadiness,
     UniversityProductStatus,
     UniversityProgramStatus,
 )
@@ -31,47 +18,6 @@ class ProgramShort(BaseModel):
     status: UniversityProgramStatus
     launch_date: date | None = None
     responsible_name: str | None = None
-    teachers_count: int = 0
-    students_count: int = 0
-
-    model_config = {"from_attributes": True}
-
-
-class TeacherShort(BaseModel):
-    id: uuid.UUID
-    full_name: str
-    email: str
-    position: str
-    readiness: TeacherReadiness
-    next_qualification_date: date | None = None
-    programs: list[ProgramShort] = Field(default_factory=list)
-
-    model_config = {"from_attributes": True}
-
-
-class StudentsByProgram(BaseModel):
-    program_id: uuid.UUID
-    program_name: str
-    total: int = 0
-    active: int = 0
-    graduated: int = 0
-
-    model_config = {"from_attributes": True}
-
-
-class StudentsSummary(BaseModel):
-    """Backward-compatible students block.
-
-    ``by_status`` is the frozen field; ``active``/``graduated``/``by_program``
-    are the P1-04-01/02 additive requirement. All are always present so both
-    the frontend mock and the new acceptance criteria pass.
-    """
-
-    total: int = 0
-    active: int = 0
-    graduated: int = 0
-    by_status: dict[str, int] = Field(default_factory=dict)
-    by_program: list[StudentsByProgram] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
 
@@ -194,22 +140,6 @@ class UniversityBrief(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class HealthScoreResponse(BaseModel):
-    """P1-04-05 optional block (``?include=health_score``).
-
-    Computed on the fly from passport aggregates via the shared P2 formula
-    (``health_score.service.compute_score``) — never persisted for reads.
-    ``calculated_at`` is the computation time (UTC, tz-aware).
-    """
-
-    university_id: uuid.UUID
-    score: int
-    details: dict[str, str] = Field(default_factory=dict)
-    calculated_at: datetime
-
-    model_config = {"from_attributes": True}
-
-
 class AuditEventShort(BaseModel):
     """P1-04-05 optional block item (``?include=audit``).
 
@@ -238,22 +168,9 @@ class PaginatedPrograms(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class PaginatedTeachers(BaseModel):
-    """P1-04-06 paginated subresource (SQL LIMIT/OFFSET + COUNT)."""
-
-    items: list[TeacherShort] = Field(default_factory=list)
-    page: int = 1
-    page_size: int = 20
-    total: int = 0
-
-    model_config = {"from_attributes": True}
-
-
 class UniversityPassport(BaseModel):
     university: UniversityBrief
     programs: list[ProgramShort] = Field(default_factory=list)
-    teachers: list[TeacherShort] = Field(default_factory=list)
-    students_summary: StudentsSummary = Field(default_factory=StudentsSummary)
     products: list[ProductShort] = Field(default_factory=list)
     licenses: list[LicenseShort] = Field(default_factory=list)
     contracts: list[ContractShort] = Field(default_factory=list)
@@ -262,9 +179,7 @@ class UniversityPassport(BaseModel):
     responsibles: list[ResponsibleShort] = Field(default_factory=list)
     workflow_summary: WorkflowSummary = Field(default_factory=WorkflowSummary)
     last_interactions: list[TimelineItem] = Field(default_factory=list)
-    # P1-04-05 additive optional blocks (only populated via ?include=...).
-    # None = not requested; health failure -> None, audit failure/empty -> [].
-    health_score: HealthScoreResponse | None = None
+    # Optional blocks (only populated via ?include=...).
     recent_audit: list[AuditEventShort] | None = None
 
     model_config = {"from_attributes": True}

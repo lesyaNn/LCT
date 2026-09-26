@@ -13,8 +13,7 @@ predicates): a university passes a direction filter when ANY enrollment
 matches, while its rows show each license's own direction. License-less
 universities produce exactly one fallback row with business columns resolved
 from the latest contract (or NULL). ``responsible`` is always an aggregated
-``'; '``-joined string (never a fan-out), ``workflow_status`` /
-``health_score`` are per-university scalars.
+``'; '``-joined string (never a fan-out), ``workflow_status`` is a per-university scalar.
 """
 
 from __future__ import annotations
@@ -89,11 +88,9 @@ def _col(
         deps.add("responsibles")
     if flags.get("needs_workflow_scalar"):
         deps.add("workflow_instances")
-    if flags.get("needs_health_scalar"):
-        deps.add("health_score_current")
     if flags.get("needs_university_maps"):
         deps.update({"meetings", "interaction_notes", "workflow_instances",
-                     "instance_stages", "workflow_tasks", "teachers"})
+                     "instance_stages", "workflow_tasks"})
     return ReportColumn(
         key=key,
         title=title,
@@ -215,15 +212,6 @@ for _c in [
         needs_fallback_contract=True,
     ),
     _col(
-        "health_score",
-        "Health Score",
-        "integer",
-        "health_score_current.score per university, materialized by the "
-        "canonical calculator; NULL until backfill/refresh. int 0..100, "
-        "missing is NULL (never 0)",
-        needs_health_scalar=True,
-    ),
-    _col(
         "city",
         "Город",
         "string",
@@ -262,17 +250,6 @@ for _c in [
         needs_university_maps=True,
     ),
     _col(
-        "teacher_readiness",
-        "Готовность преподавателей, %",
-        "integer",
-        "frozen P4-02-02 FULL rule: percent of the university teachers with "
-        "canonical readiness == ready (same compute_teacher_readiness as P1 "
-        "passports and the Dev-2 matrix, university grain instead of "
-        "per-program), nearest integer 0..100; NULL when no teachers",
-        mandatory=False,
-        needs_university_maps=True,
-    ),
-    _col(
         "overdue_tasks",
         "Просроченные задачи",
         "integer",
@@ -286,7 +263,7 @@ for _c in [
     COLUMN_REGISTRY[_c.key] = _c
 del _c
 
-#: The 14 frozen mandatory keys (documented order = default output order).
+#: Frozen mandatory keys (documented order = default output order).
 MANDATORY_COLUMNS: tuple[str, ...] = (
     "university",
     "direction",
@@ -301,7 +278,6 @@ MANDATORY_COLUMNS: tuple[str, ...] = (
     "license_expires",
     "transfer_status",
     "comment",
-    "health_score",
 )
 
 #: Supported optional columns: city/current_stage (1.0.0) +
@@ -310,10 +286,10 @@ MANDATORY_COLUMNS: tuple[str, ...] = (
 OPTIONAL_COLUMNS: tuple[str, ...] = (
     "city", "current_stage",
     "last_interaction", "workflow_progress",
-    "teacher_readiness", "overdue_tasks",
+    "overdue_tasks",
 )
 
-#: Immutable default: all 14 mandatory columns.
+#: Immutable default: all mandatory columns.
 DEFAULT_COLUMNS: tuple[str, ...] = MANDATORY_COLUMNS
 
 #: Backend presets. FULL = everything supported (STANDARD + FULL-only maps).
@@ -326,9 +302,11 @@ PRESETS: dict[str, tuple[str, ...]] = {
     "FULL": FULL_COLUMNS,
 }
 
-#: Former candidate columns now frozen (1.1.0) — kept as an empty registry
-#: so the contract diff stays explicit.
-UNSUPPORTED_OPTIONAL_COLUMNS: dict[str, str] = {}
+#: Removed columns (students/teachers/health score deleted).
+UNSUPPORTED_OPTIONAL_COLUMNS: dict[str, str] = {
+    "health_score": "removed: health score entity deleted",
+    "teacher_readiness": "removed: teachers entity deleted",
+}
 
 
 def is_known_column(key: str) -> bool:
@@ -339,7 +317,7 @@ def is_known_column(key: str) -> bool:
 def resolve_columns(columns: list[str] | tuple[str, ...] | None) -> list[str]:
     """Validate + normalize a column selection (P4-02-02).
 
-    * ``None`` -> all 14 mandatory columns (immutable default copy).
+    * ``None`` -> all mandatory columns (immutable default copy).
     * duplicates are collapsed preserving first-seen order;
     * unknown keys raise :class:`UnknownReportColumnError` (never ignored);
     * ``[]`` raises :class:`EmptyReportColumnsError` (at least one required).

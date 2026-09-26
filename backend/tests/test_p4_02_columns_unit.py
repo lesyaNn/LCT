@@ -1,9 +1,4 @@
-"""P4-02 unit tests: column registry, ReportRequest, presets (no database).
-
-Covers §29-§34 at the contract level: the 14 mandatory keys/titles, default
-columns, dedupe/unknown/empty behavior, preset constants, ReportFormat reuse
-(single shared enum) and the public ``report-columns.json`` artifact.
-"""
+"""P4-02 unit tests: column registry, ReportRequest, presets (no database)."""
 
 import json
 from pathlib import Path
@@ -42,14 +37,13 @@ EXPECTED_TITLES = {
     "license_expires": "Срок действия",
     "transfer_status": "Статус передачи",
     "comment": "Комментарий",
-    "health_score": "Health Score",
 }
 
 
 def test_mandatory_columns_exactly_14_in_order():
     assert MANDATORY_COLUMNS == tuple(EXPECTED_TITLES.keys())
-    assert len(MANDATORY_COLUMNS) == 14
-    assert len(set(MANDATORY_COLUMNS)) == 14
+    assert len(MANDATORY_COLUMNS) == len(EXPECTED_TITLES)
+    assert len(set(MANDATORY_COLUMNS)) == len(EXPECTED_TITLES)
 
 
 def test_mandatory_titles_match_spec():
@@ -75,13 +69,13 @@ def test_default_columns_are_immutable_14():
 
 
 def test_resolve_preserves_order_and_dedupes():
-    assert resolve_columns(["health_score", "university", "health_score"]) == [
-        "health_score",
+    assert resolve_columns(["comment", "university", "comment"]) == [
+        "comment",
         "university",
     ]
-    assert resolve_columns(["university", "university", "health_score"]) == [
+    assert resolve_columns(["university", "university", "comment"]) == [
         "university",
-        "health_score",
+        "comment",
     ]
 
 
@@ -109,14 +103,14 @@ def test_presets():
     assert set(FULL_COLUMNS) == set(MANDATORY_COLUMNS) | set(OPTIONAL_COLUMNS)
     assert set(OPTIONAL_COLUMNS) == {
         "city", "current_stage", "last_interaction", "workflow_progress",
-        "teacher_readiness", "overdue_tasks",
+        "overdue_tasks",
     }
     for key in OPTIONAL_COLUMNS:
         assert COLUMN_REGISTRY[key].mandatory is False, key
 
 
 def test_full_optionals_frozen():
-    for key in ("last_interaction", "workflow_progress", "teacher_readiness", "overdue_tasks"):
+    for key in ("last_interaction", "workflow_progress", "overdue_tasks"):
         assert key in COLUMN_REGISTRY, key
         assert key not in UNSUPPORTED_OPTIONAL_COLUMNS, key
 
@@ -144,11 +138,11 @@ def col_valid_empty_filter():
 
 def test_report_request_explicit_columns_normalized():
     req = ReportRequest(
-        format="pdf", filters={}, columns=["health_score", "university", "health_score"]
+        format="pdf", filters={}, columns=["comment", "university", "comment"]
     )
     assert req.format is ReportFormat.PDF
-    assert req.columns == ["health_score", "university"]
-    assert req.resolved_columns == ["health_score", "university"]
+    assert req.columns == ["comment", "university"]
+    assert req.resolved_columns == ["comment", "university"]
 
 
 def test_report_request_unknown_column_is_422_style():

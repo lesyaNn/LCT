@@ -1,40 +1,20 @@
-"""Dashboard (§16): read-only aggregations for manager's main panel.
-
-LEGACY QUARANTINE (M7) — DO NOT MOUNT in ``app/api/router.py`` (direct
-``db.query`` aggregations in the handler; superseded by
-``analytics/overview``). Reactivation requires the checklist in
-``docs/AUDIT.md`` (§0). See ``scripts/check_legacy_quarantine.py``.
-"""
-from datetime import datetime, timezone
+"""Dashboard (minimal, without teachers/health)."""
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.security import CurrentUser, get_current_user
+from app.core.permissions import require_permission
+from app.core.security import CurrentUser
 from app.db.session import get_db
-from app.modules.health_score.models import HealthScoreHistory
-from app.modules.programs.models import Program
-from app.modules.teachers.models import Teacher
-from app.modules.universities.models import University
-from app.modules.workflow.models import Task
+from app.models.catalog import University
+from app.models.interactions import Meeting
 
-router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+router = APIRouter(prefix="/dashboard", tags=["Analytics"])
 
 
-@router.get("/summary")
-def summary(db: Session = Depends(get_db), _u: CurrentUser = Depends(get_current_user)):
-    now = datetime.now(timezone.utc)
-    overdue = db.query(func.count(Task.id)).filter(
-        Task.status != "done", Task.deadline.is_not(None), Task.deadline < now).scalar() or 0
-    avg_health = db.query(func.avg(HealthScoreHistory.score)).scalar()
-    by_region = db.query(University.region, func.count(University.id)).group_by(University.region).all()
-    return {
-        "universities_total": db.query(func.count(University.id)).scalar() or 0,
-        "programs_active": db.query(func.count(Program.id)).filter(Program.status == "active").scalar() or 0,
-        "programs_launching": db.query(func.count(Program.id)).filter(Program.status == "launching").scalar() or 0,
-        "tasks_overdue": overdue,
-        "teachers_total": db.query(func.count(Teacher.id)).scalar() or 0,
-        "avg_health_score": round(float(avg_health), 1) if avg_health else None,
-        "by_region": [{"region": r or "", "count": c} for r, c in by_region],
-    }
+@router.get("/overview")
+def overview(db: Session = Depends(get_db), user: CurrentUser = Depends(require_permission("university.read"))):
+    universities_total = db.scalar(select(func.count(University.id))) or 0
+    meetings_total = db.scalar(select(func.count(Meeting.id))) or 0
+    return {"universities_total": universities_total, "meetings_total": meetings_total}

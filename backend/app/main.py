@@ -30,9 +30,7 @@ app = FastAPI(
     openapi_tags=[
         {"name": "Auth", "description": "Аутентификация через Keycloak"},
         {"name": "Universities", "description": "Каталог ВУЗов и паспорта"},
-        {"name": "Teachers", "description": "Преподаватели и паспорта"},
         {"name": "Workflow", "description": "Workflow engine: шаблоны, экземпляры, переходы"},
-        {"name": "Health Score", "description": "Расчёт и просмотр Health Score"},
         {"name": "Analytics", "description": "Аналитика и дашборд"},
         {"name": "Reports", "description": "Генерация отчётов (XLSX, PDF, JSON)"},
         {"name": "Audit", "description": "Аудит действий"},
@@ -101,7 +99,6 @@ def custom_openapi():
         del schemes["HTTPBearer"]
     canonical_tag_map = {
         "universities-passport": "Universities",
-        "health-score": "Health Score",
         "analytics": "Analytics",
     }
     error_examples = {

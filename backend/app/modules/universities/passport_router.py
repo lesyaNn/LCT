@@ -16,13 +16,11 @@ from app.core.policies import ensure_university_access
 from app.core.security import CurrentUser
 from app.modules.universities.passport_schemas import (
     PaginatedPrograms,
-    PaginatedTeachers,
     UniversityPassport,
 )
 from app.modules.universities.passport_service import (
     get_passport,
     get_programs_page,
-    get_teachers_page,
     parse_include,
 )
 
@@ -38,7 +36,7 @@ def get_university_passport(
     university_id: uuid.UUID,
     include: str | None = Query(
         default=None,
-        description="Optional blocks, comma-separated: health_score, audit",
+        description="Optional blocks, comma-separated: audit",
     ),
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(require_permission("university.read")),
@@ -65,20 +63,3 @@ def get_university_passport_programs(
     items, total = get_programs_page(db, university_id, page, page_size, status=status)
     return PaginatedPrograms(items=items, page=page, page_size=page_size, total=total)
 
-
-@router.get(
-    "/{university_id}/passport/teachers",
-    response_model=PaginatedTeachers,
-    summary="University passport teachers (paginated)",
-)
-def get_university_passport_teachers(
-    university_id: uuid.UUID,
-    page: int = Query(default=1, ge=1, description="Page number, 1-based"),
-    page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
-    readiness: Literal["ready", "attention", "expired"] | None = None,
-    db: Session = Depends(get_db),
-    user: CurrentUser = Depends(require_permission("university.read")),
-) -> PaginatedTeachers:
-    ensure_university_access(university_id, user)
-    items, total = get_teachers_page(db, university_id, page, page_size, readiness=readiness)
-    return PaginatedTeachers(items=items, page=page, page_size=page_size, total=total)

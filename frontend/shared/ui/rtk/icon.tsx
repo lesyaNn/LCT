@@ -11,7 +11,6 @@ export function Icon({ name, size = 20 }: IconProps) {
   const paths: Record<IconProps['name'], React.ReactNode> = {
     dashboard: <><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></>,
     university: <><path d="m3 9 9-5 9 5-9 5-9-5Z" /><path d="M6 11v5c2.9 2.3 9.1 2.3 12 0v-5M21 9v7" /></>,
-    teacher: <><circle cx="9" cy="8" r="3" /><path d="M3.5 20c.4-3.3 2.2-5 5.5-5s5.1 1.7 5.5 5M16 11a3 3 0 1 0 0-6M16 15c2.8 0 4.3 1.7 4.5 5" /></>,
     workflow: <><circle cx="6" cy="6" r="2.5" /><circle cx="18" cy="6" r="2.5" /><circle cx="12" cy="18" r="2.5" /><path d="M8.5 6h7M7.5 8l3 7.5M16.5 8l-3 7.5" /></>,
     report: <><path d="M5 20V10M12 20V4M19 20v-7" /><path d="M3 20h18" /></>,
     audit: <><path d="M12 3 5 6v5c0 4.4 2.8 8.3 7 10 4.2-1.7 7-5.6 7-10V6l-7-3Z" /><path d="m9 12 2 2 4-4" /></>,

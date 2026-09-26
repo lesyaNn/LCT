@@ -27,7 +27,6 @@ from app.models.catalog import (
     Vendor,
     VendorContact,
 )
-from app.models.health_score import HealthScoreCurrent
 from app.modules.audit.service import AuditAction, AuditService, context_for
 
 _AUDIT_FIELDS = {
@@ -95,38 +94,24 @@ UNIVERSITY_SORT = {
 
 
 def list_universities_health(
-    db: Session, *, page: int, page_size: int, search: str | None,
-    city: str | None, responsible_id: uuid.UUID | None, sort_order: str,
+    db, *, page: int, page_size: int, search: str | None,
+    city: str | None, responsible_id=None, sort_order: str = "asc",
     health_status: str | None = None, unified_filter=None, unified_today=None,
     user=None, external_source: str | None = None,
-) -> tuple[list[tuple[University, int | None, str | None]], int]:
-    """SQL scoped health filter/order/page over the materialized projection."""
+) -> tuple[list[tuple], int]:
+    """Plain university list (health score removed)."""
     conds = university_conditions(search=search, city=city,
         responsible_id=responsible_id, unified_filter=unified_filter,
         today=unified_today, external_source=external_source)
-    base = select(University).outerjoin(
-        HealthScoreCurrent, HealthScoreCurrent.university_id == University.id
-    ).where(*conds)
-    if health_status is not None:
-        base = base.where(HealthScoreCurrent.status == health_status)
-    count = select(func.count()).select_from(University).outerjoin(
-        HealthScoreCurrent, HealthScoreCurrent.university_id == University.id
-    ).where(*conds)
-    if health_status is not None:
-        count = count.where(HealthScoreCurrent.status == health_status)
-    page_stmt = select(University, HealthScoreCurrent.score, HealthScoreCurrent.status).select_from(
-        University
-    ).outerjoin(HealthScoreCurrent, HealthScoreCurrent.university_id == University.id).where(*conds)
-    if health_status is not None:
-        page_stmt = page_stmt.where(HealthScoreCurrent.status == health_status)
-    score = HealthScoreCurrent.score.asc() if sort_order == "asc" else HealthScoreCurrent.score.desc()
-    page_stmt = page_stmt.order_by(score.nulls_last(), University.id.asc()).limit(page_size).offset((page - 1) * page_size)
+    count = select(func.count()).select_from(University).where(*conds)
+    page_stmt = select(University).where(*conds).order_by(University.name.asc(), University.id.asc()).limit(page_size).offset((page - 1) * page_size)
     if user is not None:
         from app.modules.analytics.filter_service import UnifiedFilterService
         count = UnifiedFilterService.apply_security_scope(count, user)
         page_stmt = UnifiedFilterService.apply_security_scope(page_stmt, user)
     total = int(db.execute(count).scalar() or 0)
-    rows = list(db.execute(page_stmt).all())
+    unis = list(db.execute(page_stmt).scalars().all())
+    rows = [(u, None, None) for u in unis]
     return rows, total
 
 
@@ -140,13 +125,7 @@ def university_conditions(
     external_source: str | None = None,
 ):
     conds = []
-    if external_source == "lms":
-        from app.models.interactions import Student
-
-        conds.append(exists(select(1).select_from(Student).where(
-            Student.university_id == University.id, Student.source == "lms",
-        )))
-    elif external_source == "website":
+    if external_source == "website":
         from app.models.external import ExternalApplication
 
         conds.append(exists(select(1).select_from(ExternalApplication).where(
@@ -283,8 +262,8 @@ def get_university_scoped(db: Session, university_id: uuid.UUID, user) -> Univer
 
 
 # M4: unified university delete policy. DB-level ON DELETE is mixed
-# (RESTRICT for licenses/contracts/teachers/students, CASCADE for workflow
-# instances/meetings/documents/notes/links/snapshots), so a bare Core DELETE
+# (RESTRICT for licenses/contracts, CASCADE for workflow
+# instances/meetings/documents/notes/links), so a bare Core DELETE
 # would silently wipe history while refusing on catalog rows. The service
 # therefore pre-checks EVERYTHING and refuses with 409 while any business
 # data references the university; the DB constraints stay as backstop.
@@ -297,18 +276,14 @@ def _delete_checks():
         Document,
         InteractionNote,
         Meeting,
-        Student,
         UniversityProduct,
         UniversityProgram,
     )
-    from app.models.teachers import Teacher
     from app.models.workflow_instances import WorkflowInstance
 
     return (
         ("licenses", License, License.university_id),
         ("contracts", Contract, Contract.university_id),
-        ("teachers", Teacher, Teacher.university_id),
-        ("students", Student, Student.university_id),
         ("workflow instances", WorkflowInstance, WorkflowInstance.university_id),
         ("meetings", Meeting, Meeting.university_id),
         ("documents", Document, Document.university_id),

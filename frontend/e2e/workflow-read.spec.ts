@@ -45,14 +45,14 @@ function stubReads(page: Page) {
     let body: unknown;
     if (path === `/api/v1/universities/${universityId}/passport`) body = {
       university: { id: universityId, name: 'Тестовый ВУЗ', city: 'Москва' },
-      programs: [], teachers: [], students_summary: { total: 0, active: 0, graduated: 0, by_status: {}, by_program: [] },
+      programs: [],
       products: [], licenses: [], documents: [], meetings: [], responsibles: [], contracts: [],
       workflow_summary: { instance_id: null, template_name: null, current_stage: null, progress_percent: 0, overdue_stages: 0, next_due_date: null },
-      last_interactions: [], health_score: null, recent_audit: null,
+      last_interactions: [], recent_audit: null,
     };
     else if (path === `/api/v1/universities/${universityId}/passport/programs`) body = { items: [
-      { id: firstProgram, name: 'Программа А', direction_name: 'ИТ', status: 'active', launch_date: null, responsible_name: null, teachers_count: 0, students_count: 0 },
-      { id: secondProgram, name: 'Программа Б', direction_name: 'ИТ', status: 'planned', launch_date: null, responsible_name: null, teachers_count: 0, students_count: 0 },
+      { id: firstProgram, name: 'Программа А', direction_name: 'ИТ', status: 'active', launch_date: null, responsible_name: null },
+      { id: secondProgram, name: 'Программа Б', direction_name: 'ИТ', status: 'planned', launch_date: null, responsible_name: null },
     ], page: 1, page_size: 100, total: 2 };
     else if (path === `/api/v1/workflow/instances/by-program/${firstProgram}`) body = instance();
     else if (path === `/api/v1/workflow/instances/by-program/${secondProgram}`) body = null;

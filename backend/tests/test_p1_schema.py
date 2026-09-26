@@ -2,7 +2,7 @@
 
 Runs that need a database are PostgreSQL integration tests (canonical SQL
 migrations via ``tests/db_helpers.py``). Pure-unit checks (timestamp tz-awareness
-on metadata, derived statuses on transient objects, readiness math, migration
+on metadata, derived statuses on transient objects, migration
 chain shape) run anywhere.
 
 DB tests need PostgreSQL::
@@ -38,15 +38,7 @@ from app.models.interactions import (
     Document,
     Meeting,
     MeetingDocument,
-    Student,
 )
-from app.models.teachers import (
-    Teacher,
-    TeacherCertificate,
-    TeacherProgram,
-    TeacherQualification,
-)
-from app.services.teacher_readiness import compute_teacher_readiness
 
 EXPECTED_TABLES = {
     "universities",
@@ -58,11 +50,6 @@ EXPECTED_TABLES = {
     "licenses",
     "responsibles",
     "university_responsibles",
-    "teachers",
-    "teacher_qualifications",
-    "teacher_certificates",
-    "teacher_programs",
-    "students",
     "university_programs",
     "university_products",
     "meetings",
@@ -438,64 +425,6 @@ def test_contract_derived_status(db: Session):
 # ------------------------------------------------------------ readiness
 
 
-def test_teacher_readiness_matrix():
-    today = date.today()
-    ready = compute_teacher_readiness(
-        [
-            {
-                "certificate_name": "Инфобез",
-                "is_mandatory": True,
-                "expires_at": today + timedelta(days=400),
-            }
-        ]
-    )
-    assert ready.readiness.value == "ready"
-
-    attention = compute_teacher_readiness(
-        [
-            {
-                "certificate_name": "Инфобез",
-                "is_mandatory": True,
-                "expires_at": today + timedelta(days=10),
-            }
-        ]
-    )
-    assert attention.readiness.value == "attention"
-    assert len(attention.reasons) == 1
-
-    expired = compute_teacher_readiness(
-        [
-            {
-                "certificate_name": "Инфобез",
-                "is_mandatory": True,
-                "expires_at": today - timedelta(days=5),
-            }
-        ]
-    )
-    assert expired.readiness.value == "expired"
-
-    # edge: no mandatory -> ready; non-mandatory expired ignored
-    assert compute_teacher_readiness([]).readiness.value == "ready"
-    assert (
-        compute_teacher_readiness(
-            [
-                {
-                    "certificate_name": "Soft",
-                    "is_mandatory": False,
-                    "expires_at": today - timedelta(days=100),
-                }
-            ]
-        ).readiness.value
-        == "ready"
-    )
-    assert (
-        compute_teacher_readiness(
-            [{"certificate_name": "Инфобез", "is_mandatory": True, "expires_at": None}]
-        ).readiness.value
-        == "ready"
-    )
-
-
 # ------------------------------------------------------------ seed
 
 
@@ -535,8 +464,8 @@ def test_sql_migration_single_head_chain():
         assert m, f"bad migration filename: {fname}"
         (ups if m.group(2) == "up" else downs).add(m.group(1))
     assert ups == downs, f"unpaired migrations: up^down={ups ^ downs}"
-    assert sorted(ups)[-1] == "000027_external_integrations"
-    assert len(ups) == 27
+    assert sorted(ups)[-1] == "000029_drop_students_teachers_health"
+    assert len(ups) == 29
 
 
 @pytest.mark.skipif(

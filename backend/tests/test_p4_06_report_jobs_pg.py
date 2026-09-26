@@ -739,10 +739,10 @@ def test_migration_chain_latest_is_report_jobs():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     versions = [v for v, _, _ in module._discover()]
-    assert versions[-1] == "000027_external_integrations"
-    assert len(versions) == 27
+    assert versions[-1] == "000029_drop_students_teachers_health"
+    assert len(versions) == 29
     assert "report_jobs" in module.EXPECTED_TABLES
-    assert module.EXPECTED_TABLES[-1] == "external_sync_states"
+    assert module.EXPECTED_TABLES[-1] == "product_directions"
 
 
 def test_report_job_model_matches_migration_columns():

@@ -19,7 +19,6 @@ export const navigationItems: NavigationItem[] = [
 export const routeLabels: Record<string, string> = {
   dashboard: 'Обзор',
   universities: 'ВУЗы',
-  teachers: 'Преподаватели',
   workflows: 'Workflow',
   reports: 'Отчёты',
   audit: 'Аудит',
@@ -31,7 +30,6 @@ export const routeLabels: Record<string, string> = {
 
 export const detailRouteLabels: Record<string, string> = {
   universities: 'Университет',
-  teachers: 'Преподаватель',
   workflows: 'Взаимодействие',
 };
 

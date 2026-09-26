@@ -37,60 +37,6 @@
       "students_count": 0
     }
   ],
-  "teachers": [
-    {
-      "id": "c6956c99-7a9f-46ae-8adf-c0738a581031",
-      "full_name": "Иванов Александр В.0",
-      "position": "доцент",
-      "readiness": "ready",
-      "email": "teacher0@example.local",
-      "next_qualification_date": null,
-      "programs": []
-    },
-    {
-      "id": "2e743f0b-0095-4af3-b23f-9dcd8f5bbe0b",
-      "full_name": "Кузнецова Сергей В.3",
-      "position": "старший преподаватель",
-      "readiness": "ready",
-      "email": "teacher1@example.local",
-      "next_qualification_date": null,
-      "programs": []
-    },
-    {
-      "id": "ccb86b48-3088-472d-b772-3ea7621b2d64",
-      "full_name": "Петрова Дмитрий В.1",
-      "position": "старший преподаватель",
-      "readiness": "ready",
-      "email": "teacher2@example.local",
-      "next_qualification_date": null,
-      "programs": []
-    },
-    {
-      "id": "bc54238f-1d5c-4c3c-a8bd-c567d5f751ba",
-      "full_name": "Сидоров Игорь В.2",
-      "position": "доцент",
-      "readiness": "ready",
-      "email": "teacher3@example.local",
-      "next_qualification_date": null,
-      "programs": []
-    },
-    {
-      "id": "b4b9d205-4a60-485c-bbff-fccb86c497ac",
-      "full_name": "Смирнов Павел В.4",
-      "position": "доцент",
-      "readiness": "ready",
-      "email": "teacher4@example.local",
-      "next_qualification_date": null,
-      "programs": []
-    }
-  ],
-  "students_summary": {
-    "total": 60,
-    "active": 48,
-    "graduated": 4,
-    "expelled": 4,
-    "academic_leave": 4
-  },
   "products": [
     {
       "id": "f1747e82-f646-4e81-b48c-168817154665",

@@ -33,7 +33,7 @@ raises :class:`PDFFontUnavailableError` instead of producing mojibake
 with Helvetica.
 
 Charts use the canonical P2 thresholds via
-``app.modules.health_score.status.get_health_status`` (never hardcoded
+status helper (never hardcoded
 ``85``/``60`` here). Chart 1 groups per university when the ``university``
 column is selected (first non-null health per university name), otherwise
 it falls back to row grain; the chart title always states the grain.
@@ -61,7 +61,6 @@ from app.modules.analytics import xlsx as _xlsx
 from app.modules.analytics.columns import COLUMN_REGISTRY, resolve_columns
 from app.modules.analytics.dataset import ReportDatasetService
 from app.modules.analytics.filters import UnifiedFilter
-from app.modules.health_score.status import get_health_status
 
 __all__ = [
     "FONT_BOLD",

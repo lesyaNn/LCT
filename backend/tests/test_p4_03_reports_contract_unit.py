@@ -76,12 +76,12 @@ def test_build_job_payload_persists_filters_columns_format_and_scope():
     req = ReportRequest(
         format="xlsx",
         filters={"university_ids": [str(uid)]},
-        columns=["university", "health_score", "university"],
+        columns=["university", "comment", "university"],
     )
     payload = build_job_payload(req, user)
     assert payload["format"] == "xlsx"
     assert payload["filters"]["university_ids"] == [str(uid)]
-    assert payload["columns"] == ["university", "health_score"]
+    assert payload["columns"] == ["university", "comment"]
     assert payload["actor"]["sub"] == "scoped-1"
     assert payload["actor"]["roles"] == ["manager"]
     assert payload["actor"]["university_ids"] == [str(uid)]

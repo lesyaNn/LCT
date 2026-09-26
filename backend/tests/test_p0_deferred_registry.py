@@ -1,9 +1,8 @@
 """P0-1 guard: one schema universe + deferred modules stay unmounted.
 
 Pins the resolution of the "two schema universes" blocker:
-* canonical ``Base.metadata`` contains exactly the 31 SQL-managed tables
-  (21 P1 tables + 8 B1 workflow tables from 000011-000014 + 1 P2 health
-  snapshot table ``health_score_snapshots`` from 000015 + 1 P4 report job
+* canonical ``Base.metadata`` contains exactly the SQL-managed tables
+  (P1 tables + B1 workflow tables from 000011-000014 + 1 P4 report job
   table ``report_jobs`` from 000018);
 * pre-UUID / stub models live on ``DeferredBase`` metadata only;
 * deferred routers are importable but NOT mounted in the production app;
@@ -27,16 +26,12 @@ CANON_TABLES = frozenset(
         "it_programs",
         "vendors",
         "it_products",
+        "product_directions",
         "vendor_contacts",
         "contracts",
         "licenses",
         "responsibles",
         "university_responsibles",
-        "teachers",
-        "teacher_qualifications",
-        "teacher_certificates",
-        "teacher_programs",
-        "students",
         "university_programs",
         "university_products",
         "meetings",
@@ -52,9 +47,7 @@ CANON_TABLES = frozenset(
         "workflow_attachments",
         "workflow_tasks",
         "instance_stages",
-        "health_score_snapshots",
         "report_jobs",
-        "health_score_current",
         "audit_outbox",
         "external_applications",
         "external_sync_states",
@@ -68,7 +61,6 @@ DEFERRED_TABLES = frozenset(
         "workflows",
         "tasks",
         "files",
-        "health_score_history",
         "users",
     }
 )
@@ -120,14 +112,12 @@ def test_deferred_tables_not_on_canon_metadata():
 
 def test_deferred_models_isolated_on_deferred_base():
     import app.modules.documents.models as documents_models
-    import app.modules.health_score.models as health_score_models
     import app.modules.identity.models as identity_models
     import app.modules.workflow.models as workflow_models
 
-    for mod in (documents_models, health_score_models, identity_models, workflow_models):
+    for mod in (documents_models, identity_models, workflow_models):
         for name in (
             "FileMeta",
-            "HealthScoreHistory",
             "User",
             "Workflow",
             "WorkflowStatus",
@@ -149,15 +139,12 @@ def test_mounted_routers_are_only_the_production_contract():
         "/api/v1/catalog",
         "/api/v1/universities",
         "/api/v1/meetings",
-        "/api/v1/students",
         "/api/v1/directions",
         "/api/v1/programs",
         "/api/v1/products",
         "/api/v1/vendors",
         "/api/v1/responsibles",
-        "/api/v1/teachers",
         "/api/v1/workflow",
-        "/api/v1/health-score",
         "/api/v1/analytics",
         "/api/v1/reports",
         "/api/v1/audit/events",

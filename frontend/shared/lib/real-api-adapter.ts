@@ -3,7 +3,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import { queryKeys } from './query-keys';
 import { ApiRequestError } from './api-errors';
 import { getExpirationStatus } from './formatters';
-import type { ImportCatalogType, ImportExecuteResponse, ImportOptions, ImportPreviewResponse } from './import-repository';
+import type { ImportExecuteResponse, ImportRunOptions } from './import-repository';
 import type { CatalogInput, CatalogItem, CatalogListQuery, CatalogListResult, CatalogReferenceData, CatalogType, ResponsibleCatalogItem } from './catalogs-repository';
 import type {
   AdminUser,
@@ -17,13 +17,8 @@ import type {
 import type {
   PaginatedResult,
   ProgramStatus,
-  TeacherCertificate,
-  TeacherPassport,
-  TeacherQualification,
-  TeacherReadiness,
   UniversityDocumentRow,
   UniversityFilters,
-  UniversityHealthScore,
   UniversityHistoryEvent,
   UniversityHistoryFilters,
   UniversityLicenseRow,
@@ -35,9 +30,6 @@ import type {
   UniversityProgramRow,
   UniversityResponsible,
   UniversityResponsibleContact,
-  UniversityStudentsSummary,
-  UniversityStudentListRow,
-  UniversityTeacherRow,
 } from './universities-repository';
 import type {
   CreateWorkflowFromExternalInput,
@@ -58,23 +50,18 @@ type ApiUniversity = {
   health_score: number | null;
   health_status: 'green' | 'yellow' | 'red' | null;
 };
-type ApiProgram = { id: string; name: string; direction_name: string; status: ProgramStatus; launch_date: string | null; responsible_name: string | null; teachers_count: number; students_count: number };
-type ApiTeacher = { id: string; full_name: string; email: string; position: string; readiness: TeacherReadiness; next_qualification_date: string | null; programs: ApiProgram[] };
+type ApiProgram = { id: string; name: string; direction_name: string; status: ProgramStatus; launch_date: string | null; responsible_name: string | null };
 type ApiLicense = { id: string; license_number: string; product_name: string; vendor_name: string; signed_at: string; expires_at: string; status: string; transfer_status: string; contract_number: string | null };
 type ApiProduct = { id: string; name: string; version: string; vendor_name: string; status: string; license: ApiLicense | null };
 type ApiDocument = { id: string; document_type: string; title: string; file_name: string; file_size: number; signed_at: string | null; expires_at: string | null; status: string; uploaded_by: string; created_at: string };
 type ApiMeeting = { id: string; meeting_type: string; subject: string; participants: string[]; outcome: string | null; next_action: string | null; next_action_due: string | null; meeting_at: string; created_by: string };
 type ApiMeetingRead = Omit<ApiMeeting, 'participants' | 'created_by'> & { participants: unknown[]; created_by_keycloak_sub: string };
-type ApiStudent = { id: string; external_id: string; university_id: string; program_id: string; full_name: string; group_name: string | null; status: string; started_at: string; finished_at: string | null; source: 'manual' | 'lms' | 'website' | 'import'; progress: number | null; synced_at: string | null };
 type ApiResponsible = { id: string; full_name: string; email: string; phone: string | null; role: string; is_primary?: boolean };
 type ApiTimeline = { id: string; type: string; title: string; description: string | null; author: string; created_at: string };
 type ApiWorkflowSummary = { instance_id: string | null; template_name: string | null; current_stage: string | { code: string; name: string } | null; progress_percent: number; overdue_stages: number; next_due_date: string | null };
-type ApiStudents = { total: number; active: number; graduated: number; by_status: Record<string, number>; by_program: Array<{ program_id: string; program_name: string; total: number; active: number; graduated: number }> };
 type ApiPassport = {
   university: { id: string; name: string; city: string | null };
   programs: ApiProgram[];
-  teachers: ApiTeacher[];
-  students_summary: ApiStudents;
   products: ApiProduct[];
   licenses: ApiLicense[];
   documents: ApiDocument[];
@@ -82,20 +69,7 @@ type ApiPassport = {
   responsibles: ApiResponsible[];
   workflow_summary: ApiWorkflowSummary;
   last_interactions: ApiTimeline[];
-  health_score: { score: number } | null;
 };
-
-type ApiHealthScore = {
-  university_id: string;
-  score: number;
-  status: 'green' | 'yellow' | 'red';
-  breakdown: Record<'tasks' | 'documents' | 'stages' | 'teachers' | 'launch', number>;
-  reasons: Array<{ code: string; severity: 'high' | 'medium' | 'low'; text: string }>;
-  calculated_at: string;
-  input_counters: Record<string, number>;
-};
-
-type ApiHealthSnapshot = { score: number; calculated_at: string };
 
 function unwrap<T>(result: Awaited<ReturnType<typeof apiFetch<T>>>, message: string): T {
   if (result.ok) return result.data;
@@ -129,19 +103,8 @@ function mapProgram(item: ApiProgram): UniversityProgramRow {
     status: item.status,
     launchDate: item.launch_date ?? '',
     responsible: responsible(item.responsible_name),
-    teachersCount: item.teachers_count,
-    studentsCount: item.students_count,
-  };
-}
-
-function mapTeacher(item: ApiTeacher): UniversityTeacherRow {
-  return {
-    id: item.id,
-    name: item.full_name,
-    position: item.position,
-    readiness: item.readiness,
-    nextTrainingDate: item.next_qualification_date,
-    allowedPrograms: item.programs.map((program) => program.name),
+    teachersCount: 0,
+    studentsCount: 0,
   };
 }
 
@@ -162,8 +125,7 @@ export function serializeUniversityListQuery(params: UniversityListQuery): URLSe
   appendRepeated(search, 'responsible_ids', filters.responsibleIds);
   if (filters.dateFrom) search.set('date_from', filters.dateFrom);
   if (filters.dateTo) search.set('date_to', filters.dateTo);
-  if (filters.healthStatuses.length === 1) search.set('health_status', filters.healthStatuses[0]);
-  const supportedSort = params.sort === 'health_score' ? 'health_score' : 'name';
+  const supportedSort = 'name';
   search.set('sort_by', supportedSort);
   search.set('sort_order', params.order);
   return search;
@@ -209,10 +171,10 @@ export async function realGetUniversityPassport(id: string, queryClient?: QueryC
     id: data.university.id,
     name: data.university.name,
     city: data.university.city ?? '—',
-    healthScore: data.health_score?.score ?? 0,
+    healthScore: 0,
     metrics: {
       activePrograms: data.programs.filter((item) => item.status === 'active' || item.status === 'launched').length,
-      teachers: { total: data.teachers.length, ready: data.teachers.filter((item) => item.readiness === 'ready').length, attention: data.teachers.filter((item) => item.readiness !== 'ready').length },
+      teachers: { total: 0, ready: 0, attention: 0 },
       licenses: { active: data.licenses.filter((item) => item.status === 'active').length, expiring: data.licenses.filter((item) => item.status === 'expires_soon').length, overdue: data.licenses.filter((item) => item.status === 'expired').length },
       documents: { total: data.documents.length, signed: data.documents.filter((item) => item.status === 'signed').length, overdue: data.documents.filter((item) => item.status === 'expired').length, limited: data.documents.length >= 20 },
     },
@@ -242,31 +204,8 @@ export async function realGetUniversityPrograms(id: string, page = 1, pageSize =
   return { items: data.items.map(mapProgram), page: data.page, pageSize: data.page_size, total: data.total };
 }
 
-export async function realGetUniversityTeachers(id: string, page = 1, pageSize = 20, signal?: AbortSignal, readiness: TeacherReadiness | 'all' = 'all'): Promise<PaginatedResult<UniversityTeacherRow>> {
-  const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
-  if (readiness !== 'all') params.set('readiness', readiness);
-  const data = unwrap(await apiFetch<ApiPage<ApiTeacher>>(`/api/v1/universities/${encodeURIComponent(id)}/passport/teachers?${params}`, { signal }), 'Не удалось загрузить преподавателей ВУЗа.');
-  return { items: data.items.map(mapTeacher), page: data.page, pageSize: data.page_size, total: data.total };
-}
 
-export async function realGetUniversityStudentsSummary(id: string, queryClient?: QueryClient): Promise<UniversityStudentsSummary> {
-  const data = (await passportBundle(id, queryClient)).students_summary;
-  return {
-    total: data.total,
-    active: data.active,
-    graduated: data.graduated,
-    academicLeave: data.by_status.academic_leave ?? 0,
-    byProgram: data.by_program.map((item) => ({ programId: item.program_id, programName: item.program_name, active: item.active, graduated: item.graduated, total: item.total })),
-  };
-}
 
-export async function realGetUniversityStudents(id: string, page = 1, pageSize = 20, signal?: AbortSignal): Promise<PaginatedResult<UniversityStudentListRow>> {
-  const data = unwrap(await apiFetch<ApiPage<ApiStudent>>(`/api/v1/universities/${encodeURIComponent(id)}/students?page=${page}&page_size=${pageSize}`, { signal }), 'Не удалось загрузить студентов ВУЗа.');
-  return {
-    items: data.items.map((item) => ({ id: item.id, externalId: item.external_id, studentName: item.full_name, programId: item.program_id, programName: 'Программа не указана', active: item.status === 'active' ? 1 : 0, graduated: item.status === 'graduated' ? 1 : 0, total: 1, flow: item.group_name, status: item.status, startedAt: item.started_at, finishedAt: item.finished_at, source: item.source, progress: item.progress, syncedAt: item.synced_at })),
-    page: data.page, pageSize: data.page_size, total: data.total,
-  };
-}
 
 type ExternalDataDto = {
   university_id: string;
@@ -289,7 +228,7 @@ export async function realGetUniversityExternalData(
     source: data.source,
     mode: data.mode,
     syncedAt: data.synced_at,
-    students: data.students.map((row): ExternalStudent => ({ id: row.id, name: row.name, programName: null, flow: row.flow, progress: row.progress, source: row.source, syncedAt: row.synced_at })),
+    students: data.students.map((row): ExternalStudent => ({ id: row.id, name: row.name, programName: null, flow: row.flow, progress: row.progress, source: 'manual', syncedAt: row.synced_at })),
     applications: data.applications.map((row): ExternalApplication => ({ id: row.id, universityId: row.university_id, programId: row.program_id, programName: row.program_name, applicationsCount: row.applications_count, demandScore: row.demand_score, source: row.source, syncedAt: row.synced_at, workflowInstanceId: row.workflow_instance_id })),
   };
 }
@@ -416,120 +355,35 @@ export async function realGetUniversityHistory(id: string, filters: UniversityHi
   });
 }
 
-const breakdownMeta = {
-  tasks: { label: 'Задачи', weight: 25 },
-  documents: { label: 'Документы', weight: 20 },
-  stages: { label: 'Этапы', weight: 20 },
-  teachers: { label: 'Преподаватели', weight: 20 },
-  launch: { label: 'Запуск', weight: 15 },
-} as const;
-
-export async function realGetUniversityHealthScore(id: string, signal?: AbortSignal): Promise<UniversityHealthScore> {
-  const [scoreResult, historyResult] = await Promise.all([
-    apiFetch<ApiHealthScore>(`/api/v1/universities/${encodeURIComponent(id)}/health-score`, { signal }),
-    apiFetch<ApiHealthSnapshot[]>(`/api/v1/universities/${encodeURIComponent(id)}/health-score/history?days=30`, { signal }),
-  ]);
-  const score = unwrap(scoreResult, 'Не удалось загрузить Health Score.');
-  const history = historyResult.ok
-    ? historyResult.data.map((item) => ({ date: item.calculated_at.slice(0, 10), score: item.score })).reverse()
-    : [];
-  const points = history;
-  return {
-    universityId: score.university_id,
-    currentScore: score.score,
-    status: score.status,
-    breakdown: (Object.keys(breakdownMeta) as Array<keyof typeof breakdownMeta>).map((key) => ({
-      id: key,
-      label: breakdownMeta[key].label,
-      weight: breakdownMeta[key].weight,
-      score: score.breakdown[key],
-      inputCounters: Object.entries(score.input_counters).map(([label, value]) => ({ label, value })),
-    })),
-    reasons: score.reasons.map((reason) => ({ id: reason.code, severity: reason.severity, title: reason.text, description: reason.text })),
-    history: points,
-    historyUnavailable: !historyResult.ok,
-    previousSnapshot: points.length > 1 ? points[points.length - 2] : null,
-  };
-}
-
-type ApiTeacherPassport = {
-  teacher: { id: string; university_id: string; full_name: string; email: string; position: string };
-  university: { id: string; name: string; city: string | null };
-  qualifications: Array<{ id: string; qualification_name: string; obtained_at: string; expires_at: string | null; document_ref: string | null }>;
-  certificates: Array<{ id: string; certificate_name: string; issued_by: string; issued_at: string; expires_at: string | null; is_mandatory: boolean; program: { name: string } | null; document_ref: string | null }>;
-  programs: Array<{ id: string; program: { id: string; name: string; direction_name: string }; can_teach: boolean; assigned_at: string }>;
-  readiness: TeacherReadiness;
-  readiness_reasons: string[];
-  next_qualification_date: string | null;
-};
-
-export async function realGetTeacherPassport(id: string): Promise<TeacherPassport> {
-  const data = unwrap(await apiFetch<ApiTeacherPassport>(`/api/v1/teachers/${encodeURIComponent(id)}/passport`), 'Не удалось загрузить паспорт преподавателя.');
-  const qualifications: TeacherQualification[] = data.qualifications.map((item) => {
-    const expiresAt = item.expires_at ?? item.obtained_at;
-    return {
-      id: item.id,
-      name: item.qualification_name,
-      obtainedAt: item.obtained_at,
-      expiresAt,
-      status: item.expires_at ? getExpirationStatus(item.expires_at) : 'current',
-      document: item.document_ref ? { name: item.document_ref, fileType: 'Документ', fileSize: '—', downloadUrl: null } : null,
-    };
-  });
-  const certificates: TeacherCertificate[] = data.certificates.map((item) => ({
-    id: item.id,
-    name: item.certificate_name,
-    issuer: item.issued_by,
-    issuedAt: item.issued_at,
-    expiresAt: item.expires_at,
-    mandatory: item.is_mandatory,
-    program: item.program?.name ?? null,
-    status: item.expires_at ? getExpirationStatus(item.expires_at) : 'no_expiry',
-    document: item.document_ref ? { name: item.document_ref, fileType: 'Документ', fileSize: '—', downloadUrl: null } : null,
-  }));
-  return {
-    teacher: {
-      id: data.teacher.id,
-      name: data.teacher.full_name,
-      position: data.teacher.position,
-      readiness: data.readiness,
-      allowedPrograms: data.programs.map((item) => item.program.name),
-      universityId: data.university.id,
-      universityName: data.university.name,
-      universityCity: data.university.city ?? '—',
-      readinessReason: data.readiness_reasons.join(' · ') || 'Данные актуальны',
-      nextTrainingDate: data.next_qualification_date,
-      qualificationRequired: data.next_qualification_date !== null || data.readiness !== 'ready',
-    },
-    qualifications,
-    trainings: [],
-    certificates,
-    allowedPrograms: data.programs.map((item) => ({
-      id: item.program.id,
-      name: item.program.name,
-      direction: item.program.direction_name,
-      canTeach: item.can_teach,
-      assignedAt: item.assigned_at,
-      status: 'active',
-    })),
-  };
-}
-
 // --------------------------------------------------------------------- import
 
-export async function realUploadImportPreview(file: File, catalogType: ImportCatalogType, signal?: AbortSignal, onProgress?: (value: number) => void): Promise<ImportPreviewResponse> {
+export async function realUploadImportFile(file: File, signal?: AbortSignal, onProgress?: (value: number) => void): Promise<unknown> {
   const formData = new FormData();
   formData.append('file', file, file.name);
-  formData.append('catalog_type', catalogType);
-  const result = await apiUploadFormData<ImportPreviewResponse>('/api/v1/import/preview', formData, { signal, onProgress });
+  const result = await apiUploadFormData<unknown>('/api/v1/import/upload', formData, { signal, onProgress });
   if (result.ok) return result.data;
-  throw new ApiRequestError(result.status, result.body, 'Не удалось загрузить файл и построить предпросмотр.', result.error);
+  throw new ApiRequestError(result.status, result.body, 'Не удалось загрузить файл.', result.error);
 }
 
-export async function realExecuteImport(fileId: string, mapping: Record<string, string>, options: ImportOptions): Promise<ImportExecuteResponse> {
+export async function realPreviewImportSheet(fileId: string, sheet: string, signal?: AbortSignal): Promise<unknown> {
+  return unwrap(await apiFetch<unknown>('/api/v1/import/sheets/preview', {
+    method: 'POST',
+    body: { file_id: fileId, sheet },
+    signal,
+  }), 'Не удалось построить предпросмотр листа.');
+}
+
+export async function realExecuteSheetImport(fileId: string, sheet: string, options: ImportRunOptions): Promise<ImportExecuteResponse> {
   return unwrap(await apiFetch<ImportExecuteResponse>('/api/v1/import/execute', {
     method: 'POST',
-    body: { file_id: fileId, filename: options.filename, mapping, catalog_type: options.catalog_type, options: { skip_header: options.skip_header, update_existing: options.update_existing, dry_run: options.dry_run } },
+    body: { file_id: fileId, sheet, dry_run: options.dry_run, update_existing: options.update_existing, filename: options.filename ?? null },
+  }), 'Не удалось запустить импорт.');
+}
+
+export async function realExecuteSheetsImport(fileId: string, sheets: string[], options: ImportRunOptions): Promise<ImportExecuteResponse> {
+  return unwrap(await apiFetch<ImportExecuteResponse>('/api/v1/import/execute', {
+    method: 'POST',
+    body: { file_id: fileId, sheets, dry_run: options.dry_run, update_existing: options.update_existing, filename: options.filename ?? null },
   }), 'Не удалось запустить импорт.');
 }
 

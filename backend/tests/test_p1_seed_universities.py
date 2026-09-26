@@ -13,11 +13,9 @@ from app.models.catalog import Contract, License, Responsible, University
 from app.models.interactions import (
     Document,
     Meeting,
-    Student,
     UniversityProduct,
     UniversityProgram,
 )
-from app.models.teachers import Teacher
 
 EXPECTED_UNIVERSITIES = {
     "МГУ им. М.В. Ломоносова",

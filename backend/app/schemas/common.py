@@ -87,13 +87,6 @@ class MeetingType(str, enum.Enum):
     EMAIL = "email"
 
 
-class StudentStatus(str, enum.Enum):
-    ACTIVE = "active"
-    GRADUATED = "graduated"
-    EXPELLED = "expelled"
-    ACADEMIC_LEAVE = "academic_leave"
-
-
 class UniversityProgramStatus(str, enum.Enum):
     PLANNED = "planned"
     ACTIVE = "active"
@@ -105,27 +98,6 @@ class UniversityProductStatus(str, enum.Enum):
     PLANNED = "planned"
     ACTIVE = "active"
     EXPIRED = "expired"
-
-
-class TeacherReadiness(str, enum.Enum):
-    """Deterministic readiness, computed on the backend (P1-02-03)."""
-
-    READY = "ready"
-    ATTENTION = "attention"
-    EXPIRED = "expired"
-
-
-class HealthScoreStatus(str, enum.Enum):
-    """Статус Health Score вуза (P2-07-07) — отображается в Swagger и UI-бейджах.
-
-    * ``green`` — 85–100, вуз готов к запуску;
-    * ``yellow`` — 60–84, есть замечания, требует внимания;
-    * ``red`` — 0–59, критические проблемы.
-    """
-
-    GREEN = "green"
-    YELLOW = "yellow"
-    RED = "red"
 
 
 # ----------------------------------------------------------- workflow enums
@@ -205,14 +177,11 @@ __all__ = [
     "ErrorDetail",
     "ErrorResponse",
     "FilterBase",
-    "HealthScoreStatus",
     "LicenseStatus",
     "MeetingType",
     "PaginatedResponse",
     "PaginationParams",
     "ReportFormat",
-    "StudentStatus",
-    "TeacherReadiness",
     "TransferStatus",
     "TransitionAction",
     "UniversityFilter",

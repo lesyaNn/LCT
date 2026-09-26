@@ -33,7 +33,7 @@ import {
   getHealthStatus,
   healthStatusMeta,
   type HealthStatus,
-} from '@/shared/lib/health-score';
+} from '@/shared/lib/universities-repository';
 import {
   getUniversities,
   programStatusLabels,

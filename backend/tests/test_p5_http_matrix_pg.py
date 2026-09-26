@@ -13,7 +13,7 @@ from app.core.security import CurrentUser, get_current_user
 from app.db.session import get_db
 from app.main import app
 from app.models.catalog import ITDirection, ITProgram, University
-from app.models.interactions import Meeting, Student, UniversityProgram
+from app.models.interactions import Meeting, UniversityProgram
 from app.schemas.errors import ErrorResponse
 
 

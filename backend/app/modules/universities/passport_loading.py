@@ -24,22 +24,13 @@ from app.models.catalog import (
     UniversityResponsible,
     Vendor,
 )
-from app.models.enums import (
-    EXPIRY_WARNING_DAYS,
-)
+from app.models.enums import EXPIRY_WARNING_DAYS
 from app.models.interactions import (
     Document,
     InteractionNote,
     Meeting,
-    Student,
     UniversityProduct,
     UniversityProgram,
-)
-from app.models.teachers import (
-    Teacher,
-    TeacherCertificate,
-    TeacherProgram,
-    TeacherQualification,
 )
 
 DOCUMENTS_LIMIT = 20
@@ -75,13 +66,8 @@ class PassportLoadContext:
 
     university_id: uuid.UUID
     university_row: tuple | None = None
-    # (UniversityProgram, ITProgram, ITDirection|None, Responsible|None, teachers_count)
+    # (UniversityProgram, ITProgram, ITDirection|None, Responsible|None)
     program_rows: list[tuple] = field(default_factory=list)
-    # (program_id, program_name, status, count) aggregate rows
-    student_rows: list[tuple] = field(default_factory=list)
-    # (Teacher, TeacherProgram|None, ITProgram|None, ITDirection|None,
-    #  expired_cnt, soon_cnt, min_expires)
-    teacher_rows: list[tuple] = field(default_factory=list)
     # (UniversityProduct, ITProduct, Vendor)
     product_rows: list[tuple] = field(default_factory=list)
     # UNION rows (mappings): kind=license|contract
@@ -104,125 +90,20 @@ def _load_university_row(db, university_id: uuid.UUID):
     ).first()
 
 
-def _teacher_count_scalar(university_id: uuid.UUID):
-    """Correlated teacher counter (a SELECT *column*, not a statement)."""
-    return (
-        select(func.count(func.distinct(TeacherProgram.teacher_id)))
-        .select_from(
-            TeacherProgram.__table__.join(
-                Teacher.__table__,
-                Teacher.__table__.c.id == TeacherProgram.__table__.c.teacher_id,
-            )
-        )
-        .where(
-            Teacher.__table__.c.university_id == university_id,
-            TeacherProgram.__table__.c.program_id == UniversityProgram.__table__.c.program_id,
-        )
-        .scalar_subquery()
-    )
-
-
-def _load_program_rows(db, university_id: uuid.UUID) -> list[tuple]:
-    """Block 2: programs + teacher counters in ONE statement.
-
-    Many-to-one JOINs (program/direction/responsible) cannot multiply
-    rows; the teacher counter is a correlated scalar subquery (a column
-    of the same statement). ``students_count`` is NOT queried here — it
-    is filled from the students aggregate (block 3).
-    """
+def _load_program_rows(db, university_id) -> list[tuple]:
+    """Block 2: programs in ONE statement."""
     stmt = (
         select(
             UniversityProgram,
             ITProgram,
             ITDirection,
             Responsible,
-            _teacher_count_scalar(university_id).label("teachers_count"),
         )
         .join(ITProgram, ITProgram.id == UniversityProgram.program_id)
         .join(ITDirection, ITDirection.id == ITProgram.direction_id)
         .outerjoin(Responsible, Responsible.id == UniversityProgram.responsible_id)
         .where(UniversityProgram.university_id == university_id)
         .order_by(UniversityProgram.created_at)
-    )
-    return list(db.execute(stmt).all())
-
-
-def _load_student_rows(db, university_id: uuid.UUID) -> list[tuple]:
-    """Block 3: single GROUP BY aggregate over the university's students."""
-    return list(
-        db.execute(
-            select(Student.program_id, ITProgram.name, Student.status, func.count(Student.id))
-            .join(ITProgram, ITProgram.id == Student.program_id)
-            .where(Student.university_id == university_id)
-            .group_by(Student.program_id, ITProgram.name, Student.status)
-        ).all()
-    )
-
-
-def _readiness_scalar(column, teacher_fk, mandatory_only: bool, today: date, soon: date):
-    """Correlated (expired_count, soon_count, min_expires) for one child table."""
-    filters = [
-        teacher_fk == Teacher.id,
-        column.is_not(None),
-    ]
-    if mandatory_only:
-        filters.append(TeacherCertificate.is_mandatory.is_(True))
-    expired = (
-        select(func.count())
-        .select_from(TeacherCertificate if mandatory_only else TeacherQualification)
-        .where(*filters, column < today)
-        .scalar_subquery()
-    )
-    expiring = (
-        select(func.count())
-        .select_from(TeacherCertificate if mandatory_only else TeacherQualification)
-        .where(*filters, column >= today, column <= soon)
-        .scalar_subquery()
-    )
-    minimum = (
-        select(func.min(column))
-        .select_from(TeacherCertificate if mandatory_only else TeacherQualification)
-        .where(*filters)
-        .scalar_subquery()
-    )
-    return expired, expiring, minimum
-
-
-def _load_teacher_rows(db, university_id: uuid.UUID) -> list[tuple]:
-    """Block 4: teachers + programs + readiness inputs in ONE statement.
-
-    The teacher_programs/program/direction LEFT JOINs fan out at most
-    one row per teacher×program (bounded, never a cross-collection
-    cartesian product). Readiness inputs are six correlated scalar
-    subqueries (expired/soon counts + min expiry over mandatory dated
-    certificates and dated qualifications) — columns, not statements.
-    """
-    today = date.today()
-    soon = today + timedelta(days=EXPIRY_WARNING_DAYS)
-    exp_c, soon_c, min_c = _readiness_scalar(
-        TeacherCertificate.expires_at, TeacherCertificate.teacher_id, True, today, soon
-    )
-    exp_q, soon_q, min_q = _readiness_scalar(
-        TeacherQualification.expires_at, TeacherQualification.teacher_id, False, today, soon
-    )
-    stmt = (
-        select(
-            Teacher,
-            TeacherProgram,
-            ITProgram,
-            ITDirection,
-            exp_c.label("expired_cert"),
-            exp_q.label("expired_qual"),
-            soon_c.label("soon_cert"),
-            soon_q.label("soon_qual"),
-            min_c.label("min_cert"),
-            min_q.label("min_qual"),
-        )
-        .outerjoin(TeacherProgram, TeacherProgram.teacher_id == Teacher.id)
-        .outerjoin(ITProgram, ITProgram.id == TeacherProgram.program_id)
-        .outerjoin(ITDirection, ITDirection.id == ITProgram.direction_id)
-        .where(Teacher.university_id == university_id)
-        .order_by(Teacher.full_name, Teacher.id, ITProgram.name, ITProgram.id)
     )
     return list(db.execute(stmt).all())
 

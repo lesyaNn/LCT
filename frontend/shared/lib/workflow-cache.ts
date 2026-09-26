@@ -2,7 +2,6 @@ import type { QueryClient } from '@tanstack/react-query';
 import { queryKeys } from './query-keys';
 import { dashboardQueryKey } from './dashboard-repository';
 import {
-  universityHealthScoreQueryKey,
   universityHistoryFamilyQueryKey,
   universityPassportQueryKey,
   universitiesQueryKey,
@@ -50,7 +49,6 @@ export function invalidateWorkflowRelatedQueries(queryClient: QueryClient, insta
     invalidations.push(
       queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowByProgramFamily(universityId) }),
       queryClient.invalidateQueries({ queryKey: universityPassportQueryKey(universityId) }),
-      queryClient.invalidateQueries({ queryKey: universityHealthScoreQueryKey(universityId) }),
       queryClient.invalidateQueries({ queryKey: universityHistoryFamilyQueryKey(universityId) }),
     );
   }

@@ -1,6 +1,5 @@
-"""P1-01-03 + P1-07-01 + P1-08-01: students, links, meetings, documents, notes.
+"""P1-01-03 + P1-07-01: links, meetings, documents, notes.
 
-* students — minimal set, no extra PII (P1-08-01).
 * meetings.participants — JSONB (JSON on SQLite) array of objects.
 * documents — file registry only, NOT the source of business dates/numbers
   (P1-06-01): signed_at/expires_at here are display copies; licenses/contracts
@@ -34,39 +33,6 @@ from app.models.mixins import TimestampMixin, UUIDPKMixin
 
 if TYPE_CHECKING:  # pragma: no cover
     from app.models.catalog import Contract, ITProgram, License, Responsible, University
-
-
-class Student(UUIDPKMixin, TimestampMixin, Base):
-    __tablename__ = "students"
-    __table_args__ = (
-        Index("ix_students_university_id", "university_id"),
-        Index("ix_students_program_id", "program_id"),
-        Index("ix_students_status", "status"),
-    )
-
-    external_id: Mapped[str] = mapped_column(String(256), unique=True, nullable=False)
-    university_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("universities.id", name="fk_students_university_id_universities",
-                   ondelete="RESTRICT"),
-        nullable=False,
-    )
-    program_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("it_programs.id", name="fk_students_program_id_it_programs",
-                   ondelete="RESTRICT"),
-        nullable=False,
-    )
-    full_name: Mapped[str] = mapped_column(String(512), nullable=False)
-    group_name: Mapped[str | None] = mapped_column(
-        String(256), nullable=True, default=None
-    )
-    status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
-    started_at: Mapped[date] = mapped_column(Date, nullable=False)
-    finished_at: Mapped[date | None] = mapped_column(Date, nullable=True, default=None)
-    source: Mapped[str] = mapped_column(String(32), nullable=False, default="manual")
-    progress: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
-    synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
-
-    university: Mapped["University"] = relationship(back_populates="students")
 
 
 class UniversityProgram(UUIDPKMixin, TimestampMixin, Base):

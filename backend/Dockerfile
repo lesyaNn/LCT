@@ -52,8 +52,6 @@ RUN rm -rf \
     app/modules/universities/router.py \
     app/modules/universities/service.py \
     app/modules/universities/repository.py \
-    app/modules/teachers/router.py \
-    app/modules/health_score/router.py \
   && chmod +x ./entrypoint.sh && chown -R appuser:appuser /code
 ENV PYTHONPATH=/code
 EXPOSE 8000

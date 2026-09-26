@@ -1,7 +1,6 @@
 export type IconName =
   | 'dashboard'
   | 'university'
-  | 'teacher'
   | 'workflow'
   | 'report'
   | 'audit'

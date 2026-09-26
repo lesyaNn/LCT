@@ -1,4 +1,4 @@
-"""Dev-2 response contract (filter DTO stays with Dev-1)."""
+"""Analytics response contract (without students/teachers/health score)."""
 
 from datetime import date
 from typing import Literal
@@ -9,20 +9,10 @@ from pydantic import BaseModel, Field
 
 class KPI(BaseModel):
     universities: int = 0
-    average_health_score: float = 0
-    red_universities: int = 0
-    yellow_universities: int = 0
-    green_universities: int = 0
     overdue_stages: int = 0
     expiring_licenses: int = 0
-    teacher_readiness_issues: int = 0
     active_programs: int = 0
     launched_programs: int = 0
-
-
-class HealthBucket(BaseModel):
-    range: str
-    count: int
 
 
 class WorkflowBucket(BaseModel):
@@ -42,14 +32,6 @@ class LicenseWarning(BaseModel):
     days_left: int
 
 
-class TeacherWarning(BaseModel):
-    university: str
-    teacher: str
-    certificate: str
-    expires_at: date
-    days_left: int
-
-
 class OverdueItem(BaseModel):
     type: Literal["stage", "task"]
     id: str | None = None
@@ -62,7 +44,7 @@ class OverdueItem(BaseModel):
 
 class TrendPoint(BaseModel):
     date: date
-    avg_score: float
+    avg_score: float = 0
 
 
 class LaunchPoint(BaseModel):
@@ -73,13 +55,11 @@ class LaunchPoint(BaseModel):
 
 class Overview(BaseModel):
     kpi: KPI
-    health_distribution: list[HealthBucket]
-    workflow_distribution: list[WorkflowBucket]
-    program_statuses: list[ProgramBucket]
-    expiring_licenses: list[LicenseWarning]
-    teacher_readiness: list[TeacherWarning]
-    overdue_items: list[OverdueItem]
-    health_trend: list[TrendPoint]
+    workflow_distribution: list[WorkflowBucket] = Field(default_factory=list)
+    program_statuses: list[ProgramBucket] = Field(default_factory=list)
+    expiring_licenses: list[LicenseWarning] = Field(default_factory=list)
+    overdue_items: list[OverdueItem] = Field(default_factory=list)
+    health_trend: list[TrendPoint] = Field(default_factory=list)
     launch_dynamics: list[LaunchPoint] = Field(default_factory=list)
 
 
@@ -98,15 +78,12 @@ class MatrixColumn(BaseModel):
 class MatrixCell(BaseModel):
     university_id: UUID
     program_id: UUID
-    # Archived is explicit: an existing archived link must NOT become not_used.
     status: Literal["not_used", "planned", "in_progress", "launched", "risk", "archived"]
-    health_score: int | None
-    risk_level: Literal["none", "unknown", "low", "medium", "high"]
-    teacher_readiness: float | None
-    license_status: str | None
-    workflow_progress: float | None
-    overdue_count: int
-    next_milestone: str | None
+    risk_level: Literal["none", "low", "high"] = "none"
+    license_status: str | None = None
+    workflow_progress: float | None = None
+    overdue_count: int = 0
+    next_milestone: str | None = None
     workflow_scope: Literal["university"] = "university"
 
 

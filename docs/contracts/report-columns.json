@@ -11,7 +11,7 @@
     "string": "text or null (missing LEFT relations are null, never ''/N/A/-)"
   },
   "defaults": {
-    "columns_omitted": "all 14 mandatory columns in documented order",
+    "columns_omitted": "all 13 mandatory columns in documented order",
     "duplicates": "deduped preserving first-seen order",
     "empty_list": "422 - at least one column required",
     "unknown_key": "422 - never silently ignored"
@@ -94,12 +94,6 @@
       "title": "Комментарий",
       "type": "string",
       "source": "COALESCE(licenses.comment, licenses.contract_id -> contracts.comment) for license rows; latest contract comment for license-less fallback rows; else NULL (both canonical comment fields exist)"
-    },
-    {
-      "key": "health_score",
-      "title": "Health Score",
-      "type": "integer",
-      "source": "health_score_current.score per university, materialized by the canonical calculator; NULL until backfill/refresh. int 0..100, missing is NULL (never 0)"
     }
   ],
   "optional_columns_supported": [
@@ -128,19 +122,16 @@
       "source": "frozen P4-02-02 FULL rule (mirrors the Dev-2 matrix): percent of completed instance_stages over non-skipped stages across ACTIVE workflow_instances of the university, nearest integer 0..100; NULL when there are no eligible stages"
     },
     {
-      "key": "teacher_readiness",
-      "title": "Готовность преподавателей, %",
-      "type": "integer",
-      "source": "frozen P4-02-02 FULL rule: percent of the university teachers with canonical readiness == ready (same compute_teacher_readiness as P1 passports and the Dev-2 matrix, university grain instead of per-program), nearest integer 0..100; NULL when no teachers"
-    },
-    {
       "key": "overdue_tasks",
       "title": "Просроченные задачи",
       "type": "integer",
       "source": "frozen P4-02-02 FULL rule (P2 canonical overdue rule): count of workflow_tasks with status == open and deadline at least 1 day in the past on ACTIVE workflow_instances of the university; 0 when none"
     }
   ],
-  "optional_columns_unsupported": {},
+  "optional_columns_unsupported": [
+    "health_score",
+    "teacher_readiness"
+  ],
   "ordering": "University.name ASC, University.id ASC, License.license_number ASC NULLS LAST, License.id ASC (deterministic, never DB natural order)",
   "presets": {
     "FULL": "14 mandatory + all 6 supported optionals",

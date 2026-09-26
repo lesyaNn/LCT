@@ -20,7 +20,6 @@ import {
 import {
   type AttentionItem,
   type DashboardAnalytics,
-  type HealthScoreDistributionItem,
   type LaunchDynamicsItem,
   type ProgramStatusItem,
 } from '@/shared/lib/dashboard-repository';
@@ -31,13 +30,6 @@ import { attentionSeverityIntent } from '@/shared/lib/status-semantics';
 import styles from './dashboard-charts.module.css';
 
 const numberFormatter = new Intl.NumberFormat('ru-RU');
-
-const healthColors: Record<HealthScoreDistributionItem['tone'], string> = {
-  danger: 'var(--rtk-color-danger)',
-  warning: 'var(--rtk-color-warning)',
-  brand: 'var(--rtk-color-brand)',
-  success: 'var(--rtk-color-success)',
-};
 
 const statusColors: Record<ProgramStatusItem['tone'], string> = {
   neutral: 'var(--rtk-color-text-tertiary)',
@@ -82,20 +74,6 @@ function ChartCard({ title, description, children, exportSlug, exportTestId }: C
   );
 }
 
-function HealthTooltip({ active, payload }: TooltipContentProps) {
-  if (!active || !payload?.length) return null;
-
-  const point = payload[0]?.payload as HealthScoreDistributionItem | undefined;
-  if (!point) return null;
-
-  return (
-    <div className={styles.tooltip} role="status">
-      <strong>{point.range}</strong>
-      <span>{formatCount(point.count)} вузов</span>
-    </div>
-  );
-}
-
 function ProgramTooltip({ active, payload }: TooltipContentProps) {
   if (!active || !payload?.length) return null;
 
@@ -121,27 +99,6 @@ function LaunchTooltip({ active, payload }: TooltipContentProps) {
       <strong>{point.monthLabel}</strong>
       <span>Фактические: {formatCount(point.actual)}</span>
       <span>Планируемые: {formatCount(point.planned)}</span>
-    </div>
-  );
-}
-
-function HealthScoreChart({ data }: { data: DashboardAnalytics['healthScoreDistribution'] }) {
-  return (
-    <div className={styles.chartStack}>
-      <div className={styles.chartCanvas} role="img" aria-label="Распределение вузов по диапазонам Health Score">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: -12 }}>
-            <CartesianGrid stroke="var(--rtk-color-border)" strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="range" tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} />
-            <YAxis allowDecimals={false} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} width={28} />
-            <Tooltip content={HealthTooltip} cursor={{ fill: 'var(--rtk-color-surface-hover)' }} />
-            <Bar dataKey="count" name="Количество вузов" radius={[6, 6, 0, 0]}>
-              {data.map((item) => <Cell fill={healthColors[item.tone]} key={item.range} />)}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-      <p className={styles.chartNote}>Значения показывают количество вузов в каждом диапазоне.</p>
     </div>
   );
 }
@@ -246,9 +203,6 @@ export function DashboardAnalytics({ data }: { data: DashboardAnalytics }) {
 function AnalyticsGrid({ data }: { data: DashboardAnalytics }) {
   return (
     <div className={styles.grid}>
-      <ChartCard title="Распределение Health Score" description="Количество вузов по диапазонам показателя." exportSlug="health-distribution" exportTestId="chart-export-health-distribution">
-        {data.healthScoreDistribution.length ? <HealthScoreChart data={data.healthScoreDistribution} /> : <EmptyChart />}
-      </ChartCard>
       <ChartCard title="Программы по статусам" description="Текущее распределение программ в реестре." exportSlug="programs" exportTestId="chart-export-programs">
         {data.programStatuses.length ? <ProgramStatusChart data={data.programStatuses} /> : <EmptyChart />}
       </ChartCard>

@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useState, type ReactNode } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -20,7 +19,6 @@ import { Modal } from '@/shared/ui/rtk/modal';
 import { EmptyState } from '@/shared/ui/empty-state';
 import { Select, TextArea } from '@/shared/ui/rtk/form-controls';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
-import { MetricCard } from '@/shared/ui/rtk/metric-card';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { BackgroundRefreshNotice } from '@/shared/ui/background-refresh-notice';
 import { Toast } from '@/shared/ui/rtk/toast';
@@ -31,14 +29,12 @@ import { queryKeys } from '@/shared/lib/query-keys';
 import { formatDateRu, formatDateTimeRu } from '@/shared/lib/formatters';
 import {
   createWorkflowFromExternal,
-  externalSourceLabel,
   getUniversityExternalData,
   isExternalSourceUnavailable,
-  normalizeStudentRows,
   universityExternalDataQueryKey,
   type ExternalApplication,
 } from '@/shared/lib/external-integrations-repository';
-import { documentStatusIntent, licenseStatusIntent, productStatusIntent, programStatusIntent, readinessSemantics } from '@/shared/lib/status-semantics';
+import { documentStatusIntent, licenseStatusIntent, productStatusIntent, programStatusIntent } from '@/shared/lib/status-semantics';
 import {
   getUniversityProducts,
   getUniversityPrograms,
@@ -47,10 +43,6 @@ import {
   getUniversityMeetings,
   deleteUniversityMeeting,
   getUniversityResponsibles,
-  getUniversityStudentsSummary,
-  getUniversityStudents,
-  deleteUniversityStudent,
-  getUniversityTeachers,
   programStatusLabels,
   universityProductsQueryKey,
   universityProgramsQueryKey,
@@ -59,17 +51,10 @@ import {
   universityMeetingsQueryKey,
   universityPassportQueryKey,
   universityResponsiblesQueryKey,
-  universityStudentsQueryKey,
-  universityStudentsSummaryQueryKey,
-  universityTeachersQueryKey,
   type ProgramStatus,
-  type TeacherReadiness,
   type UniversityProductRow,
   type UniversityProductStatus,
   type UniversityProgramRow,
-  type UniversityStudentsByProgram,
-  type UniversityStudentListRow,
-  type UniversityTeacherRow,
   type UniversityLicenseRow,
   type UniversityLicenseStatus,
   type UniversityDocumentRow,
@@ -79,8 +64,7 @@ import {
   UNIVERSITY_PASSPORT_CAPABILITIES,
 } from '@/shared/lib/universities-repository';
 import { PassportDataTable, PassportTableSkeleton, type PassportMobileField, type PassportTableColumn } from './passport-data-table';
-import { MeetingMutationForm, ProductAssignmentForm, ProgramAssignmentForm, StudentMutationForm } from './passport-mutation-forms';
-import { ReadinessBadge } from '@/shared/ui/rtk/readiness-badge';
+import { MeetingMutationForm, ProductAssignmentForm, ProgramAssignmentForm } from './passport-mutation-forms';
 import styles from './university-passport-sections.module.css';
 
 const formatDate = formatDateRu;
@@ -108,9 +92,6 @@ function ProgramFilter({ value, onChange }: { value: ProgramStatus | 'all'; onCh
   return <label className={styles.filter}><span>Статус</span><Select value={value} onChange={(event) => onChange(event.target.value as ProgramStatus | 'all')}><option value="all">Все статусы</option>{Object.entries(programStatusLabels).map(([status, label]) => <option value={status} key={status}>{label}</option>)}</Select></label>;
 }
 
-function TeacherFilter({ value, onChange }: { value: TeacherReadiness | 'all'; onChange: (value: TeacherReadiness | 'all') => void }) {
-  return <label className={styles.filter}><span>Готовность</span><Select value={value} onChange={(event) => onChange(event.target.value as TeacherReadiness | 'all')}><option value="all">Все статусы</option>{Object.entries(readinessSemantics).map(([status, meta]) => <option value={status} key={status}>{meta.label}</option>)}</Select></label>;
-}
 
 type ProgramViewRow = UniversityProgramRow & {
   externalApplication?: ExternalApplication;
@@ -220,128 +201,7 @@ function ProgramsSection({ id }: { id: string }) {
   return <section className={styles.section} aria-label="Программы"><SectionToolbar title="Программы"><div className={styles.integrationControls}>{websiteQuery.isError && isExternalSourceUnavailable(websiteQuery.error) ? <StatusBadge intent="neutral">Данные сайта сейчас недоступны</StatusBadge> : websiteQuery.data ? <SyncMeta source="Сайт" syncedAt={websiteQuery.data.syncedAt} mode={websiteQuery.data.mode} /> : <StatusBadge intent="neutral">Ручные данные</StatusBadge>}{canAttach ? <Button variant="primary" size="s" type="button" onClick={() => setAssignmentOpen(true)}>Добавить программу</Button> : null}</div></SectionToolbar><FilterToolbar embedded label="Фильтры программ" activeFilters={statusFilter === 'all' ? [] : [{ id: 'status', label: `Статус: ${programStatusLabels[statusFilter]}`, onRemove: () => changeStatusFilter('all') }]} controls={() => <ProgramFilter value={statusFilter} onChange={changeStatusFilter} />} onReset={() => changeStatusFilter('all')} resetDisabled={statusFilter === 'all'} mobileCount={statusFilter === 'all' ? 0 : 1} />{websiteQuery.isError && !isExternalSourceUnavailable(websiteQuery.error) ? <ExternalUnavailableNotice source="сайта" error={websiteQuery.error} onRetry={() => void websiteQuery.refetch()} /> : null}<div className={styles.refreshStatus} aria-live="polite">{query.isFetching ? <span role="status">Обновляем программы…</span> : null}{query.isError ? <BackgroundRefreshNotice onRetry={() => void query.refetch()} /> : null}</div><PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Нет программ с выбранным статусом" serverPagination={{ page, pageSize: 20, total: query.data.total, onPageChange: setPage }} />{assignmentOpen ? <ProgramAssignmentForm universityId={id} existingProgramIds={query.data.items.map((program) => program.id)} onClose={() => setAssignmentOpen(false)} onSaved={() => { setAssignmentOpen(false); setToast({ intent: 'success', title: 'Программа добавлена' }); }} /> : null}{toast ? <div className={styles.toastViewport}><Toast intent={toast.intent} title={toast.title} message={toast.message} onClose={() => setToast(null)} /></div> : null}</section>;
 }
 
-function ProgramChips({ programs }: { programs: string[] }) {
-  const visible = programs.slice(0, 2);
-  const remaining = programs.length - visible.length;
-  return <div className={styles.chips} aria-label={`Разрешённые программы: ${programs.join(', ')}`}>{visible.map((program) => <span className={styles.chip} key={program}>{program}</span>)}{remaining > 0 ? <span className={styles.chipMore}>+{remaining}</span> : null}</div>;
-}
 
-function TeachersSection({ id }: { id: string }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const readinessParam = searchParams.get('teacher_readiness');
-  const readinessFilter: TeacherReadiness | 'all' = readinessParam && readinessParam in readinessSemantics ? readinessParam as TeacherReadiness : 'all';
-  const [page, setPage] = useState(1);
-  const changeReadinessFilter = (value: TeacherReadiness | 'all') => {
-    const next = new URLSearchParams(searchParams.toString());
-    if (value === 'all') next.delete('teacher_readiness'); else next.set('teacher_readiness', value);
-    setPage(1);
-    router.replace(`${pathname}?${next.toString()}`, { scroll: false });
-  };
-  const query = useQuery({ queryKey: universityTeachersQueryKey(id, page, 20, readinessFilter), queryFn: ({ signal }) => getUniversityTeachers(id, page, 20, signal, readinessFilter), placeholderData: keepPreviousData, staleTime: 30_000 });
-  const rows = useMemo(() => [...(query.data?.items ?? [])].sort((left, right) => ({ expired: 0, attention: 1, ready: 2 }[left.readiness] - { expired: 0, attention: 1, ready: 2 }[right.readiness])), [query.data]);
-  const columns: PassportTableColumn<UniversityTeacherRow>[] = [
-    { id: 'name', label: 'ФИО', sortable: true, sortValue: (row) => row.name, render: (row) => <strong className={styles.primaryCell}>{row.name}</strong> },
-    { id: 'position', label: 'Должность', sortable: true, sortValue: (row) => row.position, render: (row) => row.position },
-    { id: 'readiness', label: 'Готовность', sortable: true, sortValue: (row) => ({ expired: 0, attention: 1, ready: 2 }[row.readiness]), render: (row) => <ReadinessBadge readiness={row.readiness} size="sm" /> },
-    { id: 'training', label: 'Следующее обучение', sortable: true, sortValue: (row) => row.nextTrainingDate ?? '', render: (row) => row.nextTrainingDate ? formatDate(row.nextTrainingDate) : 'Данные отсутствуют' },
-    { id: 'programs', label: 'Программы', render: (row) => <ProgramChips programs={row.allowedPrograms} /> },
-    { id: 'actions', label: 'Действия', render: (row) => <Link className={styles.actionLink} href={`/teachers/${row.id}`}>Открыть</Link> },
-  ];
-  const mobileFields: PassportMobileField<UniversityTeacherRow>[] = [
-    { label: 'ФИО', render: (row) => <strong className={styles.primaryCell}>{row.name}</strong> },
-    { label: 'Должность', render: (row) => row.position },
-    { label: 'Готовность', render: (row) => <ReadinessBadge readiness={row.readiness} size="md" /> },
-    { label: 'Обучение', render: (row) => row.nextTrainingDate ? formatDate(row.nextTrainingDate) : 'Данные отсутствуют' },
-    { label: 'Программы', render: (row) => <ProgramChips programs={row.allowedPrograms} /> },
-    { label: 'Действия', render: (row) => <Link className={styles.actionLink} href={`/teachers/${row.id}`}>Открыть профиль</Link> },
-  ];
-
-  if (query.isPending) return <section className={styles.section} aria-label="Преподаватели"><PassportTableSkeleton /></section>;
-  if (!query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
-
-  return <section className={styles.section} aria-label="Преподаватели"><SectionToolbar title="Преподаватели" /><FilterToolbar embedded label="Фильтры преподавателей" activeFilters={readinessFilter === 'all' ? [] : [{ id: 'readiness', label: `Готовность: ${readinessSemantics[readinessFilter].label}`, onRemove: () => changeReadinessFilter('all') }]} controls={() => <TeacherFilter value={readinessFilter} onChange={changeReadinessFilter} />} onReset={() => changeReadinessFilter('all')} resetDisabled={readinessFilter === 'all'} mobileCount={readinessFilter === 'all' ? 0 : 1} /><div className={styles.refreshStatus} aria-live="polite">{query.isFetching ? <span role="status">Обновляем преподавателей…</span> : null}{query.isError ? <BackgroundRefreshNotice onRetry={() => void query.refetch()} /> : null}</div><PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Нет преподавателей с выбранным статусом" serverPagination={{ page, pageSize: 20, total: query.data.total, onPageChange: setPage }} /></section>;
-}
-
-function StudentSummary({ total, active, graduated, academicLeave }: { total: number; active: number; graduated: number; academicLeave: number }) {
-  const metrics = [['Всего', total], ['Активные', active], ['Выпущены', graduated], ['Академический отпуск', academicLeave]] as const;
-  return <div className={styles.studentSummary} aria-label="Сводка по студентам">{metrics.map(([label, value]) => <MetricCard label={label} value={value} centered key={label} />)}</div>;
-}
-
-type StudentViewRow = UniversityStudentsByProgram & {
-  id: string;
-  studentName?: string;
-  flow: string | null;
-  progress: number | null;
-  source: 'lms' | 'manual' | 'website' | 'import';
-  syncedAt: string | null;
-};
-
-function StudentRowName({ row }: { row: StudentViewRow }) {
-  return <><strong className={styles.primaryCell}>{row.studentName ?? row.programName}</strong>{row.studentName ? <span className={styles.secondaryCell}>{row.programName}</span> : null}</>;
-}
-
-function StudentsSection({ id }: { id: string }) {
-  const { user } = useAuth();
-  const queryClient = useQueryClient();
-  const [page, setPage] = useState(1);
-  const [editor, setEditor] = useState<UniversityStudentListRow | null | undefined>(undefined);
-  const [deleteCandidate, setDeleteCandidate] = useState<UniversityStudentListRow | null>(null);
-  const canWrite = !isMockDataSourceFor('passport') && hasPermission(user, 'university.edit');
-  const query = useQuery({ queryKey: universityStudentsSummaryQueryKey(id), queryFn: () => getUniversityStudentsSummary(id, queryClient), staleTime: 30_000 });
-  const listQuery = useQuery({ queryKey: universityStudentsQueryKey(id, page), queryFn: ({ signal }) => getUniversityStudents(id, page, 20, signal), placeholderData: keepPreviousData, staleTime: 30_000 });
-  const lmsQuery = useQuery({ queryKey: universityExternalDataQueryKey(id, 'lms'), queryFn: () => getUniversityExternalData(id, 'lms'), enabled: UNIVERSITY_PASSPORT_CAPABILITIES.externalData, staleTime: 30_000 });
-  const [toast, setToast] = useState<{ intent: 'success' | 'error' | 'info'; title: string; message?: ReactNode } | null>(null);
-  const remove = useMutation({
-    mutationFn: (studentId: string) => deleteUniversityStudent(studentId),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.universities.studentsFamily(id) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.universities.passport(id) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.universities.historyFamily(id) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.audit.all }),
-      ]);
-      setDeleteCandidate(null);
-      setToast({ intent: 'success', title: 'Студент удалён' });
-    },
-    onError: (cause) => setToast({ intent: 'error', title: normalizeApiError(cause).message }),
-  });
-  const rows = useMemo<StudentViewRow[]>(() => {
-    const programNames = new Map((query.data?.byProgram ?? []).map((item) => [item.programId, item.programName]));
-    return normalizeStudentRows(listQuery.data?.items ?? [], lmsQuery.data?.students ?? []).map((row) => ({
-      ...row, programName: programNames.get(row.programId) ?? row.programName,
-    }));
-  }, [lmsQuery.data, listQuery.data, query.data]);
-  const columns: PassportTableColumn<StudentViewRow>[] = [
-    { id: 'programName', label: 'Студент / программа', sortable: true, sortValue: (row) => row.studentName ?? row.programName, render: (row) => <StudentRowName row={row} /> },
-    { id: 'flow', label: 'Поток', sortable: true, sortValue: (row) => row.flow ?? '', render: (row) => row.flow ?? '—' },
-    { id: 'progress', label: 'Прогресс', sortable: true, sortValue: (row) => row.progress ?? -1, render: (row) => row.progress === null ? '—' : `${row.progress}%` },
-    { id: 'active', label: 'Активные', sortable: true, sortValue: (row) => row.active, render: (row) => row.active },
-    { id: 'graduated', label: 'Выпущены', sortable: true, sortValue: (row) => row.graduated, render: (row) => row.graduated },
-    { id: 'total', label: 'Всего', sortable: true, sortValue: (row) => row.total, render: (row) => row.total },
-    { id: 'source', label: 'Источник', render: (row) => <StatusBadge intent={row.source === 'manual' ? 'neutral' : 'brand'}>{externalSourceLabel(row.source)}</StatusBadge> },
-    { id: 'syncedAt', label: 'Синхронизация', render: (row) => row.syncedAt ? formatDate(row.syncedAt) : '—' },
-    { id: 'actions', label: 'Действия', render: (row) => canWrite ? <div className={styles.assignmentActions}><Button variant="ghost" size="s" type="button" onClick={() => setEditor(row)}>Изменить</Button><Button variant="ghost" size="s" type="button" onClick={() => setDeleteCandidate(row)}>Удалить</Button></div> : null },
-  ];
-  const mobileFields: PassportMobileField<StudentViewRow>[] = [
-    { label: 'Студент / программа', render: (row) => <StudentRowName row={row} /> },
-    { label: 'Поток', render: (row) => row.flow ?? '—' },
-    { label: 'Прогресс', render: (row) => row.progress === null ? '—' : `${row.progress}%` },
-    { label: 'Состав', render: (row) => `${row.active} активных · ${row.graduated} выпущены · ${row.total} всего` },
-    { label: 'Источник', render: (row) => <StatusBadge intent={row.source === 'manual' ? 'neutral' : 'brand'}>{externalSourceLabel(row.source)}</StatusBadge> },
-    { label: 'Синхронизация', render: (row) => row.syncedAt ? formatDate(row.syncedAt) : '—' },
-    { label: 'Действия', render: (row) => canWrite ? <div className={styles.assignmentActions}><Button variant="ghost" size="s" type="button" onClick={() => setEditor(row)}>Изменить</Button><Button variant="ghost" size="s" type="button" onClick={() => setDeleteCandidate(row)}>Удалить</Button></div> : null },
-  ];
-
-  if (query.isPending || listQuery.isPending) return <section className={styles.section} aria-label="Студенты"><PassportTableSkeleton /></section>;
-  if (!query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
-  if (!listQuery.data) return <RouteErrorState compact onRetry={() => void listQuery.refetch()} />;
-  const syncedAt = lmsQuery.data?.syncedAt ?? rows.find((row) => row.syncedAt)?.syncedAt ?? null;
-  const summary = query.data;
-  const externalToast = lmsQuery.isError ? <div className={styles.toastViewport}><Toast intent="error" title="LMS недоступна" message="Показаны доступные локальные данные." /></div> : null;
-  return <div className={styles.studentPage}><StudentSummary total={summary.total} active={summary.active} graduated={summary.graduated} academicLeave={summary.academicLeave} /><section className={styles.section} aria-label="Студенты по программам"><SectionToolbar title="Студенты"><div className={styles.toolbarControls}><SyncMeta source={lmsQuery.data ? 'LMS' : 'Ручные данные'} syncedAt={syncedAt} mode={lmsQuery.data?.mode} />{canWrite ? <Button variant="primary" size="s" type="button" onClick={() => setEditor(null)}>Добавить студента</Button> : null}</div></SectionToolbar>{lmsQuery.isError ? <ExternalUnavailableNotice source="LMS" error={lmsQuery.error} onRetry={() => void lmsQuery.refetch()} /> : null}<PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Нет данных по студентам" serverPagination={{ page, pageSize: 20, total: listQuery.data.total, onPageChange: setPage }} /></section>{editor !== undefined ? <StudentMutationForm universityId={id} student={editor} onClose={() => setEditor(undefined)} onSaved={() => { setEditor(undefined); setToast({ intent: 'success', title: 'Данные студента сохранены' }); }} /> : null}{deleteCandidate ? <Modal title="Удалить студента?" onClose={() => { if (!remove.isPending) setDeleteCandidate(null); }}><p>Студент «{deleteCandidate.studentName}» будет удалён без возможности восстановления.</p><div className={styles.assignmentActions}><Button variant="ghost" type="button" disabled={remove.isPending} onClick={() => setDeleteCandidate(null)}>Отмена</Button><Button variant="danger" type="button" loading={remove.isPending} disabled={remove.isPending} onClick={() => remove.mutate(deleteCandidate.id)}>Удалить</Button></div></Modal> : null}{toast ? <div className={styles.toastViewport}><Toast intent={toast.intent} title={toast.title} message={toast.message} onClose={() => setToast(null)} /></div> : externalToast}</div>;
-}
 
 function ProductLicense({ row }: { row: UniversityProductRow }) {
   return <div className={styles.license}><strong>{row.licenseNumber}</strong><span>{formatDate(row.expiresAt)}</span></div>;
@@ -373,7 +233,7 @@ function ProductsSection({ id }: { id: string }) {
   return <section className={styles.section} aria-label="Продукты"><SectionToolbar title="Продукты">{canAttach ? <Button variant="primary" size="s" type="button" onClick={() => setAssignmentOpen(true)}>Добавить продукт</Button> : null}</SectionToolbar><PassportDataTable rows={query.data} columns={columns} mobileFields={mobileFields} emptyMessage="Нет подключённых продуктов" />{assignmentOpen ? <ProductAssignmentForm universityId={id} existingProductIds={query.data.map((product) => product.id)} onClose={() => setAssignmentOpen(false)} onSaved={() => { setAssignmentOpen(false); setSaved(true); }} /> : null}{saved ? <div className={styles.toastViewport}><Toast intent="success" title="Продукт добавлен" onClose={() => setSaved(false)} /></div> : null}</section>;
 }
 
-export { ProgramsSection, ProductsSection, StudentsSection, TeachersSection };
+export { ProgramsSection, ProductsSection };
 
 const licenseStatusLabels: Record<UniversityLicenseStatus, string> = { active: 'Действует', expires_soon: 'Скоро истекает', expired: 'Просрочена' };
 const documentStatusLabels: Record<UniversityDocumentStatus, string> = { signed: 'Подписан', pending: 'На подписи', expired: 'Просрочен', archived: 'В архиве' };

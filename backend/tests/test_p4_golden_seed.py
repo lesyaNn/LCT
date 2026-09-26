@@ -17,7 +17,6 @@ from datetime import date, datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.models.catalog import ITProduct, License, University, Vendor
-from app.models.health_score import HealthScoreSnapshot
 
 TEST_URL = os.getenv("TEST_DATABASE_URL", "sqlite://")
 

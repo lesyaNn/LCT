@@ -5,7 +5,6 @@ import { useMemo, useSyncExternalStore } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Checklist from '@atomaro/icons/24/action/Checklist';
 import TimeStroke from '@atomaro/icons/24/alert/TimeStroke';
-import Group from '@atomaro/icons/24/business/Group';
 import StatisticsBoard from '@atomaro/icons/24/business/StatisticsBoard';
 import Calendar from '@atomaro/icons/24/communication/Calendar';
 import HistoryAction from '@atomaro/icons/24/communication/HistoryAction';
@@ -17,14 +16,11 @@ import ArrowRight from '@atomaro/icons/24/navigation/ArrowRight';
 import { useAuth } from '@/shared/auth/AuthProvider';
 import { hasPermission } from '@/shared/lib/access-control';
 import { formatDateRu, formatDateTimeRu } from '@/shared/lib/formatters';
-import { healthStatusMeta, type HealthStatus } from '@/shared/lib/health-score';
 import { normalizeApiError } from '@/shared/lib/api-errors';
 import { workflowStatusIntent } from '@/shared/lib/status-semantics';
 import {
   getUniversityPassport,
-  getUniversityHealthScore,
   universityPassportQueryKey,
-  universityHealthScoreQueryKey,
   UNIVERSITY_PASSPORT_CAPABILITIES,
   type UniversityPassport,
   type UniversityPassportEvent,
@@ -41,9 +37,8 @@ import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { NotFoundState } from '@/shared/ui/not-found-state';
 import { ForbiddenState } from '@/shared/ui/access-state';
 import { MetricCardSkeleton, Skeleton, SkeletonGroup } from '@/shared/ui/skeleton';
-import { UniversityHealthScore } from './university-health-score';
 import { UniversityHistory } from './university-history';
-import { DocumentsSection, LicensesSection, MeetingsSection, ProductsSection, ProgramsSection, ResponsiblesSection, StudentsSection, TeachersSection } from './university-passport-sections';
+import { DocumentsSection, LicensesSection, MeetingsSection, ProductsSection, ProgramsSection, ResponsiblesSection } from './university-passport-sections';
 import { UniversityWorkflow } from './university-workflow';
 import styles from './university-passport.module.css';
 
@@ -61,10 +56,7 @@ function isMobileLayout() {
 
 const tabDefinitions = [
   { id: 'overview', label: 'Обзор' },
-  { id: 'health-score', label: 'Health Score' },
   { id: 'programs', label: 'Программы' },
-  { id: 'teachers', label: 'Преподаватели' },
-  { id: 'students', label: 'Студенты' },
   { id: 'products', label: 'Продукты' },
   { id: 'licenses', label: 'Лицензии' },
   { id: 'documents', label: 'Документы' },
@@ -86,31 +78,7 @@ function getInitials(name: string): string {
   return name.split(/\s+/).map((part) => part[0]).filter(Boolean).slice(0, 2).join('').toLocaleUpperCase('ru-RU');
 }
 
-function StatusBadge({ status }: { status: HealthStatus }) {
-  const meta = healthStatusMeta[status];
-  return <SemanticStatusBadge intent={meta.tone}>{meta.label}</SemanticStatusBadge>;
-}
-
-function HeaderHealth({ score, status, onDetails }: { score: number | null; status: HealthStatus | null; onDetails: () => void }) {
-  if (score === null || status === null) return <div className={styles.healthSummary}><span className={styles.overline}>Health Score</span><strong className={styles.healthScore}>—</strong><button className={styles.textAction} type="button" onClick={onDetails}>Подробнее <ArrowRight size={14} fill="currentColor" /></button></div>;
-  return (
-    <div className={styles.healthSummary}>
-      <div className={styles.healthSummaryTop}>
-        <div>
-          <span className={styles.overline}>Health Score</span>
-          <strong className={styles.healthScore}>{score}</strong>
-        </div>
-        <StatusBadge status={status} />
-      </div>
-      <div className={styles.healthMeter} role="progressbar" aria-label={`Health Score ${score} из 100`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={score}>
-        <span className={`${styles.healthMeterFill} ${styles[`meter-${status}`]}`} style={{ width: `${Math.max(0, Math.min(100, score))}%` }} />
-      </div>
-      <button className={styles.textAction} type="button" onClick={onDetails}>Подробнее <ArrowRight size={14} fill="currentColor" /></button>
-    </div>
-  );
-}
-
-function PassportHeader({ passport, healthScore, healthStatus, onTabChange }: { passport: UniversityPassport; healthScore: number | null; healthStatus: HealthStatus | null; onTabChange: (tab: PassportTabId) => void }) {
+function PassportHeader({ passport, onTabChange }: { passport: UniversityPassport; onTabChange: (tab: PassportTabId) => void }) {
   return (
     <header className={styles.header}>
       <div className={styles.headerMain}>
@@ -119,7 +87,6 @@ function PassportHeader({ passport, healthScore, healthStatus, onTabChange }: { 
           <p className={styles.city}>{passport.city}</p>
         </div>
         <div className={styles.headerSide}>
-          <HeaderHealth score={healthScore} status={healthStatus} onDetails={() => onTabChange('health-score')} />
           <div className={styles.headerActions} aria-label="Действия с вузом">
             <Button variant="primary" size="s" type="button" onClick={() => onTabChange('workflow')}><Checklist size={16} fill="currentColor" />Workflow</Button>
           </div>
@@ -137,7 +104,6 @@ function OverviewMetrics({ passport }: { passport: UniversityPassport }) {
       <div className={styles.sectionHeading}><h2 id="passport-metrics-title">Ключевые показатели</h2></div>
       <div className={styles.metricsGrid}>
         <MetricCard label="Активные программы" value={metrics.activePrograms} icon={Book} />
-        <MetricCard label="Преподаватели" value={metrics.teachers.total} icon={Group} indicators={[{ value: metrics.teachers.ready, label: 'готовы', intent: 'success' }, { value: metrics.teachers.attention, label: 'требуют внимания', intent: 'warning' }]} />
         <MetricCard label="Лицензии" value={licensesTotal} icon={Education} indicators={[{ value: metrics.licenses.active, label: 'действуют', intent: 'success' }, { value: metrics.licenses.expiring, label: 'истекают', intent: 'warning' }, { value: metrics.licenses.overdue, label: 'просрочены', intent: 'danger' }]} />
         <MetricCard label="Документы" value={metrics.documents.limited ? `≥${metrics.documents.total}` : metrics.documents.total} icon={DocumentText} indicators={metrics.documents.limited ? undefined : [{ value: metrics.documents.signed, label: 'подписано', intent: 'success' }, { value: metrics.documents.overdue, label: 'просрочено', intent: 'danger' }]} />
       </div>
@@ -211,7 +177,6 @@ export function UniversityPassport({ id }: { id: string }) {
   const { user } = useAuth();
   const activeTab = parseTab(searchParams.get('tab'));
   const query = useQuery({ queryKey: universityPassportQueryKey(id), queryFn: () => getUniversityPassport(id, queryClient), staleTime: 30_000 });
-  const healthQuery = useQuery({ queryKey: universityHealthScoreQueryKey(id), queryFn: ({ signal }) => getUniversityHealthScore(id, signal), enabled: query.isSuccess, staleTime: 30_000 });
   const canReport = user?.role === 'admin' || user?.role === 'manager';
   const canAdvance = canReport && UNIVERSITY_PASSPORT_CAPABILITIES.mutations;
   const activeTabDefinition = useMemo(() => tabDefinitions.find((tab) => tab.id === activeTab) ?? tabDefinitions[0], [activeTab]);
@@ -230,14 +195,8 @@ export function UniversityPassport({ id }: { id: string }) {
   const passport = query.data;
   const renderContent = (tab: PassportTabId) => tab === 'overview'
     ? <OverviewContent passport={passport} canAdvance={canAdvance} onTabChange={selectTab} />
-    : tab === 'health-score'
-      ? <UniversityHealthScore id={id} />
     : tab === 'programs'
       ? <ProgramsSection id={id} />
-    : tab === 'teachers'
-      ? <TeachersSection id={id} />
-    : tab === 'students'
-      ? <StudentsSection id={id} />
     : tab === 'products'
       ? <ProductsSection id={id} />
     : tab === 'licenses'
@@ -256,7 +215,7 @@ export function UniversityPassport({ id }: { id: string }) {
 
   return (
     <div className={styles.page}>
-      <PassportHeader passport={passport} healthScore={healthQuery.data?.currentScore ?? null} healthStatus={healthQuery.data?.status ?? null} onTabChange={selectTab} />
+      <PassportHeader passport={passport} onTabChange={selectTab} />
       <TabbedSurface tabs={!mobileLayout ? <Tabs items={tabDefinitions} activeId={activeTab} onChange={(id) => selectTab(id as PassportTabId)} label="Разделы паспорта вуза" prefix="passport-tab" /> : undefined}>
       {!mobileLayout ? <div className={styles.desktopPanel} id="passport-panel" role="tabpanel" aria-labelledby={`passport-tab-${activeTab}`}>{renderContent(activeTab)}</div> : null}
       {mobileLayout ? <div className={styles.mobileAccordion} aria-label="Разделы паспорта вуза">

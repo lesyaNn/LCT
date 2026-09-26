@@ -7,15 +7,15 @@ module — that is how autogenerate and ``upgrade head`` see every model
 
 Table naming follows the task specs exactly:
 universities, it_directions, it_programs, vendors, it_products, contracts,
-licenses, responsibles, university_responsibles, teachers,
-teacher_qualifications, teacher_certificates, teacher_programs, students,
+licenses, responsibles, university_responsibles,
 university_programs, university_products, meetings, documents,
 interaction_notes, meeting_documents, workflow_templates, workflow_stages,
 workflow_instances, workflow_stage_transitions, workflow_comments,
 workflow_attachments, workflow_tasks, instance_stages,
-health_score_snapshots (P2-09-01, migration 000015), report_jobs
+report_jobs
 (P4-06-01, migration 000018, Dev-1 actor_* schema), external_applications
-and external_sync_states (Stage 11, migration 000027).
+and external_sync_states (Stage 11, migration 000027), product_directions
+(import sheet "Продукт_Направление", migration 000028).
 """
 
 from app.models.catalog import (  # noqa: F401
@@ -24,14 +24,13 @@ from app.models.catalog import (  # noqa: F401
     ITProduct,
     ITProgram,
     License,
+    ProductDirection,
     Responsible,
     University,
     UniversityResponsible,
     Vendor,
     VendorContact,
 )
-from app.models.health_score import HealthScoreCurrent, HealthScoreSnapshot  # noqa: F401
-from app.models.audit_outbox import AuditOutbox  # noqa: F401
 from app.models.external import ExternalApplication, ExternalSyncState  # noqa: F401
 from app.models.report_job import (  # noqa: F401
     REPORT_JOB_STATUSES,
@@ -46,15 +45,8 @@ from app.models.interactions import (  # noqa: F401
     InteractionNote,
     Meeting,
     MeetingDocument,
-    Student,
     UniversityProduct,
     UniversityProgram,
-)
-from app.models.teachers import (  # noqa: F401
-    Teacher,
-    TeacherCertificate,
-    TeacherProgram,
-    TeacherQualification,
 )
 from app.models.workflow_templates import (  # noqa: F401
     WorkflowStage,
@@ -75,15 +67,11 @@ __all__ = [
     "ITProgram",
     "Vendor",
     "ITProduct",
+    "ProductDirection",
     "Contract",
     "License",
     "Responsible",
     "UniversityResponsible",
-    "Teacher",
-    "TeacherQualification",
-    "TeacherCertificate",
-    "TeacherProgram",
-    "Student",
     "UniversityProgram",
     "UniversityProduct",
     "Meeting",
@@ -98,8 +86,6 @@ __all__ = [
     "WorkflowAttachment",
     "WorkflowTask",
     "InstanceStage",
-    "HealthScoreSnapshot",
-    "HealthScoreCurrent",
     "AuditOutbox",
     "ExternalApplication",
     "ExternalSyncState",

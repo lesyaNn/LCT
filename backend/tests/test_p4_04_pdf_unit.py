@@ -38,7 +38,7 @@ from app.modules.analytics.pdf import (
 )
 from app.modules.analytics.xlsx import REPORT_TITLE
 
-SUBSET_5 = ["university", "product", "workflow_status", "responsible", "health_score"]
+SUBSET_5 = ["university", "product", "workflow_status", "responsible", "workflow_progress"]
 
 
 def _rows_5() -> list[dict]:
@@ -50,7 +50,7 @@ def _rows_5() -> list[dict]:
             "product": "ПО Защита",
             "workflow_status": "Этап 2",
             "responsible": "Иван Петров",
-            "health_score": 85,
+            "workflow_progress": 85,
             "_university_id": uid,
         },
         {
@@ -58,7 +58,7 @@ def _rows_5() -> list[dict]:
             "product": None,
             "workflow_status": None,
             "responsible": None,
-            "health_score": None,
+            "workflow_progress": None,
             "_university_id": uid,
         },
         {
@@ -66,7 +66,7 @@ def _rows_5() -> list[dict]:
             "product": "ПО Второе",
             "workflow_status": "Этап 1",
             "responsible": "Пётр Второй",
-            "health_score": 55,
+            "workflow_progress": 55,
             "_university_id": beta,
         },
     ]
@@ -311,8 +311,8 @@ def test_format_cell_value_null_dates_numbers_literal():
     assert format_cell_value("comment", None) == ""
     assert format_cell_value("license_signed", date(2026, 2, 1)) == "01.02.2026"
     assert format_cell_value("license_signed", datetime(2026, 2, 1, 10, 30)) == "01.02.2026"
-    assert format_cell_value("health_score", 85) == "85"
-    assert format_cell_value("health_score", None) == ""
+    assert format_cell_value("workflow_progress", 85) == "85"
+    assert format_cell_value("workflow_progress", None) == ""
     # PDF executes no formulas: user text stays literal (no apostrophe).
     assert format_cell_value("comment", "=HYPERLINK(1)") == "=HYPERLINK(1)"
     assert format_cell_value("university", "МГУ им. Ломоносова") == "МГУ им. Ломоносова"
@@ -321,9 +321,9 @@ def test_format_cell_value_null_dates_numbers_literal():
 def test_compute_kpi_from_same_dataset():
     class _Dataset:
         rows = [
-            {"university": "A", "health_score": 90},
-            {"university": "A", "health_score": 70},
-            {"university": "B", "health_score": None},
+            {"university": "A", "workflow_progress": 90},
+            {"university": "A", "workflow_progress": 70},
+            {"university": "B", "workflow_progress": None},
         ]
         total = 3
         university_count = 2
@@ -339,7 +339,7 @@ def test_compute_kpi_from_same_dataset():
 
 def test_compute_kpi_no_scores_is_none_not_zero():
     class _Dataset:
-        rows = [{"university": "A", "health_score": None}]
+        rows = [{"university": "A", "workflow_progress": None}]
         total = 1
         university_count = 1
 
@@ -409,7 +409,7 @@ def test_pdf_default_columns_are_14_mandatory(tmp_path):
     text = extract_pdf_text(result.path.read_bytes())
     compact = _nospace(text)
     assert _nospace(COLUMN_REGISTRY["university"].title) in compact
-    assert _nospace(COLUMN_REGISTRY["health_score"].title) in compact
+    assert _nospace(COLUMN_REGISTRY["workflow_progress"].title) in compact
 
 
 def test_pdf_subset_order_and_content(tmp_path):
@@ -518,7 +518,7 @@ def test_pdf_multi_page_table(tmp_path):
             "product": "ПО",
             "workflow_status": "Этап 1",
             "responsible": "Ответственный",
-            "health_score": 70,
+            "workflow_progress": 70,
             "_university_id": uuid4() if i % 7 else uid,
         }
         for i in range(250)
@@ -552,7 +552,7 @@ def test_pdf_empty_health_and_workflow_skip_charts(tmp_path):
             "product": None,
             "workflow_status": None,
             "responsible": None,
-            "health_score": None,
+            "workflow_progress": None,
             "_university_id": uuid4(),
         }
     ]
@@ -568,13 +568,13 @@ def test_health_distribution_uses_canonical_thresholds():
     from app.modules.analytics.pdf import _health_distribution
 
     rows = [
-        {"university": "A", "health_score": 85},  # green boundary
-        {"university": "B", "health_score": 84},  # yellow boundary
-        {"university": "C", "health_score": 60},  # yellow boundary
-        {"university": "D", "health_score": 59},  # red boundary
-        {"university": "E", "health_score": None},
+        {"university": "A", "workflow_progress": 85},  # green boundary
+        {"university": "B", "workflow_progress": 84},  # yellow boundary
+        {"university": "C", "workflow_progress": 60},  # yellow boundary
+        {"university": "D", "workflow_progress": 59},  # red boundary
+        {"university": "E", "workflow_progress": None},
     ]
-    counts, grain = _health_distribution(rows, ["university", "health_score"])
+    counts, grain = _health_distribution(rows, ["university", "workflow_progress"])
     assert counts == {"green": 1, "yellow": 2, "red": 1}
     assert "ВУЗ" in grain
 
@@ -582,8 +582,8 @@ def test_health_distribution_uses_canonical_thresholds():
 def test_health_distribution_row_grain_without_university_column():
     from app.modules.analytics.pdf import _health_distribution
 
-    rows = [{"health_score": 90}, {"health_score": 90}, {"health_score": None}]
-    counts, grain = _health_distribution(rows, ["health_score"])
+    rows = [{"workflow_progress": 90}, {"workflow_progress": 90}, {"workflow_progress": None}]
+    counts, grain = _health_distribution(rows, ["workflow_progress"])
     assert counts == {"green": 2, "yellow": 0, "red": 0}
     assert "строк" in grain
 

@@ -1,5 +1,5 @@
 import type { AuditEvent, AuditListQuery, AuditListResult } from '@/shared/lib/audit-repository';
-import type { ImportCatalogType, ImportExecuteResponse, ImportJob, ImportOptions, ImportPreviewResponse } from '@/shared/lib/import-repository';
+import type { ImportExecuteResponse, ImportJob, ImportRunOptions } from '@/shared/lib/import-repository';
 import type { CatalogInput, CatalogItem, CatalogListQuery, CatalogListResult, CatalogReferenceData, CatalogType, ResponsibleCatalogItem } from '@/shared/lib/catalogs-repository';
 import { ApiRequestError } from '@/shared/lib/api-errors';
 import type {
@@ -32,7 +32,6 @@ import type {
   ExternalApplication,
   ExternalDashboardMetrics,
   ExternalDataSource,
-  ExternalStudent,
   UniversityExternalData,
 } from '@/shared/lib/external-integrations-repository';
 
@@ -446,29 +445,106 @@ export function mockUpdateWorkflowStage(templateId: string, stageId: string, inp
 
 // --------------------------------------------------------------------- import
 
-type StoredImportFile = { filename: string; catalogType?: ImportCatalogType };
-type StoredImportJob = ImportJob & { processingAt: number; doneAt: number; options: ImportOptions };
+type StoredImportFile = { filename: string };
+type StoredImportJob = ImportJob & { processingAt: number; doneAt: number; options: ImportRunOptions };
 
 const importFiles = new Map<string, StoredImportFile>();
 const importJobs = new Map<string, StoredImportJob>();
 
-const importPreviewHeaders = ['Название ВУЗа', 'Номер договора', 'Срок действия лицензии (год)', 'Вендор', 'ПО'];
-const importPreviewRows = [
-  { 'Название ВУЗа': 'МТУСИ', 'Номер договора': 'ДОГ-2026-001', 'Срок действия лицензии (год)': 2027, Вендор: 'Ростелеком', ПО: 'Профессиональная переподготовка' },
-  { 'Название ВУЗа': 'Уральский федеральный университет', 'Номер договора': 'ДОГ-2026-002', 'Срок действия лицензии (год)': 2028, Вендор: 'Контур', ПО: 'Короткие курсы' },
-  { 'Название ВУЗа': 'Казанский федеральный университет', 'Номер договора': 'ДОГ-2026-003', 'Срок действия лицензии (год)': 2027, Вендор: 'Ростелеком', ПО: 'Корпоративный трек' },
+/** Демо-структура тестового Импорт_CRM.xlsx: листы и объёмы. */
+const mockImportSheets = [
+  { id: 'ВУЗы', label: 'ВУЗы', row_count: 4 },
+  { id: 'ИТ-продукты', label: 'ИТ-продукты', row_count: 6 },
+  { id: 'Ответственные ВУЗа', label: 'Ответственные ВУЗа', row_count: 4 },
+  { id: 'Договоры и лицензии', label: 'Договоры и лицензии', row_count: 5 },
+  { id: 'Направления', label: 'Направления', row_count: 5 },
+  { id: 'Программы', label: 'Программы', row_count: 8 },
+  { id: 'Продукт_Направление', label: 'Продукт_Направление', row_count: 9 },
 ];
 
-export function mockUploadImportPreview(file: File): ImportPreviewResponse {
+const mockSheetPreviews: Record<string, { headers: string[]; rows: Array<Record<string, string | number | boolean | null>>; row_count: number }> = {
+  'ВУЗы': {
+    headers: ['Название ВУЗа', 'Город'],
+    rows: [
+      { 'Название ВУЗа': 'Донецкий национальный технический университет', Город: 'Донецк' },
+      { 'Название ВУЗа': 'Московский государственный университет имени М.В. Ломоносова', Город: 'Москва' },
+      { 'Название ВУЗа': 'Санкт-Петербургский государственный университет', Город: 'Санкт-Петербург' },
+    ],
+    row_count: 4,
+  },
+  'ИТ-продукты': {
+    headers: ['Вендор', 'ИТ-продукт'],
+    rows: [
+      { Вендор: 'Microsoft', 'ИТ-продукт': 'Microsoft Office' },
+      { Вендор: '1С', 'ИТ-продукт': '1С:Предприятие' },
+      { Вендор: 'Microsoft', 'ИТ-продукт': 'Windows' },
+    ],
+    row_count: 6,
+  },
+  'Ответственные ВУЗа': {
+    headers: ['ВУЗ', 'ФИО', 'Должность', 'Email', 'Телефон'],
+    rows: [
+      { ВУЗ: 'Донецкий национальный технический университет', ФИО: 'Иванов Иван Иванович', Должность: 'Проректор по ИТ', Email: 'ivanov@donntu.ru', Телефон: '+7 (900) 111-22-33' },
+      { ВУЗ: 'Донецкий национальный технический университет', ФИО: 'Петров Петр Петрович', Должность: 'Начальник отдела ИТ', Email: 'petrov@donntu.ru', Телефон: '+7 (900) 444-55-66' },
+    ],
+    row_count: 4,
+  },
+  'Договоры и лицензии': {
+    headers: ['ВУЗ', 'Вендор', 'ИТ-продукт', 'Номер договора', 'Дата договора', 'Подписание лицензии', 'Окончание действия лицензии', 'Статус'],
+    rows: [
+      { ВУЗ: 'Донецкий национальный технический университет', Вендор: 'Microsoft', 'ИТ-продукт': 'Microsoft Office', 'Номер договора': '15/2026', 'Дата договора': '2026-01-15', 'Подписание лицензии': '2026-01-20', 'Окончание действия лицензии': '2027-01-31', Статус: 'Действует' },
+      { ВУЗ: 'Донецкий национальный технический университет', Вендор: 'Microsoft', 'ИТ-продукт': 'Windows', 'Номер договора': '15/2026', 'Дата договора': '2026-01-15', 'Подписание лицензии': '2026-01-20', 'Окончание действия лицензии': '2027-01-31', Статус: 'Действует' },
+    ],
+    row_count: 5,
+  },
+  'Направления': {
+    headers: ['Код направления', 'Название направления'],
+    rows: [
+      { 'Код направления': '09.03.01', 'Название направления': 'Информатика и вычислительная техника' },
+      { 'Код направления': '09.03.02', 'Название направления': 'Информационные системы и технологии' },
+      { 'Код направления': '10.03.01', 'Название направления': 'Информационная безопасность' },
+    ],
+    row_count: 5,
+  },
+  'Программы': {
+    headers: ['Название программы', 'Направление', 'Описание'],
+    rows: [
+      { 'Название программы': 'Искусственный интеллект', Направление: 'Информатика и вычислительная техника', Описание: 'ML, нейросети и анализ данных' },
+      { 'Название программы': 'Кибербезопасность', Направление: 'Информационная безопасность', Описание: 'Защита информации и сетей' },
+    ],
+    row_count: 8,
+  },
+  'Продукт_Направление': {
+    headers: ['ID продукта', 'ID направления'],
+    rows: [
+      { 'ID продукта': 'Microsoft Office', 'ID направления': '09.03.02' },
+      { 'ID продукта': 'Windows', 'ID направления': '09.03.01' },
+      { 'ID продукта': 'Teams', 'ID направления': '11.03.02' },
+    ],
+    row_count: 9,
+  },
+};
+
+export function mockUploadImportFile(file: File): unknown {
   const fileId = id('import-file');
   importFiles.set(fileId, { filename: file.name });
   return {
     file_id: fileId,
     filename: file.name,
-    headers: [...importPreviewHeaders],
-    preview: importPreviewRows.map((row) => ({ ...row })),
-    row_count: 20,
-    detected_sheet: 'Лист1',
+    sheets: mockImportSheets.map((sheet) => ({ ...sheet })),
+  };
+}
+
+export function mockPreviewImportSheet(fileId: string, sheet: string): unknown {
+  if (!importFiles.has(fileId)) throw new Error('Файл импорта не найден. Загрузите его заново.');
+  const found = mockSheetPreviews[sheet];
+  if (!found) throw new Error(`Лист «${sheet}» не найден в файле.`);
+  return {
+    file_id: fileId,
+    sheet,
+    headers: [...found.headers],
+    preview: found.rows.map((row) => ({ ...row })),
+    row_count: found.row_count,
   };
 }
 
@@ -483,15 +559,16 @@ function visibleImportJob(stored: StoredImportJob): Record<string, unknown> {
     dry_run: stored.dryRun,
     created_at: stored.createdAt,
     filename: stored.filename,
-    catalog_type: stored.catalogType,
+    sheet: stored.sheet,
     created_by: stored.createdBy,
     result: status === 'done' ? stored.result : undefined,
   };
 }
 
-export function mockExecuteImport(fileId: string, _mapping: Record<string, string>, options: ImportOptions): ImportExecuteResponse {
+export function mockExecuteSheetImport(fileId: string, sheet: string, options: ImportRunOptions): ImportExecuteResponse {
   const file = importFiles.get(fileId);
   if (!file) throw new Error('Файл импорта не найден. Загрузите его заново.');
+  const total = mockSheetPreviews[sheet]?.row_count ?? 0;
   const created = Date.now();
   const job: StoredImportJob = {
     id: id('import-job'),
@@ -501,12 +578,57 @@ export function mockExecuteImport(fileId: string, _mapping: Record<string, strin
     dryRun: options.dry_run,
     createdAt: now(),
     filename: file.filename,
-    catalogType: options.catalog_type,
+    sheet,
     createdBy: 'Мария Менеджер',
     processingAt: created + 700,
     doneAt: created + 2_400,
     options,
-    result: { total_rows: 20, inserted: options.dry_run ? 20 : 18, updated: options.dry_run ? 0 : 2, skipped: 0, errors: [], dry_run: options.dry_run },
+    result: { total_rows: total, inserted: options.dry_run ? total : Math.max(0, total - 1), updated: options.dry_run ? 0 : Math.min(1, total), skipped: 0, errors: [], dry_run: options.dry_run },
+  };
+  importJobs.set(job.id, job);
+  return { job_id: job.id };
+}
+
+export function mockExecuteSheetsImport(fileId: string, sheets: string[], options: ImportRunOptions): ImportExecuteResponse {
+  const file = importFiles.get(fileId);
+  if (!file) throw new Error('Файл импорта не найден. Загрузите его заново.');
+  const breakdown = sheets.map((sheet) => {
+    const total = mockSheetPreviews[sheet]?.row_count ?? 0;
+    return {
+      sheet,
+      summary: {
+        total_rows: total,
+        inserted: options.dry_run ? total : Math.max(0, total - 1),
+        updated: options.dry_run ? 0 : Math.min(1, total),
+        skipped: 0,
+        errors: [],
+        dry_run: options.dry_run,
+      },
+    };
+  });
+  const created = Date.now();
+  const job: StoredImportJob = {
+    id: id('import-job'),
+    type: 'xlsx_import',
+    status: 'queued',
+    progress: 0,
+    dryRun: options.dry_run,
+    createdAt: now(),
+    filename: file.filename,
+    sheet: `Все листы (${sheets.length})`,
+    createdBy: 'Мария Менеджер',
+    processingAt: created + 700,
+    doneAt: created + 2_400,
+    options,
+    result: {
+      total_rows: breakdown.reduce((total, item) => total + item.summary.total_rows, 0),
+      inserted: breakdown.reduce((total, item) => total + item.summary.inserted, 0),
+      updated: breakdown.reduce((total, item) => total + item.summary.updated, 0),
+      skipped: 0,
+      errors: [],
+      dry_run: options.dry_run,
+      sheets: breakdown,
+    },
   };
   importJobs.set(job.id, job);
   return { job_id: job.id };
@@ -613,17 +735,6 @@ function externalIndex(universityId: string): number {
   return Math.max(1, Number(digits ?? 1));
 }
 
-function mockLmsStudents(universityId: string): ExternalStudent[] {
-  const index = externalIndex(universityId);
-  return [
-    { id: `lms-${universityId}-001`, name: 'Алексей Морозов', programName: 'Аналитика данных', flow: 'Поток «Осень 2026»', progress: 78, source: 'lms', syncedAt: mockExternalSyncAt },
-    { id: `lms-${universityId}-002`, name: 'Мария Кузнецова', programName: 'Информационная безопасность', flow: 'Поток «Осень 2026»', progress: 64, source: 'lms', syncedAt: mockExternalSyncAt },
-    { id: `lms-${universityId}-003`, name: 'Илья Соколов', programName: 'ИТ-менеджмент', flow: `Поток «Весна ${2026 + (index % 2)}»`, progress: 91, source: 'lms', syncedAt: mockExternalSyncAt },
-    { id: `lms-${universityId}-004`, name: 'Ольга Белова', programName: 'Аналитика данных', flow: 'Поток «Весна 2026»', progress: 48, source: 'lms', syncedAt: mockExternalSyncAt },
-    { id: `lms-${universityId}-005`, name: 'Роман Фёдоров', programName: 'ИТ-менеджмент', flow: 'Поток «Осень 2026»', progress: 33, source: 'lms', syncedAt: mockExternalSyncAt },
-  ];
-}
-
 function mockWebsiteApplications(universityId: string): ExternalApplication[] {
   const index = externalIndex(universityId);
   const definitions = [
@@ -645,9 +756,6 @@ function mockWebsiteApplications(universityId: string): ExternalApplication[] {
 }
 
 export function mockGetUniversityExternalData(universityId: string, source: ExternalDataSource): UniversityExternalData {
-  if (source === 'lms') {
-    return { universityId, source, mode: 'mock', syncedAt: mockExternalSyncAt, students: mockLmsStudents(universityId), applications: [] };
-  }
   return { universityId, source, mode: 'mock', syncedAt: mockExternalSyncAt, students: [], applications: mockWebsiteApplications(universityId) };
 }
 

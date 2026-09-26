@@ -19,12 +19,10 @@ Frozen export shape (P4-05-01)::
       },
       "filters": {<8 UnifiedFilter fields, raw serialized>},
       "columns": [{"key": "university", "title": "Наименование ВУЗа"}, ...],
-      "rows": [{"university": "...", "health_score": 85}, ...],
+      "rows": [{"university": "...", "comment": "..."}, ...],
       "totals": {
         "row_count": 123,
-        "universities": 12,
-        "avg_health_score": 79.5,
-        "by_health_status": {"green": 5, "yellow": 4, "red": 3}
+        "universities": 12
       }
     }
 
@@ -32,11 +30,7 @@ Top-level key order is stable (insertion order above); rows preserve the
 selected-column order. ``totals`` accumulate during the single streaming
 pass: ``universities`` = distinct ``university`` names (``University.name``
 is unique, so this equals the university count whenever the column is
-selected; ``None`` when it is not),
-``avg_health_score`` = mean of present numeric ``health_score`` values
-(``None`` when the column is not selected or all scores are missing), ``by_health_status`` buckets present scores with the
-canonical 60/85 boundaries (green ≥ 85, yellow 60–84, red < 60; missing
-scores are not counted).
+selected; ``None`` when it is not).
 
 Typed serialization: UUID -> string, date ->
 ``YYYY-MM-DD``, datetime -> ISO8601 with timezone, numbers stay numbers,
@@ -74,8 +68,6 @@ from app.modules.analytics.filters import UnifiedFilter
 from app.modules.analytics.xlsx import GeneratedReport
 
 __all__ = [
-    "HEALTH_GREEN_MIN",
-    "HEALTH_YELLOW_MIN",
     "JSON_FROZEN_KEYS",
     "REPORT_GENERATOR",
     "REPORT_NAME",
@@ -98,10 +90,6 @@ JSON_FROZEN_KEYS: tuple[str, ...] = (
 REPORT_NAME = "Аналитический отчёт по взаимодействию с ВУЗами"
 REPORT_VERSION = "1.0"
 REPORT_GENERATOR = "CRM ИТ-Школа Ростелеком"
-
-#: Health-color boundaries shared with the matrix cell status (60/85).
-HEALTH_GREEN_MIN = 85
-HEALTH_YELLOW_MIN = 60
 
 
 def _generated_by(user: Any | None) -> str | None:
@@ -187,9 +175,6 @@ def generate_json_report(
     ]
     row_count = 0
     university_names: set[str] = set()
-    health_sum = 0.0
-    health_n = 0
-    by_health = {"green": 0, "yellow": 0, "red": 0}
     try:
         # Phase 1: stream dataset rows (bounded) into the rows temp file
         # as pre-serialized JSON lines — one query pass, no double
@@ -206,18 +191,6 @@ def generate_json_report(
                 name = row.get("university")
                 if isinstance(name, str) and name:
                     university_names.add(name)
-                score = row.get("health_score")
-                if isinstance(score, bool):
-                    pass
-                elif isinstance(score, (int, float)):
-                    health_sum += float(score)
-                    health_n += 1
-                    if score >= HEALTH_GREEN_MIN:
-                        by_health["green"] += 1
-                    elif score >= HEALTH_YELLOW_MIN:
-                        by_health["yellow"] += 1
-                    else:
-                        by_health["red"] += 1
 
         # Phase 2: assemble the frozen document (stable top-level order).
         metadata = {
@@ -230,8 +203,6 @@ def generate_json_report(
         totals = {
             "row_count": row_count,
             "universities": len(university_names) or None,
-            "avg_health_score": round(health_sum / health_n, 1) if health_n else None,
-            "by_health_status": by_health,
         }
         with open(tmp_path, "w", encoding="utf-8") as out:
             out.write("{\n")

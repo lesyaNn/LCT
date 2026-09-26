@@ -6,7 +6,7 @@ licenses, responsibles, university_responsibles.
 ON DELETE policy (explicit per spec, see IMPORTANT DECISIONS in README):
 * catalog references (direction, vendor) — RESTRICT (default NO ACTION):
   a direction/vendor with children cannot be deleted (P1-11-03).
-* licenses/contracts/students/teachers reference to universities/products —
+* licenses/contracts reference to universities/products —
   RESTRICT: deleting a university/product in use is blocked.
 * licenses.contract_id, contracts.product_id — SET NULL.
 * university_responsibles — CASCADE on both sides (spec: "связка чистится
@@ -30,11 +30,9 @@ if TYPE_CHECKING:  # pragma: no cover
     from app.models.interactions import (
         Document,
         Meeting,
-        Student,
         UniversityProduct,
         UniversityProgram,
     )
-    from app.models.teachers import Teacher, TeacherCertificate
 
 
 class University(UUIDPKMixin, TimestampMixin, Base):
@@ -54,8 +52,6 @@ class University(UUIDPKMixin, TimestampMixin, Base):
     )
     licenses: Mapped[list["License"]] = relationship(back_populates="university")
     contracts: Mapped[list["Contract"]] = relationship(back_populates="university")
-    teachers: Mapped[list["Teacher"]] = relationship(back_populates="university")
-    students: Mapped[list["Student"]] = relationship(back_populates="university")
     university_programs: Mapped[list["UniversityProgram"]] = relationship(
         back_populates="university", cascade="all, delete-orphan"
     )
@@ -77,6 +73,9 @@ class ITDirection(UUIDPKMixin, TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(512), nullable=False)
 
     programs: Mapped[list["ITProgram"]] = relationship(back_populates="direction")
+    product_links: Mapped[list["ProductDirection"]] = relationship(
+        back_populates="direction"
+    )
 
 
 class ITProgram(UUIDPKMixin, TimestampMixin, Base):
@@ -92,9 +91,6 @@ class ITProgram(UUIDPKMixin, TimestampMixin, Base):
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
 
     direction: Mapped["ITDirection"] = relationship(back_populates="programs")
-    teacher_links: Mapped[list["TeacherCertificate"]] = relationship(
-        back_populates="program"
-    )
 
 
 class Vendor(UUIDPKMixin, TimestampMixin, Base):
@@ -125,6 +121,9 @@ class ITProduct(UUIDPKMixin, TimestampMixin, Base):
     vendor: Mapped["Vendor"] = relationship(back_populates="products")
     contacts: Mapped[list["VendorContact"]] = relationship(back_populates="product")
     licenses: Mapped[list["License"]] = relationship(back_populates="product")
+    direction_links: Mapped[list["ProductDirection"]] = relationship(
+        back_populates="product"
+    )
 
 
 class VendorContact(UUIDPKMixin, TimestampMixin, Base):
@@ -149,6 +148,40 @@ class VendorContact(UUIDPKMixin, TimestampMixin, Base):
 
     vendor: Mapped["Vendor"] = relationship(back_populates="contacts")
     product: Mapped["ITProduct"] = relationship(back_populates="contacts")
+
+
+class ProductDirection(UUIDPKMixin, TimestampMixin, Base):
+    """M:N product <-> direction (import sheet "Продукт_Направление").
+
+    Runtime-only description of SQL migration ``000028_product_directions``.
+    Both FKs are RESTRICT (catalog protection, cf. university_products):
+    a product/direction in use cannot be deleted; links are removed first.
+    """
+
+    __tablename__ = "product_directions"
+    __table_args__ = (
+        UniqueConstraint(
+            "product_id", "direction_id", name="uq_product_directions_prod_dir"
+        ),
+        Index("ix_product_directions_product_id", "product_id"),
+        Index("ix_product_directions_direction_id", "direction_id"),
+    )
+
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("it_products.id",
+                   name="fk_product_directions_product_id_it_products",
+                   ondelete="RESTRICT"),
+        nullable=False,
+    )
+    direction_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("it_directions.id",
+                   name="fk_product_directions_direction_id_it_directions",
+                   ondelete="RESTRICT"),
+        nullable=False,
+    )
+
+    product: Mapped["ITProduct"] = relationship(back_populates="direction_links")
+    direction: Mapped["ITDirection"] = relationship(back_populates="product_links")
 
 
 class Contract(UUIDPKMixin, TimestampMixin, Base):

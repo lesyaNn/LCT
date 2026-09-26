@@ -4,14 +4,12 @@ Two canonical directories — NO duplicates:
 
 - `docs/mocks/` (repo root, P1/P3 contract):
   - `university-passport.json` — генератор `backend/scripts/generate_mocks.py`
-  - `teacher-passport.json` — генератор `backend/scripts/generate_mocks.py`
   - `analytics-overview.json` — статический эталон `GET /api/v1/analytics/overview`
-    (генератора нет — зафиксирован golden-тестом `test_p4_dev2_analytics.py`;
-    при смене контракта обновить вручную + прогнать golden)
+    (при смене контракта обновить вручную)
   - `report-request.json` — статический эталон `POST /api/v1/reports`
     (аналогично: контракт + `test_p4_03_reports_contract_unit.py`)
 - `backend/docs/mocks/` (P2, генерируемые):
-  - `health-score.json`, `workflow-instance.json` — генератор
+  - `workflow-instance.json` — генератор
     `backend/scripts/generate_p2_mocks.py`
   - `report-job.json` — статический эталон `GET /api/v1/reports/{job_id}`
     (контракт + `test_p4_03_reports_contract_unit.py`)

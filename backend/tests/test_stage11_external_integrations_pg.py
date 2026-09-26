@@ -18,7 +18,7 @@ from app.db.session import get_db
 from app.main import app
 from app.models.catalog import ITDirection, ITProgram, University
 from app.models.external import ExternalApplication
-from app.models.interactions import Student, UniversityProgram
+from app.models.interactions import UniversityProgram
 from app.models.workflow_instances import WorkflowInstance
 from app.models.workflow_templates import WorkflowStage, WorkflowTemplate
 from app.modules.integrations import service

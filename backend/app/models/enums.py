@@ -58,13 +58,6 @@ class DocumentStatusRaw(str, enum.Enum):
     ARCHIVED = "archived"
 
 
-class StudentStatus(str, enum.Enum):
-    ACTIVE = "active"
-    GRADUATED = "graduated"
-    EXPELLED = "expelled"
-    ACADEMIC_LEAVE = "academic_leave"
-
-
 class UniversityProgramStatus(str, enum.Enum):
     PLANNED = "planned"
     ACTIVE = "active"
@@ -78,12 +71,6 @@ class UniversityProductStatus(str, enum.Enum):
     EXPIRED = "expired"
 
 
-class TeacherReadiness(str, enum.Enum):
-    READY = "ready"
-    ATTENTION = "attention"
-    EXPIRED = "expired"
-
-
-#: Days before ``expires_at`` when a license/contract/certificate counts as
-#: "expiring soon" (P1-06-02, P1-05-03).
+#: Days before ``expires_at`` when a license/contract counts as
+#: "expiring soon" (P1-06-02).
 EXPIRY_WARNING_DAYS = 30

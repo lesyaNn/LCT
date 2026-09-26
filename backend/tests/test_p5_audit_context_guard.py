@@ -14,12 +14,8 @@ from app.modules.audit.router import router as audit_router
 from app.modules.audit.service import get_audit_db
 from app.modules.auth.router import router as auth_router
 from app.modules.catalog.router import router as catalog_router
-from app.modules.health_score.health_router import router as health_router
-from app.modules.health_score.ranking_router import router as ranking_router
 from app.modules.imports.router import router as imports_router
 from app.modules.meetings.router import router as meetings_router
-from app.modules.students.router import router as students_router
-from app.modules.teachers.passport_router import router as teacher_passport_router
 from app.modules.universities.passport_router import router as passport_router
 from app.modules.workflow_attachments.router import router as workflow_attachments_router
 from app.modules.workflow_instances.router import router as workflow_instances_router
@@ -31,12 +27,8 @@ from app.modules.workflow_transitions.router import router as workflow_transitio
 MOUNTED_ROUTERS = (
     auth_router,
     imports_router,
-    health_router,
-    ranking_router,
     passport_router,
-    teacher_passport_router,
     meetings_router,
-    students_router,
     catalog_router,
     workflow_templates_router,
     workflow_instances_router,

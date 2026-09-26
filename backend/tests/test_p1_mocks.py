@@ -1,9 +1,8 @@
 """P1-12-01: committed mocks validate against the Pydantic schemas.
 
 Regenerate with ``python scripts/generate_mocks.py`` (from ``backend/``);
-this test locks the AC: files exist, parse as ``UniversityPassport`` /
-``TeacherPassport``, and contain the headline demo signals (expiring
-license, attention teacher with reasons).
+this test locks the AC: files exist, parse as ``UniversityPassport``,
+and contain the headline demo signals (expiring license).
 """
 
 import json
@@ -11,7 +10,7 @@ import os
 from datetime import date
 
 import app.schemas.licenses as license_schemas
-from app.schemas import TeacherPassport, UniversityPassport
+from app.schemas import UniversityPassport
 from app.services.license_status import derive_license_status, days_to_expiry
 
 MOCKS_DIR = os.path.join(
@@ -33,8 +32,6 @@ def test_university_passport_valid():
     passport = UniversityPassport.model_validate(payload)
     assert passport.university.name == "МГУ им. М.В. Ломоносова"
     assert len(passport.programs) >= 2
-    assert len(passport.teachers) >= 2
-    assert passport.students_summary.total > 0
     assert len(passport.licenses) >= 1
     assert len(passport.documents) >= 1
     assert len(passport.meetings) >= 1
@@ -71,13 +68,3 @@ def test_license_status_expired_with_controlled_today():
     expires_at = date(2026, 9, 17)
     assert derive_license_status(expires_at, frozen_today) == "expired"
     assert days_to_expiry(expires_at, frozen_today) == -1
-
-
-def test_teacher_passport_valid_with_reasons():
-    payload = _load("teacher-passport.json")
-    passport = TeacherPassport.model_validate(payload)
-    assert passport.readiness.value == "attention"
-    assert passport.readiness_reasons, "attention passport must explain why"
-    assert passport.next_qualification_date is not None
-    assert len(passport.certificates) >= 1
-    assert any(c.is_mandatory for c in passport.certificates)

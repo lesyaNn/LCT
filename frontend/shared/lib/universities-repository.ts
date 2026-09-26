@@ -1,6 +1,15 @@
-import { getHealthStatus, type HealthStatus } from './health-score';
+export type HealthStatus = 'green' | 'yellow' | 'red';
+export const healthStatusMeta: Record<HealthStatus, { label: string; tone: 'success' | 'warning' | 'danger' }> = {
+  green: { label: 'Зелёный', tone: 'success' },
+  yellow: { label: 'Жёлтый', tone: 'warning' },
+  red: { label: 'Красный', tone: 'danger' },
+};
+export function getHealthStatus(score: number): HealthStatus {
+  if (score >= 85) return 'green';
+  if (score >= 60) return 'yellow';
+  return 'red';
+}
 import { programStatusLabels, type ProgramStatus } from './dashboard-repository';
-import { getExpirationStatus, type ExpirationStatus } from './formatters';
 import { apiDownload, apiFetch } from './api-client';
 import { ApiRequestError } from './api-errors';
 import { fromDataSource, isMockDataSource, isMockDataSourceFor } from './data-source';
@@ -17,10 +26,8 @@ import {
   registerMockWorkflow,
 } from '@/shared/mocks/api-adapter';
 import {
-  realGetTeacherPassport,
   realGetUniversities,
   realGetUniversityDocuments,
-  realGetUniversityHealthScore,
   realGetUniversityHistory,
   realGetUniversityLicenses,
   realGetUniversityMeetings,
@@ -28,9 +35,6 @@ import {
   realGetUniversityProducts,
   realGetUniversityPrograms,
   realGetUniversityResponsibles,
-  realGetUniversityStudentsSummary,
-  realGetUniversityStudents,
-  realGetUniversityTeachers,
 } from './real-api-adapter';
 
 export type { ProgramStatus };
@@ -915,101 +919,6 @@ export async function getUniversityHistory(id: string, filters: UniversityHistor
   return fromDataSource({ mock: () => getMockUniversityHistory(id, filters), real: () => realGetUniversityHistory(id, filters) });
 }
 
-export type HealthScoreReasonSeverity = 'high' | 'medium' | 'low';
-
-export interface UniversityHealthScoreBreakdown {
-  id: 'tasks' | 'documents' | 'stages' | 'teachers' | 'launch';
-  label: string;
-  weight: number;
-  score: number;
-  inputCounters: Array<{ label: string; value: number }>;
-}
-
-export interface UniversityHealthScoreReason {
-  id: string;
-  severity: HealthScoreReasonSeverity;
-  title: string;
-  description: string;
-  details?: string;
-  inputCounters?: Array<{ label: string; value: number }>;
-}
-
-export interface UniversityHealthScoreHistoryPoint {
-  date: string;
-  score: number;
-}
-
-export interface UniversityHealthScore {
-  universityId: string;
-  currentScore: number;
-  status: HealthStatus;
-  breakdown: UniversityHealthScoreBreakdown[];
-  reasons: UniversityHealthScoreReason[];
-  history: UniversityHealthScoreHistoryPoint[];
-  historyUnavailable?: boolean;
-  previousSnapshot: UniversityHealthScoreHistoryPoint | null;
-}
-
-export const universityHealthScoreQueryKey = queryKeys.universities.healthScore;
-
-function clampScore(value: number): number {
-  return Math.max(0, Math.min(100, Math.round(value)));
-}
-
-function createHealthHistory(currentScore: number, numericId: number): UniversityHealthScoreHistoryPoint[] {
-  const today = new Date(Date.UTC(2026, 8, 22));
-  return Array.from({ length: 30 }, (_, index) => {
-    const date = new Date(today);
-    date.setUTCDate(today.getUTCDate() - (29 - index));
-    const trend = (index - 22) * (numericId % 3 === 0 ? 0.28 : 0.16);
-    const wave = ((index * 7 + numericId) % 5) - 2;
-    return { date: date.toISOString().slice(0, 10), score: clampScore(currentScore - 3 + trend + wave) };
-  }).map((point, index, points) => index === points.length - 1 ? { ...point, score: currentScore } : point);
-}
-
-/** Temporary typed adapter for the future GET /universities/{id}/health-score endpoints. */
-async function getMockUniversityHealthScore(id: string): Promise<UniversityHealthScore> {
-  const university = getUniversityOrThrow(id);
-
-  const numericId = Number(id.split('-').at(-1)) || 1;
-  const currentScore = university.healthScore;
-  const taskScore = clampScore(currentScore + (university.attention ? -9 : 4));
-  const documentScore = clampScore(currentScore + (numericId % 2 === 0 ? 3 : -4));
-  const stageScore = clampScore(currentScore + (university.currentStage.id === stage.completed.id ? 8 : -3));
-  const teacherScore = clampScore(currentScore + (numericId % 3 === 0 ? -7 : 2));
-  const launchScore = clampScore(currentScore + (university.programStatusCounts.launched ? 3 : -6));
-  const history = createHealthHistory(currentScore, numericId);
-  const previousSnapshot = history[history.length - 8] ?? history[0];
-  const reasons: UniversityHealthScoreReason[] = university.attention
-    ? [
-      { id: `${id}-reason-tasks`, severity: 'high', title: 'Есть просроченные задачи', description: 'Часть контрольных задач не закрыта в установленный срок.', details: 'Проверьте задачи workflow и назначьте ответственных.', inputCounters: [{ label: 'Всего задач', value: 18 }, { label: 'Просрочено', value: 4 }] },
-      { id: `${id}-reason-documents`, severity: 'medium', title: 'Не все документы подписаны', description: 'Для запуска следующего этапа не хватает подтверждённых документов.', details: 'Нужно проверить пакет документов по двум активным программам.', inputCounters: [{ label: 'Документов', value: 24 }, { label: 'Ожидают подписи', value: 3 }] },
-      { id: `${id}-reason-teachers`, severity: 'low', title: 'Преподавателям требуется обновление данных', description: 'У нескольких преподавателей не подтверждена готовность к запуску.', inputCounters: [{ label: 'Требуют внимания', value: 8 }] },
-    ]
-    : [
-      { id: `${id}-reason-stable`, severity: 'low', title: 'Критичных факторов не обнаружено', description: 'Основные показатели вуза находятся в стабильном диапазоне.', details: 'Текущие задачи, документы и этапы обновляются без критичных отклонений.' },
-    ];
-
-  return {
-    universityId: university.id,
-    currentScore,
-    status: getHealthStatus(currentScore),
-    breakdown: [
-      { id: 'tasks', label: 'Задачи', weight: 25, score: taskScore, inputCounters: [{ label: 'Всего задач', value: 18 }, { label: 'Выполнено', value: 14 }, { label: 'Просрочено', value: university.attention ? 4 : 1 }] },
-      { id: 'documents', label: 'Документы', weight: 20, score: documentScore, inputCounters: [{ label: 'Всего документов', value: 24 }, { label: 'Подписано', value: university.attention ? 19 : 23 }, { label: 'Просрочено', value: university.attention ? 2 : 0 }] },
-      { id: 'stages', label: 'Этапы', weight: 20, score: stageScore, inputCounters: [{ label: 'Всего этапов', value: 6 }, { label: 'Завершено', value: university.currentStage.id === stage.completed.id ? 6 : 3 }, { label: 'Текущий этап', value: 1 }] },
-      { id: 'teachers', label: 'Преподаватели', weight: 20, score: teacherScore, inputCounters: [{ label: 'Всего преподавателей', value: 42 + numericId }, { label: 'Готовы', value: university.attention ? 35 + numericId : 39 + numericId }, { label: 'Требуют внимания', value: university.attention ? 8 : 3 }] },
-      { id: 'launch', label: 'Запуск', weight: 15, score: launchScore, inputCounters: [{ label: 'Активных программ', value: (university.programStatusCounts.active ?? 0) + (university.programStatusCounts.launched ?? 0) }, { label: 'Запущено', value: university.programStatusCounts.launched ?? 0 }] },
-    ],
-    reasons,
-    history,
-    previousSnapshot,
-  };
-}
-
-export async function getUniversityHealthScore(id: string, signal?: AbortSignal): Promise<UniversityHealthScore> {
-  return fromDataSource({ domain: 'passport', signal, mock: () => getMockUniversityHealthScore(id), real: () => realGetUniversityHealthScore(id, signal) });
-}
 
 export interface UniversityProgramRow {
   id: string;
@@ -1022,113 +931,7 @@ export interface UniversityProgramRow {
   studentsCount: number;
 }
 
-export type TeacherReadiness = 'ready' | 'attention' | 'expired';
 
-export interface UniversityTeacherRow {
-  id: string;
-  name: string;
-  position: string;
-  readiness: TeacherReadiness;
-  nextTrainingDate: string | null;
-  allowedPrograms: string[];
-}
-
-export interface TeacherQualification {
-  id: string;
-  name: string;
-  obtainedAt: string;
-  expiresAt: string;
-  status: ExpirationStatus;
-  document: { name: string; fileType: string; fileSize: string; downloadUrl: string | null } | null;
-}
-
-export interface TeacherTraining {
-  id: string;
-  name: string;
-  provider: string;
-  completedAt: string;
-  hours: number;
-  certificate: string | null;
-}
-
-export type TeacherCertificateStatus = ExpirationStatus | 'no_expiry';
-
-export interface TeacherCertificate {
-  id: string;
-  name: string;
-  issuer: string;
-  issuedAt: string;
-  expiresAt: string | null;
-  mandatory: boolean;
-  program: string | null;
-  status: TeacherCertificateStatus;
-  document: { name: string; fileType: string; fileSize: string; downloadUrl: string | null } | null;
-}
-
-export interface TeacherPassportProfile extends Omit<UniversityTeacherRow, 'nextTrainingDate'> {
-  universityId: string;
-  universityName: string;
-  universityCity: string;
-  readinessReason: string;
-  nextTrainingDate: string | null;
-  qualificationRequired: boolean;
-}
-
-export interface TeacherProgramAssignment {
-  id: string;
-  name: string;
-  direction: string;
-  canTeach: boolean;
-  assignedAt: string;
-  status: ProgramStatus;
-}
-
-export interface TeacherPassport {
-  teacher: TeacherPassportProfile;
-  qualifications: TeacherQualification[];
-  trainings: TeacherTraining[];
-  certificates: TeacherCertificate[];
-  allowedPrograms: TeacherProgramAssignment[];
-}
-
-export interface UniversityStudentsByProgram {
-  programId: string;
-  programName: string;
-  active: number;
-  graduated: number;
-  total: number;
-}
-
-export interface UniversityStudentsSummary {
-  total: number;
-  active: number;
-  graduated: number;
-  academicLeave: number;
-  byProgram: UniversityStudentsByProgram[];
-}
-
-export interface UniversityStudentListRow extends UniversityStudentsByProgram {
-  id: string;
-  studentName?: string;
-  externalId?: string;
-  flow: string | null;
-  status?: string;
-  startedAt?: string;
-  finishedAt?: string | null;
-  source?: 'manual' | 'lms' | 'website' | 'import';
-  progress?: number | null;
-  syncedAt?: string | null;
-}
-
-export interface UniversityStudentInput {
-  externalId: string;
-  programId: string;
-  fullName: string;
-  groupName: string;
-  status: 'active' | 'graduated' | 'academic_leave' | 'expelled';
-  startedAt: string;
-  finishedAt: string | null;
-}
 
 export type UniversityProductStatus = 'planned' | 'active' | 'expiring' | 'expired';
 
@@ -1143,18 +946,12 @@ export interface UniversityProductRow {
 }
 
 export const universityProgramsQueryKey = queryKeys.universities.programs;
-export const universityTeachersQueryKey = queryKeys.universities.teachers;
-export const teacherPassportQueryKey = queryKeys.teachers.passport;
-export const universityStudentsQueryKey = queryKeys.universities.students;
-export const universityStudentsSummaryQueryKey = queryKeys.universities.studentsSummary;
 export const universityProductsQueryKey = queryKeys.universities.products;
 
 const programDirections = ['Аналитика и данные', 'Цифровая трансформация', 'Информационная безопасность', 'Управление проектами'];
 /** Shared catalog dictionary used by university passport and report filters. */
 export const universityProgramDirectionOptions = programDirections.map((name) => ({ id: name.toLocaleLowerCase('ru-RU').replace(/\s+/g, '-'), name }));
 const programNames = ['Аналитика данных', 'Цифровая экономика', 'Кибербезопасность', 'ИТ-менеджмент'];
-const teacherNames = ['Мария Кузнецова', 'Алексей Орлов', 'Ольга Соколова', 'Илья Морозов', 'Наталья Лебедева', 'Сергей Фёдоров'];
-const teacherPositions = ['Руководитель программы', 'Старший преподаватель', 'Преподаватель-практик'];
 
 function getUniversityNumericId(id: string): number {
   const mockSuffix = id.match(/(?:^|-)0*(\d{1,4})$/)?.[1];
@@ -1219,168 +1016,7 @@ export async function getWorkflowSelectorPrograms(id: string, signal?: AbortSign
   return items;
 }
 
-/** Typed frontend adapter for the future university teachers endpoint. */
-async function getMockUniversityTeachers(id: string): Promise<UniversityTeacherRow[]> {
-  getUniversityOrThrow(id);
-  return universityTeachersFixture(id);
-}
 
-export async function getUniversityTeachers(id: string, page = 1, pageSize = 20, signal?: AbortSignal, readiness: TeacherReadiness | 'all' = 'all'): Promise<PaginatedResult<UniversityTeacherRow>> {
-  return fromDataSource({ domain: 'passport', signal, mock: async () => {
-    const items = (await getMockUniversityTeachers(id)).filter((item) => readiness === 'all' || item.readiness === readiness);
-    return { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: items.length };
-  }, real: () => realGetUniversityTeachers(id, page, pageSize, signal, readiness) });
-}
-
-function getTeacherPassportContext(id: string): { teacher: UniversityTeacherRow; university: UniversityListItem } {
-  const parts = id.split('-');
-  const universityId = `university-${String(Number(parts[1]) || 1).padStart(3, '0')}`;
-  const university = getUniversityOrThrow(universityId);
-  const teacherIndex = Math.max(0, (Number(parts[2]) || 1) - 1);
-  const teachers = universityTeachersFixture(universityId);
-  return { university, teacher: teachers[teacherIndex] ?? teachers[0] };
-}
-
-function universityTeachersFixture(id: string): UniversityTeacherRow[] {
-  const numericId = getUniversityNumericId(id);
-  const readiness: TeacherReadiness[] = ['ready', 'attention', 'expired', 'ready', 'ready', 'attention'];
-  const count = 5 + (numericId % 2);
-  return Array.from({ length: count }, (_, index) => ({
-    id: `teacher-${String(numericId).padStart(3, '0')}-${index + 1}`,
-    name: teacherNames[(index + numericId) % teacherNames.length],
-    position: teacherPositions[(index + numericId) % teacherPositions.length],
-    readiness: readiness[(index + numericId) % readiness.length],
-    nextTrainingDate: `2026-${String(((index + numericId) % 9) + 1).padStart(2, '0')}-${String(((index * 4 + numericId) % 22) + 3).padStart(2, '0')}`,
-    allowedPrograms: [
-      programNames[(index + numericId) % programNames.length],
-      ...(index % 2 === 0 ? [programNames[(index + numericId + 1) % programNames.length]] : []),
-    ],
-  }));
-}
-
-const qualificationNames = ['Педагогический дизайн', 'Информационная безопасность', 'Управление образовательными проектами'];
-const certificateNames = ['Информационная безопасность', 'Цифровая педагогика', 'Управление проектами', 'Основы аналитики данных'];
-
-function getReadinessReason(readiness: TeacherReadiness, certificates: TeacherCertificate[]): string {
-  const expiring = certificates.find((item) => item.mandatory && item.status === 'expires_soon');
-  const expired = certificates.find((item) => item.mandatory && item.status === 'expired');
-  if (readiness === 'ready') return 'Все обязательные сертификаты актуальны';
-  if (readiness === 'expired' && expired) return `Истёк обязательный сертификат: ${expired.name}`;
-  if (expiring?.expiresAt) return `Сертификат «${expiring.name}» истекает ${new Intl.DateTimeFormat('ru-RU').format(new Date(expiring.expiresAt))}`;
-  return 'Нужно обновить данные о квалификации';
-}
-
-/** Typed frontend adapter for the future GET /teachers/{id}/passport endpoint. */
-async function getMockTeacherPassport(id: string): Promise<TeacherPassport> {
-  const { teacher, university } = getTeacherPassportContext(id);
-  const numericId = getUniversityNumericId(university.id);
-  const certificateDates: Array<string | null> = teacher.readiness === 'expired'
-    ? ['2026-08-15', '2027-02-20', '2026-09-10', null]
-    : teacher.readiness === 'attention'
-      ? ['2026-10-15', '2027-02-20', '2027-04-10', null]
-      : ['2027-01-15', '2027-02-20', '2027-04-10', null];
-  const certificates: TeacherCertificate[] = certificateNames.map((name, index) => {
-    const expiresAt = certificateDates[index];
-    return {
-      id: `${id}-certificate-${index + 1}`,
-      name,
-      issuer: ['Ростелеком', 'ИТ-Академия', 'НОЦ «Цифровые кадры»', 'Университетская школа'][index],
-      issuedAt: `202${index % 2 + 3}-${String(((numericId + index) % 8) + 1).padStart(2, '0')}-12`,
-      expiresAt,
-      mandatory: index < 3,
-      program: index === 3 ? null : programNames[(index + numericId) % programNames.length],
-      status: expiresAt ? getExpirationStatus(expiresAt, 30) : ('no_expiry' as const),
-      document: {
-        name: `${name}.pdf`,
-        fileType: 'PDF',
-        fileSize: `${1 + index}.2 МБ`,
-        downloadUrl: null,
-      },
-    };
-  }).sort((left, right) => Number(right.mandatory) - Number(left.mandatory) || (left.expiresAt ?? '9999-12-31').localeCompare(right.expiresAt ?? '9999-12-31'));
-
-  const qualifications: TeacherQualification[] = qualificationNames.map((name, index) => {
-    const expiresAt = [`2027-04-18`, `2026-12-12`, `2026-09-10`][index];
-    return {
-      id: `${id}-qualification-${index + 1}`,
-      name,
-      obtainedAt: `202${index + 2}-0${index + 3}-18`,
-      expiresAt,
-      status: getExpirationStatus(expiresAt),
-      document: index === 2 ? null : { name: `${name}.pdf`, fileType: 'PDF', fileSize: `${2 + index}.4 МБ`, downloadUrl: null },
-    };
-  }).sort((left, right) => right.obtainedAt.localeCompare(left.obtainedAt));
-
-  const trainings: TeacherTraining[] = [
-    { id: `${id}-training-1`, name: 'Современные методы онлайн-обучения', provider: 'Ростелеком Лицей', completedAt: '2026-06-24', hours: 24, certificate: 'Сертификат RTK-2026-184' },
-    { id: `${id}-training-2`, name: 'Практики безопасной разработки', provider: 'ИТ-Академия', completedAt: '2025-11-18', hours: 16, certificate: 'Сертификат IT-2025-071' },
-    { id: `${id}-training-3`, name: 'Работа с данными в образовательных программах', provider: 'НОЦ «Цифровые кадры»', completedAt: '2025-04-09', hours: 32, certificate: null },
-  ];
-
-  const teacherNumber = Number(id.split('-').at(-1)) || 1;
-  const qualificationRequired = teacherNumber % 5 !== 0;
-  return {
-    teacher: {
-      ...teacher,
-      universityId: university.id,
-      universityName: university.name,
-      universityCity: university.city,
-      readinessReason: getReadinessReason(teacher.readiness, certificates),
-      nextTrainingDate: qualificationRequired ? teacher.nextTrainingDate : null,
-      qualificationRequired,
-    },
-    qualifications,
-    trainings,
-    certificates,
-    allowedPrograms: teacher.allowedPrograms.map((name, index) => ({
-      id: `${university.id}-program-${index + 1}`,
-      name,
-      direction: programDirections[(index + numericId) % programDirections.length],
-      canTeach: index !== 1,
-      assignedAt: `2026-${String(((index + numericId) % 6) + 3).padStart(2, '0')}-${String(((index * 5 + numericId) % 20) + 1).padStart(2, '0')}`,
-      status: (['active', 'launched', 'planned', 'archived'] as ProgramStatus[])[(index + numericId) % 4],
-    })),
-  };
-}
-
-export async function getTeacherPassport(id: string): Promise<TeacherPassport> {
-  return fromDataSource({ domain: 'passport', mock: () => getMockTeacherPassport(id), real: () => realGetTeacherPassport(id) });
-}
-
-/** Typed frontend adapter for the future aggregate students endpoint. */
-async function getMockUniversityStudentsSummary(id: string): Promise<UniversityStudentsSummary> {
-  const university = getUniversityOrThrow(id);
-  const numericId = getUniversityNumericId(id);
-  const byProgram = programNames.map((programName, index) => {
-    const total = 42 + ((numericId * 9 + index * 13) % 65);
-    const graduated = 8 + ((numericId + index * 4) % 18);
-    const active = Math.max(0, total - graduated - ((numericId + index) % 5));
-    return { programId: `${id}-program-${index + 1}`, programName, active, graduated, total };
-  });
-  const total = byProgram.reduce((sum, item) => sum + item.total, 0);
-  const graduated = byProgram.reduce((sum, item) => sum + item.graduated, 0);
-  const academicLeave = 2 + (numericId % 5);
-
-  return {
-    total,
-    active: Math.max(0, total - graduated - academicLeave),
-    graduated,
-    academicLeave,
-    byProgram: university.programsCount ? byProgram : [],
-  };
-}
-
-export async function getUniversityStudentsSummary(id: string, queryClient?: QueryClient): Promise<UniversityStudentsSummary> {
-  return fromDataSource({ domain: 'passport', mock: () => getMockUniversityStudentsSummary(id), real: () => realGetUniversityStudentsSummary(id, queryClient) });
-}
-
-export async function getUniversityStudents(id: string, page = 1, pageSize = 20, signal?: AbortSignal): Promise<PaginatedResult<UniversityStudentListRow>> {
-  return fromDataSource<PaginatedResult<UniversityStudentListRow>>({ domain: 'passport', signal, mock: async () => {
-    const summary = await getMockUniversityStudentsSummary(id);
-    const items = summary.byProgram.map((row) => ({ ...row, id: row.programId, flow: null }));
-    return { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: items.length };
-  }, real: () => realGetUniversityStudents(id, page, pageSize, signal) });
-}
 
 export async function attachUniversityProgram(universityId: string, programId: string): Promise<{ id: string }> {
   return unwrapPassportMutation(await apiFetch<{ id: string }>(`/api/v1/universities/${encodeURIComponent(universityId)}/programs`, {
@@ -1401,23 +1037,6 @@ function unwrapPassportMutation<T>(result: Awaited<ReturnType<typeof apiFetch<T>
   throw new ApiRequestError(result.status, result.body, 'Не удалось сохранить данные паспорта.', result.error);
 }
 
-export async function createUniversityStudent(universityId: string, input: UniversityStudentInput): Promise<{ id: string }> {
-  return unwrapPassportMutation(await apiFetch<{ id: string }>(`/api/v1/universities/${encodeURIComponent(universityId)}/students`, {
-    method: 'POST',
-    body: { external_id: input.externalId.trim(), program_id: input.programId, full_name: input.fullName.trim(), group_name: input.groupName.trim() || null, status: input.status, started_at: input.startedAt, finished_at: input.finishedAt },
-  }));
-}
-
-export async function updateUniversityStudent(studentId: string, input: UniversityStudentInput): Promise<{ id: string }> {
-  return unwrapPassportMutation(await apiFetch<{ id: string }>(`/api/v1/students/${encodeURIComponent(studentId)}`, {
-    method: 'PATCH',
-    body: { program_id: input.programId, full_name: input.fullName.trim(), group_name: input.groupName.trim() || null, status: input.status, started_at: input.startedAt, finished_at: input.finishedAt },
-  }));
-}
-
-export async function deleteUniversityStudent(studentId: string): Promise<void> {
-  unwrapPassportMutation(await apiFetch<void>(`/api/v1/students/${encodeURIComponent(studentId)}`, { method: 'DELETE' }));
-}
 
 /** Typed frontend adapter for the future university products/licenses endpoint. */
 async function getMockUniversityProducts(id: string): Promise<UniversityProductRow[]> {

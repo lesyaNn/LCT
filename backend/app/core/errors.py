@@ -149,8 +149,6 @@ def _http_details(detail: Any) -> Mapping[str, Any] | None:
 
 
 _CONSTRAINT_FIELDS = {
-    "uq_students_external_id": "external_id",
-    "students_external_id_key": "external_id",
     "universities_name_key": "name",
     "it_directions_code_key": "code",
     "vendors_name_key": "name",

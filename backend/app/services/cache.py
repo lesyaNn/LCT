@@ -19,7 +19,6 @@ logger = logging.getLogger("rtk")
 
 CACHE_TTL = {
     "catalogs": 300,  # 5 минут: directions, programs, products, vendors
-    "health_score": 300,  # 5 минут
     "analytics": 60,  # 1 минута: overview
     "university_list": 60,  # 1 минута
 }
@@ -69,14 +68,6 @@ async def invalidate_catalogs() -> None:
     _delete_pattern("catalogs:")
 
 
-async def invalidate_health_score(university_id: uuid.UUID | None = None) -> None:
-    if university_id is not None:
-        redis_infra.cache_delete(f"health_score:{university_id}")
-        _delete_pattern("health_score:batch:")
-        return
-    _delete_pattern("health_score:")
-
-
 async def invalidate_analytics() -> None:
     _delete_pattern("analytics:")
 
@@ -87,5 +78,4 @@ __all__ = [
     "cached",
     "invalidate_analytics",
     "invalidate_catalogs",
-    "invalidate_health_score",
 ]

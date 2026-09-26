@@ -7,12 +7,11 @@
   (expiring licenses, expired documents, certificate readiness) stay valid
   whenever the seed runs.
 * Creates the full chain: catalogs -> universities -> programs/products ->
-  responsibles -> teachers/certificates -> students -> licenses/contracts ->
+  responsibles -> licenses/contracts ->
   meetings -> documents -> notes, with no dangling FKs.
 
 Workflow instances (P1-09-02 progress table) are P2-owned tables and are
-intentionally NOT seeded here — license/document/teacher signals that feed
-Health Score ARE seeded exactly per spec. The P2-01-04 standard
+intentionally NOT seeded here. The P2-01-04 standard
 14-stage workflow *template* IS seeded here via ``seed_workflow_templates``
 (idempotent, runs after ``migrate``).
 """
@@ -44,20 +43,9 @@ from app.models.interactions import (
     InteractionNote,
     Meeting,
     MeetingDocument,
-    Student,
     UniversityProduct,
     UniversityProgram,
 )
-
-try:  # pragma: no cover - import guard for partial checkouts
-    from app.models.teachers import (
-        Teacher,
-        TeacherCertificate,
-        TeacherProgram,
-        TeacherQualification,
-    )
-except Exception:  # pragma: no cover
-    Teacher = TeacherCertificate = TeacherProgram = TeacherQualification = None
 
 from app.db.seed_workflow import seed_workflow_templates
 
@@ -300,106 +288,6 @@ def seed_demo(session: Session, skip_universities: bool | None = None) -> dict:
             )
             uni_progs.append((prog, up))
 
-        # --- teachers (P1-09-03 exact plan) ---
-        plan = TEACHER_PLAN[uname]
-        for t_idx, readiness in enumerate(plan):
-            email = f"teacher.u{u_idx}.t{t_idx}@example.local"
-            teacher, created = _get_or_create(
-                session,
-                Teacher,
-                {
-                    "university_id": uni.id,
-                 "full_name": f"{last_names[(u_idx * 3 + t_idx) % 10]} "
-                              f"{first_names[(u_idx + t_idx * 2) % 10]} "
-                              f"В.{t_idx}",
-                 "phone": None,
-                    "position": "доцент" if t_idx % 2 == 0 else "старший преподаватель",
-                },
-                email=email,
-            )
-            if created:
-                # teacher_programs: 1-2 of the university's programs
-                for lk, (prog, _up) in enumerate(uni_progs[: 1 + (t_idx % 2)]):
-                    session.add(
-                        TeacherProgram(
-                            teacher_id=teacher.id,
-                            program_id=prog.id,
-                        can_teach=True,
-                        assigned_at=today - timedelta(days=300 + t_idx),
-                        )
-                    )
-                # qualification
-                session.add(
-                    TeacherQualification(
-                    teacher_id=teacher.id,
-                    qualification_name="Повышение квалификации ППС",
-                    obtained_at=today - timedelta(days=400 + t_idx * 30),
-                        expires_at=(
-                            today + timedelta(days=300)
-                            if readiness != "expired"
-                            else today - timedelta(days=60)
-                        ),
-                    document_ref=None,
-                    )
-                )
-                # certificates per readiness
-                if readiness == "ready-nocert":
-                    session.add(
-                        TeacherCertificate(
-                        teacher_id=teacher.id,
-                        certificate_name=OPTIONAL_CERTS[t_idx % 2],
-                        issued_by="Внутренний центр",
-                        issued_at=today - timedelta(days=200),
-                        expires_at=today + timedelta(days=500),
-                        is_mandatory=False,
-                            program_id=None,
-                            document_ref=None,
-                        )
-                    )
-                else:
-                    if readiness == "ready":
-                        deltas = [400 + t_idx * 40, 550]
-                    elif readiness == "attention":
-                        # СПбГУ: 15; ВШЭ: 10/25 — derive from position in plan
-                        att_seen = sum(1 for x in plan[: t_idx + 1] if x == "attention")
-                        delta_map = {1: 15, 2: 25}
-                        first = (
-                            10
-                            if uname == "НИУ ВШЭ" and att_seen == 1
-                            else delta_map.get(att_seen, 20)
-                        )
-                        deltas = [first, 400]
-                    else:  # expired
-                        deltas = [-5 - t_idx * 7, 400 if t_idx % 2 == 0 else -40]
-                    for c_idx, delta in enumerate(deltas[:2]):
-                        session.add(
-                            TeacherCertificate(
-                            teacher_id=teacher.id,
-                            certificate_name=MANDATORY_CERTS[
-                                    (t_idx + c_idx) % len(MANDATORY_CERTS)
-                                ],
-                            issued_by="АНО ДПО «РТК Школа»",
-                            issued_at=today - timedelta(days=1000),
-                            expires_at=today + timedelta(days=delta),
-                            is_mandatory=True,
-                            program_id=uni_progs[0][0].id,
-                            document_ref=None,
-                            )
-                        )
-                    session.add(
-                        TeacherCertificate(
-                        teacher_id=teacher.id,
-                        certificate_name=OPTIONAL_CERTS[t_idx % 2],
-                        issued_by="Внутренний центр",
-                        issued_at=today - timedelta(days=200),
-                        expires_at=today + timedelta(days=600),
-                        is_mandatory=False,
-                            program_id=None,
-                            document_ref=None,
-                        )
-                    )
-                session.flush()
-
         # --- licenses + contracts (P1-09-02 expiry plan) ---
         exp_plan = LICENSE_EXPIRY.get(uname, [180])
         for l_idx, delta in enumerate(exp_plan):
@@ -547,41 +435,6 @@ def seed_demo(session: Session, skip_universities: bool | None = None) -> dict:
                 content=f"Заметка {n_idx + 1} по {uname[:20]}",
             )
 
-        # --- students (bulk, idempotent) ---
-        existing = set(
-            session.execute(select(Student.external_id).filter_by(university_id=uni.id))
-            .scalars()
-            .all()
-        )
-        to_add = []
-        for _prog, up in uni_progs:
-            for s_idx in range(30):
-                ext = f"lms-u{u_idx}-p{str(up.program_id)[:8]}-{s_idx:03d}"
-                if ext in existing:
-                    continue
-                if s_idx < 24:
-                    st, fin = "active", None
-                elif s_idx < 26:
-                    st, fin = "graduated", today - timedelta(days=30)
-                elif s_idx < 28:
-                    st, fin = "expelled", None
-                else:
-                    st, fin = "academic_leave", None
-                to_add.append(
-                    Student(
-                        external_id=ext,
-                        university_id=uni.id,
-                    program_id=up.program_id,
-                    full_name=f"Студентов Студент {u_idx}-{s_idx}",
-                    group_name=f"Группа {(s_idx % 3) + 1}",
-                        status=st,
-                        started_at=today - timedelta(days=400),
-                    finished_at=fin,
-                    )
-                )
-        session.add_all(to_add)
-        session.flush()
-
     session.commit()
 
     wf_stats = seed_workflow_templates(session)
@@ -600,9 +453,6 @@ def _collect_stats(session: Session) -> dict:
         (Vendor, "vendors"),
         (ITProduct, "products"),
         (Responsible, "responsibles"),
-        (Teacher, "teachers"),
-        (TeacherCertificate, "certificates"),
-        (Student, "students"),
         (License, "licenses"),
         (Contract, "contracts"),
         (Meeting, "meetings"),

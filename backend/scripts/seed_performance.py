@@ -17,9 +17,6 @@ Scale targets (additive, totals include the 10-university demo seed):
 * universities:          +50  (~60 total)
 * it_programs:           +100 (~106 total, global catalog)
 * university_programs:   ~6/univ (~325 total)
-* teachers:              10/univ (500 new, ~534 total)
-* teacher_programs:      3/teacher (1500 new, ~1550 total)
-* students:              100/univ (5000 new, ~5750 total)
 * licenses:              10/univ (500 new, ~520 total)
 * contracts:             4/univ (200 new, ~230 total)
 * documents:             60/univ (3000 new, ~3040 total)
@@ -60,24 +57,14 @@ from app.models.interactions import (  # noqa: E402
     Document,
     InteractionNote,
     Meeting,
-    Student,
     UniversityProduct,
     UniversityProgram,
-)
-from app.models.teachers import (  # noqa: E402
-    Teacher,
-    TeacherCertificate,
-    TeacherProgram,
-    TeacherQualification,
 )
 
 RNG = random.Random(42)
 
 N_PERF_UNIVS = 50
 N_EXTRA_PROGRAMS = 100
-TEACHERS_PER_UNIV = 10
-LINKS_PER_TEACHER = 3
-STUDENTS_PER_UNIV = 100
 LICENSES_PER_UNIV = 10
 CONTRACTS_PER_UNIV = 4
 DOCS_PER_UNIV = 60
@@ -86,9 +73,6 @@ NOTES_PER_UNIV = 40
 AUDIT_PER_UNIV = 60
 
 SYSTEM_SUB = "perf-seed"
-
-STATUSES = ["active"] * 80 + ["graduated"] * 10 + ["expelled"] * 5 + ["academic_leave"] * 5
-
 
 def _get_or_create(session: Session, model, defaults: dict, **key):
     obj = session.execute(select(model).filter_by(**key)).scalar_one_or_none()
@@ -184,95 +168,6 @@ def seed_performance(session: Session) -> dict:
                 program_id=prog.id,
             )
             uni_prog_ids.append(prog.id)
-
-        # teachers + certs + quals + links
-        for t_idx in range(TEACHERS_PER_UNIV):
-            email = f"perf.u{u_idx:02d}.t{t_idx:02d}@example.local"
-            teacher, created = _get_or_create(
-                session,
-                Teacher,
-                {
-                    "university_id": uni.id,
-                    "full_name": f"PERF Преподаватель {u_idx:02d}-{t_idx:02d}",
-                    "position": "доцент",
-                },
-                email=email,
-            )
-            if not created:
-                continue
-            for lk in range(LINKS_PER_TEACHER):
-                prog_id = uni_prog_ids[(t_idx + lk) % len(uni_prog_ids)]
-                session.add(
-                    TeacherProgram(
-                        teacher_id=teacher.id,
-                        program_id=prog_id,
-                        can_teach=True,
-                        assigned_at=today - timedelta(days=300),
-                    )
-                )
-            # 1 qualification (mixed expiry) + 2 mandatory certs + 1 optional
-            delta_q = RNG.choice([400, 200, 15, -30])
-            session.add(
-                TeacherQualification(
-                    teacher_id=teacher.id,
-                    qualification_name="ПК PERF",
-                    obtained_at=today - timedelta(days=400),
-                    expires_at=today + timedelta(days=delta_q),
-                )
-            )
-            for c_idx in range(2):
-                delta_c = RNG.choice([500, 300, 20, 10, -10, -60])
-                session.add(
-                    TeacherCertificate(
-                        teacher_id=teacher.id,
-                        certificate_name=f"PERF Mandatory {c_idx}",
-                        issued_by="PERF Center",
-                        issued_at=today - timedelta(days=900),
-                        expires_at=today + timedelta(days=delta_c),
-                        is_mandatory=True,
-                    )
-                )
-            session.add(
-                TeacherCertificate(
-                    teacher_id=teacher.id,
-                    certificate_name="PERF Optional",
-                    issued_by="PERF Center",
-                    issued_at=today - timedelta(days=200),
-                    expires_at=today + timedelta(days=600),
-                    is_mandatory=False,
-                )
-            )
-            session.flush()
-
-        # students: 100/univ bulk
-        existing = set(
-            session.execute(
-                select(Student.external_id).filter_by(university_id=uni.id)
-            ).scalars().all()
-        )
-        to_add = []
-        for s_idx in range(STUDENTS_PER_UNIV):
-            ext = f"perf-u{u_idx:02d}-{s_idx:03d}"
-            if ext in existing:
-                continue
-            st = RNG.choice(STATUSES)
-            prog_id = uni_prog_ids[s_idx % len(uni_prog_ids)]
-            to_add.append(
-                Student(
-                    external_id=ext,
-                    university_id=uni.id,
-                    program_id=prog_id,
-                    full_name=f"PERF Студент {u_idx:02d}-{s_idx:03d}",
-                    group_name=f"Группа {(s_idx % 4) + 1}",
-                    status=st,
-                    started_at=today - timedelta(days=400),
-                    finished_at=(
-                        today - timedelta(days=30) if st == "graduated" else None
-                    ),
-                )
-            )
-        session.add_all(to_add)
-        session.flush()
 
         # contracts + licenses + university_products
         for c_idx in range(CONTRACTS_PER_UNIV):
@@ -406,9 +301,6 @@ def seed_performance(session: Session) -> dict:
         (University, "universities"),
         (ITProgram, "programs"),
         (UniversityProgram, "university_programs"),
-        (Teacher, "teachers"),
-        (TeacherProgram, "teacher_programs"),
-        (Student, "students"),
         (License, "licenses"),
         (Contract, "contracts"),
         (Document, "documents"),

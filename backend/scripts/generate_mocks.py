@@ -1,27 +1,19 @@
-"""Generate P3 mock JSON from the demo seed (P1-12-01).
+"""Generate P3 mock JSON from the demo seed.
 
 Usage (from ``backend/``)::
 
     python scripts/generate_mocks.py [--out ../docs/mocks]
 
-Builds ``UniversityPassport`` / ``TeacherPassport`` DTOs from a freshly
-seeded database and dumps them as JSON, so P3 can mock
-``GET /universities/{id}/passport`` and ``GET /teachers/{id}/passport``
-without a backend. Files are re-validated against the Pydantic schemas on
+Builds the ``UniversityPassport`` DTO from a freshly seeded database and
+dumps it as JSON, so P3 can mock ``GET /universities/{id}/passport``
+without a backend. The file is re-validated against the Pydantic schema on
 every run (round-trip parse) — the script fails loudly on schema drift.
-
-Illustrative placeholders (P2-owned, filled with demo values until the
-real services land):
-* ``health_score`` / ``health_status`` — target values from P1-09-01.
-* ``workflow_summary`` — stage pointer; workflow instances are P2-owned.
-* ``trainings`` — empty; no training entity exists in P1.
 """
 
 import argparse
 import json
 import os
 import sys
-from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -34,13 +26,10 @@ from app.models.interactions import (
     Document,
     InteractionNote,
     Meeting,
-    Student,
     UniversityProduct,
     UniversityProgram,
 )
-from app.models.teachers import Teacher
 from app.schemas import (
-    CertificateShort,
     ContractShort,
     DocumentShort,
     DocumentStatus,
@@ -49,32 +38,19 @@ from app.schemas import (
     MeetingShort,
     ProductShort,
     ProgramShort,
-    QualificationShort,
     ResponsibleDetail,
     ResponsibleShort,
     StageShort,
-    StudentsSummary,
-    TeacherDetail,
-    TeacherPassport,
-    TeacherReadiness,
-    TeacherShort,
     UniversityDetail,
     UniversityPassport,
     WorkflowSummary,
 )
-from app.services.teacher_readiness import compute_teacher_readiness
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# When run from backend/, repo root is one level up.
 if os.path.basename(REPO_ROOT) == "backend":
     REPO_ROOT = os.path.dirname(REPO_ROOT)
 
 UNIVERSITY_NAME = "МГУ им. М.В. Ломоносова"
-TEACHER_UNIVERSITY = "СПбГУ"
-TEACHER_READINESS = "attention"
-
-# Illustrative P2-owned values (see module docstring).
-HEALTH_SCORE = {UNIVERSITY_NAME: (92, "green")}
 WORKFLOW_STAGE = {"code": "control", "name": "Контроль исполнения"}
 
 
@@ -102,14 +78,11 @@ def build_university_passport(session: Session, uni_name: str) -> UniversityPass
         if primary is not None
         else None
     )
-    score, status = HEALTH_SCORE.get(uni_name, (None, None))
     university = UniversityDetail(
         id=uni.id,
         name=uni.name,
         city=uni.city,
         responsible=responsible,
-        health_score=score,
-        health_status=status,
         created_at=uni.created_at,
         updated_at=uni.updated_at,
     )
@@ -120,35 +93,6 @@ def build_university_passport(session: Session, uni_name: str) -> UniversityPass
         .filter(UniversityProgram.university_id == uni.id)
     ).all()
     programs = [_program_short(prog) for _, prog in uni_progs]
-
-    teachers = []
-    for teacher in sorted(uni.teachers, key=lambda t: t.full_name):
-        result = compute_teacher_readiness(
-            certificates=teacher.certificates,
-            qualifications=teacher.qualifications,
-        )
-        teachers.append(
-            TeacherShort(
-                id=teacher.id,
-                full_name=teacher.full_name,
-                position=teacher.position,
-                readiness=result.readiness,
-            )
-        )
-
-    student_statuses = Counter(
-        s.status
-        for s in session.execute(
-            select(Student).filter_by(university_id=uni.id)
-        ).scalars().all()
-    )
-    students_summary = StudentsSummary(
-        total=sum(student_statuses.values()),
-        active=student_statuses.get("active", 0),
-        graduated=student_statuses.get("graduated", 0),
-        expelled=student_statuses.get("expelled", 0),
-        academic_leave=student_statuses.get("academic_leave", 0),
-    )
 
     uni_products = session.execute(
         select(UniversityProduct, ITProduct)
@@ -224,8 +168,6 @@ def build_university_passport(session: Session, uni_name: str) -> UniversityPass
     return UniversityPassport(
         university=university,
         programs=programs,
-        teachers=teachers,
-        students_summary=students_summary,
         products=products,
         licenses=licenses,
         contracts=contracts,
@@ -241,80 +183,8 @@ def build_university_passport(session: Session, uni_name: str) -> UniversityPass
     )
 
 
-def _certificate_short(cert) -> CertificateShort:
-    return CertificateShort(
-        id=cert.id,
-        name=cert.certificate_name,
-        issued_by=cert.issued_by,
-        issued_at=cert.issued_at,
-        expires_at=cert.expires_at,
-        is_mandatory=cert.is_mandatory,
-        program_name=cert.program.name if cert.program else None,
-    )
-
-
-def build_teacher_passport(
-    session: Session, uni_name: str, readiness: str = "attention"
-) -> TeacherPassport:
-    uni = session.execute(select(University).filter_by(name=uni_name)).scalar_one()
-    teachers = session.execute(
-        select(Teacher).filter_by(university_id=uni.id)
-    ).scalars().all()
-    scored = []
-    for teacher in teachers:
-        result = compute_teacher_readiness(
-            certificates=teacher.certificates,
-            qualifications=teacher.qualifications,
-        )
-        scored.append((teacher, result))
-    teacher, result = next(
-        (t, r) for t, r in scored if r.readiness.value == readiness
-    )
-
-    allowed = []
-    for link in teacher.teacher_programs:
-        prog = session.get(ITProgram, link.program_id)
-        if prog is not None:
-            allowed.append(_program_short(prog))
-
-    detail = TeacherDetail(
-        id=teacher.id,
-        university_id=teacher.university_id,
-        university_name=uni.name,
-        full_name=teacher.full_name,
-        email=teacher.email,
-        phone=teacher.phone,
-        position=teacher.position,
-        readiness=result.readiness,
-        next_qualification_date=result.next_qualification_date,
-        qualifications=[
-            QualificationShort(
-                id=q.id,
-                name=q.qualification_name,
-                obtained_at=q.obtained_at,
-                expires_at=q.expires_at,
-            )
-            for q in teacher.qualifications
-        ],
-        certificates=[_certificate_short(c) for c in teacher.certificates],
-        allowed_programs=allowed,
-        created_at=teacher.created_at,
-        updated_at=teacher.updated_at,
-    )
-    return TeacherPassport(
-        teacher=detail,
-        trainings=[],
-        certificates=detail.certificates,
-        qualifications=detail.qualifications,
-        allowed_programs=allowed,
-        next_qualification_date=result.next_qualification_date,
-        readiness=result.readiness,
-        readiness_reasons=result.reasons,
-    )
-
-
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate P3 mock JSON (P1-12-01).")
+    parser = argparse.ArgumentParser(description="Generate P3 mock JSON.")
     parser.add_argument(
         "--out",
         default=os.path.join(REPO_ROOT, "docs", "mocks"),
@@ -334,39 +204,18 @@ def main() -> None:
     with Session(engine) as session:
         seed_demo(session)
         university_passport = build_university_passport(session, UNIVERSITY_NAME)
-        teacher_passport = build_teacher_passport(
-            session, TEACHER_UNIVERSITY, TEACHER_READINESS
-        )
 
-    outputs = {
-        "university-passport.json": UniversityPassport,
-        "teacher-passport.json": TeacherPassport,
-    }
-    passports = {
-        "university-passport.json": university_passport,
-        "teacher-passport.json": teacher_passport,
-    }
-    for filename, model in outputs.items():
-        passport = passports[filename]
-        payload = passport.model_dump(mode="json")
-        # Round-trip validation: fails loudly on schema drift.
-        model.model_validate(payload)
-        path = os.path.join(args.out, filename)
-        with open(path, "w", encoding="utf-8") as fh:
-            json.dump(payload, fh, ensure_ascii=False, indent=2)
-            fh.write("\n")
-        assert TeacherReadiness  # keep import used for future variants
-        print(f"WROTE {path}")
-
+    payload = university_passport.model_dump(mode="json")
+    UniversityPassport.model_validate(payload)
+    path = os.path.join(args.out, "university-passport.json")
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, ensure_ascii=False, indent=2)
+        fh.write("\n")
+    print("WROTE", path)
     print(
-        f"university: {UNIVERSITY_NAME} "
-        f"({len(university_passport.programs)} programs, "
-        f"{len(university_passport.teachers)} teachers, "
-        f"{len(university_passport.licenses)} licenses)"
-    )
-    print(
-        f"teacher: {teacher_passport.teacher.full_name} "
-        f"readiness={teacher_passport.readiness.value}"
+        "university: " + UNIVERSITY_NAME
+        + " (" + str(len(university_passport.programs)) + " programs, "
+        + str(len(university_passport.licenses)) + " licenses)"
     )
 
 

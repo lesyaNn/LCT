@@ -1,10 +1,10 @@
-"""L14: all 7 mocks exist once, in canonical places, schema-valid.
+"""L14: mocks exist once, in canonical places, schema-valid.
 
 Canonical map (see ``backend/docs/mocks/README.md``):
-* ``docs/mocks/``: university-passport, teacher-passport (generated),
-  analytics-overview + report-request (static etalons, no generator);
-* ``backend/docs/mocks/``: health-score, workflow-instance (generated),
-  report-job (static etalon, no generator).
+* ``docs/mocks/``: university-passport, analytics-overview + report-request
+  (static etalons, no generator);
+* ``backend/docs/mocks/``: workflow-instance (generated), report-job
+  (static etalon, no generator).
 
 Also pins: no ``university-passport.json`` duplicate under
 ``backend/docs/mocks/`` (drift of doubles removed in Dev-3).
@@ -41,10 +41,9 @@ def test_no_university_passport_duplicate():
 
 
 def test_p1_passport_mocks_valid():
-    from app.schemas import TeacherPassport, UniversityPassport
+    from app.schemas import UniversityPassport
 
     UniversityPassport.model_validate(_load(ROOT_MOCKS, "university-passport.json"))
-    TeacherPassport.model_validate(_load(ROOT_MOCKS, "teacher-passport.json"))
 
 
 def test_analytics_overview_mock_valid():
@@ -60,10 +59,8 @@ def test_report_request_mock_valid():
 
 
 def test_p2_mocks_valid():
-    from app.modules.health_score.schemas import HealthScoreResponse
     from app.modules.workflow_instances.schemas import InstanceDetail
 
-    HealthScoreResponse.model_validate(_load(BACKEND_MOCKS, "health-score.json"))
     InstanceDetail.model_validate(_load(BACKEND_MOCKS, "workflow-instance.json"))
 
 

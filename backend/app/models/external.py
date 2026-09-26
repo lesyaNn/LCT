@@ -24,7 +24,6 @@ class ExternalApplication(UUIDPKMixin, TimestampMixin, Base):
     ingest_channel: Mapped[str] = mapped_column(String(32), nullable=False)
     university_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("universities.id", ondelete="RESTRICT"), nullable=True)
     program_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("it_programs.id", ondelete="RESTRICT"), nullable=True)
-    student_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("students.id", ondelete="SET NULL"), nullable=True)
     person_name: Mapped[str | None] = mapped_column(String(512), nullable=True)
     status: Mapped[str | None] = mapped_column(String(64), nullable=True)
     flow_name: Mapped[str | None] = mapped_column(String(256), nullable=True)

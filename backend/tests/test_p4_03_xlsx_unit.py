@@ -38,7 +38,7 @@ SUBSET_6 = [
     "product",
     "workflow_status",
     "responsible",
-    "health_score",
+    "city",
 ]
 
 
@@ -51,7 +51,7 @@ def _rows_6() -> list[dict]:
             "product": "ПО Защита",
             "workflow_status": "Ответственный",
             "responsible": "Иван Петров",
-            "health_score": 85,
+            "city": "Москва",
             "_university_id": uid,
         },
         {
@@ -60,7 +60,7 @@ def _rows_6() -> list[dict]:
             "product": None,
             "workflow_status": None,
             "responsible": None,
-            "health_score": None,
+            "city": None,
             "_university_id": uid,
         },
     ]
@@ -249,7 +249,7 @@ def test_data_rows_values_and_row_count(tmp_path):
     assert result.row_count == 2
     ws = load_workbook(result.path)["Отчёт"]
     assert ws.cell(row=7, column=1).value == "МГУ им. Ломоносова"
-    assert ws.cell(row=7, column=6).value == 85
+    assert ws.cell(row=7, column=6).value == "Москва"
     assert ws.cell(row=8, column=1).value == "МГУ им. Ломоносова"
     # Nulls stay EMPTY cells (never placeholders).
     assert ws.cell(row=8, column=2).value is None
@@ -274,9 +274,9 @@ def test_data_borders_and_alignment(tmp_path):
     text_cell = ws.cell(row=7, column=1)
     assert text_cell.alignment.horizontal == "left"
     assert text_cell.border.left.style == "thin"
-    num_cell = ws.cell(row=7, column=6)
-    assert num_cell.alignment.horizontal == "center"
-    assert num_cell.data_type == "n"
+    city_cell = ws.cell(row=7, column=6)
+    assert city_cell.alignment.horizontal == "left"
+    assert city_cell.value == "Москва"
 
 
 def test_freeze_and_autofilter_cover_header_row_6(tmp_path):
@@ -292,16 +292,16 @@ def test_freeze_and_autofilter_default_14(tmp_path):
     assert result.columns == list(DEFAULT_COLUMNS)
     ws = load_workbook(result.path)["Отчёт"]
     assert ws.freeze_panes == "A7"
-    assert ws.auto_filter.ref == "A6:N6"
-    assert [ws.cell(row=HEADER_ROW, column=i).value for i in range(1, 15)] == [
+    assert ws.auto_filter.ref == "A6:M6"
+    assert [ws.cell(row=HEADER_ROW, column=i).value for i in range(1, 14)] == [
         COLUMN_REGISTRY[k].title for k in DEFAULT_COLUMNS
     ]
 
 
 def test_column_order_preserved_not_sorted(tmp_path):
-    cols = ["health_score", "university", "comment"]
+    cols = ["workflow_progress", "university", "comment"]
     rows = [
-        {"health_score": 60, "university": "ВУЗ", "comment": "Комментарий"}
+        {"workflow_progress": 60, "university": "ВУЗ", "comment": "Комментарий"}
     ]
     result = _gen(tmp_path, cols, rows)
     ws = load_workbook(result.path)["Отчёт"]
@@ -335,12 +335,12 @@ def test_dates_typed_with_excel_format(tmp_path):
 
 
 def test_min_widths_applied_and_capped(tmp_path):
-    rows = [{"university": "В", "comment": "x" * 500, "health_score": 5}]
-    result = _gen(tmp_path, ["university", "comment", "health_score"], rows)
+    rows = [{"university": "В", "comment": "x" * 500, "workflow_progress": 5}]
+    result = _gen(tmp_path, ["university", "comment", "workflow_progress"], rows)
     ws = load_workbook(result.path)["Отчёт"]
     dims = ws.column_dimensions
     assert dims["A"].width >= MIN_COLUMN_WIDTHS["university"]
-    assert dims["C"].width >= MIN_COLUMN_WIDTHS["health_score"]
+    assert dims["C"].width >= MIN_COLUMN_WIDTHS["workflow_progress"]
     assert dims["B"].width <= MAX_COLUMN_WIDTH
     assert dims["B"].width >= MIN_COLUMN_WIDTHS["comment"]
 
@@ -389,10 +389,10 @@ def test_formula_injection_stored_as_text(tmp_path):
 
 
 def test_negative_number_stays_numeric(tmp_path):
-    rows = [{"university": "ВУЗ", "health_score": -5}]
+    rows = [{"university": "ВУЗ", "workflow_progress": -5}]
     out = tmp_path / "neg.xlsx"
     generate_xlsx_report(
-        FakeSession(rows), UnifiedFilter(), ["university", "health_score"], out
+        FakeSession(rows), UnifiedFilter(), ["university", "workflow_progress"], out
     )
     ws = load_workbook(out)["Отчёт"]
     cell = ws.cell(row=7, column=2)

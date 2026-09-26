@@ -2,8 +2,8 @@ import { expect, test } from '@playwright/test';
 
 test('real CRM routes remain usable at desktop, tablet and mobile widths', async ({ page }) => {
   test.skip(!process.env.E2E_ADMIN_USERNAME || !process.env.E2E_ADMIN_PASSWORD
-    || !process.env.E2E_UNIVERSITY_ID || !process.env.E2E_TEACHER_ID || !process.env.E2E_WORKFLOW_INSTANCE_ID,
-  'Set isolated admin credentials and university, teacher, Workflow fixture IDs');
+    || !process.env.E2E_UNIVERSITY_ID || !process.env.E2E_WORKFLOW_INSTANCE_ID,
+  'Set isolated admin credentials and university, Workflow fixture IDs');
 
   const pageErrors: string[] = [];
   const consoleErrors: string[] = [];
@@ -36,7 +36,7 @@ test('real CRM routes remain usable at desktop, tablet and mobile widths', async
 
   const paths = [
     '/dashboard', '/universities', `/universities/${process.env.E2E_UNIVERSITY_ID}`,
-    `/teachers/${process.env.E2E_TEACHER_ID}`, '/workflows',
+    '/workflows',
     `/workflows/${process.env.E2E_WORKFLOW_INSTANCE_ID}`, '/reports', '/audit',
     '/admin', '/admin/catalogs', '/admin/import', '/admin/users', '/admin/workflow/templates', '/docs',
   ];

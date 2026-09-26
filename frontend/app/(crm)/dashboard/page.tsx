@@ -4,9 +4,6 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import Education from '@atomaro/icons/24/culture/Education';
 import Book from '@atomaro/icons/24/culture/Book';
-import Group from '@atomaro/icons/24/business/Group';
-import StatisticsBoard from '@atomaro/icons/24/business/StatisticsBoard';
-import Attention from '@atomaro/icons/24/action/Attention';
 import Time from '@atomaro/icons/24/alert/TimeStroke';
 import DocumentText from '@atomaro/icons/24/document/DocumentText';
 import Checklist from '@atomaro/icons/24/action/Checklist';
@@ -49,12 +46,9 @@ interface KpiDefinition {
 
 const kpiDefinitions: KpiDefinition[] = [
   { title: 'Вузы', caption: 'в реестре', tone: 'brand', icon: Education, value: (overview) => formatCount(overview.universitiesTotal) },
-  { title: 'Средний Health Score', caption: 'среднее по вузам', tone: 'brand', icon: StatisticsBoard, value: (overview) => formatScore(overview.averageHealthScore) },
-  { title: 'Красные вузы', caption: 'нуждаются во внимании', tone: 'danger', icon: Attention, href: '/universities?health_status=red', ariaLabel: 'Перейти к красным вузам', value: (overview) => formatCount(overview.redUniversities) },
   { title: 'Просроченные этапы', caption: 'требуют контроля', tone: 'danger', icon: Time, href: '/workflows?overdue=true', ariaLabel: 'Перейти к просроченным этапам workflow', value: (overview) => formatCount(overview.overdueStages) },
   { title: 'Истекающие лицензии', caption: 'до истечения 30 дней', tone: 'warning', icon: DocumentText, value: (overview) => formatCount(overview.expiringLicenses) },
   { title: 'Активные программы', caption: 'запущены', tone: 'orange', icon: Book, value: (overview) => formatCount(overview.activePrograms) },
-  { title: 'Преподаватели к повышению', caption: 'требуют внимания', tone: 'warning', icon: Group, value: (overview) => formatCount(overview.teachersNeedUpgrade) },
   {
     title: 'Заявки с сайта за 7 дней',
     caption: 'новые заявки',
@@ -64,16 +58,6 @@ const kpiDefinitions: KpiDefinition[] = [
     ariaLabel: 'Открыть список ВУЗов с заявками с сайта',
     value: (overview) => formatCount(overview.websiteApplications7d),
     tooltip: (overview) => `Источник: сайт${overview.mode === 'mock' ? ' (тестовые данные)' : overview.mode === 'import' ? ' (данные импорта)' : ''}\nСинхронизировано: ${overview.websiteSyncedAt ? formatDateTimeRu(overview.websiteSyncedAt) : 'недоступно'}`,
-  },
-  {
-    title: 'Обучающиеся в LMS',
-    caption: 'активные записи',
-    tone: 'brand',
-    icon: Group,
-    href: '/universities?external_source=lms',
-    ariaLabel: 'Открыть список ВУЗов с данными LMS',
-    value: (overview) => formatCount(overview.lmsStudents),
-    tooltip: (overview) => `Источник: LMS${overview.mode === 'mock' ? ' (тестовые данные)' : ''}\nСинхронизировано: ${overview.lmsSyncedAt ? formatDateTimeRu(overview.lmsSyncedAt) : 'недоступно'}`,
   },
 ];
 

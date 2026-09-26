@@ -137,18 +137,16 @@ export const reportColumnDefinitions: ReportColumnDefinition[] = [
   { id: 'license_expires', label: 'Срок действия' },
   { id: 'transfer_status', label: 'Статус передачи' },
   { id: 'comment', label: 'Комментарий' },
-  { id: 'health_score', label: 'Health Score' },
   { id: 'city', label: 'Город' },
   { id: 'current_stage', label: 'Текущий этап' },
   { id: 'last_interaction', label: 'Последнее взаимодействие' },
   { id: 'workflow_progress', label: 'Прогресс workflow, %' },
-  { id: 'teacher_readiness', label: 'Готовность преподавателей, %' },
   { id: 'overdue_tasks', label: 'Просроченные задачи' },
 ];
 
 /** Existing UI presets built from the supported backend columns. */
 export const reportColumnPresetNames = ['Минимум', 'Стандарт', 'Полный'] as const;
-export const DEFAULT_REPORT_COLUMNS = reportColumnDefinitions.slice(0, 14).map((column) => column.id);
+export const DEFAULT_REPORT_COLUMNS = reportColumnDefinitions.slice(0, 13).map((column) => column.id);
 export const reportColumnPresets: Record<(typeof reportColumnPresetNames)[number], string[]> = {
   Минимум: DEFAULT_REPORT_COLUMNS,
   Стандарт: reportColumnDefinitions.slice(0, 16).map((column) => column.id),

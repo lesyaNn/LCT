@@ -7,17 +7,11 @@ import { catalogQueryKeys, getCatalogReferenceData } from '@/shared/lib/catalogs
 import { queryKeys } from '@/shared/lib/query-keys';
 import {
   createUniversityMeeting,
-  createUniversityStudent,
   attachUniversityProgram,
   attachUniversityProduct,
-  getWorkflowSelectorPrograms,
   updateUniversityMeeting,
-  updateUniversityStudent,
-  workflowProgramsQueryKey,
   type UniversityMeetingInput,
   type UniversityMeetingRow,
-  type UniversityStudentInput,
-  type UniversityStudentListRow,
 } from '@/shared/lib/universities-repository';
 import { Button } from '@/shared/ui/rtk/button';
 import { Input, Select, TextArea } from '@/shared/ui/rtk/form-controls';
@@ -72,62 +66,6 @@ export function ProductAssignmentForm({ universityId, existingProductIds, onClos
   return <CatalogAssignmentForm universityId={universityId} existingIds={existingProductIds} kind="products" onClose={onClose} onSaved={onSaved} />;
 }
 
-export function StudentMutationForm({ universityId, student, onClose, onSaved }: { universityId: string; student: UniversityStudentListRow | null; onClose: () => void; onSaved: () => void }) {
-  const queryClient = useQueryClient();
-  const programs = useQuery({ queryKey: workflowProgramsQueryKey(universityId), queryFn: () => getWorkflowSelectorPrograms(universityId), staleTime: 30_000 });
-  const [externalId, setExternalId] = useState(student?.externalId ?? '');
-  const [programId, setProgramId] = useState(student?.programId ?? '');
-  const [fullName, setFullName] = useState(student?.studentName ?? '');
-  const [groupName, setGroupName] = useState(student?.flow ?? '');
-  const [status, setStatus] = useState<UniversityStudentInput['status']>((student?.status as UniversityStudentInput['status']) ?? 'active');
-  const [startedAt, setStartedAt] = useState(student?.startedAt ?? new Date().toISOString().slice(0, 10));
-  const [finishedAt, setFinishedAt] = useState(student?.finishedAt ?? '');
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [message, setMessage] = useState<string | null>(null);
-  const save = useMutation({
-    mutationFn: (input: UniversityStudentInput) => student ? updateUniversityStudent(student.id, input) : createUniversityStudent(universityId, input),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.universities.studentsFamily(universityId) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.universities.passport(universityId) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.universities.historyFamily(universityId) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.audit.all }),
-      ]);
-      onSaved();
-    },
-  });
-  const submit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (save.isPending) return;
-    const nextErrors: Record<string, string> = {};
-    if (!student && !externalId.trim()) nextErrors.external_id = 'Укажите внешний ID.';
-    if (!programId) nextErrors.program_id = 'Выберите программу.';
-    if (!fullName.trim()) nextErrors.full_name = 'Укажите ФИО.';
-    if (!startedAt) nextErrors.started_at = 'Укажите дату начала.';
-    setErrors(nextErrors);
-    if (Object.keys(nextErrors).length) return;
-    setMessage(null);
-    save.mutate({ externalId, programId, fullName, groupName, status, startedAt, finishedAt: finishedAt || null }, {
-      onError: (cause) => {
-        const normalized = normalizeApiError(cause);
-        setErrors(Object.fromEntries(normalized.fieldErrors.map((field) => [field.field, field.message])));
-        setMessage(normalized.message);
-      },
-    });
-  };
-  return <Modal title={student ? 'Редактировать студента' : 'Добавить студента'} onClose={() => { if (!save.isPending) onClose(); }}><form className={styles.assignmentForm} onSubmit={submit} noValidate>
-    {!student ? <label className={styles.filter}><span>Внешний ID *</span><Input value={externalId} maxLength={256} aria-invalid={Boolean(errors.external_id)} onChange={(event) => setExternalId(event.target.value)} />{fieldError(errors, 'external_id')}</label> : null}
-    <label className={styles.filter}><span>Программа *</span><Select value={programId} disabled={programs.isPending || programs.isError} aria-invalid={Boolean(errors.program_id)} onChange={(event) => setProgramId(event.target.value)}><option value="">Выберите программу</option>{programs.data?.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}</Select>{fieldError(errors, 'program_id')}</label>
-    {programs.isError ? <p className={styles.assignmentError} role="alert">Не удалось загрузить программы. <button type="button" onClick={() => void programs.refetch()}>Повторить</button></p> : null}
-    <label className={styles.filter}><span>ФИО *</span><Input value={fullName} maxLength={512} aria-invalid={Boolean(errors.full_name)} onChange={(event) => setFullName(event.target.value)} />{fieldError(errors, 'full_name')}</label>
-    <label className={styles.filter}><span>Группа</span><Input value={groupName} maxLength={256} onChange={(event) => setGroupName(event.target.value)} /></label>
-    <label className={styles.filter}><span>Статус</span><Select value={status} onChange={(event) => setStatus(event.target.value as UniversityStudentInput['status'])}><option value="active">Активен</option><option value="graduated">Выпущен</option><option value="academic_leave">Академический отпуск</option><option value="expelled">Отчислен</option></Select></label>
-    <label className={styles.filter}><span>Дата начала *</span><Input type="date" value={startedAt} aria-invalid={Boolean(errors.started_at)} onChange={(event) => setStartedAt(event.target.value)} />{fieldError(errors, 'started_at')}</label>
-    <label className={styles.filter}><span>Дата завершения</span><Input type="date" value={finishedAt} onChange={(event) => setFinishedAt(event.target.value)} /></label>
-    {message ? <p className={styles.assignmentError} role="alert">{message}</p> : null}
-    <div className={styles.assignmentActions}><Button type="button" variant="ghost" disabled={save.isPending} onClick={onClose}>Отмена</Button><Button type="submit" variant="primary" loading={save.isPending} disabled={save.isPending || programs.isPending || programs.isError}>Сохранить</Button></div>
-  </form></Modal>;
-}
 
 export function MeetingMutationForm({ universityId, meeting, onClose, onSaved }: { universityId: string; meeting: UniversityMeetingRow | null; onClose: () => void; onSaved: () => void }) {
   const queryClient = useQueryClient();

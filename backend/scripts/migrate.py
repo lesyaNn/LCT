@@ -48,10 +48,11 @@ LEGACY_ALEMBIC_HEAD = "7f3a1c9e2b06"
 LEGACY_SQL_HEAD = "000010_audit_identity"
 
 # Canonical application tables (alembic_version/schema_migrations excluded):
-# 21 P1 tables + 8 B1 workflow tables (000011-000014) + health_score_snapshots
+# P1 tables + B1 workflow tables
 # (P2-09-01, 000015) + report_jobs (P4-06-01, 000018) + the materialized
 # health score projection (000022), audit outbox (000023), and external
-# application/sync snapshots (000027).
+# application/sync snapshots (000027) + the product<->direction link
+# (000028, import sheet "Продукт_Направление").
 # 000019/000020 only ALTER report_jobs (no new tables); 000021 only ALTERs
 # audit_events (no new tables). Pinned by
 # tests/test_p5_migrate_expected_guard.py — keep in sync with
@@ -67,11 +68,6 @@ EXPECTED_TABLES = [
     "contracts",
     "licenses",
     "university_responsibles",
-    "teachers",
-    "teacher_qualifications",
-    "teacher_certificates",
-    "teacher_programs",
-    "students",
     "university_programs",
     "university_products",
     "meetings",
@@ -87,13 +83,12 @@ EXPECTED_TABLES = [
     "workflow_attachments",
     "workflow_tasks",
     "instance_stages",
-    "health_score_snapshots",
-    "health_score_current",
     "report_jobs",
     "audit_outbox",
     "vendor_contacts",
     "external_applications",
     "external_sync_states",
+    "product_directions",
 ]
 
 VERSION_RE = re.compile(r"^(?P<ver>\d{6}_[a-z0-9_]+)\.(?P<dir>up|down)\.sql$")
@@ -111,11 +106,6 @@ LEGACY_TABLES = [
     "contracts",
     "licenses",
     "university_responsibles",
-    "teachers",
-    "teacher_qualifications",
-    "teacher_certificates",
-    "teacher_programs",
-    "students",
     "university_programs",
     "university_products",
     "meetings",

@@ -66,7 +66,7 @@ WRITE = require_permission("university.edit")
 LEGACY_CATALOG_WRITE = require_role("admin", "curator")
 
 
-UniversitySortBy = Literal["name", "city", "created_at", "health_score"]
+UniversitySortBy = Literal["name", "city", "created_at"]
 HealthStatusFilter = Literal["green", "yellow", "red"]
 DirectionSortBy = Literal["code", "name", "created_at"]
 ProgramSortBy = Literal["name", "created_at"]
@@ -122,11 +122,7 @@ def list_universities(
     ),
     sort_by: UniversitySortBy = Query(default="name"),
     sort_order: SortOrder = Query(default="asc"),
-    health_status: HealthStatusFilter | None = Query(
-        default=None,
-        description="Filter by computed Health Score status (scores calculated per university, cached 5 min)",
-    ),
-    external_source: Literal["lms", "website"] | None = Query(default=None),
+    external_source: Literal["website"] | None = Query(default=None),
     unified: UnifiedFilter = Depends(get_unified_filter),
     db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(READ),
@@ -143,8 +139,7 @@ def list_universities(
         sort_order=sort_order,
         unified_filter=unified,
         user=user,
-        health_status=health_status,
-        external_source=external_source,
+                external_source=external_source,
     )
     return PaginatedResponse(items=items, page=page, page_size=page_size, total=total)
 

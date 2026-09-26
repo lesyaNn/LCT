@@ -26,7 +26,7 @@ from app.modules.analytics.json_export import (
     serialize_json_value,
 )
 
-SUBSET_3 = ["university", "health_score", "comment"]
+SUBSET_3 = ["university", "city", "comment"]
 
 
 def _rows() -> list[dict]:
@@ -34,14 +34,14 @@ def _rows() -> list[dict]:
     return [
         {
             "university": "МГУ им. Ломоносова",
-            "health_score": 85,
+            "city": "Москва",
             "comment": "Комментарий №1",
             "_university_id": uid,
             "_license_id": uuid.uuid4(),
         },
         {
             "university": "ВУЗ Бета",
-            "health_score": None,
+            "city": None,
             "comment": None,
             "_university_id": uid,
             "_license_id": None,
@@ -169,7 +169,7 @@ def test_columns_carry_key_and_title(tmp_path):
     _, doc = _gen(tmp_path, SUBSET_3, _rows())
     assert doc["columns"] == [
         {"key": "university", "title": "Наименование ВУЗа"},
-        {"key": "health_score", "title": "Health Score"},
+        {"key": "city", "title": "Город"},
         {"key": "comment", "title": "Комментарий"},
     ]
 
@@ -179,30 +179,24 @@ def test_totals_computed(tmp_path):
     assert doc["totals"]["row_count"] == 2
     # Фикстура несёт два разных имени (в проде имена уникальны).
     assert doc["totals"]["universities"] == 2
-    assert doc["totals"]["avg_health_score"] == 85.0
-    assert doc["totals"]["by_health_status"] == {"green": 1, "yellow": 0, "red": 0}
 
 
 def test_totals_empty_when_no_scores(tmp_path):
     _, doc = _gen(tmp_path, ["university"], [])
     assert doc["totals"] == {
         "row_count": 0, "universities": None,
-        "avg_health_score": None,
-        "by_health_status": {"green": 0, "yellow": 0, "red": 0},
     }
 
 
 def test_totals_fallback_to_names_without_ids(tmp_path):
     # Курсор несёт только публичные ключи: distinct university names.
     rows = [
-        {"university": "ВУЗ А", "health_score": 90},
-        {"university": "ВУЗ А", "health_score": 50},
-        {"university": "ВУЗ Б", "health_score": None},
+        {"university": "ВУЗ А", "city": "Москва"},
+        {"university": "ВУЗ А", "city": "Москва"},
+        {"university": "ВУЗ Б", "city": None},
     ]
-    _, doc = _gen(tmp_path, ["university", "health_score"], rows)
+    _, doc = _gen(tmp_path, ["university", "city"], rows)
     assert doc["totals"]["universities"] == 2
-    assert doc["totals"]["avg_health_score"] == 70.0
-    assert doc["totals"]["by_health_status"] == {"green": 1, "yellow": 0, "red": 1}
 
 
 def test_default_columns_are_14_mandatory(tmp_path):
@@ -215,14 +209,14 @@ def test_default_columns_are_14_mandatory(tmp_path):
 
 
 def test_subset_and_selected_column_order(tmp_path):
-    cols = ["health_score", "university", "comment"]
+    cols = ["city", "university", "comment"]
     result, doc = _gen(tmp_path, cols, _rows())
     assert result.columns == cols
     assert [c["key"] for c in doc["columns"]] == cols
     assert doc["totals"]["row_count"] == 2
     assert list(doc["rows"][0].keys()) == cols
     assert doc["rows"][0] == {
-        "health_score": 85,
+        "city": "Москва",
         "university": "МГУ им. Ломоносова",
         "comment": "Комментарий №1",
     }
@@ -238,10 +232,9 @@ def test_hidden_keys_never_emitted(tmp_path):
 def test_null_stays_null_numeric_stays_numeric(tmp_path):
     _, doc = _gen(tmp_path, SUBSET_3, _rows())
     second = doc["rows"][1]
-    assert second["health_score"] is None
+    assert second["city"] is None
     assert second["comment"] is None
-    assert doc["rows"][0]["health_score"] == 85
-    assert isinstance(doc["rows"][0]["health_score"], int)
+    assert doc["rows"][0]["city"] == "Москва"
 
 
 def test_unicode_readable_utf8_not_escaped_dump(tmp_path):
@@ -337,7 +330,7 @@ def test_large_export_bounded_single_pass(tmp_path):
     rows = [
         {
             "university": f"ВУЗ {i:05d}",
-            "health_score": i % 101,
+            "workflow_progress": i % 101,
             "comment": None,
             "_university_id": uuid.uuid4(),
         }

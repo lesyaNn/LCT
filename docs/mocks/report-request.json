@@ -23,7 +23,6 @@
     "license_signed",
     "license_expires",
     "transfer_status",
-    "comment",
-    "health_score"
+    "comment"
   ]
 }

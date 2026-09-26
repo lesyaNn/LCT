@@ -12,6 +12,7 @@ import os
 import re
 
 CREATE_RE = re.compile(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)", re.IGNORECASE)
+DROP_RE = re.compile(r"DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?(\w+)", re.IGNORECASE)
 
 
 def _load_migrate():
@@ -30,12 +31,14 @@ def _created_tables():
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "migrations"
     )
     found: set[str] = set()
+    dropped: set[str] = set()
     for name in sorted(os.listdir(migrations)):
         if not name.endswith(".up.sql"):
             continue
         text = open(os.path.join(migrations, name), encoding="utf-8").read()
         found |= set(CREATE_RE.findall(text))
-    return found - {"schema_migrations"}
+        dropped |= set(DROP_RE.findall(text))
+    return (found - {"schema_migrations"}) - dropped
 
 
 def test_expected_tables_matches_migrations():

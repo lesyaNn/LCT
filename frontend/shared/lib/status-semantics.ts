@@ -1,5 +1,8 @@
 import type { ExpirationStatus, UpcomingDateStatus } from './formatters';
-import type { ProgramStatus, TeacherCertificateStatus, TeacherReadiness, UniversityDocumentStatus, UniversityHistoryEventType, UniversityLicenseStatus, UniversityPassportWorkflow, UniversityProductStatus, UniversityWorkflowStageStatus } from './universities-repository';
+import type { ExpirationStatus as _ExpirationStatus } from './formatters';
+import type { ProgramStatus, UniversityDocumentStatus, UniversityHistoryEventType, UniversityLicenseStatus, UniversityPassportWorkflow, UniversityProductStatus, UniversityWorkflowStageStatus } from './universities-repository';
+export type TeacherReadiness = 'ready' | 'attention' | 'expired';
+export type TeacherCertificateStatus = _ExpirationStatus | 'no_expiry';
 import type { AttentionItem } from './dashboard-repository';
 
 export type SemanticIntent = 'neutral' | 'brand' | 'info' | 'success' | 'warning' | 'danger';

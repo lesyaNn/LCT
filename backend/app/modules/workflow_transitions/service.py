@@ -198,30 +198,6 @@ def transition_instance(
         new_value={"stage_id": target.template_stage_id, "stage_name": target.name, "comment": text},
     )
     db.commit()
-    # P2-08-01 + P2-09-01: post-commit writers (best-effort — a writer
-    # failure must never roll back the committed transition).
-    # H2: failures are LOGGED with exc_info (never bare pass) so a stale
-    # health_score_current/snapshot drift is visible; full outbox retry is
-    # a follow-up (see BACKEND_REVIEW.md H2).
-    try:
-        from app.modules.health_score.cache import invalidate_health_score
-
-        invalidate_health_score(instance.university_id)
-    except Exception:
-        logger.exception(
-            "health-score cache invalidation failed after transition",
-            extra={"instance_id": str(instance.id)},
-        )
-    try:
-        from app.modules.health_score.materialization import refresh_health_score
-        refresh_health_score(db, instance.university_id, "transition", create_snapshot=True)
-        db.commit()
-    except Exception:
-        db.rollback()
-        logger.exception(
-            "health-score materialization failed after transition",
-            extra={"instance_id": str(instance.id)},
-        )
     return get_instance_or_404(db, instance.id)
 
 

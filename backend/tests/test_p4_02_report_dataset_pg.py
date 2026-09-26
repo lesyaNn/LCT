@@ -44,7 +44,6 @@ from app.models.catalog import (
     UniversityResponsible,
     Vendor,
 )
-from app.models.health_score import HealthScoreSnapshot, HealthScoreCurrent
 from app.models.interactions import UniversityProduct, UniversityProgram
 from app.models.workflow_instances import InstanceStage, WorkflowInstance
 from app.models.workflow_templates import WorkflowStage, WorkflowTemplate

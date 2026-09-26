@@ -8,7 +8,7 @@ owns execution: it atomically claims the oldest queued job
 ``ready``; a failed attempt with attempts left is requeued (max 3
 attempts per the spec), otherwise the job goes ``failed``. The API only
 creates jobs (``202``) and never executes them — ``BackgroundTasks`` are
-banned for reports/imports by the spec (they die with the API process,
+banned for reports by the spec (they die with the API process,
 block the loop and have no retries).
 
 :meth:`generate_report_task` stays callable standalone (tests, one-off
@@ -17,8 +17,8 @@ retries): it claims the job itself first. Every entry receives ONLY
 session via the canonical ``SessionLocal`` factory. The worker rehydrates
 the persisted snapshot (``UnifiedFilter`` + resolved columns + the saved
 actor security context) and dispatches the already-existing
-:func:`generate_report_file` (xlsx/pdf/json), or the XLSX import pipeline
-for ``xlsx_import`` jobs. It never re-reads the client request and never
+:func:`generate_report_file` (xlsx/pdf/json), or the single-sheet import
+pipeline for ``xlsx_import`` jobs. It never re-reads the client request and never
 runs as admin/global unless the job snapshot itself carries an explicit
 global (admin) scope.
 
@@ -129,34 +129,42 @@ def generate_report_task(job_id: str | uuid.UUID) -> str:
 
 
 def run_import_job(db: Session, job: ReportJob) -> str:
-    """Execute a claimed ``xlsx_import`` job (Dev-3 payload).
+    """Execute a claimed ``xlsx_import`` job (single sheet or a pack).
 
     Same steps as ``POST /import/execute`` after the claim: run
-    ``execute_import`` over the stored file_id/mapping/options, write the
-    XLSX error report to the job artifact path, store the summary in
-    ``result``. On failure the attempt is requeued (attempts left) or the
-    job goes failed — never half-committed.
+    ``execute_sheet``/``execute_sheets`` over the stored file_id/sheet(s)
+    and options, write the XLSX error report to the job artifact path,
+    store the summary in ``result``. On failure the attempt is requeued
+    (attempts left) or the job goes failed — never half-committed.
     """
     from app.modules.imports import service as import_service
 
     payload = job.payload or {}
     try:
-        summary = import_service.execute_import(
-            db,
-            payload["file_id"],
-            payload.get("mapping", {}),
-            update_existing=payload.get("update_existing", True),
-            dry_run=payload.get("dry_run", False),
-            catalog_type=payload.get("catalog_type", "licenses"),
-        )
+        if payload.get("sheets"):
+            summary = import_service.execute_sheets(
+                db,
+                payload["file_id"],
+                list(payload["sheets"]),
+                dry_run=payload.get("dry_run", False),
+                update_existing=payload.get("update_existing", True),
+            )
+        else:
+            summary = import_service.execute_sheet(
+                db,
+                payload["file_id"],
+                payload["sheet"],
+                dry_run=payload.get("dry_run", False),
+                update_existing=payload.get("update_existing", True),
+            )
     except Exception as exc:
         # Import files may contain personal data and database exceptions may
         # include cell values. Keep the public job error deliberately generic.
         logger.error("import worker failed id=%s type=%s", job.id, type(exc).__name__)
         return jobs.requeue_or_fail(
-            db, job, RuntimeError("Не удалось обработать импорт; проверьте файл и маппинг"),
+            db, job, RuntimeError("Не удалось обработать импорт; проверьте файл и лист"),
         )
-    artifact = job.file_path or str(jobs.job_file_path(job.id, "xlsx"))
+    artifact = Path(jobs.job_file_path(job.id, "xlsx"))
     size = import_service.write_error_report(summary, artifact)
     job.result = summary
     db.add(job)

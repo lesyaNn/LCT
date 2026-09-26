@@ -87,7 +87,7 @@ def test_http_error_code_is_explicit_not_guessed_from_message():
 
 def test_integrity_conflict_exposes_only_safe_field():
     class Diagnostic:
-        constraint_name = "uq_students_external_id"
+        constraint_name = "universities_name_key"
         column_name = None
 
     class DriverError(Exception):
@@ -98,10 +98,10 @@ def test_integrity_conflict_exposes_only_safe_field():
 
     @api.get("/duplicate")
     def duplicate():
-        raise IntegrityError("private sql", {"external_id": "secret"}, DriverError())
+        raise IntegrityError("private sql", {"name": "secret"}, DriverError())
 
     response = TestClient(api, raise_server_exceptions=False).get("/duplicate")
     assert response.status_code == 409
-    assert response.json()["error"]["details"] == {"field": "external_id"}
+    assert response.json()["error"]["details"] == {"field": "name"}
     assert "private sql" not in response.text
     assert "secret" not in response.text

@@ -20,11 +20,9 @@ from app.models.interactions import (
     Document,
     InteractionNote,
     Meeting,
-    Student,
     UniversityProduct,
     UniversityProgram,
 )
-from app.models.teachers import Teacher
 from app.models.workflow_instances import WorkflowInstance
 from app.modules.catalog import service as catalog_service
 
@@ -38,8 +36,6 @@ def db():
             University.__table__,
             License.__table__,
             Contract.__table__,
-            Teacher.__table__,
-            Student.__table__,
             WorkflowInstance.__table__,
             Meeting.__table__,
             Document.__table__,

@@ -11,7 +11,7 @@ import enum
 import logging
 import uuid
 from collections import defaultdict
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 
 from sqlalchemy import func, select
 
@@ -19,11 +19,9 @@ from app.core.errors import BusinessException
 from app.core.exceptions import NotFound
 from app.schemas.errors import ErrorCode
 from app.models.catalog import Contract, ITDirection, ITProgram, License, Responsible
-from app.models.enums import EXPIRY_WARNING_DAYS, TeacherReadiness, UniversityProductStatus, UniversityProgramStatus
-from app.models.interactions import Document, InteractionNote, Meeting, Student, UniversityProgram
-from app.models.teachers import Teacher, TeacherCertificate, TeacherProgram, TeacherQualification
+from app.models.enums import EXPIRY_WARNING_DAYS, UniversityProductStatus, UniversityProgramStatus
+from app.models.interactions import Document, InteractionNote, Meeting, UniversityProgram
 from app.modules.audit.service import AuditService
-from app.modules.health_score.service import compute_score
 from app.modules.universities.passport_loading import (
     AUDIT_LIMIT,
     DOCUMENTS_LIMIT,
@@ -36,38 +34,28 @@ from app.modules.universities.passport_loading import (
     _load_product_rows,
     _load_program_rows,
     _load_responsible_rows,
-    _load_student_rows,
-    _load_teacher_rows,
     _load_university_row,
-    _readiness_scalar,
-    _teacher_count_scalar,
 )
 from app.modules.universities.passport_schemas import (
     AuditEventShort,
     ContractShort,
     DocumentShort,
-    HealthScoreResponse,
     LicenseShort,
     MeetingShort,
     ProductShort,
     ProgramShort,
     ResponsibleShort,
-    StudentsByProgram,
-    StudentsSummary,
-    TeacherShort,
     TimelineItem,
     UniversityBrief,
     UniversityPassport,
     WorkflowSummary,
 )
-from app.services.teacher_readiness import compute_teacher_readiness
 
 logger = logging.getLogger(__name__)
 
 class PassportInclude(str, enum.Enum):
-    """Allowed ``?include=`` blocks for the passport endpoint (P1-04-05)."""
+    """Allowed ``?include=`` blocks for the passport endpoint."""
 
-    HEALTH_SCORE = "health_score"
     AUDIT = "audit"
 
 
@@ -138,54 +126,14 @@ def _participants_to_strs(raw: object) -> list[str]:
 
 
 
-def _readiness_from_aggregates(expired_cnt: int, soon_cnt: int, min_expires: date | None):
-    """Readiness adaptor: aggregates -> :func:`compute_teacher_readiness`.
-
-    ``compute_teacher_readiness`` stays the single source of truth (it is
-    CALLED here, not reimplemented). Equivalence argument for the two
-    exposed fields (``readiness``, ``next_qualification_date``; the
-    human-readable ``reasons`` are not part of ``TeacherShort``):
-
-    * the aggregates range over exactly the items the formula considers
-      mandatory-and-dated (mandatory certificates + all qualifications
-      with ``expires_at`` set);
-    * ``expired_cnt > 0`` ⟺ ``min_expires < today`` (min over the same
-      set), so a single synthetic dated entry reproduces EXPIRED;
-    * otherwise ``soon_cnt > 0`` ⟺ ``today <= min_expires <= today+30``,
-      reproducing ATTENTION;
-    * otherwise READY, and ``next_qualification_date`` is the minimum in
-      both worlds (``None`` when the set is empty).
-    """
-    if min_expires is None:
-        entries: list[dict] = []
-    else:
-        entries = [
-            {
-                "certificate_name": "passport",
-                "is_mandatory": True,
-                "expires_at": min_expires,
-            }
-        ]
-    result = compute_teacher_readiness(certificates=entries, qualifications=[])
-    # Defensive cross-check of the proof above (cheap, per-teacher ints).
-    if expired_cnt > 0:
-        assert result.readiness == TeacherReadiness.EXPIRED
-    elif soon_cnt > 0:
-        assert result.readiness == TeacherReadiness.ATTENTION
-    else:
-        assert result.readiness == TeacherReadiness.READY
-    return result
-
-
-
 # ---------------------------------------------------------- assemblers ---
 
 
 def _assemble_programs(
-    program_rows: list[tuple], students_count_by_program: dict[uuid.UUID, int]
+    program_rows: list[tuple],
 ) -> list[ProgramShort]:
     out: list[ProgramShort] = []
-    for link, program, direction, responsible, teachers_count in program_rows:
+    for link, program, direction, responsible in program_rows:
         try:
             status = UniversityProgramStatus(link.status)
         except ValueError:
@@ -198,107 +146,6 @@ def _assemble_programs(
                 status=status,
                 launch_date=link.launch_date,
                 responsible_name=responsible.full_name if responsible else None,
-                teachers_count=int(teachers_count or 0),
-                students_count=int(students_count_by_program.get(link.program_id, 0)),
-            )
-        )
-    return out
-
-
-def _assemble_students_summary(student_rows: list[tuple]) -> tuple[StudentsSummary, dict]:
-    """Build StudentsSummary AND the per-program totals map from one aggregate."""
-    if not student_rows:
-        return StudentsSummary(total=0, active=0, graduated=0, by_status={}, by_program=[]), {}
-    by_status: dict[str, int] = defaultdict(int)
-    per_program: dict[uuid.UUID, dict[str, int]] = defaultdict(lambda: defaultdict(int))
-    name_by_id: dict[uuid.UUID, str] = {}
-    total = 0
-    for program_id, program_name, status, count in student_rows:
-        count = int(count)
-        total += count
-        by_status[str(status)] += count
-        per_program[program_id][str(status)] += count
-        name_by_id[program_id] = program_name
-    by_program = [
-        StudentsByProgram(
-            program_id=pid,
-            program_name=name_by_id.get(pid, ""),
-            total=sum(counts.values()),
-            active=int(counts.get("active", 0)),
-            graduated=int(counts.get("graduated", 0)),
-        )
-        for pid, counts in sorted(per_program.items(), key=lambda kv: name_by_id.get(kv[0], ""))
-    ]
-    by_status = dict(sorted(by_status.items()))
-    totals = {pid: sum(counts.values()) for pid, counts in per_program.items()}
-    return (
-        StudentsSummary(
-            total=total,
-            active=int(by_status.get("active", 0)),
-            graduated=int(by_status.get("graduated", 0)),
-            by_status=by_status,
-            by_program=by_program,
-        ),
-        totals,
-    )
-
-
-def _assemble_teachers(
-    teacher_rows: list[tuple],
-    programs_cache: list[ProgramShort] | None = None,
-) -> list[TeacherShort]:
-    by_program_id: dict[uuid.UUID, ProgramShort] = {p.id: p for p in (programs_cache or [])}
-    grouped: dict[uuid.UUID, dict] = {}
-    order: list[uuid.UUID] = []
-    for row in teacher_rows:
-        teacher, tp, program, direction, e_cert, e_qual, s_cert, s_qual, min_c, min_q = row
-        entry = grouped.get(teacher.id)
-        if entry is None:
-            entry = {"teacher": teacher, "links": [], "exp": 0, "soon": 0, "mins": []}
-            grouped[teacher.id] = entry
-            order.append(teacher.id)
-        entry["exp"] += int(e_cert or 0) + int(e_qual or 0)
-        entry["soon"] += int(s_cert or 0) + int(s_qual or 0)
-        if min_c is not None:
-            entry["mins"].append(min_c)
-        if min_q is not None:
-            entry["mins"].append(min_q)
-        if tp is not None and program is not None:
-            if program.id not in by_program_id:
-                by_program_id[program.id] = ProgramShort(
-                    id=program.id,
-                    name=program.name,
-                    direction_name=direction.name if direction is not None else "",
-                    status=UniversityProgramStatus.ACTIVE,
-                    launch_date=None,
-                    responsible_name=None,
-                    teachers_count=0,
-                    students_count=0,
-                )
-            entry["links"].append(program.id)
-
-    out: list[TeacherShort] = []
-    for tid in order:
-        entry = grouped[tid]
-        teacher = entry["teacher"]
-        min_expires = min(entry["mins"]) if entry["mins"] else None
-        result = _readiness_from_aggregates(entry["exp"], entry["soon"], min_expires)
-        seen: set[uuid.UUID] = set()
-        linked: list[ProgramShort] = []
-        for pid in entry["links"]:
-            if pid in by_program_id and pid not in seen:
-                seen.add(pid)
-                linked.append(by_program_id[pid])
-        teacher_programs = sorted(linked, key=lambda p: p.name)
-        out.append(
-            TeacherShort(
-                id=teacher.id,
-                full_name=teacher.full_name,
-                email=teacher.email,
-                position=teacher.position or "",
-                readiness=result.readiness,
-                next_qualification_date=result.next_qualification_date,
-                programs=list(teacher_programs),
             )
         )
     return out
@@ -509,46 +356,20 @@ def get_workflow_transitions_raw() -> list[TimelineItem]:
 # ------------------------------------------------------------- P1-04-02 ---
 
 
-def get_programs(db, university_id: uuid.UUID) -> list[ProgramShort]:
-    """Batch-load university programs with aggregate counters (no N+1).
-
-    Standalone entry point (2 statements: block 2 + one batched student
-    counter). The passport pipeline instead reuses the students
-    aggregate, so it issues no extra statement here.
-    """
+def get_programs(db, university_id) -> list[ProgramShort]:
+    """Batch-load university programs (no N+1)."""
     program_rows = _load_program_rows(db, university_id)
     if not program_rows:
         return []
-    program_ids = [link.program_id for link, _, _, _, _ in program_rows]
-    student_counts: dict[uuid.UUID, int] = dict(
-        db.execute(
-            select(Student.program_id, func.count(Student.id))
-            .where(
-                Student.university_id == university_id,
-                Student.program_id.in_(program_ids),
-            )
-            .group_by(Student.program_id)
-        ).all()
-    )
-    return _assemble_programs(program_rows, student_counts)
+    return _assemble_programs(program_rows)
 
 
-def get_teachers(
-    db,
-    university_id: uuid.UUID,
-    programs_cache: list[ProgramShort] | None = None,
-) -> list[TeacherShort]:
-    """Batch-load teachers with programs + readiness (no N+1, 1 statement)."""
-    teacher_rows = _load_teacher_rows(db, university_id)
-    if not teacher_rows:
-        return []
-    return _assemble_teachers(teacher_rows, programs_cache)
+def _removed_teachers_stub():
+    return []
 
 
-def get_students_summary(db, university_id: uuid.UUID) -> StudentsSummary:
-    """Single GROUP BY query (program names joined in); Python-side rollup."""
-    summary, _ = _assemble_students_summary(_load_student_rows(db, university_id))
-    return summary
+def _removed_students_stub():
+    return None
 
 
 # ------------------------------------------------------------- P1-04-03 ---
@@ -696,44 +517,6 @@ def get_workflow_summary(db, university_id: uuid.UUID) -> WorkflowSummary:
 # ------------------------------------------------------------- P1-04-05 ---
 
 
-def get_health_score_for_passport(
-    university_id: uuid.UUID,
-    licenses: list[LicenseShort],
-    teachers: list[TeacherShort],
-    documents: list[DocumentShort],
-) -> HealthScoreResponse:
-    """Read-only Health Score from already-loaded passport data (P1-04-05).
-
-    Direct Python reuse of the shared P2 formula — same monolith, so no HTTP
-    boundary is crossed (no client, no timeout, no retry needed).
-
-    Signals are derived transparently (zero extra queries, zero writes —
-    ``HealthScoreService.calculate`` must NOT be called here because it
-    persists a history row on every call):
-    * ``missing_license`` — any expired license;
-    * ``teacher_training`` — any teacher whose readiness is not ready;
-    * ``missing_docs`` — empty file registry;
-    * ``stage_delay`` / ``launch_delay`` — False (P2 workflow unavailable,
-      unobservable; never fabricate a penalty);
-    * ``overdue_tasks`` — 0 (legacy ``tasks`` table uses int FKs incompatible
-      with UUID universities; querying it with a UUID fails on PostgreSQL).
-    """
-    signals = {
-        "missing_license": any(lic.status == "expired" for lic in licenses),
-        "teacher_training": any(t.readiness != TeacherReadiness.READY for t in teachers),
-        "missing_docs": not documents,
-        "stage_delay": False,
-        "launch_delay": False,
-    }
-    score, details = compute_score(overdue_tasks=0, signals=signals)
-    return HealthScoreResponse(
-        university_id=university_id,
-        score=score,
-        details=details,
-        calculated_at=datetime.now(timezone.utc),
-    )
-
-
 def get_recent_audit(db, university_id: uuid.UUID) -> list[AuditEventShort]:
     """Last 5 audit events of one university via the existing P5 service.
 
@@ -788,16 +571,12 @@ def get_passport(
 
     ctx = PassportLoadContext(university_id=university_id, university_row=row)
     ctx.program_rows = _load_program_rows(db, university_id)  # block 2
-    ctx.student_rows = _load_student_rows(db, university_id)  # block 3
-    ctx.teacher_rows = _load_teacher_rows(db, university_id)  # block 4
     ctx.product_rows = _load_product_rows(db, university_id)  # block 5
     ctx.license_contract_rows = _load_license_contract_rows(db, university_id)  # block 6
     ctx.interaction_rows = _load_interaction_rows(db, university_id)  # block 7
     ctx.responsible_rows = _load_responsible_rows(db, university_id)  # block 8
 
-    students_summary, students_count_by_program = _assemble_students_summary(ctx.student_rows)
-    programs = _assemble_programs(ctx.program_rows, students_count_by_program)
-    teachers = _assemble_teachers(ctx.teacher_rows, programs)
+    programs = _assemble_programs(ctx.program_rows)
     products, licenses, contracts = _assemble_products_licenses_contracts(
         ctx.product_rows, ctx.license_contract_rows
     )
@@ -816,16 +595,7 @@ def get_passport(
     timeline = _compose_timeline(documents, meetings, note_rows)
     workflow_summary = get_workflow_summary(db, university_id)
 
-    health_score = None
     recent_audit = None
-    if PassportInclude.HEALTH_SCORE in include:
-        try:
-            health_score = get_health_score_for_passport(
-                university_id, licenses, teachers, documents
-            )
-        except Exception as exc:
-            _optional_block_failed(university_id, "health_score", exc)
-            health_score = None
     if PassportInclude.AUDIT in include:
         try:
             recent_audit = get_recent_audit(db, university_id)
@@ -836,8 +606,6 @@ def get_passport(
     return UniversityPassport(
         university=UniversityBrief(id=row[0], name=row[1], city=row[2]),
         programs=programs,
-        teachers=teachers,
-        students_summary=students_summary,
         products=products,
         licenses=licenses,
         contracts=contracts,
@@ -846,7 +614,6 @@ def get_passport(
         responsibles=responsibles,
         workflow_summary=workflow_summary,
         last_interactions=timeline,
-        health_score=health_score,
         recent_audit=recent_audit,
     )
 
@@ -855,7 +622,7 @@ def get_passport(
 
 
 def get_programs_page(
-    db, university_id: uuid.UUID, page: int, page_size: int, status: str | None = None
+    db, university_id, page: int, page_size: int, status: str | None = None
 ) -> tuple[list[ProgramShort], int]:
     """Paginated university programs (SQL LIMIT/OFFSET + COUNT, no N+1)."""
     row = _load_university_row(db, university_id)
@@ -878,7 +645,6 @@ def get_programs_page(
             ITProgram,
             ITDirection,
             Responsible,
-            _teacher_count_scalar(university_id).label("teachers_count"),
         )
         .join(ITProgram, ITProgram.id == UniversityProgram.program_id)
         .join(ITDirection, ITDirection.id == ITProgram.direction_id)
@@ -889,79 +655,7 @@ def get_programs_page(
         .offset((page - 1) * page_size)
     )
     program_rows = list(db.execute(stmt).all())
-    counts: dict[uuid.UUID, int] = {}
-    if program_rows:
-        program_ids = [link.program_id for link, _, _, _, _ in program_rows]
-        counts = dict(
-            db.execute(
-                select(Student.program_id, func.count(Student.id))
-                .where(
-                    Student.university_id == university_id,
-                    Student.program_id.in_(program_ids),
-                )
-                .group_by(Student.program_id)
-            ).all()
-        )
-    return _assemble_programs(program_rows, counts), int(total)
+    return _assemble_programs(program_rows), int(total)
 
 
-def get_teachers_page(
-    db, university_id: uuid.UUID, page: int, page_size: int, readiness: str | None = None
-) -> tuple[list[TeacherShort], int]:
-    """Paginated university teachers (SQL LIMIT/OFFSET + COUNT, no N+1)."""
-    row = _load_university_row(db, university_id)
-    if row is None:
-        raise NotFound("University not found")
-    today = date.today()
-    soon = today + timedelta(days=EXPIRY_WARNING_DAYS)
-    exp_c, soon_c, min_c = _readiness_scalar(TeacherCertificate.expires_at, TeacherCertificate.teacher_id, True, today, soon)
-    exp_q, soon_q, min_q = _readiness_scalar(TeacherQualification.expires_at, TeacherQualification.teacher_id, False, today, soon)
-    expired = (exp_c + exp_q) > 0
-    attention = (soon_c + soon_q) > 0
-    conditions = [Teacher.university_id == university_id]
-    if readiness == "expired":
-        conditions.append(expired)
-    elif readiness == "attention":
-        conditions.extend((~expired, attention))
-    elif readiness == "ready":
-        conditions.extend((~expired, ~attention))
-    total = (
-        db.execute(
-            select(func.count()).select_from(Teacher).where(*conditions)
-        ).scalar()
-        or 0
-    )
-    page_ids = list(
-        db.execute(
-            select(Teacher.id)
-            .where(*conditions)
-            .order_by(Teacher.full_name, Teacher.id)
-            .limit(page_size)
-            .offset((page - 1) * page_size)
-        )
-        .scalars()
-        .all()
-    )
-    if not page_ids:
-        return [], int(total)
-    stmt = (
-        select(
-            Teacher,
-            TeacherProgram,
-            ITProgram,
-            ITDirection,
-            exp_c.label("expired_cert"),
-            exp_q.label("expired_qual"),
-            soon_c.label("soon_cert"),
-            soon_q.label("soon_qual"),
-            min_c.label("min_cert"),
-            min_q.label("min_qual"),
-        )
-        .outerjoin(TeacherProgram, TeacherProgram.teacher_id == Teacher.id)
-        .outerjoin(ITProgram, ITProgram.id == TeacherProgram.program_id)
-        .outerjoin(ITDirection, ITDirection.id == ITProgram.direction_id)
-        .where(Teacher.id.in_(page_ids))
-        .order_by(Teacher.full_name, Teacher.id, ITProgram.name, ITProgram.id)
-    )
-    teacher_rows = list(db.execute(stmt).all())
-    return _assemble_teachers(teacher_rows), int(total)
+

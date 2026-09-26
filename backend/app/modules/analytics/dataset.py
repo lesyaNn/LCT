@@ -53,12 +53,8 @@ from app.models.catalog import (
     UniversityResponsible,
     Vendor,
 )
-from app.models.health_score import HealthScoreCurrent
 from app.models.interactions import InteractionNote, Meeting, UniversityProgram
-from app.models.teachers import Teacher
 from app.models.workflow_instances import InstanceStage, WorkflowInstance, WorkflowTask
-from app.schemas.common import TeacherReadiness
-from app.services.teacher_readiness import compute_teacher_readiness
 from app.modules.analytics.analytics import AnalyticsService
 from app.modules.analytics.columns import COLUMN_REGISTRY, resolve_columns
 from app.modules.analytics.filter_service import UnifiedFilterService
@@ -134,14 +130,6 @@ class ReportDatasetService:
             .limit(1)
             .correlate(University)
             .scalar_subquery()
-        )
-
-    @staticmethod
-    def _latest_snapshot_score() -> Any:
-        return (
-            select(HealthScoreCurrent.score)
-            .where(HealthScoreCurrent.university_id == University.id)
-            .correlate(University).scalar_subquery()
         )
 
     @staticmethod
@@ -258,8 +246,6 @@ class ReportDatasetService:
                 )
             if "current_stage" in resolved:
                 select_list.append(current_name.label("current_stage"))
-        if "health_score" in resolved:
-            select_list.append(ReportDatasetService._latest_snapshot_score().label("health_score"))
 
         stmt = select(*select_list).select_from(University)
         if need_license:
@@ -296,10 +282,7 @@ class ReportDatasetService:
     ) -> ReportDataset:
         """Execute the dataset query (1 SELECT, +1 batched when needed).
 
-        ``user`` confines the query to the caller's data scope (same
-        intersection as the P1 list). ``health_fallback`` is retained as a
-        compatibility argument but intentionally does nothing: score readers
-        use only ``health_score_current`` and missing rows stay ``NULL``.
+        ``user`` confines the query to the caller's data scope.
         """
         stmt = ReportDatasetService.build_query(filters, columns, today=today)
         if user is not None:
@@ -321,8 +304,6 @@ class ReportDatasetService:
                 db, rows, resolved, today=today
             )
 
-        if health_fallback and "health_score" in resolved:
-            ReportDatasetService._attach_health_fallback(db, rows, today=today)
 
         for row in rows:
             row.pop("_license_id", None)
@@ -473,7 +454,6 @@ class ReportDatasetService:
         * ``last_interaction`` — GREATEST(max meetings, max notes) as date;
         * ``workflow_progress`` — % completed over non-skipped stages of
           ACTIVE instances (Dev-2 matrix rule), nearest int;
-        * ``teacher_readiness`` — % teachers with canonical readiness ready;
         * ``overdue_tasks`` — P2 canonical overdue count on ACTIVE instances.
         Only requested columns are computed (bounded extra SELECTs, never
         per-row). Missing data -> ``None`` (``0`` for the overdue count).
@@ -555,33 +535,6 @@ class ReportDatasetService:
                     counts[uid] = int(total)
             maps["overdue_tasks"] = counts
 
-        if "teacher_readiness" in resolved:
-            readiness: dict[uuid.UUID, int | None] = {}
-            teachers = list(
-                db.execute(
-                    select(Teacher)
-                    .where(Teacher.university_id.in_(uids))
-                    .options(
-                        selectinload(Teacher.certificates),
-                        selectinload(Teacher.qualifications),
-                    )
-                ).scalars().all()
-            )
-            by_uni: dict[uuid.UUID, list] = {}
-            for teacher in teachers:
-                by_uni.setdefault(teacher.university_id, []).append(teacher)
-            for uid in uids:
-                group = by_uni.get(uid, [])
-                if not group:
-                    continue
-                ready = sum(
-                    compute_teacher_readiness(
-                        list(t.certificates), list(t.qualifications), day
-                    ).readiness == TeacherReadiness.READY
-                    for t in group
-                )
-                readiness[uid] = round(ready / len(group) * 100)
-            maps["teacher_readiness"] = readiness
 
         return maps
 

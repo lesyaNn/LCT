@@ -25,7 +25,11 @@
   "request": {
     "format": {
       "type": "enum string",
-      "values": ["xlsx", "pdf", "json"],
+      "values": [
+        "xlsx",
+        "pdf",
+        "json"
+      ],
       "note": "all three formats share one validation path, one job payload shape and one worker entry point (generate_report_file); each format has its own file generator reading ONLY from ReportDatasetService"
     },
     "filters": {
@@ -64,12 +68,14 @@
       "license_signed",
       "license_expires",
       "transfer_status",
-      "comment",
-      "health_score"
+      "comment"
     ]
   },
   "format_examples": {
-    "xlsx": {"format": "xlsx", "note": "workbook: sheets Отчёт + Фильтры (see xlsx_workbook)"},
+    "xlsx": {
+      "format": "xlsx",
+      "note": "workbook: sheets Отчёт + Фильтры (see xlsx_workbook)"
+    },
     "pdf": {
       "format": "pdf",
       "filters": {
@@ -82,7 +88,12 @@
         "responsible_ids": [],
         "workflow_statuses": []
       },
-      "columns": ["university", "product", "workflow_status", "responsible", "health_score"],
+      "columns": [
+        "university",
+        "product",
+        "workflow_status",
+        "responsible"
+      ],
       "note": "same filters/columns as xlsx; PDF renders title/period/filters/timestamp/KPI/table/charts (see report-output.json)"
     },
     "json": {
@@ -104,7 +115,10 @@
   "async_api": {
     "endpoint": "POST /api/v1/reports",
     "success": "202 Accepted",
-    "success_body": {"job_id": "uuid", "status": "queued"},
+    "success_body": {
+      "job_id": "uuid",
+      "status": "queued"
+    },
     "response_model": "app.modules.analytics.report_service.ReportQueuedResponse",
     "rbac": "reports.read (401 without token, 403 without permission; held by admin + manager, never widened)",
     "lifecycle": "queued -> building -> ready | failed (progress: queued=0, building=10, ready=100; failed keeps current)",
@@ -117,7 +131,10 @@
     "status": "LIVE since P4-06-01: persistent report_jobs storage (migration 000018) + BackgroundTasks worker; the router is mounted and POST returns a real persisted job_id"
   },
   "xlsx_workbook": {
-    "sheets": ["Отчёт", "Фильтры"],
+    "sheets": [
+      "Отчёт",
+      "Фильтры"
+    ],
     "report_sheet_rows": {
       "1": "title: Аналитический отчёт по взаимодействию с ВУЗами",
       "2": "period (neutral 'Период: не задан' when both bounds absent)",

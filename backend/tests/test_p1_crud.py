@@ -47,8 +47,7 @@ from app.models.catalog import (
     UniversityResponsible,
     Vendor,
 )
-from app.models.interactions import Student, UniversityProduct, UniversityProgram
-from app.models.teachers import Teacher, TeacherProgram
+from app.models.interactions import UniversityProduct, UniversityProgram
 
 TEST_URL = os.getenv("TEST_DATABASE_URL", "sqlite://")
 

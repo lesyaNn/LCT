@@ -7,24 +7,12 @@ import { getExternalDashboardMetrics } from './external-integrations-repository'
 export interface DashboardOverview {
   mode?: 'real' | 'mock' | 'import';
   universitiesTotal: number | null;
-  averageHealthScore: number | null;
-  redUniversities: number | null;
   overdueStages: number | null;
   expiringLicenses: number | null;
   activePrograms: number | null;
-  teachersNeedUpgrade: number | null;
+  launchedPrograms: number | null;
   websiteApplications7d: number | null;
-  lmsStudents: number | null;
   websiteSyncedAt: string | null;
-  lmsSyncedAt: string | null;
-}
-
-export type HealthScoreRange = '0–20' | '21–40' | '41–60' | '61–80' | '81–100';
-
-export interface HealthScoreDistributionItem {
-  range: HealthScoreRange;
-  count: number;
-  tone: 'danger' | 'warning' | 'brand' | 'success';
 }
 
 export type ProgramStatus = 'planned' | 'active' | 'launched' | 'archived';
@@ -63,7 +51,6 @@ export interface AttentionItem {
 }
 
 export interface DashboardAnalytics {
-  healthScoreDistribution: HealthScoreDistributionItem[];
   programStatuses: ProgramStatusItem[];
   launchDynamics: LaunchDynamicsItem[];
   attentionItems: AttentionItem[];
@@ -87,21 +74,17 @@ export const dashboardDataQueryKey = (filters: DashboardFilters) => queryKeys.da
 const dashboardOverviewMock: DashboardOverview = {
   mode: 'mock',
   universitiesTotal: 42,
-  averageHealthScore: 78.4,
-  redUniversities: 5,
   overdueStages: 12,
   expiringLicenses: 8,
   activePrograms: 24,
-  teachersNeedUpgrade: 17,
+  launchedPrograms: 7,
   websiteApplications7d: 38,
-  lmsStudents: 126,
   websiteSyncedAt: '2026-09-24T08:45:00.000Z',
-  lmsSyncedAt: '2026-09-24T08:45:00.000Z',
 };
 
 type AnalyticsOverviewDto = {
-  kpi: { universities: number; average_health_score: number; red_universities: number; overdue_stages: number; expiring_licenses: number; active_programs: number; teacher_readiness_issues: number };
-  health_distribution: Array<{ range: string; count: number }>;
+  kpi: { universities: number; overdue_stages: number; expiring_licenses: number; active_programs: number; launched_programs: number };
+  workflow_distribution: Array<{ stage: string; count: number }>;
   program_statuses: Array<{ status: string; count: number }>;
   launch_dynamics?: Array<{ month: string; actual: number; planned: number }>;
   overdue_items: Array<{ id?: string; university_id?: string | null; university: string; stage?: string | null; task?: string | null; days_overdue: number; type: 'stage' | 'task' }>;
@@ -121,16 +104,12 @@ function analyticsParams(filters: DashboardFilters): string {
 function mapDashboardOverview(dto: AnalyticsOverviewDto): DashboardOverview {
   return {
     universitiesTotal: dto.kpi.universities,
-    averageHealthScore: dto.kpi.average_health_score,
-    redUniversities: dto.kpi.red_universities,
     overdueStages: dto.kpi.overdue_stages,
     expiringLicenses: dto.kpi.expiring_licenses,
     activePrograms: dto.kpi.active_programs,
-    teachersNeedUpgrade: dto.kpi.teacher_readiness_issues,
+    launchedPrograms: dto.kpi.launched_programs,
     websiteApplications7d: null,
-    lmsStudents: null,
     websiteSyncedAt: null,
-    lmsSyncedAt: null,
   };
 }
 
@@ -155,13 +134,6 @@ function getRecentMonths(): LaunchDynamicsItem[] {
 }
 
 const dashboardAnalyticsMock: DashboardAnalytics = {
-  healthScoreDistribution: [
-    { range: '0–20', count: 2, tone: 'danger' },
-    { range: '21–40', count: 3, tone: 'danger' },
-    { range: '41–60', count: 8, tone: 'warning' },
-    { range: '61–80', count: 17, tone: 'brand' },
-    { range: '81–100', count: 12, tone: 'success' },
-  ],
   programStatuses: [
     { status: 'planned', label: programStatusLabels.planned, count: 9, tone: 'neutral' },
     { status: 'active', label: programStatusLabels.active, count: 24, tone: 'brand' },
@@ -172,8 +144,6 @@ const dashboardAnalyticsMock: DashboardAnalytics = {
   attentionItems: [
     { id: 'attention-001', universityId: 'university-001', universityName: 'Московский технический университет связи и информатики', problemCode: 'LIC-EXP', problemLabel: 'Истекает лицензия', severity: 'red', overdueDays: 18 },
     { id: 'attention-002', universityId: 'university-002', universityName: 'Санкт-Петербургский политехнический университет', problemCode: 'WF-OVERDUE', problemLabel: 'Просрочен этап workflow', severity: 'orange', overdueDays: 12 },
-    { id: 'attention-003', universityId: 'university-003', universityName: 'Уральский федеральный университет', problemCode: 'HEALTH-LOW', problemLabel: 'Низкий Health Score', severity: 'yellow', overdueDays: 9 },
-    { id: 'attention-004', universityId: 'university-004', universityName: 'Казанский федеральный университет', problemCode: 'TEACH-READINESS', problemLabel: 'Преподаватели требуют повышения', severity: 'orange', overdueDays: 7 },
     { id: 'attention-005', universityId: 'university-005', universityName: 'Новосибирский государственный университет', problemCode: 'DOC-MISSING', problemLabel: 'Не хватает документов', severity: 'yellow', overdueDays: 4 },
   ],
 };
@@ -182,7 +152,6 @@ function mapDashboardAnalytics(overview: AnalyticsOverviewDto): DashboardAnalyti
   const tones: Record<ProgramStatus, ProgramStatusItem['tone']> = { planned: 'neutral', active: 'brand', launched: 'success', archived: 'dark' };
   const monthFormatter = new Intl.DateTimeFormat('ru-RU', { month: 'short' });
   return {
-    healthScoreDistribution: overview.health_distribution.map((item) => ({ range: item.range.replace('-', '–') as HealthScoreRange, count: item.count, tone: item.range === '0-20' || item.range === '21-40' ? 'danger' : item.range === '41-60' ? 'warning' : item.range === '61-80' ? 'brand' : 'success' })),
     programStatuses: overview.program_statuses.filter((item): item is { status: ProgramStatus; count: number } => item.status in tones).map((item) => ({ status: item.status, label: programStatusLabels[item.status], count: item.count, tone: tones[item.status] })),
     launchDynamics: (overview.launch_dynamics ?? []).map((item) => { const date = new Date(`${item.month}-01T12:00:00`); return { monthKey: item.month, monthLabel: monthFormatter.format(date).replace('.', ''), actual: item.actual, planned: item.planned }; }),
     attentionItems: overview.overdue_items.filter((item) => Boolean(item.university_id)).slice(0, 5).map((item, index) => ({ id: item.id ?? `overdue-${index}`, universityId: item.university_id!, universityName: item.university, problemCode: item.type === 'stage' ? 'WF-OVERDUE' : 'TASK-OVERDUE', problemLabel: item.stage ?? item.task ?? 'Просрочено', severity: item.days_overdue > 14 ? 'red' : item.days_overdue > 7 ? 'orange' : 'yellow', overdueDays: item.days_overdue })),

@@ -1,38 +1,11 @@
 {
   "kpi": {
     "universities": 10,
-    "average_health_score": 67,
-    "red_universities": 3,
-    "yellow_universities": 4,
-    "green_universities": 3,
     "overdue_stages": 12,
     "expiring_licenses": 8,
-    "teacher_readiness_issues": 10,
     "active_programs": 25,
     "launched_programs": 15
   },
-  "health_distribution": [
-    {
-      "range": "0-20",
-      "count": 0
-    },
-    {
-      "range": "21-40",
-      "count": 1
-    },
-    {
-      "range": "41-60",
-      "count": 2
-    },
-    {
-      "range": "61-80",
-      "count": 4
-    },
-    {
-      "range": "81-100",
-      "count": 3
-    }
-  ],
   "workflow_distribution": [
     {
       "stage": "Поиск контактов",
@@ -121,22 +94,6 @@
       "product": "Product Y",
       "expires_at": "2026-10-15",
       "days_left": 29
-    }
-  ],
-  "teacher_readiness": [
-    {
-      "university": "МФТИ",
-      "teacher": "Петров П.",
-      "certificate": "Инф. безопасность",
-      "expires_at": "2026-10-15",
-      "days_left": 30
-    },
-    {
-      "university": "УрФУ",
-      "teacher": "Сидоров С.",
-      "certificate": "Кубербезопасность",
-      "expires_at": "2026-10-05",
-      "days_left": 20
     }
   ],
   "overdue_items": [

@@ -113,7 +113,7 @@ MIN_COLUMN_WIDTHS: dict[str, int | float] = {
     "license_expires": 14,
     "transfer_status": 16,
     "comment": 40,
-    "health_score": 12,
+    "workflow_progress": 12,
     "city": 15,
     "current_stage": 20,
 }

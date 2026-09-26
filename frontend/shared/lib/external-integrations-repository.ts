@@ -1,7 +1,6 @@
 import { normalizeApiError } from './api-errors';
 import { fromDataSource } from './data-source';
 import { queryKeys } from './query-keys';
-import type { UniversityStudentListRow } from './universities-repository';
 import {
   mockCreateWorkflowFromExternal,
   mockGetExternalDashboardMetrics,
@@ -13,9 +12,9 @@ import {
   realGetExternalDashboardMetrics,
 } from './real-api-adapter';
 
-export type ExternalDataSource = 'lms' | 'website';
+export type ExternalDataSource = 'website';
 export type ExternalRecordSource = ExternalDataSource | 'manual' | 'import';
-export const EXTERNAL_SOURCE_LABELS = { lms: 'LMS', manual: 'Ручные данные', website: 'Сайт', import: 'Импорт' } as const;
+export const EXTERNAL_SOURCE_LABELS = { manual: 'Ручные данные', website: 'Сайт', import: 'Импорт' } as const;
 export function externalSourceLabel(source: keyof typeof EXTERNAL_SOURCE_LABELS): string {
   return EXTERNAL_SOURCE_LABELS[source];
 }
@@ -26,7 +25,7 @@ export interface ExternalStudent {
   programName: string | null;
   flow: string | null;
   progress: number | null;
-  source: 'lms' | 'manual';
+  source: 'manual';
   syncedAt: string | null;
 }
 
@@ -71,17 +70,6 @@ export interface ExternalDashboardMetrics {
   lmsStudents: number | null;
   websiteSyncedAt: string | null;
   lmsSyncedAt: string | null;
-}
-
-export function normalizeStudentRows(rows: UniversityStudentListRow[], external: ExternalStudent[]): Array<UniversityStudentListRow & { progress: number | null; source: keyof typeof EXTERNAL_SOURCE_LABELS; syncedAt: string | null }> {
-  // Real rows already carry canonical source metadata from the Student API.
-  // The legacy frontend demo fixture has no such fields; enrich it only there.
-  const mockById = new Map(external.map((item) => [item.id, item]));
-  return rows.map((row) => {
-    const fixture = row.source ? undefined : mockById.get(row.externalId ?? '');
-    return { ...row, flow: fixture?.flow ?? row.flow, progress: row.progress ?? fixture?.progress ?? null,
-      source: row.source ?? (fixture ? 'lms' : 'manual'), syncedAt: row.syncedAt ?? fixture?.syncedAt ?? null };
-  });
 }
 
 export const universityExternalDataQueryKey = (id: string, source: ExternalDataSource) =>

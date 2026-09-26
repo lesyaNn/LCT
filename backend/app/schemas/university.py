@@ -17,9 +17,7 @@ from app.schemas.catalog import ProductShort, ProgramShort
 from app.schemas.common import (
     DocumentStatus,
     DocumentType,
-    HealthScoreStatus,
     MeetingType,
-    TeacherReadiness,
 )
 from app.schemas.licenses import ContractShort, LicenseShort
 
@@ -45,23 +43,6 @@ class StageShort(BaseModel):
 
     code: str = Field(examples=["negotiation"])
     name: str = Field(examples=["Переговоры"])
-
-
-class TeacherShort(BaseModel):
-    id: uuid.UUID
-    full_name: str
-    position: str | None = None
-    readiness: TeacherReadiness | None = None
-
-    model_config = {"from_attributes": True}
-
-
-class StudentsSummary(BaseModel):
-    total: int = 0
-    active: int = 0
-    graduated: int = 0
-    expelled: int = 0
-    academic_leave: int = 0
 
 
 class DocumentShort(BaseModel):
@@ -128,8 +109,6 @@ class UniversityList(BaseModel):
     city: str | None = None
     responsible: ResponsibleShort | None = None
     current_stage: StageShort | None = None
-    health_score: int | None = Field(default=None, ge=0, le=100)
-    health_status: str | None = None
     last_interaction_at: datetime | None = None
 
     model_config = {"from_attributes": True}
@@ -140,8 +119,6 @@ class UniversityDetail(BaseModel):
     name: str
     city: str | None = None
     responsible: ResponsibleDetail | None = None
-    health_score: int | None = Field(default=None, ge=0, le=100)
-    health_status: HealthScoreStatus | str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -160,8 +137,6 @@ class UniversityPassport(BaseModel):
 
     university: UniversityDetail
     programs: list[ProgramShort] = Field(default_factory=list)
-    teachers: list[TeacherShort] = Field(default_factory=list)
-    students_summary: StudentsSummary = Field(default_factory=StudentsSummary)
     products: list[ProductShort] = Field(default_factory=list)
     licenses: list[LicenseShort] = Field(default_factory=list)
     contracts: list[ContractShort] = Field(default_factory=list)
@@ -179,8 +154,6 @@ __all__ = [
     "ResponsibleDetail",
     "ResponsibleShort",
     "StageShort",
-    "StudentsSummary",
-    "TeacherShort",
     "UniversityBase",
     "UniversityCreate",
     "UniversityDetail",

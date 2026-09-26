@@ -41,7 +41,6 @@ export const DOC_SECTION_DEFINITIONS: Array<{ id: string; title: string; topics:
       { slug: 'workflow', title: 'Workflow' },
       { slug: 'documents', title: 'Загрузка документов' },
       { slug: 'reports', title: 'Отчёты' },
-      { slug: 'health-score', title: 'Health Score' },
     ],
   },
   {

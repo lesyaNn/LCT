@@ -50,16 +50,10 @@ from app.models.catalog import (
 from app.models.enums import (
     ContractStatusRaw,
     TransferStatus,
-    TeacherReadiness,
     EXPIRY_WARNING_DAYS,
 )
 from app.models.interactions import UniversityProgram
-from app.models.teachers import (
-    Teacher,
-    TeacherCertificate,
-)
 from app.modules.universities.repository import UniversityRepository
-from app.services.teacher_readiness import compute_teacher_readiness
 
 TEST_URL = os.getenv("TEST_DATABASE_URL", "sqlite://")
 
@@ -722,23 +716,6 @@ def test_responsible_filter_via_join_distinct(db: Session):
         .all()
     )
     assert len(nodup) == 2
-
-
-def test_health_status_filter_implemented():
-    """P1-03-01 shipped: health_status filter + health_score sort exist.
-
-    Service computes scores in Python (cached 5 min); total is AFTER the
-    filter; UniversityRead carries the computed score/status.
-    """
-    import inspect as _inspect
-
-    from app.modules.catalog import service as catalog_service
-    from app.modules.catalog.schemas import UniversityRead
-
-    params = _inspect.signature(catalog_service.list_university_page).parameters
-    assert "health_status" in params
-    assert "health_score" in UniversityRead.model_fields
-    assert "health_status" in UniversityRead.model_fields
 
 
 # ================================================= pagination / sorting ==
