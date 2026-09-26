@@ -25,6 +25,40 @@ export function getAvailableWorkflowTransitionTargets(stages: UniversityWorkflow
     .map((target) => ({ id: target.id, orderIndex: target.orderIndex, name: target.name }));
 }
 
+export function getAvailableWorkflowRollbackTargets(stages: UniversityWorkflowStage[], currentStage: UniversityWorkflowStage): WorkflowTransitionTarget[] {
+  return stages
+    .filter((target) => target.orderIndex < currentStage.orderIndex)
+    .filter((target) => target.status === 'completed' || target.status === 'skipped')
+    .sort((left, right) => right.orderIndex - left.orderIndex)
+    .map((target) => ({ id: target.id, orderIndex: target.orderIndex, name: target.name }));
+}
+
+/**
+ * Apply the visual part of a rollback to a cached workflow snapshot.
+ * Mirrors the server policy: the target and every stage between it and the
+ * current one reopen (pending), the pointer moves back to the target.
+ */
+export function applyOptimisticWorkflowRollback(workflow: UniversityWorkflow, targetStageId: string): UniversityWorkflow {
+  const currentStage = workflow.stages.find((stage) => stage.status === 'current') ?? workflow.currentStage;
+  const targetStage = workflow.stages.find((stage) => stage.id === targetStageId);
+  if (!currentStage || !targetStage || targetStage.orderIndex >= currentStage.orderIndex) return workflow;
+
+  const stages = workflow.stages.map((stage) => {
+    if (stage.id === targetStage.id) return { ...stage, status: 'current' as const, startedAt: new Date().toISOString(), completedAt: null, completion: null };
+    if (stage.orderIndex >= targetStage.orderIndex && stage.orderIndex < currentStage.orderIndex) {
+      return { ...stage, status: 'pending' as const, completedAt: null, completion: null };
+    }
+    if (stage.id === currentStage.id) return { ...stage, status: 'pending' as const, completedAt: null, completion: null };
+    return stage;
+  });
+
+  return {
+    ...workflow,
+    currentStage: stages.find((stage) => stage.id === targetStage.id) ?? targetStage,
+    completedSteps: stages.filter((stage) => stage.status === 'completed' || stage.status === 'skipped').length,
+    stages,
+  };
+}
 /**
  * Apply the visual part of a forward transition to a cached workflow snapshot.
  * The server remains authoritative; this helper only supplies the immediate UI

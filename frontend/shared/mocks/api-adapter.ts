@@ -184,6 +184,31 @@ export function mockTransitionWorkflow(instanceId: string, targetStageId: string
   return workflowRecord(definition);
 }
 
+export function mockRollbackWorkflow(instanceId: string, targetStageId: string, comment: string): WorkflowInstanceApiRecord {
+  const definition = workflowDefinition(instanceId);
+  const currentIndex = definition.stages.findIndex((stage) => stage.id === definition.currentStageId);
+  const targetIndex = definition.stages.findIndex((stage) => stage.id === targetStageId);
+  if (targetIndex < 0 || targetIndex >= currentIndex) throw new Error('Можно вернуться только на предыдущий пройденный этап.');
+  const target = definition.stages[targetIndex];
+  const previous = definition.stages[currentIndex];
+  definition.currentStageId = target.id;
+  workflowDefinitions.set(instanceId, definition);
+  writeSession(`workflow-stage:${instanceId}`, target.id);
+  prependAuditEvent({
+    id: id('audit-rollback'),
+    occurredAt: now(),
+    user: { id: 'mock-manager', name: 'Мария Менеджер', email: 'manager@example.test' },
+    role: 'manager',
+    action: 'WORKFLOW_TRANSITION',
+    entity: { id: instanceId, type: 'workflow_instance', label: definition.universityName },
+    university: { id: definition.universityId, name: definition.universityName },
+    oldValues: { stage: previous?.name ?? '—' },
+    newValues: { stage: target.name, comment, rollback: true },
+    requestId: id('request'),
+  });
+  return workflowRecord(definition);
+}
+
 export function mockListWorkflowComments(instanceId: string): WorkflowCommentApiRecord[] {
   const comments = workflowComments.get(instanceId)
     ?? readSession<WorkflowCommentApiRecord[]>(`workflow-comments:${instanceId}`, []);

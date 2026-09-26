@@ -22,7 +22,7 @@ from app.core.permissions import require_permission
 from app.core.security import CurrentUser
 from app.modules.audit.service import get_audit_db
 from app.modules.workflow_instances import service as instance_service
-from app.modules.workflow_instances.schemas import InstanceDetail
+from app.modules.workflow_instances.schemas import AllowedTransitionRead, InstanceDetail
 from app.modules.workflow_transitions import service
 from app.modules.workflow_transitions.schemas import (
     TransitionRequest,
@@ -53,6 +53,48 @@ def transition_instance(
     existing = service.get_instance_or_404(db, instance_id)
     instance_service.authorize_scope(user, existing)
     instance = service.transition_instance(
+        db,
+        instance_id,
+        data.target_instance_stage_id,
+        data.comment,
+        user.id,
+    )
+    return instance_service.get_instance_detail(db, instance.id)
+
+
+@router.get(
+    "/instances/{instance_id}/rollback-targets",
+    response_model=list[AllowedTransitionRead],
+    summary="Previous closed stages the instance can roll back to (newest first)",
+)
+def list_rollback_targets(
+    instance_id: uuid.UUID,
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(READ),
+) -> list[AllowedTransitionRead]:
+    existing = service.get_instance_or_404(db, instance_id)
+    instance_service.authorize_scope(user, existing)
+    stages = service.ordered_stages(instance_id, db)
+    return [
+        AllowedTransitionRead(id=row.id, order_index=row.order_index, name=row.name)
+        for row in service.rollback_targets(existing, stages)
+    ]
+
+
+@router.post(
+    "/instances/{instance_id}/rollback",
+    response_model=InstanceDetail,
+    summary="Step the workflow instance back to a previous stage (atomic)",
+)
+def rollback_instance(
+    instance_id: uuid.UUID,
+    data: TransitionRequest,
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(WRITE),
+) -> InstanceDetail:
+    existing = service.get_instance_or_404(db, instance_id)
+    instance_service.authorize_scope(user, existing)
+    instance = service.rollback_instance(
         db,
         instance_id,
         data.target_instance_stage_id,

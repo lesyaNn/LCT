@@ -70,6 +70,7 @@ function stubReads(page: Page) {
       { id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', instance_id: instanceId, from_stage_id: firstTemplateStage, to_stage_id: secondTemplateStage, actor_keycloak_sub: 'author-sub', comment: 'Этап завершён', created_at: now },
     ];
     else if (path === `/api/v1/workflow/instances/${instanceId}/allowed-transitions`) body = [];
+    else if (path === `/api/v1/workflow/instances/${instanceId}/rollback-targets`) body = [];
     else if (path === `/api/v1/workflow/instances/${instanceId}/attachments/cccccccc-cccc-4ccc-8ccc-cccccccccccc/download`) {
       return route.fulfill({ status: 200, contentType: 'application/pdf', headers: { 'access-control-allow-origin': new URL(page.url()).origin, 'content-disposition': 'attachment; filename="workflow.pdf"' }, body: '%PDF-1.4 test' });
     } else return route.continue();

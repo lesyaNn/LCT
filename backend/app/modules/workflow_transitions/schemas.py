@@ -9,11 +9,16 @@ from pydantic import BaseModel, Field
 
 
 class TransitionRequest(BaseModel):
-    """Move the current pointer to another runtime stage (P2-03-01)."""
+    """Move the current pointer to another runtime stage (P2-03-01).
+
+    Reused by both directions: ``POST transition`` requires a later stage,
+    ``POST rollback`` requires a previous closed stage.
+    """
 
     target_instance_stage_id: uuid.UUID = Field(
-        description="Instance-stage (snapshot row) to move to; must be ahead "
-        "of the current row, required rows in between block the move."
+        description="Instance-stage (snapshot row) to move to; forward moves "
+        "must be ahead of the current row, rollbacks must target a previous "
+        "closed row."
     )
     comment: str = Field(
         min_length=1,

@@ -15,11 +15,21 @@ Transition policy (P2-03-02, pinned by ``test_p2_11_01_transition.py``):
 
 * only ``active`` instances move;
 * a non-empty comment is required (history keeps it, P2-03-03);
-* only forward moves (``order_index`` strictly grows);
+* forward moves (``order_index`` strictly grows);
 * only optional (``is_required == False``) stages between current and target
   may be skipped; required ones block the move;
 * the whole move (stage updates + history row + audit event) commits in ONE
   transaction (P2-03-01 atomicity).
+
+Rollback policy (explicit step-back to a previous stage):
+
+* only ``active`` instances move, comment is required;
+* the target must be a *previous* stage (``order_index`` strictly smaller)
+  that is already closed (``completed``/``skipped``);
+* the target and every stage between it and the current one are reopened
+  (``pending``, ``completed_at`` cleared) so the work is redone;
+* history stays append-only: the step back is recorded as a transition row
+  (from current to target) plus an audit event marked ``rollback: true``.
 
 Comment policy (P2-04-01): anyone with the write gate creates; the author
 may edit within 15 minutes, admins any time afterwards.
@@ -75,6 +85,11 @@ def _ordered_stages(instance_id: uuid.UUID, db: Session) -> list[InstanceStage]:
             .order_by(InstanceStage.order_index.asc())
         ).scalars()
     )
+
+
+def ordered_stages(instance_id: uuid.UUID, db: Session) -> list[InstanceStage]:
+    """Runtime snapshot rows for one instance, oldest stage first."""
+    return _ordered_stages(instance_id, db)
 
 
 def _current_stage(
@@ -196,6 +211,110 @@ def transition_instance(
         university_id=instance.university_id,
         old_value={"stage_id": current.template_stage_id, "stage_name": current.name},
         new_value={"stage_id": target.template_stage_id, "stage_name": target.name, "comment": text},
+    )
+    db.commit()
+    return get_instance_or_404(db, instance.id)
+
+
+def rollback_targets(instance: WorkflowInstance, stages: list[InstanceStage]) -> list[InstanceStage]:
+    """Previous closed stages eligible for rollback, newest first."""
+    if instance.status != "active" or instance.current_instance_stage_id is None:
+        return []
+    current = _current_stage(instance, stages)
+    return sorted(
+        (
+            s for s in stages
+            if s.order_index < current.order_index
+            and (s.status or "") in CLOSED_STAGE_STATUSES
+        ),
+        key=lambda s: s.order_index,
+        reverse=True,
+    )
+
+
+def validate_rollback(
+    instance: WorkflowInstance,
+    stages: list[InstanceStage],
+    target_instance_stage_id: uuid.UUID,
+    comment: str,
+) -> tuple[InstanceStage, InstanceStage, list[InstanceStage]]:
+    """Validate a step back; return (current, target, rows to reopen).
+
+    Pure policy (no SQL), mirroring :func:`validate_transition`.
+    """
+    if instance.status != "active":
+        raise BadTransition(
+            "Only active workflow instances can transition",
+            code=ErrorCode.WORKFLOW_INSTANCE_NOT_ACTIVE,
+        )
+    if not (comment or "").strip():
+        raise BadTransition("Transition comment is required")
+
+    current = _current_stage(instance, stages)
+    target = next((s for s in stages if s.id == target_instance_stage_id), None)
+    if target is None:
+        raise NotFound("Target workflow stage not found")
+    if target.order_index >= current.order_index:
+        raise BadTransition("Rollback target must be a previous stage")
+    if (target.status or "") not in CLOSED_STAGE_STATUSES:
+        raise BadTransition("Can only roll back to a completed stage")
+
+    reopened = [
+        s for s in stages
+        if target.order_index <= s.order_index < current.order_index
+    ]
+    return current, target, reopened
+
+
+def rollback_instance(
+    db: Session,
+    instance_id: uuid.UUID,
+    target_instance_stage_id: uuid.UUID,
+    comment: str,
+    actor: str,
+) -> WorkflowInstance:
+    """Step the current pointer back to a previous stage atomically.
+
+    Reopens the target and every stage between it and the current one
+    (``pending``, ``completed_at`` cleared), moves both current pointers,
+    appends the history row and the audit event, then commits once.
+    History stays append-only: the step back itself is recorded.
+    """
+    instance = db.execute(
+        select(WorkflowInstance)
+        .where(WorkflowInstance.id == instance_id)
+        .with_for_update()
+    ).scalar_one_or_none()
+    if instance is None:
+        raise NotFound("Workflow instance not found")
+    stages = _ordered_stages(instance_id, db)
+    current, target, reopened = validate_rollback(
+        instance, stages, target_instance_stage_id, comment
+    )
+
+    text = comment.strip()
+    for row in reopened:
+        row.status = "pending"
+        row.completed_at = None
+    instance.current_instance_stage_id = target.id
+    instance.current_stage_id = target.template_stage_id
+    db.add(
+        WorkflowStageTransition(
+            instance_id=instance.id,
+            from_stage_id=current.template_stage_id,
+            to_stage_id=target.template_stage_id,
+            actor_keycloak_sub=actor,
+            comment=text,
+        )
+    )
+    AuditService(db).enqueue_event(
+        context=context_for(db, actor),
+        action=AuditAction.WORKFLOW_TRANSITION,
+        entity_type="workflow_instance",
+        entity_id=instance.id,
+        university_id=instance.university_id,
+        old_value={"stage_id": current.template_stage_id, "stage_name": current.name},
+        new_value={"stage_id": target.template_stage_id, "stage_name": target.name, "comment": text, "rollback": True},
     )
     db.commit()
     return get_instance_or_404(db, instance.id)
@@ -356,7 +475,11 @@ __all__ = [
     "list_comment_page",
     "list_comments",
     "list_transitions",
+    "ordered_stages",
+    "rollback_instance",
+    "rollback_targets",
     "transition_instance",
     "utcnow",
+    "validate_rollback",
     "validate_transition",
 ]
