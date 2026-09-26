@@ -104,7 +104,7 @@ test('desktop dashboard presets occupy one row', async ({ page }) => {
     expect(bounds).not.toBeNull();
     expect(bounds!.width).toBeLessThanOrEqual(150);
     expect(bounds!.height).toBeLessThanOrEqual(34);
-    expect(bounds!.y).toBeGreaterThan(buttonBottom);
+    expect(Math.abs(bounds!.y + bounds!.height - buttonBottom)).toBeLessThanOrEqual(2);
   }
   await expect(page.getByTestId('dashboard-kpi')).toBeVisible();
   const filterBounds = await page.locator('section[aria-label="Фильтры аналитики"]').boundingBox();
@@ -169,6 +169,11 @@ test('filter surfaces stay inside the viewport on desktop, tablet and mobile', a
         await expect(filters.locator('input[type="search"]').first()).toBeHidden();
         await page.getByRole('button', { name: 'Показать фильтры' }).click();
         await expect(filters.locator('input[type="search"]').first()).toBeVisible();
+        const period = filters.getByRole('group', { name: 'Период создания' });
+        const presetBottom = await period.getByRole('button', { name: 'Прошлый год' }).evaluate((element) => element.getBoundingClientRect().bottom);
+        const date = await period.getByLabel('От', { exact: true }).boundingBox();
+        expect(date).not.toBeNull();
+        expect(Math.abs(date!.y + date!.height - presetBottom)).toBeLessThanOrEqual(2);
       }
     }
   }
@@ -199,6 +204,11 @@ test('audit period and available select filters reach server params', async ({ p
   await page.goto('/audit');
   const surface = page.locator('section[aria-label="Фильтры журнала аудита"]');
   await expect(surface).toBeVisible();
+  const period = surface.getByRole('group', { name: 'Период' });
+  const presetBottom = await period.getByRole('button', { name: 'Прошлый год' }).evaluate((element) => element.getBoundingClientRect().bottom);
+  const date = await period.getByLabel('От', { exact: true }).boundingBox();
+  expect(date).not.toBeNull();
+  expect(Math.abs(date!.y + date!.height - presetBottom)).toBeLessThanOrEqual(2);
   const periodResponse = page.waitForResponse((response) => {
     const url = new URL(response.url());
     return url.pathname === '/api/v1/audit/events' && url.searchParams.get('date_from') === '2026-01-01';
