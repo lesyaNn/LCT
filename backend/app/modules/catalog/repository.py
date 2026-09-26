@@ -98,12 +98,12 @@ def list_universities_health(
     db: Session, *, page: int, page_size: int, search: str | None,
     city: str | None, responsible_id: uuid.UUID | None, sort_order: str,
     health_status: str | None = None, unified_filter=None, unified_today=None,
-    user=None,
+    user=None, external_source: str | None = None,
 ) -> tuple[list[tuple[University, int | None, str | None]], int]:
     """SQL scoped health filter/order/page over the materialized projection."""
     conds = university_conditions(search=search, city=city,
         responsible_id=responsible_id, unified_filter=unified_filter,
-        today=unified_today)
+        today=unified_today, external_source=external_source)
     base = select(University).outerjoin(
         HealthScoreCurrent, HealthScoreCurrent.university_id == University.id
     ).where(*conds)
@@ -137,8 +137,22 @@ def university_conditions(
     responsible_id: uuid.UUID | None,
     unified_filter=None,
     today=None,
+    external_source: str | None = None,
 ):
     conds = []
+    if external_source == "lms":
+        from app.models.interactions import Student
+
+        conds.append(exists(select(1).select_from(Student).where(
+            Student.university_id == University.id, Student.source == "lms",
+        )))
+    elif external_source == "website":
+        from app.models.external import ExternalApplication
+
+        conds.append(exists(select(1).select_from(ExternalApplication).where(
+            ExternalApplication.university_id == University.id,
+            ExternalApplication.source == "website",
+        )))
     if search:
         pattern = like_pattern(search)
         conds.append(
@@ -185,7 +199,7 @@ def list_universities(
     sort_order: str,
     unified_filter=None,
     unified_today=None,
-    user=None,
+    user=None, external_source: str | None = None,
 ) -> tuple[list[University], int]:
     conds = university_conditions(
         search=search,
@@ -193,6 +207,7 @@ def list_universities(
         responsible_id=responsible_id,
         unified_filter=unified_filter,
         today=unified_today,
+        external_source=external_source,
     )
     count_stmt = select(func.count()).select_from(University).where(*conds)
     page_stmt = (

@@ -32,6 +32,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.core.exceptions import NotFound
 from app.core.policies import apply_university_scope, ensure_university_access
 from app.models.catalog import ITProgram, Responsible, University
+from app.models.external import ExternalApplication
 from app.models.interactions import UniversityProgram
 from app.models.workflow_instances import (
     InstanceStage,
@@ -207,6 +208,7 @@ def create_instance(
     responsible_id: uuid.UUID | None = None,
     actor_sub: str = "",
     today: date | None = None,
+    external_application: ExternalApplication | None = None,
 ) -> InstanceDetail:
     """Atomic creation: header + snapshot + pointers + creation transition."""
     university = db.get(University, university_id)
@@ -267,6 +269,8 @@ def create_instance(
             )
         )
     db.add_all(snapshots)
+    if external_application is not None:
+        external_application.workflow_instance_id = instance.id
     if snapshots:
         db.flush()  # snapshot ids for the current pointer (same transaction)
         first = snapshots[0]
@@ -296,6 +300,7 @@ def create_instance(
             new_value={
                 "template_id": str(template.id),
                 "stages": len(snapshots),
+                "external_application_id": str(external_application.id) if external_application else None,
             },
         )
         db.commit()

@@ -73,6 +73,10 @@ class Settings(BaseSettings):
     # it); ``REPORTS_ROOT`` wins when both are set.
     reports_root: str = "/app/reports"
 
+    # Explicit offline adapter; never enabled automatically after a real error.
+    # No live provider contract/credentials are configured in this release.
+    external_adapter_mode: str = "disabled"
+
     # --- Health Score (P2-07-03) ---
     # CSV обязательных типов документов для компонента D.
     # Дефолт ТЗ: contract,license,act,protocol.
@@ -89,6 +93,8 @@ class Settings(BaseSettings):
                 "AUTH_DEV_BYPASS is allowed only in explicit local development/test environments"
             )
         if production:
+            if self.external_adapter_mode != "disabled":
+                raise ValueError("External mock adapter is forbidden in production")
             if "*" in origins or "*" in self.cors_origin_list:
                 raise ValueError("CORS wildcard is not allowed in production")
             if self.storage_backend.lower() in {"s3", "minio"} and (

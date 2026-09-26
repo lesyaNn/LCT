@@ -67,6 +67,7 @@ def list_university_page(
     unified_today=None,
     user=None,
     health_status: str | None = None,
+    external_source: str | None = None,
 ) -> tuple[list[UniversityRead], int]:
     """List universities from the materialized health projection.
 
@@ -89,6 +90,7 @@ def list_university_page(
             unified_filter=unified_filter,
             unified_today=unified_today,
             user=user,
+            external_source=external_source,
         )
         return [UniversityRead.model_validate(r) for r in rows], total
     rows, total = repo.list_universities_health(
@@ -96,6 +98,7 @@ def list_university_page(
         responsible_id=responsible_id, sort_order=sort_order,
         health_status=health_status, unified_filter=unified_filter,
         unified_today=unified_today, user=user,
+        external_source=external_source,
     )
     items = []
     for u, score, status in rows:

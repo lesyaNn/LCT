@@ -14,7 +14,8 @@ interaction_notes, meeting_documents, workflow_templates, workflow_stages,
 workflow_instances, workflow_stage_transitions, workflow_comments,
 workflow_attachments, workflow_tasks, instance_stages,
 health_score_snapshots (P2-09-01, migration 000015), report_jobs
-(P4-06-01, migration 000018, Dev-1 actor_* schema).
+(P4-06-01, migration 000018, Dev-1 actor_* schema), external_applications
+and external_sync_states (Stage 11, migration 000027).
 """
 
 from app.models.catalog import (  # noqa: F401
@@ -31,6 +32,7 @@ from app.models.catalog import (  # noqa: F401
 )
 from app.models.health_score import HealthScoreCurrent, HealthScoreSnapshot  # noqa: F401
 from app.models.audit_outbox import AuditOutbox  # noqa: F401
+from app.models.external import ExternalApplication, ExternalSyncState  # noqa: F401
 from app.models.report_job import (  # noqa: F401
     REPORT_JOB_STATUSES,
     STATUS_BUILDING,
@@ -99,5 +101,7 @@ __all__ = [
     "HealthScoreSnapshot",
     "HealthScoreCurrent",
     "AuditOutbox",
+    "ExternalApplication",
+    "ExternalSyncState",
     "ReportJob",
 ]

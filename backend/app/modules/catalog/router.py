@@ -126,6 +126,7 @@ def list_universities(
         default=None,
         description="Filter by computed Health Score status (scores calculated per university, cached 5 min)",
     ),
+    external_source: Literal["lms", "website"] | None = Query(default=None),
     unified: UnifiedFilter = Depends(get_unified_filter),
     db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(READ),
@@ -143,6 +144,7 @@ def list_universities(
         unified_filter=unified,
         user=user,
         health_status=health_status,
+        external_source=external_source,
     )
     return PaginatedResponse(items=items, page=page, page_size=page_size, total=total)
 

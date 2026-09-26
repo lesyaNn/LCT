@@ -1,6 +1,6 @@
 """API v1 production router.
 
-Mounted: auth, import, university passport, teacher passport, meetings,
+Mounted: auth, import, explicit external integrations, university passport, teacher passport, meetings,
 students, catalog CRUD/overview, workflow templates/stages, workflow instances (+ canonical
 B2 transitions/comments), workflow instance attachments, health-score
 (batch/ranking/history/attention), and async analytics reports (P4-06-01:
@@ -19,6 +19,7 @@ from app.modules.catalog.router import router as catalog_router
 from app.modules.health_score.health_router import router as health_router
 from app.modules.health_score.ranking_router import router as ranking_router
 from app.modules.imports.router import router as imports_router
+from app.modules.integrations.router import router as integrations_router
 from app.modules.meetings.router import router as meetings_router
 from app.modules.students.router import router as students_router
 from app.modules.teachers.passport_router import router as teacher_passport_router
@@ -32,6 +33,7 @@ v1 = APIRouter(prefix="/api/v1")
 v1.include_router(auth_router)
 v1.include_router(admin_users_router)
 v1.include_router(imports_router)
+v1.include_router(integrations_router)
 # NOTE: health_router ДО catalog_router: точный путь /universities/health-score
 # (batch, P2-08-02) иначе перехватывается GET /universities/{university_id}.
 v1.include_router(health_router)

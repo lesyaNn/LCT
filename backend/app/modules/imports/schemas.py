@@ -67,7 +67,7 @@ class ImportExecuteRequest(BaseModel):
 
     file_id: str = Field(pattern=r"^[0-9a-f]{32}$")
     filename: str | None = Field(default=None, max_length=256)
-    catalog_type: Literal["licenses", "universities", "directions", "products", "responsibles", "vendor_contacts"] = "licenses"
+    catalog_type: Literal["licenses", "universities", "directions", "products", "responsibles", "vendor_contacts", "applications"] = "licenses"
     mapping: dict[str, str] = Field(examples=[EXAMPLE_MAPPING])
     options: ImportOptions = Field(default_factory=ImportOptions)
 

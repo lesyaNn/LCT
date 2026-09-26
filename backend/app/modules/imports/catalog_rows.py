@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.catalog import ITDirection, ITProduct, Responsible, University, Vendor, VendorContact
+from app.models.catalog import ITDirection, ITProduct, ITProgram, Responsible, University, Vendor, VendorContact
+from app.models.external import ExternalApplication
+from app.models.interactions import Student, UniversityProgram
 from app.modules.imports.normalize import normalize_phone, normalized_name, split_products
 from app.modules.imports.service import ImportValidationError
 
@@ -58,6 +62,51 @@ def _product(db: Session, vendor: Vendor, name: str, version: str) -> tuple[ITPr
 
 
 def apply_catalog_row(db: Session, row: dict, kind: str, update_existing: bool) -> str:
+    if kind == "applications":
+        from app.modules.integrations.service import upsert_application
+
+        external_id = _required(row, "application.external_id")
+        university_name = _required(row, "university.name")
+        program_name = _required(row, "program.name")
+        university = _unique_match(db, University, University.name, university_name, "university.name")
+        if university is None:
+            raise ImportValidationError("ВУЗ отсутствует в каталоге", code="NOT_FOUND", field="university.name")
+        programs = list(db.scalars(select(ITProgram).join(UniversityProgram, UniversityProgram.program_id == ITProgram.id).where(
+            UniversityProgram.university_id == university.id,
+            func.lower(ITProgram.name) == program_name.lower(),
+        ).limit(2)))
+        if len(programs) != 1:
+            raise ImportValidationError("Программа не найдена или связь неоднозначна", code="NOT_FOUND" if not programs else "DUPLICATE", field="program.name")
+        existing = db.scalar(select(ExternalApplication).where(
+            ExternalApplication.source == "website", ExternalApplication.external_id == external_id,
+        ))
+        if existing is not None:
+            if existing.university_id not in (None, university.id) or (existing.workflow_instance_id is not None and existing.program_id not in (None, programs[0].id)):
+                raise ImportValidationError("ID заявки связан с другим ВУЗом или Workflow", code="DUPLICATE", field="application.external_id")
+            if not update_existing:
+                return "skipped"
+        payload = {"external_id": external_id, "university_id": university.id,
+                   "program_id": programs[0].id}
+        for key, target in (("application.person_name", "person_name"), ("application.status", "status"),
+                            ("application.flow_name", "flow_name")):
+            if key in row:
+                payload[target] = normalized_name(row[key]) or None
+        student_external_id = normalized_name(row.get("application.student_external_id"))
+        if student_external_id:
+            student = db.scalar(select(Student).where(Student.external_id == student_external_id))
+            if student is None or student.university_id != university.id:
+                raise ImportValidationError("Обучающийся с указанным ID не найден в этом ВУЗе", code="NOT_FOUND", field="application.student_external_id")
+            payload["student_id"] = student.id
+        raw_created = row.get("application.created_at")
+        if raw_created not in (None, ""):
+            try:
+                created = raw_created if isinstance(raw_created, datetime) else datetime.fromisoformat(str(raw_created).strip().replace("Z", "+00:00"))
+                payload["external_created_at"] = created if created.tzinfo else created.replace(tzinfo=timezone.utc)
+            except ValueError as exc:
+                raise ImportValidationError("Неверная дата заявки", code="INVALID_FORMAT", field="application.created_at") from exc
+        upsert_application(db, payload, ingest_channel="file", synced_at=datetime.now(timezone.utc))
+        return "updated" if existing is not None else "inserted"
+
     if kind == "universities":
         name = _required(row, "university.name")
         city = normalized_name(row.get("university.city")) or None

@@ -82,6 +82,12 @@ TARGET_FIELDS = frozenset({
     "responsible.phone",
     "responsible.role",
     "university_responsibles",
+    "application.external_id",
+    "application.student_external_id",
+    "application.status",
+    "application.flow_name",
+    "application.person_name",
+    "application.created_at",
 })
 
 # One server-owned mapping contract. The UI receives these definitions with
@@ -110,6 +116,12 @@ FIELD_DEFINITIONS: dict[str, tuple[str, tuple[str, ...]]] = {
     "responsible.phone": ("Телефон ответственного", ("телефон ответственного",)),
     "responsible.role": ("Роль ответственного", ("роль", "должность")),
     "university_responsibles": ("Ответственные от ВУЗа", ("ответственные от вуза", "представители вуза")),
+    "application.external_id": ("ID внешней заявки", ("id заявки", "application id", "external application id", "external id")),
+    "application.student_external_id": ("Внешний ID обучающегося", ("id обучающегося", "student external id")),
+    "application.status": ("Статус заявки", ("статус заявки", "application status")),
+    "application.flow_name": ("Поток заявки", ("поток заявки", "поток", "cohort")),
+    "application.person_name": ("ФИО заявителя", ("фио заявителя", "заявитель", "person")),
+    "application.created_at": ("Дата создания заявки", ("дата заявки", "создана", "created at")),
 }
 assert set(FIELD_DEFINITIONS) == TARGET_FIELDS
 
@@ -122,6 +134,7 @@ IMPORT_REQUIRED_FIELDS = {
     "vendor_contacts": frozenset({
         "vendor.name", "product.name", "vendor_contact.full_name", "vendor_contact.email"
     }),
+    "applications": frozenset({"application.external_id", "university.name", "program.name"}),
 }
 
 IMPORT_FIELDS_BY_TYPE = {
@@ -130,7 +143,8 @@ IMPORT_FIELDS_BY_TYPE = {
     "products": tuple(k for k in TARGET_FIELDS if k.startswith(("vendor.", "product."))),
     "responsibles": tuple(k for k in TARGET_FIELDS if k.startswith("responsible.")),
     "vendor_contacts": tuple(k for k in TARGET_FIELDS if k.startswith(("vendor.", "product.", "vendor_contact."))),
-    "licenses": tuple(k for k in TARGET_FIELDS if not k.startswith("vendor_contact.")),
+    "licenses": tuple(k for k in TARGET_FIELDS if not k.startswith(("vendor_contact.", "application."))),
+    "applications": tuple(k for k in TARGET_FIELDS if k.startswith("application.") or k in {"university.name", "program.name"}),
 }
 
 

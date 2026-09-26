@@ -45,6 +45,9 @@ class StudentRead(BaseModel):
     finished_at: date | None = None
     created_at: datetime
     updated_at: datetime
+    source: str = "manual"
+    progress: int | None = None
+    synced_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 

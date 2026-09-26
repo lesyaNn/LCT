@@ -62,6 +62,9 @@ class Student(UUIDPKMixin, TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
     started_at: Mapped[date] = mapped_column(Date, nullable=False)
     finished_at: Mapped[date | None] = mapped_column(Date, nullable=True, default=None)
+    source: Mapped[str] = mapped_column(String(32), nullable=False, default="manual")
+    progress: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+    synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
 
     university: Mapped["University"] = relationship(back_populates="students")
 

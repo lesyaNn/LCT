@@ -47,7 +47,6 @@ RUN rm -rf \
     app/modules/identity/router.py \
     app/modules/dashboard/router.py \
     app/modules/notifications/router.py \
-    app/modules/integrations/router.py \
     app/modules/workflow/router.py \
     app/modules/workflow/service.py \
     app/modules/universities/router.py \

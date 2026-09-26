@@ -50,7 +50,8 @@ LEGACY_SQL_HEAD = "000010_audit_identity"
 # Canonical application tables (alembic_version/schema_migrations excluded):
 # 21 P1 tables + 8 B1 workflow tables (000011-000014) + health_score_snapshots
 # (P2-09-01, 000015) + report_jobs (P4-06-01, 000018) + the materialized
-# health score projection (000022) and audit outbox (000023).
+# health score projection (000022), audit outbox (000023), and external
+# application/sync snapshots (000027).
 # 000019/000020 only ALTER report_jobs (no new tables); 000021 only ALTERs
 # audit_events (no new tables). Pinned by
 # tests/test_p5_migrate_expected_guard.py — keep in sync with
@@ -91,6 +92,8 @@ EXPECTED_TABLES = [
     "report_jobs",
     "audit_outbox",
     "vendor_contacts",
+    "external_applications",
+    "external_sync_states",
 ]
 
 VERSION_RE = re.compile(r"^(?P<ver>\d{6}_[a-z0-9_]+)\.(?P<dir>up|down)\.sql$")
