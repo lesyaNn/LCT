@@ -111,7 +111,11 @@ function AuditFilters({ query, result, options, onPatch, onReset }: { query: Aud
       <MultiSelect label="Тип сущности" values={query.filters.entityTypes} options={entityOptions} disabled={!capabilities?.entityTypes || !options} onChange={(values) => onPatch({ entityTypes: values })} />
     </>;
 
-  return <FilterToolbar label="Фильтры журнала аудита" controls={controls} onReset={onReset} resetDisabled={!selectedFilterCount(query.filters)} mobileCount={selectedFilterCount(query.filters)} />;
+  const chips = [
+    ...(query.filters.dateFrom || query.filters.dateTo ? [{ id: 'period', label: `Период: ${query.filters.dateFrom || '…'} — ${query.filters.dateTo || '…'}`, onRemove: () => onPatch({ dateFrom: '', dateTo: '' }) }] : []),
+    ...([['userIds', 'Пользователь', users], ['universityIds', 'ВУЗ', universities], ['actions', 'Тип действия', actionOptions], ['entityTypes', 'Тип сущности', entityOptions]] as const).filter(([key]) => query.filters[key].length).map(([key, label, entries]) => ({ id: key, label: `${label}: ${query.filters[key].map((id) => entries.find((item) => item.id === id)?.name ?? id).join(', ')}`, onRemove: () => onPatch({ [key]: [] }) })),
+  ];
+  return <FilterToolbar activeFilters={chips} label="Фильтры журнала аудита" controls={controls} onReset={onReset} resetDisabled={!selectedFilterCount(query.filters)} mobileCount={selectedFilterCount(query.filters)} />;
 }
 
 function TimeCell({ value }: { value: string }) {

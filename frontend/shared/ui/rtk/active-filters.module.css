@@ -1,0 +1,9 @@
+.root { align-items: flex-start; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); min-width: 0; }
+.title { color: var(--rtk-color-text-secondary); font-size: 12px; font-weight: 600; padding: 7px 0; }
+.list { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); min-width: 0; }
+.chip, .clear { align-items: center; border-radius: 999px; cursor: pointer; display: inline-flex; font-size: 12px; gap: 4px; min-height: 30px; }
+.chip { background: var(--rtk-color-brand-soft); border: 1px solid var(--rtk-color-brand); color: var(--rtk-color-brand); max-width: 100%; overflow-wrap: anywhere; padding: 4px 8px; }
+.chip:hover { background: var(--rtk-color-surface-hover); }
+.clear { background: transparent; border: 0; color: var(--rtk-color-text-secondary); padding: 4px 8px; }
+.clear:hover { color: var(--rtk-color-text-primary); }
+@media (max-width: 768px) { .chip, .clear { min-height: 44px; } }

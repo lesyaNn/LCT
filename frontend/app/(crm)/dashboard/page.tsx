@@ -87,7 +87,13 @@ export default function DashboardPage() {
     staleTime: 60_000,
   });
 
-  const filterBar = <FilterToolbar label="Фильтры аналитики" collapsible controls={() => <>
+  const activeFilters = [
+    ...(filters.dateFrom || filters.dateTo ? [{ id: 'period', label: `Период: ${filters.dateFrom || '…'} — ${filters.dateTo || '…'}`, onRemove: () => setFilters((current) => ({ ...current, dateFrom: '', dateTo: '' })) }] : []),
+    ...([['universityIds', 'ВУЗ', references.data?.universities ?? []], ['directionIds', 'Направление', references.data?.directions ?? []], ['productIds', 'Продукт', references.data?.products ?? []], ['responsibleIds', 'Ответственный', references.data?.responsibles ?? []]] as const)
+      .filter(([key]) => filters[key].length)
+      .map(([key, label, entries]) => ({ id: key, label: `${label}: ${filters[key].map((id) => entries.find((item) => item.id === id)?.name ?? id).join(', ')}`, onRemove: () => setFilters((current) => ({ ...current, [key]: [] })) })),
+  ];
+  const filterBar = <FilterToolbar activeFilters={activeFilters} label="Фильтры аналитики" collapsible controls={() => <>
         <DateRangeField presets from={filters.dateFrom} to={filters.dateTo} onFromChange={(dateFrom) => setFilters((current) => ({ ...current, dateFrom }))} onToChange={(dateTo) => setFilters((current) => ({ ...current, dateTo }))} onRangeChange={(dateFrom, dateTo) => setFilters((current) => ({ ...current, dateFrom, dateTo }))} />
         <MultiSelect label="ВУЗ" values={filters.universityIds} options={references.data?.universities ?? []} disabled={references.isPending || references.isError} onChange={(universityIds) => setFilters((current) => ({ ...current, universityIds }))} />
         <MultiSelect label="Направление" values={filters.directionIds} options={references.data?.directions ?? []} disabled={references.isPending || references.isError} onChange={(directionIds) => setFilters((current) => ({ ...current, directionIds }))} />

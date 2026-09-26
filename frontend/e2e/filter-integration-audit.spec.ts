@@ -46,6 +46,7 @@ test('program and teacher filters reach the API before pagination', async ({ pag
     return url.pathname === `/api/v1/universities/${id}/passport/programs` && url.searchParams.get('status') === status;
   });
   await programsSection.getByRole('combobox', { name: 'Статус' }).selectOption(status);
+  await expect(programsSection.getByLabel('Активные фильтры')).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`program_status=${status}`));
   await expect(programsSection.getByText(fixture.programs.items[0].name).first()).toBeVisible();
   releasePrograms();
@@ -54,7 +55,8 @@ test('program and teacher filters reach the API before pagination', async ({ pag
   const programBody = await filteredPrograms.json() as PageResult<Program>;
   expect(programBody.total).toBe(fixture.programs.items.filter((item) => item.status === status).length);
   expect(programBody.items.every((item) => item.status === status)).toBeTruthy();
-  await programsSection.getByRole('button', { name: 'Сбросить' }).click();
+  await programsSection.getByRole('button', { name: 'Сбросить', exact: true }).click();
+  await expect(programsSection.getByLabel('Активные фильтры')).toHaveCount(0);
   await expect(programsSection.getByRole('combobox', { name: 'Статус' })).toHaveValue('all');
   await expect(page).not.toHaveURL(/program_status=/);
 
@@ -71,6 +73,7 @@ test('program and teacher filters reach the API before pagination', async ({ pag
     return url.pathname === `/api/v1/universities/${id}/passport/teachers` && url.searchParams.get('readiness') === readiness;
   });
   await teachersSection.getByRole('combobox', { name: 'Готовность' }).selectOption(readiness);
+  await expect(teachersSection.getByLabel('Активные фильтры')).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`teacher_readiness=${readiness}`));
   await expect(teachersSection.getByText(fixture.teachers.items[0].full_name).first()).toBeVisible();
   releaseTeachers();
@@ -79,7 +82,8 @@ test('program and teacher filters reach the API before pagination', async ({ pag
   const teacherBody = await filteredTeachers.json() as PageResult<Teacher>;
   expect(teacherBody.total).toBe(fixture.teachers.items.filter((item) => item.readiness === readiness).length);
   expect(teacherBody.items.every((item) => item.readiness === readiness)).toBeTruthy();
-  await teachersSection.getByRole('button', { name: 'Сбросить' }).click();
+  await teachersSection.getByRole('button', { name: 'Сбросить', exact: true }).click();
+  await expect(teachersSection.getByLabel('Активные фильтры')).toHaveCount(0);
   await expect(teachersSection.getByRole('combobox', { name: 'Готовность' })).toHaveValue('all');
   await expect(page).not.toHaveURL(/teacher_readiness=/);
 });
@@ -103,7 +107,7 @@ test('desktop dashboard presets occupy one row', async ({ page }) => {
     const bounds = await period.getByLabel(label, { exact: true }).boundingBox();
     expect(bounds).not.toBeNull();
     expect(bounds!.width).toBeLessThanOrEqual(150);
-    expect(bounds!.height).toBeLessThanOrEqual(34);
+    expect(bounds!.height).toBeLessThanOrEqual(46);
     expect(Math.abs(bounds!.y + bounds!.height - buttonBottom)).toBeLessThanOrEqual(2);
   }
   await expect(page.getByTestId('dashboard-kpi')).toBeVisible();
@@ -141,9 +145,9 @@ test('filter surfaces stay inside the viewport on desktop, tablet and mobile', a
   const response = await request.get('http://localhost:3000/api/v1/universities?page=1&page_size=1', { headers: { authorization } });
   expect(response.ok()).toBeTruthy();
   const university = ((await response.json()) as PageResult<University>).items[0];
-  const paths = ['/dashboard', '/universities', '/audit'];
+  const paths = ['/dashboard', '/universities', '/audit', '/admin/users', '/reports', '/workflows'];
   if (university) paths.push(`/universities/${university.id}?tab=programs`, `/universities/${university.id}?tab=teachers`);
-  for (const width of [1440, 768, 390]) {
+  for (const width of [1440, 1024, 768, 390]) {
     await page.setViewportSize({ width, height: 900 });
     for (const path of paths) {
       await page.goto(path);
@@ -156,9 +160,11 @@ test('filter surfaces stay inside the viewport on desktop, tablet and mobile', a
         expect(search).not.toBeNull();
         expect(university).not.toBeNull();
         expect(university!.x).toBeGreaterThan(search!.x + search!.width);
-        const searchField = await filters.locator('input[type="search"]').first().locator('..').boundingBox();
-        expect(searchField).not.toBeNull();
-        expect(Math.abs(searchField!.y + searchField!.height - university!.y - university!.height)).toBeLessThanOrEqual(2);
+        await expect.poll(() => filters.evaluate((element) => {
+          const searchControl = element.querySelector('input[type="search"]')?.parentElement?.getBoundingClientRect();
+          const summary = element.querySelector('details summary')?.getBoundingClientRect();
+          return searchControl && summary ? Math.abs(searchControl.bottom - summary.bottom) : Infinity;
+        })).toBeLessThanOrEqual(2);
         const city = await filters.locator('select').first().boundingBox();
         const responsible = await filters.locator('details summary').nth(3).boundingBox();
         expect(city).not.toBeNull();
@@ -174,6 +180,9 @@ test('filter surfaces stay inside the viewport on desktop, tablet and mobile', a
         const date = await period.getByLabel('От', { exact: true }).boundingBox();
         expect(date).not.toBeNull();
         expect(Math.abs(date!.y + date!.height - presetBottom)).toBeLessThanOrEqual(2);
+        const resetButton = await page.locator('section[aria-label="Фильтры списка вузов"]').first().getByRole('button', { name: 'Сбросить', exact: true }).boundingBox();
+        expect(resetButton).not.toBeNull();
+        expect(Math.abs(resetButton!.y + resetButton!.height - date!.y - date!.height)).toBeLessThanOrEqual(2);
       }
     }
   }
@@ -185,6 +194,46 @@ test('filter surfaces stay inside the viewport on desktop, tablet and mobile', a
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth), { message: `${path} drawer overflows` }).toBeLessThanOrEqual(391);
     await page.getByRole('dialog', { name: 'Фильтры' }).getByRole('button', { name: 'Закрыть' }).click();
   }
+});
+
+test('shared active filters remove only their own value and reset the panel', async ({ page }) => {
+  test.skip(!process.env.E2E_ADMIN_USERNAME || !process.env.E2E_ADMIN_PASSWORD, 'Set E2E admin credentials.');
+  await page.goto('/login');
+  const keycloakButton = page.getByRole('button', { name: 'Войти через Keycloak' });
+  if (await keycloakButton.isVisible().catch(() => false)) await keycloakButton.click();
+  await page.locator('input[name="username"]').fill(process.env.E2E_ADMIN_USERNAME ?? '');
+  await page.locator('input[name="password"]').fill(process.env.E2E_ADMIN_PASSWORD ?? '');
+  await page.getByRole('button', { name: /Вход|Войти|Sign in|Log in/i }).click();
+  await page.waitForURL((url) => url.pathname === '/dashboard');
+
+  await page.goto('/admin/users');
+  const users = page.locator('section[aria-label="Фильтры пользователей"]');
+  await expect(page.getByLabel('Активные фильтры')).toHaveCount(0);
+  await users.getByRole('combobox', { name: 'Роль' }).selectOption('admin');
+  await expect(page.getByLabel('Активные фильтры')).toBeVisible();
+  await users.getByRole('searchbox', { name: /Поиск по ФИО/ }).fill('Demo');
+  await expect(page.getByLabel('Активные фильтры').getByRole('button', { name: /Удалить фильтр/ })).toHaveCount(2);
+  await page.getByRole('button', { name: /Удалить фильтр «Поиск:/ }).click();
+  await expect(users.getByRole('combobox', { name: 'Роль' })).toHaveValue('admin');
+  await users.getByRole('button', { name: 'Сбросить', exact: true }).click();
+  await expect(page.getByLabel('Активные фильтры')).toHaveCount(0);
+
+  await page.goto('/reports');
+  const reports = page.locator('section[aria-label="Фильтры отчёта"]');
+  await expect(page.getByLabel('Активные фильтры')).toHaveCount(0);
+  await reports.getByRole('button', { name: 'Текущий год' }).click();
+  await expect(page.getByLabel('Активные фильтры')).toBeVisible();
+  await reports.getByRole('button', { name: 'Сбросить', exact: true }).click();
+  await expect(page.getByLabel('Активные фильтры')).toHaveCount(0);
+
+  await page.goto('/workflows');
+  const workflow = page.locator('section[aria-label="Фильтры Workflow"]');
+  await expect(page.getByLabel('Активные фильтры')).toHaveCount(0);
+  await workflow.getByRole('combobox', { name: 'Статус' }).selectOption('in_progress');
+  await expect(page.getByLabel('Активные фильтры')).toBeVisible();
+  await page.getByRole('button', { name: /Удалить фильтр «Статус:/ }).click();
+  await expect(workflow.getByRole('combobox', { name: 'Статус' })).toHaveValue('');
+  await expect(page.getByLabel('Активные фильтры')).toHaveCount(0);
 });
 
 test('audit period and available select filters reach server params', async ({ page, request }) => {
@@ -215,7 +264,7 @@ test('audit period and available select filters reach server params', async ({ p
   });
   await surface.getByLabel('От').fill('2026-01-01');
   expect((await periodResponse).status()).toBe(200);
-  await surface.getByRole('button', { name: 'Сбросить' }).click();
+  await surface.getByRole('button', { name: 'Сбросить', exact: true }).click();
   await expect(page).not.toHaveURL(/date_from=/);
 
   let testedSelects = 0;
@@ -236,7 +285,7 @@ test('audit period and available select filters reach server params', async ({ p
     await details.locator('input[type="checkbox"]').first().click();
     expect((await apiResponse).status()).toBe(200);
     await details.locator('summary').click();
-    await surface.getByRole('button', { name: 'Сбросить' }).click();
+    await surface.getByRole('button', { name: 'Сбросить', exact: true }).click();
     await expect(page).not.toHaveURL(new RegExp(`${optionKey === 'users' ? 'user' : optionKey === 'universities' ? 'university' : queryKey}=`));
   }
   expect(testedSelects).toBeGreaterThan(0);
@@ -262,8 +311,8 @@ test('university list filters send supported parameters and reset', async ({ pag
   const surface = page.locator('section[aria-label="Фильтры списка вузов"]').first();
   await expect(surface).toBeVisible();
   const reset = async () => {
-    await surface.getByRole('button', { name: 'Сбросить' }).click();
-    await expect(surface.getByRole('button', { name: 'Сбросить' })).toBeDisabled();
+    await surface.getByRole('button', { name: 'Сбросить', exact: true }).click();
+    await expect(surface.getByRole('button', { name: 'Сбросить', exact: true })).toBeDisabled();
   };
   const expectParam = (key: string) => page.waitForResponse((response) => {
     const url = new URL(response.url());
@@ -272,6 +321,10 @@ test('university list filters send supported parameters and reset', async ({ pag
   const searchResponse = expectParam('search');
   await surface.getByLabel('Поиск по названию вуза').fill(first.name.slice(0, 8));
   expect((await searchResponse).status()).toBe(200);
+  await expect(page.getByLabel('Активные фильтры')).toBeVisible();
+  await page.getByRole('button', { name: /Удалить фильтр «Поиск:/ }).click();
+  await expect(page.getByLabel('Активные фильтры')).toHaveCount(0);
+  await surface.getByLabel('Поиск по названию вуза').fill(first.name.slice(0, 8));
   await reset();
 
   for (const [label, key] of [

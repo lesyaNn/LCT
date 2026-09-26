@@ -15,12 +15,12 @@ import {
 } from '@tanstack/react-table';
 import Attention from '@atomaro/icons/24/action/Attention';
 import Search from '@atomaro/icons/24/action/Search';
-import CloseSmall from '@atomaro/icons/24/navigation/CloseSmall';
 import ChevronSort from '@atomaro/icons/24/navigation/ChevronSort';
 import SortDown from '@atomaro/icons/24/editor/SortDown';
 import SortUp from '@atomaro/icons/24/editor/SortUp';
 import { Button } from '@/shared/ui/rtk/button';
 import { FilterToolbar } from '@/shared/ui/rtk/filter-surface';
+import type { ActiveFilterItem } from '@/shared/ui/rtk/active-filters';
 import { DateRangeField } from '@/shared/ui/rtk/date-range-field';
 import { Select } from '@/shared/ui/rtk/form-controls';
 import { EmptyState } from '@/shared/ui/empty-state';
@@ -346,7 +346,7 @@ function selectedNames(values: string[], options: Array<{ id: string; name: stri
   return `${names.slice(0, 2).join(', ')} +${names.length - 2}`;
 }
 
-function ActiveFilterChips({ filters, options, onPatch, onReset }: { filters: UniversityFilters; options: UniversityFilterOptions; onPatch: (patch: QueryPatch) => void; onReset: () => void }) {
+function universityActiveFilters(filters: UniversityFilters, options: UniversityFilterOptions, onPatch: (patch: QueryPatch) => void): ActiveFilterItem[] {
   const chips: Array<{ key: string; label: string; patch: QueryPatch }> = [];
   if (filters.search) chips.push({ key: 'search', label: `Поиск: ${filters.search}`, patch: { search: null, page: 1 } });
   if (filters.universityIds.length) chips.push({ key: 'university', label: `Вуз: ${selectedNames(filters.universityIds, options.universities)}`, patch: { university: null, page: 1 } });
@@ -358,17 +358,7 @@ function ActiveFilterChips({ filters, options, onPatch, onReset }: { filters: Un
   if (filters.healthStatuses.length) chips.push({ key: 'health_status', label: `Health Score: ${selectedNames(filters.healthStatuses, HEALTH_STATUS_OPTIONS.map((option) => ({ id: option.value, name: option.label })))}`, patch: { health_status: null, page: 1 } });
   if (filters.workflowStageId) chips.push({ key: 'stage', label: `Этап: ${options.stages.find((item) => item.id === filters.workflowStageId)?.name ?? filters.workflowStageId}`, patch: { stage: null, page: 1 } });
   if (filters.dateFrom || filters.dateTo) chips.push({ key: 'date', label: `Период: ${filters.dateFrom || '…'} — ${filters.dateTo || '…'}`, patch: { date_from: null, date_to: null, page: 1 } });
-  if (!chips.length) return null;
-
-  return (
-    <div className={styles.activeFilters} aria-label="Активные фильтры">
-      <span className={styles.activeFiltersLabel}>Активные фильтры</span>
-      <div className={styles.chipList}>
-        {chips.map((chip) => <button className={styles.filterChip} type="button" key={chip.key} onClick={() => onPatch(chip.patch)} aria-label={`Удалить фильтр «${chip.label}»`}>{chip.label}<CloseSmall size={14} fill="currentColor" aria-hidden="true" /></button>)}
-        <button className={styles.clearAllButton} type="button" onClick={onReset}>Сбросить всё</button>
-      </div>
-    </div>
-  );
+  return chips.map(({ key, label, patch }) => ({ id: key, label, onRemove: () => onPatch(patch) }));
 }
 
 function filterOptionsFromCatalogs(references?: CatalogReferenceData): UniversityFilterOptions {
@@ -577,8 +567,7 @@ export function UniversitiesList() {
         </div>
       </header>
       <div className={styles.filterArea}>
-        <FilterToolbar label="Фильтры списка вузов" collapsible desktopGridClassName={styles.filterGrid} controls={(mobile) => <Filters compact={mobile} state={state} options={filterOptions} catalogsLoading={catalogsQuery.isPending} catalogsUnavailable={catalogsQuery.isError} searchInput={searchInput} setSearchInput={setSearchInput} onPatch={goToState} />} onReset={resetFilters} resetDisabled={!hasFilters} mobileCount={activeFilterCount} />
-        <ActiveFilterChips filters={state.filters} options={filterOptions} onPatch={goToState} onReset={resetFilters} />
+        <FilterToolbar label="Фильтры списка вузов" collapsible desktopGridClassName={styles.filterGrid} controls={(mobile) => <Filters compact={mobile} state={state} options={filterOptions} catalogsLoading={catalogsQuery.isPending} catalogsUnavailable={catalogsQuery.isError} searchInput={searchInput} setSearchInput={setSearchInput} onPatch={goToState} />} onReset={resetFilters} resetDisabled={!hasFilters} mobileCount={activeFilterCount} activeFilters={universityActiveFilters(state.filters, filterOptions, goToState)} />
         {catalogsQuery.isError ? <RouteErrorState compact onRetry={() => void catalogsQuery.refetch()} /> : null}
       </div>
       {query.isPending ? <TableSkeleton rows={6} columns={7} label="Загрузка списка вузов" /> : !query.data ? <RouteErrorState onRetry={() => void query.refetch()} /> : query.data.total === 0 ? <EmptyState icon={<Search size={20} fill="currentColor" />} title={hasFilters ? 'По заданным фильтрам ничего не найдено' : 'Вузы пока не добавлены'} description={hasFilters ? 'Измените условия поиска или сбросьте фильтры.' : 'Когда появятся записи, они будут отображены в этом списке.'} primaryAction={hasFilters ? { label: 'Сбросить фильтры', onClick: resetFilters, variant: 'secondary' } : undefined} /> : (

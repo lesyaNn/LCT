@@ -96,16 +96,6 @@
 .optionSearch { align-items: center; border-bottom: 1px solid var(--rtk-color-border); display: flex; gap: var(--rtk-space-2); margin: calc(-1 * var(--rtk-space-1)) calc(-1 * var(--rtk-space-2)) var(--rtk-space-2); padding: 0 var(--rtk-space-2) var(--rtk-space-2); }
 .optionSearch svg { color: var(--rtk-color-text-tertiary); flex: 0 0 auto; }
 .optionSearch input[type='search'] { accent-color: var(--rtk-color-brand); background: transparent; border: 0; color: var(--rtk-color-text-primary); min-width: 0; outline: 0; width: 100%; }
-.activeFilters { align-items: flex-start; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); }
-.activeFiltersLabel { color: var(--rtk-color-text-secondary); font-size: 12px; font-weight: 600; padding: 7px 0; }
-.chipList { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); min-width: 0; }
-.filterChip,
-.clearAllButton { align-items: center; border-radius: 999px; cursor: pointer; display: inline-flex; gap: 5px; min-height: 28px; }
-.filterChip { background: var(--rtk-color-brand-soft); border: 1px solid var(--rtk-color-brand); color: var(--rtk-color-brand); max-width: 100%; overflow-wrap: anywhere; padding: 4px 8px; }
-.filterChip:hover { background: var(--rtk-color-surface-hover); }
-.clearAllButton { background: transparent; border: 0; color: var(--rtk-color-text-secondary); padding: 4px 6px; text-decoration: underline; }
-.clearAllButton:hover { color: var(--rtk-color-text-primary); }
-
 .programStatus {
   align-items: center;
   border-radius: 999px;
@@ -192,7 +182,6 @@
   .pageSize { align-self: stretch; justify-content: space-between; }
   .pageButton, .pageButtonActive { height: 44px; min-width: 44px; }
   .pageSize select { min-height: 44px; }
-  .filterChip, .clearAllButton { min-height: 44px; }
 }
 
 @media (max-width: 480px) {
