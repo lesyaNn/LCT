@@ -302,3 +302,66 @@ test('Programs distinguishes an unconfigured site, imported data and a source fa
   await expect(section.getByText('Данные сайта сейчас недоступны')).toBeVisible();
   await expect(section.getByRole('table')).toBeVisible();
 });
+
+test('report status polling updates its row without replacing the page', async ({ page }) => {
+  test.skip(!process.env.E2E_ADMIN_USERNAME || !process.env.E2E_ADMIN_PASSWORD, 'Set E2E admin credentials.');
+  await page.goto('/login');
+  const keycloakButton = page.getByRole('button', { name: 'Войти через Keycloak' });
+  if (await keycloakButton.isVisible().catch(() => false)) await keycloakButton.click();
+  await page.locator('input[name="username"]').fill(process.env.E2E_ADMIN_USERNAME ?? '');
+  await page.locator('input[name="password"]').fill(process.env.E2E_ADMIN_PASSWORD ?? '');
+  await page.getByRole('button', { name: /Вход|Войти|Sign in|Log in/i }).click();
+  await page.waitForURL((url) => url.pathname === '/dashboard');
+
+  const createdAt = new Date().toISOString();
+  const job = { id: 'qa-polling-job', name: 'Проверка обновления', format: 'xlsx', status: 'building', progress: 10, created_at: createdAt };
+  let polls = 0;
+  await page.route((url) => url.pathname === '/api/v1/reports', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: [job], total: 1, page: 1, page_size: 100 }) }));
+  await page.route((url) => url.pathname === `/api/v1/reports/${job.id}`, (route) => {
+    polls += 1;
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...job, progress: 10 + polls * 10 }) });
+  });
+  await page.goto('/reports');
+  const jobs = page.getByRole('region', { name: 'Задачи отчётов' });
+  await expect(jobs.getByText(job.name).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Параметры отчёта' })).toBeVisible();
+  await expect.poll(() => polls).toBeGreaterThanOrEqual(2);
+  await expect(jobs.getByText(job.name).first()).toBeVisible();
+  await expect(jobs.getByRole('table')).toBeVisible();
+});
+
+test('window focus refresh keeps the Audit table visible', async ({ page }) => {
+  test.skip(!process.env.E2E_ADMIN_USERNAME || !process.env.E2E_ADMIN_PASSWORD, 'Set E2E admin credentials.');
+  await page.goto('/login');
+  const keycloakButton = page.getByRole('button', { name: 'Войти через Keycloak' });
+  if (await keycloakButton.isVisible().catch(() => false)) await keycloakButton.click();
+  await page.locator('input[name="username"]').fill(process.env.E2E_ADMIN_USERNAME ?? '');
+  await page.locator('input[name="password"]').fill(process.env.E2E_ADMIN_PASSWORD ?? '');
+  await page.getByRole('button', { name: /Вход|Войти|Sign in|Log in/i }).click();
+  await page.waitForURL((url) => url.pathname === '/dashboard');
+  await page.goto('/audit');
+  const table = page.getByRole('table').first();
+  await expect(table).toBeVisible();
+  let release: () => void = () => {};
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  let refreshes = 0;
+  await page.route((url) => url.pathname === '/api/v1/audit/events', async (route) => {
+    refreshes += 1;
+    await gate;
+    await route.continue();
+  });
+  await page.waitForTimeout(31_000);
+  const otherTab = await page.context().newPage();
+  await otherTab.goto('about:blank');
+  await otherTab.bringToFront();
+  await page.bringToFront();
+  await page.evaluate(() => {
+    // Headless Chromium does not reliably restore visibilityState after bringToFront.
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+    window.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect.poll(() => refreshes).toBeGreaterThan(0);
+  await expect(table).toBeVisible();
+  release();
+  await expect(page.getByRole('table').first()).toBeVisible();
+});
