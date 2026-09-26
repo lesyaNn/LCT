@@ -2,6 +2,7 @@
 
 import type { ComponentType } from 'react';
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Attachment from '@atomaro/icons/24/action/Attachment';
@@ -18,13 +19,13 @@ import { hasPermission, hasRole } from '@/shared/lib/access-control';
 import type { WorkflowTransitionTarget } from '@/shared/lib/workflow-transition';
 import { formatDateRu, formatDateTimeRu, getRelativeDueDateRu } from '@/shared/lib/formatters';
 import { workflowStageStatusSemantics, type WorkflowStageIcon } from '@/shared/lib/status-semantics';
-import { createProgramWorkflow, getUniversityWorkflow, getWorkflowByProgram, getApiUniversityWorkflow, getWorkflowAllowedTransitions, isRealWorkflowMode, listWorkflowTasksPage, listWorkflowAttachmentsPage, listWorkflowHistory, workflowByProgramQueryKey, workflowQueryKey, type UniversityWorkflow, type UniversityWorkflowAttachment, type UniversityWorkflowStage, type UniversityWorkflowStageStatus, type UniversityWorkflowTask } from '@/shared/lib/universities-repository';
+import { getUniversityResponsibles, getUniversityWorkflow, getWorkflowAllowedTransitions, isRealWorkflowMode, listWorkflowTasksPage, listWorkflowAttachmentsPage, listWorkflowHistory, universityResponsiblesQueryKey, updateWorkflowResponsible, workflowQueryKey, type UniversityWorkflow, type UniversityWorkflowAttachment, type UniversityWorkflowStage, type UniversityWorkflowStageStatus, type UniversityWorkflowTask } from '@/shared/lib/universities-repository';
 import { queryKeys } from '@/shared/lib/query-keys';
 import { workflowAttachmentFromApi } from '@/shared/lib/workflow-attachments';
 import { getWorkflowSelectorPrograms, workflowProgramsQueryKey } from '@/shared/lib/universities-repository';
-import { listWorkflowTemplates, workflowTemplateListQueryKey } from '@/shared/lib/workflow-templates-repository';
-import { normalizeApiError } from '@/shared/lib/api-errors';
 import { getUniversityExternalData, universityExternalDataQueryKey } from '@/shared/lib/external-integrations-repository';
+import { normalizeApiError } from '@/shared/lib/api-errors';
+import { listUniversityWorkflowInstances, universityWorkflowInstancesQueryKey } from '@/shared/lib/workflow-creation-repository';
 import { Select } from '@/shared/ui/rtk/form-controls';
 import { Avatar } from '@/shared/ui/rtk/avatar';
 import { Button } from '@/shared/ui/rtk/button';
@@ -37,6 +38,7 @@ import { ListSkeleton, Skeleton, SkeletonGroup } from '@/shared/ui/skeleton';
 import { Toast } from '@/shared/ui/rtk/toast';
 import { WorkflowComments } from './workflow-comments';
 import { WorkflowAttachments } from './workflow-attachments';
+import { WorkflowCreateModal } from './workflow-create-modal';
 import { WorkflowTransitionModal, type WorkflowTransitionNotification } from './workflow-transition-modal';
 import styles from './university-workflow.module.css';
 
@@ -164,13 +166,59 @@ function WorkflowStageDetails({ stage, stages, instanceId, universityId, userId,
   );
 }
 
-function WorkflowHeader({ workflow }: { workflow: UniversityWorkflow }) {
+function WorkflowResponsibleField({ instanceId, workflow, canManage, onNotify }: { instanceId: string; workflow: UniversityWorkflow; canManage: boolean; onNotify: (notification: WorkflowTransitionNotification) => void }) {
+  const queryClient = useQueryClient();
+  const responsiblesQuery = useQuery({
+    queryKey: universityResponsiblesQueryKey(workflow.universityId),
+    queryFn: () => getUniversityResponsibles(workflow.universityId),
+    staleTime: 30_000,
+  });
+  const options = useMemo(() => responsiblesQuery.data ?? [], [responsiblesQuery.data]);
+  const [value, setValue] = useState(workflow.responsibleId ?? '');
+  const activeValue = options.some((item) => item.id === value) ? value : '';
+  const dirty = activeValue !== (workflow.responsibleId ?? '');
+  const save = useMutation({
+    mutationFn: () => updateWorkflowResponsible(instanceId, activeValue || null),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: workflowQueryKey(instanceId) }),
+        queryClient.invalidateQueries({ queryKey: universityWorkflowInstancesQueryKey(workflow.universityId) }),
+      ]);
+    },
+    onError: (cause) => onNotify({ intent: 'error', title: 'Ответственный не сохранён', message: normalizeApiError(cause).message }),
+  });
+
+  if (!canManage) {
+    return <p className={styles.programName}>Ответственный: <strong>{workflow.responsibleName ?? 'Не назначен'}</strong></p>;
+  }
+  return (
+    <div className={styles.responsibleRow}>
+      <label className={styles.programSelector}>
+        <span>Ответственный</span>
+        <Select value={activeValue} disabled={responsiblesQuery.isPending} onChange={(event) => setValue(event.target.value)}>
+          <option value="">Не назначен</option>
+          {options.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
+        </Select>
+      </label>
+      <Button variant="secondary" size="s" type="button" loading={save.isPending} disabled={!dirty || save.isPending} onClick={() => save.mutate()}>
+        Сохранить
+      </Button>
+      {responsiblesQuery.isError ? <span className={styles.externalHint}>Не удалось загрузить ответственных вуза.</span> : null}
+    </div>
+  );
+}
+
+function WorkflowHeader({ workflow, instanceId, canManage, onNotify }: { workflow: UniversityWorkflow; instanceId: string; canManage: boolean; onNotify: (notification: WorkflowTransitionNotification) => void }) {
   const currentStage = workflow.currentStage;
   const currentSemantics = currentStage ? workflowStageStatusSemantics[currentStage.status] : null;
   const progress = workflow.totalSteps ? Math.round((workflow.completedSteps / workflow.totalSteps) * 100) : 0;
   return (
     <header className={styles.pageHeader}>
-      <div className={styles.headerMain}><div><h1>Взаимодействие с вузом</h1><p className={styles.headerContext}>{[workflow.universityName, workflow.universityCity, workflow.workflowName].filter((part, index, parts) => part && parts.findIndex((other) => other.toLocaleLowerCase('ru-RU') === part.toLocaleLowerCase('ru-RU')) === index).join(' · ')}</p></div>{currentStage && currentSemantics ? <div className={styles.headerCurrent}><span>Текущий этап</span><strong>{currentStage.name}</strong><StatusBadge intent={currentSemantics.intent} icon={<StageStatusIcon status={currentStage.status} />}>{currentSemantics.label}</StatusBadge></div> : null}</div>
+      <div className={styles.headerMain}><div><h1>Взаимодействие с вузом</h1><p className={styles.headerContext}>{[workflow.universityName, workflow.universityCity, workflow.workflowName].filter((part, index, parts) => part && parts.findIndex((other) => other.toLocaleLowerCase('ru-RU') === part.toLocaleLowerCase('ru-RU')) === index).join(' · ')}</p><WorkflowResponsibleField key={workflow.responsibleId ?? 'none'} instanceId={instanceId} workflow={workflow} canManage={canManage} onNotify={onNotify} />{workflow.responsibleName ? <p className={styles.headerContext}>Контакты: {[workflow.responsibleEmail, workflow.responsiblePhone].filter(Boolean).join(' · ') || '—'}</p> : null}</div>{currentStage && currentSemantics ? <div className={styles.headerCurrent}><span>Текущий этап</span><strong>{currentStage.name}</strong><StatusBadge intent={currentSemantics.intent} icon={<StageStatusIcon status={currentStage.status} />}>{currentSemantics.label}</StatusBadge></div> : null}</div>
       <div className={styles.overallProgress}><div className={styles.progressLabel}><span>Прогресс Workflow</span><strong>{workflow.completedSteps} из {workflow.totalSteps} этапов завершено</strong></div><div className={styles.progressTrack} role="progressbar" aria-label={`Прогресс Workflow: завершено ${workflow.completedSteps} из ${workflow.totalSteps} этапов`} aria-valuemin={0} aria-valuemax={workflow.totalSteps} aria-valuenow={workflow.completedSteps}><span style={{ width: `${progress}%` }} /></div></div>
     </header>
   );
@@ -226,7 +274,7 @@ export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride 
   if (!stages.length || !selectedStage) return <EmptyState presentation={mode === 'page' ? 'large' : 'compact'} icon={mode === 'embedded' ? <InformationStroke size={22} fill="currentColor" /> : undefined} title="Этапы Workflow пока не добавлены" description="Настроенные этапы появятся здесь после запуска процесса." />;
 
   return <div className={`${styles.page} ${mode === 'embedded' ? styles.embedded : ''}`}>
-    {mode === 'page' ? <WorkflowHeader workflow={query.data} /> : null}
+    {mode === 'page' ? <WorkflowHeader workflow={query.data} instanceId={instanceId} canManage={canManage} onNotify={setNotification} /> : null}
     <div className={styles.layout}>
       <section className={styles.stagesPanel} aria-labelledby={`${idPrefix}-stages-title`}>
         <div className={styles.panelHeading}><div><h2 id={`${idPrefix}-stages-title`}>Этапы Workflow</h2></div><span className={styles.totalLabel}>{stages.length} этапов</span></div>
@@ -239,19 +287,21 @@ export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride 
   </div>;
 }
 
-export function UniversityWorkflow({ id, canAdvance }: { id: string; canAdvance: boolean }) {
-  const realWorkflow = isRealWorkflowMode();
-  const { user } = useAuth();
-  const queryClient = useQueryClient();
+function instanceStatusLabel(status: string): string {
+  if (status === 'completed') return 'Завершён';
+  if (status === 'active') return 'В работе';
+  return status || '—';
+}
+
+function MockUniversityWorkflow({ id, canAdvance }: { id: string; canAdvance: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
   const programsQuery = useQuery({ queryKey: workflowProgramsQueryKey(id), queryFn: ({ signal }) => getWorkflowSelectorPrograms(id, signal), staleTime: 30_000 });
-  const externalQuery = useQuery({ queryKey: universityExternalDataQueryKey(id, 'website'), queryFn: () => getUniversityExternalData(id, 'website'), enabled: !realWorkflow, staleTime: 30_000 });
+  const externalQuery = useQuery({ queryKey: universityExternalDataQueryKey(id, 'website'), queryFn: () => getUniversityExternalData(id, 'website'), staleTime: 30_000 });
   const programs = useMemo(() => {
     const base = programsQuery.data ?? [];
-    if (realWorkflow) return base.map((program) => ({ key: program.id, name: program.name, instanceId: null, externalIds: [] as string[] }));
-    const applications = realWorkflow ? [] : externalQuery.data?.applications ?? [];
+    const applications = externalQuery.data?.applications ?? [];
     const result = new Map<string, { key: string; name: string; instanceId: string | null; externalIds: string[] }>();
     for (const program of base) {
       const nameKey = program.name.trim().toLocaleLowerCase('ru-RU');
@@ -265,55 +315,84 @@ export function UniversityWorkflow({ id, canAdvance }: { id: string; canAdvance:
       result.set(nameKey, program);
     }
     return [...result.values()];
-  }, [programsQuery.data, externalQuery.data, realWorkflow]);
+  }, [programsQuery.data, externalQuery.data]);
   const requestedProgram = searchParams.get('program');
   const selected = programs.find((program) => program.key === requestedProgram || (requestedProgram && program.externalIds.includes(requestedProgram))) ?? programs[0];
-  const [chosenTemplateId, setChosenTemplateId] = useState('');
-  const workflowByProgram = useQuery({ queryKey: workflowByProgramQueryKey(id, selected?.key ?? ''), queryFn: async () => {
-    const result = await getWorkflowByProgram(id, selected!.key);
-    if (result) queryClient.setQueryData(workflowQueryKey(result.id), getApiUniversityWorkflow(result));
-    return result;
-  }, enabled: realWorkflow && Boolean(selected), staleTime: 30_000 });
   const mockInstanceId = selected && requestedProgram && (selected.key === requestedProgram || selected.externalIds.includes(requestedProgram)) ? searchParams.get('workflow') ?? selected.instanceId : selected?.instanceId;
-  const instanceId = realWorkflow ? workflowByProgram.data?.id : mockInstanceId;
-  const canCreate = realWorkflow && hasPermission(user, 'workflow.change_status') && hasRole(user, 'admin');
-  const templatesQuery = useQuery({ queryKey: workflowTemplateListQueryKey(1, 100), queryFn: () => listWorkflowTemplates(1, 100), enabled: canCreate && Boolean(selected) && workflowByProgram.data === null, staleTime: 30_000 });
-  const activeTemplates = templatesQuery.data?.items.filter((template) => template.isActive) ?? [];
-  const templateId = activeTemplates.some((template) => template.id === chosenTemplateId) ? chosenTemplateId : activeTemplates[0]?.id ?? '';
-  const create = useMutation({
-    mutationFn: () => createProgramWorkflow(id, selected!.key, templateId),
-    onSuccess: async (record) => {
-      queryClient.setQueryData(workflowByProgramQueryKey(id, selected!.key), record);
-      queryClient.setQueryData(workflowQueryKey(record.id), getApiUniversityWorkflow(record));
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowOverview }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.universities.passport(id) }),
-      ]);
-    },
-    onError: (cause) => {
-      if (normalizeApiError(cause).status === 409) void workflowByProgram.refetch();
-    },
-  });
   const selectProgram = (key: string) => {
     const next = new URLSearchParams(searchParams.toString());
     next.set('program', key);
     next.delete('workflow');
     router.replace(`${pathname}?${next.toString()}`, { scroll: false });
   };
-  if (programsQuery.isPending || (!realWorkflow && externalQuery.isPending)) return <WorkflowSkeleton mode="embedded" />;
+  if (programsQuery.isPending || externalQuery.isPending) return <WorkflowSkeleton mode="embedded" />;
   if (!programsQuery.data) return <RouteErrorState compact onRetry={() => void programsQuery.refetch()} />;
   return <div className={styles.programWorkflow}>
     {programs.length > 1 ? <label className={styles.programSelector}><span>Программа</span><Select value={selected?.key ?? ''} onChange={(event) => selectProgram(event.target.value)}>{programs.map((program) => <option key={program.key} value={program.key}>{program.name}</option>)}</Select></label> : selected ? <p className={styles.programName}>Программа: <strong>{selected.name}</strong></p> : null}
-    {realWorkflow && workflowByProgram.isPending && selected ? <WorkflowSkeleton mode="embedded" /> : realWorkflow && workflowByProgram.isError && !workflowByProgram.data ? <RouteErrorState compact onRetry={() => void workflowByProgram.refetch()} /> : instanceId ? <WorkflowView key={instanceId} instanceId={instanceId} mode="embedded" canAdvance={canAdvance} /> : <>
-      <EmptyState title="Workflow ещё не создан" description={realWorkflow ? 'Для выбранной программы процесс пока не создан.' : 'Создать его можно из заявки с сайта в разделе «Программы».'} primaryAction={realWorkflow ? undefined : { label: 'Открыть программы', onClick: () => { const next = new URLSearchParams(searchParams.toString()); next.set('tab', 'programs'); router.push(`${pathname}?${next.toString()}`, { scroll: false }); } }} />
-      {canCreate && selected ? <>
-        {templatesQuery.isError ? <ErrorState title="Не удалось загрузить шаблоны Workflow" onRetry={() => void templatesQuery.refetch()} /> : null}
-        {activeTemplates.length > 1 ? <label className={styles.programSelector}><span>Шаблон Workflow</span><Select value={templateId} onChange={(event) => setChosenTemplateId(event.target.value)}>{activeTemplates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</Select></label> : null}
-        {templatesQuery.isSuccess && !activeTemplates.length ? <p className={styles.externalHint}>Нет активного шаблона Workflow.</p> : null}
-        <Button variant="primary" size="s" type="button" loading={create.isPending} disabled={!templateId || create.isPending} onClick={() => { if (!create.isPending && templateId) create.mutate(); }}>Создать Workflow</Button>
-        {create.isError ? <p role="alert" className={styles.externalHint}>{normalizeApiError(create.error).message}</p> : null}
-      </> : null}
-    </>}
-    {!realWorkflow && externalQuery.isError ? <p className={styles.externalHint}>Связь с заявками сайта сейчас недоступна; показаны программы ВУЗа.</p> : null}
+    {mockInstanceId ? <WorkflowView key={mockInstanceId} instanceId={mockInstanceId} mode="embedded" canAdvance={canAdvance} /> : <EmptyState title="Workflow ещё не создан" description="Демонстрационные данные Workflow для выбранной программы отсутствуют." />}
+    {externalQuery.isError ? <p className={styles.externalHint}>Связь с заявками сайта сейчас недоступна; показаны программы ВУЗа.</p> : null}
   </div>;
+}
+
+function RealUniversityWorkflow({ id }: { id: string; canAdvance: boolean }) {
+  const { user } = useAuth();
+  const router = useRouter();
+  const instancesQuery = useQuery({
+    queryKey: universityWorkflowInstancesQueryKey(id),
+    queryFn: ({ signal }) => listUniversityWorkflowInstances(id, signal),
+    staleTime: 30_000,
+  });
+  const [createOpen, setCreateOpen] = useState(false);
+  const instances = instancesQuery.data ?? [];
+  const canCreate = hasPermission(user, 'workflow.change_status') && hasRole(user, 'admin');
+
+  if (instancesQuery.isPending) return <WorkflowSkeleton mode="embedded" />;
+  if (!instancesQuery.data) return <RouteErrorState compact onRetry={() => void instancesQuery.refetch()} />;
+
+  return <div className={styles.programWorkflow}>
+    <div className={styles.instancesHeader}>
+      <div>
+        <h2>Воркфлоу вуза</h2>
+        <p>{instances.length ? `Всего: ${instances.length}` : 'Процессы появятся после создания первого воркфлоу.'}</p>
+      </div>
+      {canCreate ? <Button variant="primary" size="s" type="button" onClick={() => setCreateOpen(true)}>Создать воркфлоу</Button> : null}
+    </div>
+    {instances.length ? (
+      <ol className={styles.instanceList}>
+        {instances.map((item) => (
+          <li key={item.id} className={styles.instanceItem}>
+            <Link className={styles.instanceButton} href={`/workflows/${item.id}`}>
+              <strong>{item.program_name || 'Без программы'}</strong>
+              <span className={styles.instanceMeta}>
+                {item.product_name ? <span>{item.product_name}</span> : null}
+                <span>{instanceStatusLabel(item.status)}</span>
+                {item.due_date ? <span>Дедлайн: {formatDateRu(item.due_date)}</span> : null}
+                {item.is_overdue ? <span>Просрочен</span> : null}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ol>
+    ) : (
+      <EmptyState
+        title="Воркфлоу ещё не созданы"
+        description="Создайте первый воркфлоу: выберите направление, программу обучения и продукт."
+      />
+    )}
+    {createOpen ? (
+      <WorkflowCreateModal
+        universityId={id}
+        onClose={() => setCreateOpen(false)}
+        onCreated={(record) => {
+          setCreateOpen(false);
+          router.push(`/workflows/${record.id}`);
+        }}
+      />
+    ) : null}
+  </div>;
+}
+
+export function UniversityWorkflow({ id, canAdvance }: { id: string; canAdvance: boolean }) {
+  if (isRealWorkflowMode()) return <RealUniversityWorkflow id={id} canAdvance={canAdvance} />;
+  return <MockUniversityWorkflow id={id} canAdvance={canAdvance} />;
 }

@@ -129,7 +129,7 @@ def test_migration_000012_pair_discoverable_and_latest():
     assert "000019_import_jobs" in versions
     # P4-06-01 retries: attempts counter for the worker claim loop.
     assert "000020_job_attempts" in versions
-    assert versions[-1] == "000029_drop_students_teachers_health"
+    assert versions[-1] == "000031_workflow_instances_product_unique"
     assert versions.index("000011_workflow_templates") < versions.index("000012_workflow_instances")
     assert versions.index("000012_workflow_instances") < versions.index("000013_instance_stages")
     assert versions.index("000013_instance_stages") < versions.index(
@@ -198,6 +198,7 @@ def test_orm_instance_columns():
         "university_id",
         "template_id",
         "program_id",
+        "product_id",
         "current_stage_id",
         "current_instance_stage_id",
         "responsible_id",
@@ -209,6 +210,8 @@ def test_orm_instance_columns():
     }
     assert cols["university_id"].nullable is False
     assert cols["template_id"].nullable is False
+    assert cols["program_id"].nullable is True
+    assert cols["product_id"].nullable is True
     assert cols["current_stage_id"].nullable is True
     assert cols["current_instance_stage_id"].nullable is True
     assert cols["responsible_id"].nullable is True
@@ -613,4 +616,36 @@ def test_attachment_check_rejects_negative_size(db):
             )
         )
         db.commit()
+    db.rollback()
+
+
+# ------------------------------------------------- PG: instance responsible
+
+
+def test_set_instance_responsible_assign_clear_and_unlinked(db):
+    from app.core.exceptions import NotFound
+    from app.models.catalog import UniversityResponsible
+    from app.modules.workflow_instances import service as instance_service
+
+    g = _mini_instance(db)
+    other = Responsible(full_name="Чужой О.О.", email=f"stranger-{_tag()}@example.local", role="manager")
+    db.add(other)
+    db.flush()
+    db.add(UniversityResponsible(university_id=g["university"].id, responsible_id=g["responsible"].id))
+    db.commit()
+
+    detail = instance_service.set_instance_responsible(db, g["instance"].id, g["responsible"].id, actor_sub="t")
+    assert detail.responsible_id == g["responsible"].id
+    assert detail.responsible_name == "Петров П.П."
+
+    cleared = instance_service.set_instance_responsible(db, g["instance"].id, None, actor_sub="t")
+    assert cleared.responsible_id is None
+    assert cleared.responsible_name is None
+
+    with pytest.raises(NotFound):
+        instance_service.set_instance_responsible(db, g["instance"].id, other.id, actor_sub="t")
+    db.rollback()
+
+    with pytest.raises(NotFound):
+        instance_service.set_instance_responsible(db, g["instance"].id, uuid.uuid4(), actor_sub="t")
     db.rollback()

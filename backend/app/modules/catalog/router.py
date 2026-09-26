@@ -505,6 +505,7 @@ def list_products(
     page_size: int = Query(default=20, ge=1, le=100),
     search: str | None = Query(default=None, description="Case-insensitive match on name"),
     vendor_id: uuid.UUID | None = Query(default=None, description="Filter by vendor"),
+    direction_id: uuid.UUID | None = Query(default=None, description="Filter by direction (via product_directions)"),
     sort_by: ProductSortBy = Query(default="name"),
     sort_order: SortOrder = Query(default="asc"),
     db: Session = Depends(get_audit_db),
@@ -516,6 +517,7 @@ def list_products(
         page_size=page_size,
         search=_norm(search),
         vendor_id=vendor_id,
+        direction_id=direction_id,
         sort_by=sort_by,
         sort_order=sort_order,
     )

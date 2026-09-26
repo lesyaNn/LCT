@@ -475,6 +475,10 @@ export interface UniversityWorkflow {
   universityName: string;
   universityCity: string;
   workflowName: string;
+  responsibleId: string | null;
+  responsibleName: string | null;
+  responsibleEmail: string | null;
+  responsiblePhone: string | null;
   currentStage: UniversityWorkflowStage | null;
   completedSteps: number;
   totalSteps: number;
@@ -564,9 +568,14 @@ export interface WorkflowInstanceApiRecord {
   university_id: string;
   template_id: string;
   program_id?: string | null;
+  product_id?: string | null;
   university_name?: string | null;
   university_city?: string | null;
   program_name?: string | null;
+  product_name?: string | null;
+  responsible_name?: string | null;
+  responsible_email?: string | null;
+  responsible_phone?: string | null;
   current_stage_id: string | null;
   current_instance_stage_id: string | null;
   responsible_id: string | null;
@@ -595,10 +604,20 @@ export async function getWorkflowByProgram(universityId: string, programId: stri
   });
 }
 
-export async function createProgramWorkflow(universityId: string, programId: string, templateId: string): Promise<WorkflowInstanceApiRecord> {
+export async function createProgramWorkflow(universityId: string, programId: string, templateId: string, productId?: string | null): Promise<WorkflowInstanceApiRecord> {
   return unwrapApiResult(await apiFetch<WorkflowInstanceApiRecord>('/api/v1/workflow/instances', {
-    method: 'POST', body: { university_id: universityId, program_id: programId, template_id: templateId },
+    method: 'POST', body: { university_id: universityId, program_id: programId, template_id: templateId, ...(productId ? { product_id: productId } : {}) },
   }));
+}
+
+export async function updateWorkflowResponsible(instanceId: string, responsibleId: string | null): Promise<WorkflowInstanceApiRecord> {
+  return fromDataSource({
+    domain: 'workflow',
+    mock: async () => ({ ...mockGetWorkflowInstance(instanceId), responsible_id: responsibleId }),
+    real: async () => unwrapApiResult(await apiFetch<WorkflowInstanceApiRecord>(`/api/v1/workflow/instances/${instanceId}`, {
+      method: 'PATCH', body: { responsible_id: responsibleId },
+    })),
+  });
 }
 
 export async function listWorkflowInstancePage(page: number, pageSize = 100): Promise<WorkflowPage<WorkflowInstanceApiRecord>> {
@@ -783,6 +802,10 @@ async function getMockUniversityWorkflow(id: string): Promise<UniversityWorkflow
     universityName: university.name,
     universityCity: university.city,
     workflowName: 'Подключение университета',
+    responsibleId: null,
+    responsibleName: currentResponsible?.name ?? null,
+    responsibleEmail: currentResponsible?.email ?? null,
+    responsiblePhone: null,
     currentStage,
     completedSteps: stages.filter((stage) => stage.status === 'completed').length,
     totalSteps: stages.length,
@@ -831,6 +854,10 @@ export function getApiUniversityWorkflow(instance: WorkflowInstanceApiRecord): U
     universityName: instance.university_name ?? 'Workflow',
     universityCity: instance.university_city ?? '',
     workflowName: instance.program_name ?? 'Workflow',
+    responsibleId: instance.responsible_id ?? null,
+    responsibleName: instance.responsible_name ?? null,
+    responsibleEmail: instance.responsible_email ?? null,
+    responsiblePhone: instance.responsible_phone ?? null,
     currentStage,
     completedSteps: stages.filter((stage) => stage.status === 'completed' || stage.status === 'skipped').length,
     totalSteps: stages.length,
