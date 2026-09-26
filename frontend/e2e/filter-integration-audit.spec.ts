@@ -103,7 +103,8 @@ test('desktop dashboard presets occupy one row', async ({ page }) => {
     const bounds = await period.getByLabel(label, { exact: true }).boundingBox();
     expect(bounds).not.toBeNull();
     expect(bounds!.width).toBeLessThanOrEqual(150);
-    expect(Math.abs(bounds!.y + bounds!.height - buttonBottom)).toBeLessThanOrEqual(1);
+    expect(bounds!.height).toBeLessThanOrEqual(34);
+    expect(bounds!.y).toBeGreaterThan(buttonBottom);
   }
   for (const label of ['Текущий месяц', 'Текущий квартал', 'Текущий год', 'Прошлый год']) {
     const filtered = page.waitForResponse((response) => {
@@ -138,6 +139,14 @@ test('filter surfaces stay inside the viewport on desktop, tablet and mobile', a
       await page.goto(path);
       await expect(page.locator('main')).toBeVisible();
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth), { message: `${path} overflows at ${width}` }).toBeLessThanOrEqual(width + 1);
+      if (width === 1440 && path === '/universities') {
+        const filters = page.locator('section[aria-label="Фильтры списка вузов"]').last();
+        const search = await filters.locator('input[type="search"]').boundingBox();
+        const university = await filters.locator('details summary').first().boundingBox();
+        expect(search).not.toBeNull();
+        expect(university).not.toBeNull();
+        expect(university!.x).toBeGreaterThan(search!.x + search!.width);
+      }
     }
   }
   await page.setViewportSize({ width: 390, height: 900 });

@@ -2,7 +2,6 @@
 .embedded { background: transparent; border-radius: 0; box-shadow: none; padding: 0; }
 .grid { align-items: end; display: grid; gap: var(--rtk-space-3); grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); min-width: 0; }
 .grid > * { min-width: 0; }
-.grid:has(> :only-child) { grid-template-columns: minmax(min(100%, 180px), 280px); }
 .grid > label { display: flex; flex-direction: column; gap: var(--rtk-space-1); }
 .grid > label > span { color: var(--rtk-color-text-secondary); font-size: 11px; font-weight: 700; }
 .actions { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); justify-content: flex-end; margin-top: var(--rtk-space-3); }
