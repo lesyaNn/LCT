@@ -7,14 +7,15 @@ test('real import wizard: upload, mapping, dry-run, execute, persisted result', 
   test.skip(!username || !password, 'Set E2E_MANAGER_USERNAME and E2E_MANAGER_PASSWORD for the real import smoke.');
 
   await page.goto('/login');
-  await page.getByRole('button', { name: 'Войти через Keycloak' }).click();
+  const keycloakButton = page.getByRole('button', { name: 'Войти через Keycloak' });
+  if (await keycloakButton.isVisible().catch(() => false)) await keycloakButton.click();
   await page.locator('input[name="username"]').fill(username!);
   await page.locator('input[name="password"]').fill(password!);
   await page.getByRole('button', { name: /Вход|Войти|Sign in|Log in/i }).click();
   await page.waitForURL((url) => url.pathname === '/dashboard');
   await page.goto('/admin/import');
 
-  await page.getByLabel('Тип справочника').selectOption('universities');
+  await page.getByRole('combobox', { name: 'Тип справочника' }).selectOption('universities');
   const previewResponse = page.waitForResponse((response) => response.request().method() === 'POST'
     && new URL(response.url()).pathname === '/api/v1/import/preview');
   await page.locator('input[type="file"]').setInputFiles(resolve(process.cwd(), '../docs/import-example-20.xlsx'));

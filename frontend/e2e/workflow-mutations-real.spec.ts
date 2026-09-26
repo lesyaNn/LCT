@@ -21,15 +21,56 @@ async function login(page: Page, username = process.env.E2E_ADMIN_USERNAME ?? ''
 type PageResult<T> = { items: T[]; total: number };
 type Template = { id: string; name: string; is_active: boolean };
 type Instance = { id: string; university_id: string; program_id: string; current_instance_stage_id: string; stages: Array<{ id: string; name: string; order_index: number }> };
+let isolatedProgramId = '';
+let isolatedInstanceId = '';
+const workflowProgramId = () => isolatedProgramId || process.env.E2E_WORKFLOW_PROGRAM_ID || '';
+const workflowInstanceId = () => isolatedInstanceId || process.env.E2E_WORKFLOW_INSTANCE_ID || '';
+
+test.beforeAll(async ({ browser, request }) => {
+  if (process.env.E2E_WORKFLOW_ISOLATED !== '1' || process.env.E2E_WORKFLOW_MUTATIONS !== '1') return;
+  const universityId = process.env.E2E_WORKFLOW_UNIVERSITY_ID ?? '';
+  expect(universityId, 'Use a university outside the manager/user scope on the disposable stand.').not.toBe('');
+  const context = await browser.newContext({ baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:3000' });
+  try {
+    const page = await context.newPage();
+    const authorization = await login(page);
+    const headers = { authorization };
+    const get = async (path: string) => {
+      const response = await request.get(`${apiBase}/api/v1${path}`, { headers });
+      expect(response.status(), `${path}: ${await response.text()}`).toBe(200);
+      return response.json() as Promise<Record<string, unknown>>;
+    };
+    const post = async (path: string, data: Record<string, unknown>) => {
+      const response = await request.post(`${apiBase}/api/v1${path}`, { headers, data });
+      expect(response.status(), `${path}: ${await response.text()}`).toBe(201);
+      return response.json() as Promise<Record<string, unknown>>;
+    };
+    const directions = await get('/directions?page=1&page_size=1');
+    const direction = (directions.items as Array<{ id: string }>)[0];
+    expect(direction?.id).toBeTruthy();
+    const templates = await get('/workflow/templates?page=1&page_size=100');
+    const template = (templates.items as Template[]).find((item) => item.is_active);
+    expect(template).toBeDefined();
+    const program = await post('/programs', { direction_id: direction.id, name: `Final Workflow E2E ${Date.now()}` });
+    isolatedProgramId = String(program.id);
+    await post(`/universities/${universityId}/programs`, { program_id: isolatedProgramId });
+    const instance = await post('/workflow/instances', {
+      university_id: universityId, program_id: isolatedProgramId, template_id: template!.id,
+    });
+    isolatedInstanceId = String(instance.id);
+  } finally {
+    await context.close();
+  }
+});
 
 test('seeded real Workflow: create API, comment and transition UI, persist after reload', async ({ page, request }) => {
   test.skip(process.env.E2E_WORKFLOW_MUTATIONS !== '1', 'Opt in for one-time local dev mutations');
   test.skip(!process.env.E2E_ADMIN_USERNAME || !process.env.E2E_ADMIN_PASSWORD, 'Set demo admin credentials');
-  test.skip(!process.env.E2E_WORKFLOW_UNIVERSITY_ID || !process.env.E2E_WORKFLOW_PROGRAM_ID, 'Select an unused pair from the official seed');
+  test.skip(!process.env.E2E_WORKFLOW_UNIVERSITY_ID || !workflowProgramId(), 'Select an unused pair from the official seed');
   const authorization = await login(page);
   const headers = { authorization };
   const universityId = process.env.E2E_WORKFLOW_UNIVERSITY_ID ?? '';
-  const programId = process.env.E2E_WORKFLOW_PROGRAM_ID ?? '';
+  const programId = workflowProgramId();
   const templatesResponse = await request.get(`${apiBase}/api/v1/workflow/templates?page=1&page_size=100`, { headers });
   expect(templatesResponse.ok()).toBeTruthy();
   const templates = (await templatesResponse.json()) as PageResult<Template>;
@@ -82,11 +123,11 @@ test('seeded real Workflow: create API, comment and transition UI, persist after
 for (const role of ['manager', 'user'] as const) {
   test(`demo ${role} cannot mutate an unassigned Workflow`, async ({ page, request }) => {
     test.skip(process.env.E2E_WORKFLOW_MUTATIONS !== '1', 'Opt in for local dev permissions check');
-    test.skip(!process.env.E2E_WORKFLOW_INSTANCE_ID, 'Set the test-created Workflow ID');
+    test.skip(!workflowInstanceId(), 'Set the test-created Workflow ID');
     const username = process.env[`E2E_${role.toUpperCase()}_USERNAME`] ?? role;
     const password = process.env[`E2E_${role.toUpperCase()}_PASSWORD`] ?? `${role}123`;
     const authorization = await login(page, username, password);
-    const instanceId = process.env.E2E_WORKFLOW_INSTANCE_ID ?? '';
+    const instanceId = workflowInstanceId();
     const detail = await request.get(`${apiBase}/api/v1/workflow/instances/${instanceId}`, { headers: { authorization } });
     expect(detail.status()).toBe(403);
     await page.goto(`/workflows/${instanceId}`);
@@ -97,9 +138,9 @@ for (const role of ['manager', 'user'] as const) {
 
 test('seeded real Kanban: cancel keeps stage, confirm moves once', async ({ page, request }) => {
   test.skip(process.env.E2E_WORKFLOW_MUTATIONS !== '1', 'Opt in for one-time local dev mutations');
-  test.skip(!process.env.E2E_ADMIN_USERNAME || !process.env.E2E_ADMIN_PASSWORD || !process.env.E2E_WORKFLOW_INSTANCE_ID, 'Set admin and the test-created Workflow ID');
+  test.skip(!process.env.E2E_ADMIN_USERNAME || !process.env.E2E_ADMIN_PASSWORD || !workflowInstanceId(), 'Set admin and the test-created Workflow ID');
   const authorization = await login(page);
-  const instanceId = process.env.E2E_WORKFLOW_INSTANCE_ID ?? '';
+  const instanceId = workflowInstanceId();
   const headers = { authorization };
   const read = async () => (await (await request.get(`${apiBase}/api/v1/workflow/instances/${instanceId}`, { headers })).json()) as Instance;
   const before = await read();
@@ -117,9 +158,16 @@ test('seeded real Kanban: cancel keeps stage, confirm moves once', async ({ page
   expect(allowedResponse.ok()).toBeTruthy();
   const allowed = (await allowedResponse.json()) as Array<{ id: string; name: string }>;
   expect(allowed.length).toBeGreaterThan(0);
+  const allowedRequests: string[] = [];
+  page.on('request', (outgoing) => {
+    if (outgoing.method() === 'GET' && outgoing.url().includes('/allowed-transitions')) allowedRequests.push(outgoing.url());
+  });
   await page.goto('/workflows');
   await page.getByRole('tab', { name: 'Доска' }).click();
-  const handle = page.getByRole('button', { name: /Переместить:/ });
+  await expect(page.locator('article').filter({ has: page.locator(`a[href="/workflows/${instanceId}"]`) })).toBeVisible();
+  expect(allowedRequests, 'Kanban must not fetch allowed transitions for every card on load').toHaveLength(0);
+  const handle = page.locator('article').filter({ has: page.locator(`a[href="/workflows/${instanceId}"]`) })
+    .getByRole('button', { name: /Переместить:/ });
   const target = page.locator('section[aria-label]').filter({ has: page.getByRole('heading', { name: allowed[0].name, exact: true }) });
   const drag = async () => {
     const source = await handle.boundingBox();
@@ -136,6 +184,7 @@ test('seeded real Kanban: cancel keeps stage, confirm moves once', async ({ page
   };
   await drag();
   await expect(page.getByRole('dialog', { name: 'Перевести на следующий этап' })).toBeVisible();
+  expect(allowedRequests).toHaveLength(1);
   await page.getByRole('dialog').getByRole('button', { name: 'Отмена' }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   expect((await read()).current_instance_stage_id).toBe(before.current_instance_stage_id);
@@ -153,9 +202,9 @@ test('seeded real Kanban: cancel keeps stage, confirm moves once', async ({ page
 
 test('real comment edit/delete and attachment upload/download/delete', async ({ page, request }) => {
   test.skip(process.env.E2E_WORKFLOW_MUTATIONS !== '1', 'Opt in for local dev mutations');
-  test.skip(!process.env.E2E_ADMIN_USERNAME || !process.env.E2E_ADMIN_PASSWORD || !process.env.E2E_WORKFLOW_INSTANCE_ID, 'Set admin and the test-created Workflow ID');
+  test.skip(!process.env.E2E_ADMIN_USERNAME || !process.env.E2E_ADMIN_PASSWORD || !workflowInstanceId(), 'Set admin and the test-created Workflow ID');
   const authorization = await login(page);
-  const instanceId = process.env.E2E_WORKFLOW_INSTANCE_ID ?? '';
+  const instanceId = workflowInstanceId();
   const headers = { authorization };
   const leftovers = await request.get(`${apiBase}/api/v1/workflow/instances/${instanceId}/attachments`, { headers });
   const leftoverFiles = (await leftovers.json()) as PageResult<{ id: string; original_filename: string }>;

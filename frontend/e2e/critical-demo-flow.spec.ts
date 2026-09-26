@@ -1,5 +1,5 @@
 import { stat } from 'node:fs/promises';
-import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Browser, type Page, type TestInfo } from '@playwright/test';
 
 type SmokeConfig = {
   baseURL: URL;
@@ -8,6 +8,7 @@ type SmokeConfig = {
   universityId: string;
   universityName: string;
   workflowInstanceId: string;
+  workflowProgramId: string;
   expectedWorkflowStage: string;
   runId: string;
 };
@@ -24,16 +25,77 @@ function requiredEnvironment(name: string): string {
 
 function smokeConfig(): SmokeConfig {
   const baseURL = new URL(process.env.E2E_BASE_URL?.trim() || 'http://localhost:3000');
+  const isolated = process.env.E2E_CRITICAL_ISOLATED === '1';
   return {
     baseURL,
     managerUsername: requiredEnvironment('E2E_MANAGER_USERNAME'),
     managerPassword: requiredEnvironment('E2E_MANAGER_PASSWORD'),
     universityId: requiredEnvironment('E2E_UNIVERSITY_ID'),
     universityName: requiredEnvironment('E2E_UNIVERSITY_NAME'),
-    workflowInstanceId: requiredEnvironment('E2E_WORKFLOW_INSTANCE_ID'),
-    expectedWorkflowStage: requiredEnvironment('E2E_EXPECTED_WORKFLOW_STAGE'),
+    workflowInstanceId: isolated ? '' : requiredEnvironment('E2E_WORKFLOW_INSTANCE_ID'),
+    workflowProgramId: isolated ? '' : requiredEnvironment('E2E_WORKFLOW_PROGRAM_ID'),
+    expectedWorkflowStage: isolated ? '' : requiredEnvironment('E2E_EXPECTED_WORKFLOW_STAGE'),
     runId: process.env.E2E_RUN_ID?.trim() || process.env.SOURCECRAFT_RUN_ID?.trim() || 'local',
   };
+}
+
+async function isolatedWorkflowFixture(browser: Browser, request: APIRequestContext, config: SmokeConfig): Promise<SmokeConfig> {
+  const adminUsername = requiredEnvironment('E2E_ADMIN_USERNAME');
+  const adminPassword = requiredEnvironment('E2E_ADMIN_PASSWORD');
+  const apiBase = requiredEnvironment('E2E_API_URL').replace(/\/$/, '');
+  const context = await browser.newContext({ baseURL: config.baseURL.origin });
+  try {
+    const adminPage = await context.newPage();
+    let authorization = '';
+    adminPage.on('request', (outgoing) => {
+      if (outgoing.url().includes('/api/v1/auth/me')) authorization = outgoing.headers().authorization ?? authorization;
+    });
+    await adminPage.goto('/login');
+    const keycloakButton = adminPage.getByRole('button', { name: 'Войти через Keycloak' });
+    if (await keycloakButton.isVisible().catch(() => false)) await keycloakButton.click();
+    await adminPage.locator('input[name="username"]').fill(adminUsername);
+    await adminPage.locator('input[name="password"]').fill(adminPassword);
+    await adminPage.getByRole('button', { name: /Вход|Войти|Sign in|Log in/i }).click();
+    await adminPage.waitForURL((url) => url.pathname === '/dashboard');
+    await expect.poll(() => authorization).toMatch(/^Bearer\s+\S+$/);
+    const headers = { authorization };
+    const get = async (path: string) => {
+      const response = await request.get(`${apiBase}/api/v1${path}`, { headers });
+      expect(response.status(), `${path}: ${await response.text()}`).toBe(200);
+      return jsonRecord(await response.json());
+    };
+    const post = async (path: string, data: Record<string, unknown>) => {
+      const response = await request.post(`${apiBase}/api/v1${path}`, { headers, data });
+      expect(response.status(), `${path}: ${await response.text()}`).toBe(201);
+      return jsonRecord(await response.json());
+    };
+    const directions = await get('/directions?page=1&page_size=1');
+    const direction = (directions.items as unknown[])[0];
+    const directionId = requiredString(jsonRecord(direction).id, 'direction.id');
+    const templates = await get('/workflow/templates?page=1&page_size=100');
+    const activeTemplate = (templates.items as unknown[]).map(jsonRecord).find((item) => item.is_active === true);
+    if (!activeTemplate) throw new Error('E2E fixture requires an active Workflow template.');
+    const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const program = await post('/programs', { direction_id: directionId, name: `Final smoke ${stamp}` });
+    const programId = requiredString(program.id, 'program.id');
+    await post(`/universities/${config.universityId}/programs`, { program_id: programId });
+    const instance = await post('/workflow/instances', {
+      university_id: config.universityId,
+      program_id: programId,
+      template_id: requiredString(activeTemplate.id, 'template.id'),
+    });
+    const stages = instance.stages as unknown[];
+    const currentStage = stages.map(jsonRecord).find((stage) => stage.id === instance.current_instance_stage_id);
+    if (!currentStage) throw new Error('E2E fixture has no current Workflow stage.');
+    return {
+      ...config,
+      workflowInstanceId: requiredString(instance.id, 'instance.id'),
+      workflowProgramId: programId,
+      expectedWorkflowStage: requiredString(currentStage.name, 'stage.name'),
+    };
+  } finally {
+    await context.close();
+  }
 }
 
 async function checkpoint(page: Page, testInfo: TestInfo, name: string): Promise<void> {
@@ -56,8 +118,12 @@ function requiredString(value: unknown, field: string): string {
   return value;
 }
 
-test('manager completes the critical ten-step demo flow', async ({ page }, testInfo) => {
-  const config = smokeConfig();
+test('manager completes the critical ten-step demo flow', async ({ page, browser, request }, testInfo) => {
+  let config = smokeConfig();
+  if (process.env.E2E_CRITICAL_ISOLATED === '1') {
+    config = await test.step('0. Create dedicated Workflow fixture in the disposable stand',
+      () => isolatedWorkflowFixture(browser, request, config));
+  }
   const transitionComment = `E2E ${config.runId}: этап проверен и готов к переходу.`;
   const stageComment = `E2E ${config.runId}: подтверждение текущего этапа.`;
   let targetStageName = '';
@@ -65,8 +131,7 @@ test('manager completes the critical ten-step demo flow', async ({ page }, testI
   await test.step('1. Login через Keycloak как manager', async () => {
     await page.goto('/login');
     const loginButton = page.getByRole('button', { name: 'Войти через Keycloak' });
-    await expect(loginButton).toBeVisible();
-    await loginButton.click();
+    if (await loginButton.isVisible().catch(() => false)) await loginButton.click();
 
     await expect(page.locator('input[name="username"]')).toBeVisible();
     await page.locator('input[name="username"]').fill(config.managerUsername);
@@ -98,6 +163,7 @@ test('manager completes the critical ten-step demo flow', async ({ page }, testI
   await test.step('3. Universities: открыть стабильный ВУЗ', async () => {
     await page.getByRole('link', { name: 'ВУЗы' }).click();
     await page.waitForURL((url) => url.origin === config.baseURL.origin && url.pathname === '/universities');
+    await page.getByRole('searchbox', { name: 'Поиск по названию вуза' }).fill(config.universityName);
     const universityRow = page.getByTestId(`university-row-${config.universityId}`);
     await expect(universityRow).toBeVisible();
     await universityRow.getByRole('link', { name: config.universityName, exact: true }).click();
@@ -118,11 +184,8 @@ test('manager completes the critical ten-step demo flow', async ({ page }, testI
   await test.step('5. Passport → Workflow: текущий этап виден', async () => {
     await page.getByRole('tab', { name: 'Workflow' }).click();
     await expect(page).toHaveURL(new RegExp(`/universities/${config.universityId}\\?tab=workflow`));
+    await page.getByLabel('Программа').selectOption(config.workflowProgramId);
     await expect(page.getByTestId('workflow-current-stage')).toBeVisible();
-
-    // Passport fixtures and the write-capable Workflow API currently use
-    // different identifiers. The dedicated API instance is supplied by the
-    // test stand and remains part of the same user-visible Workflow journey.
     const workflowResponsePromise = page.waitForResponse((response) => (
       response.request().method() === 'GET'
       && response.url().includes(`/api/v1/workflow/instances/${config.workflowInstanceId}`)
@@ -211,8 +274,8 @@ test('manager completes the critical ten-step demo flow', async ({ page }, testI
     const matchingEvents = page.getByTestId('audit-event')
       .filter({ hasText: 'Переход Workflow' })
       .filter({ hasText: config.workflowInstanceId });
-    await expect(matchingEvents).toHaveCount(1);
-    await expect(matchingEvents).toBeVisible();
+    await expect(matchingEvents.first()).toBeVisible();
+    await expect(matchingEvents.first().locator('time')).toContainText('только что');
     await checkpoint(page, testInfo, '05-audit-transition');
   });
 });

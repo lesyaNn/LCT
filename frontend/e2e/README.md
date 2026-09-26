@@ -21,17 +21,21 @@ frontend boundary.
 | `E2E_UNIVERSITY_ID` | Stable university fixture shown by `/universities`. |
 | `E2E_UNIVERSITY_NAME` | Accessible link name for that fixture. |
 | `E2E_WORKFLOW_INSTANCE_ID` | UUID of a write-capable Workflow instance. |
+| `E2E_WORKFLOW_PROGRAM_ID` | UUID of the selected university program linked to that Workflow. |
 | `E2E_EXPECTED_WORKFLOW_STAGE` | Current stage name after the fixture reset. |
 | `E2E_RUN_ID` | Optional stable run label used in created comments. SourceCraft uses `SOURCECRAFT_RUN_ID` automatically. |
+| `E2E_CRITICAL_ISOLATED` | Optional `1` on a disposable stand: create a unique program and Workflow before each run. Requires `E2E_ADMIN_USERNAME`, `E2E_ADMIN_PASSWORD`, and `E2E_API_URL`; static Workflow IDs and stage name are then unnecessary. |
 
 Do not commit credential values. SourceCraft reads them from repository
 secrets named `e2e_base_url`, `e2e_manager_username`,
 `e2e_manager_password`, `e2e_university_id`, `e2e_university_name`,
 `e2e_workflow_instance_id`, and `e2e_expected_workflow_stage`.
 
-The configured fixture must be reset before every run (or a fresh instance ID
-must be supplied), because the scenario intentionally advances Workflow and
-adds a comment. Playwright retries are disabled to avoid repeating mutations.
+On a shared stand, the configured fixture must be reset before every run (or a
+fresh instance ID must be supplied), because the scenario intentionally advances
+Workflow and adds a comment. The disposable-stand mode creates a unique fixture
+automatically and is repeatable without a reset. Playwright retries are disabled
+to avoid repeating mutations on shared stands.
 The report endpoint must return a terminal `ready` job with a downloadable
 XLSX URL, and the audit endpoint must expose the corresponding
 `WORKFLOW_TRANSITION` event.
@@ -101,3 +105,18 @@ section. It uses the realm's disposable admin fixture unless
 `E2E_STAGE11_ADMIN_USERNAME` / `E2E_STAGE11_ADMIN_PASSWORD` are supplied.
 Afterward, `docker compose -p team26-stage11-e2e -f docker-compose.yml -f
 docker-compose.external-e2e.yml down -v` removes only its temporary volumes.
+
+## Final integration audit
+
+Use a disposable realm/database for mutation tests. `E2E_WORKFLOW_ISOLATED=1`
+creates a unique program and Workflow on `E2E_WORKFLOW_UNIVERSITY_ID` before
+each `workflow-mutations-real.spec.ts` run; choose a university outside the
+manager/user scope. It requires `E2E_WORKFLOW_MUTATIONS=1`, `E2E_API_URL`,
+and admin credentials, but no pre-existing Workflow/program IDs. The
+`E2E_CRITICAL_ISOLATED=1` mode above similarly prepares the manager smoke.
+Configure the isolated Keycloak client redirect/web origin **and**
+`post.logout.redirect.uris` for the frontend origin; the shared dev realm
+must not be changed. `final-responsive-audit.spec.ts` needs the IDs of any
+visible university, teacher, and Workflow to check real pages at 1440, 1024,
+768, and 390 px. The external integration E2E uses the explicit backend
+test adapters and does not prove connectivity to a live LMS or website.
