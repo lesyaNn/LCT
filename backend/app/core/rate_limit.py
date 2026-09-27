@@ -1,6 +1,6 @@
 """M10: fixed-window rate limiting for heavy endpoints (429 + contract code).
 
-Abuse mitigation, not billing: approximate counters backed by Redis with a
+Abuse mitigation, not billing: approximate counters backed by KeyDB with a
 node-local fallback. Never raises — on any backend error the request is
 allowed (fail-open: a cache outage must not become an API outage).
 """
@@ -26,10 +26,10 @@ def hash_client_id(raw: str) -> str:
 def check_rate_limit(key: str, limit: int, window_seconds: int = 60) -> tuple[bool, int]:
     """Return (allowed, retry_after_seconds) for one hit (M10).
 
-    Redis path uses GET/SET/INCR with the window as TTL; any failure (or no
-    Redis) degrades to the guarded in-memory fallback.
+    KeyDB path uses GET/SET/INCR with the window as TTL; any failure (or no
+    KeyDB) degrades to the guarded in-memory fallback.
     """
-    from app.infrastructure import redis as redis_infra
+    from app.infrastructure import keydb as redis_infra
 
     now = time.time()
     client = redis_infra.get_client()

@@ -15,7 +15,7 @@ from app.core.errors import BusinessException
 from app.schemas.errors import ErrorCode
 from app.core.security import CurrentUser
 from app.db.session import get_db
-from app.infrastructure import redis as cache
+from app.infrastructure import keydb as cache
 from app.modules.analytics.integration import (
     FILTER_KEYS,
     FilterProvider,

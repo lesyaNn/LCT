@@ -40,7 +40,11 @@ class Settings(BaseSettings):
     db_max_overflow: int = 10
     db_pool_timeout: int = 30
     db_statement_timeout_ms: int = 30000
+    # KeyDB (wire-совместим с Redis, тот же RESP-протокол и redis-py клиент).
+    # Схема URL остаётся ``redis://`` — это схема протокола, а не вендора.
+    # KEYDB_URL — primary, REDIS_URL — legacy fallback для старых .env.
     redis_url: str = "redis://localhost:6379/0"
+    keydb_url: str | None = None
     s3_endpoint: str = "http://localhost:9000"
     # Credentials are intentionally empty by default.  They are required from
     # the environment when S3/MinIO is selected; the old demo credential
@@ -109,6 +113,11 @@ class Settings(BaseSettings):
         if self.frontend_origin and self.frontend_origin not in origins:
             origins.append(self.frontend_origin)
         return origins
+
+    @property
+    def cache_url(self) -> str:
+        """Активный URL кеша: KEYDB_URL, иначе legacy REDIS_URL."""
+        return self.keydb_url or self.redis_url
 
 
 settings = Settings()

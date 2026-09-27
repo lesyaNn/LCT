@@ -1,6 +1,6 @@
-"""Backend cache (P5-12-01): Redis каталоги на коротком TTL + инвалидация.
+"""Backend cache (P5-12-01): KeyDB каталоги на коротком TTL + инвалидация.
 
-Поверх ``app.infrastructure.redis`` (уже с in-memory fallback): единый
+Поверх ``app.infrastructure.keydb`` (уже с in-memory fallback): единый
 ``CACHE_TTL``, ``cache_key``, ``@cached`` декоратор и инвалидаторы для
 каталогов / health-score / аналитики. Писатели вызывают инвалидаторы после
 CREATE/UPDATE/DELETE.
@@ -13,7 +13,7 @@ import logging
 import uuid
 from functools import wraps
 
-from app.infrastructure import redis as redis_infra
+from app.infrastructure import keydb as redis_infra
 
 logger = logging.getLogger("rtk")
 

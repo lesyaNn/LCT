@@ -18,7 +18,7 @@ def test_check_rate_limit_allows_then_denies():
 
 def test_check_rate_limit_never_raises_without_redis(monkeypatch):
     reset_local_buckets()
-    import app.infrastructure.redis as redis_infra
+    import app.infrastructure.keydb as redis_infra
 
     monkeypatch.setattr(redis_infra, "redis", None)
     # Drop any live client the earlier tests may have cached.
