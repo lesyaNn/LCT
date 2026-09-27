@@ -14,7 +14,6 @@
 .healthSummary { composes: surface from '../../shared/ui/rtk/section-surface.module.css'; min-width: 220px; padding: var(--rtk-space-4); }
 .healthSummaryTop { align-items: flex-start; display: flex; gap: var(--rtk-space-3); justify-content: space-between; }
 .overline { color: var(--rtk-color-text-tertiary); display: block; letter-spacing: .04em; }
-.healthScore { display: block; font-size: 30px; letter-spacing: -.04em; line-height: 1.1; margin-top: 3px; }
 .healthMeter { background: var(--rtk-color-surface-subtle); border-radius: 999px; height: 6px; margin: var(--rtk-space-3) 0; overflow: hidden; }
 .healthMeterFill { border-radius: inherit; display: block; height: 100%; transition: width 180ms ease; }
 .meter-green { background: var(--rtk-color-success); }

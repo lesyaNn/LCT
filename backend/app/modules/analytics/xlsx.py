@@ -4,7 +4,8 @@ Data comes ONLY from :class:`ReportDatasetService` (same filters, same row
 grain, same selected columns, same health/workflow values as the dataset).
 Column titles come ONLY from ``COLUMN_REGISTRY`` — there is no second
 ``XLSX_COLUMN_MAPPING``. ``UnifiedFilter`` semantics stay frozen (date bounds
-on ``universities.created_at``, AND between dimensions, OR/IN within).
+on the interaction period — meetings / interaction notes, AND between
+dimensions, OR/IN within).
 
 Workbook layout (frozen)::
 
@@ -55,11 +56,17 @@ from app.models.catalog import (
     Responsible,
     University,
 )
+from app.modules.analytics.cells import (
+    DATE_NUMBER_FORMAT,
+    classify_cell,
+    estimate_width,
+)
 from app.modules.analytics.columns import COLUMN_REGISTRY, resolve_columns
 from app.modules.analytics.dataset import ReportDatasetService
 from app.modules.analytics.filters import UnifiedFilter
 
 __all__ = [
+    "DATA_START_ROW",
     "FILTER_FIELD_ORDER",
     "HEADER_ROW",
     "MAX_COLUMN_WIDTH",
@@ -72,8 +79,10 @@ __all__ = [
     "default_reports_dir",
     "format_period",
     "generate_xlsx_report",
+    "lookup_filter_names",
     "sanitize_text",
     "serialize_filter_value",
+    "utc_aware",
 ]
 
 #: Frozen workbook structure.
@@ -132,10 +141,8 @@ THIN_BORDER = Border(
 )
 TEXT_ALIGNMENT = Alignment(horizontal="left", vertical="center")
 CENTER_ALIGNMENT = Alignment(horizontal="center", vertical="center")
-DATE_NUMBER_FORMAT = "DD.MM.YYYY"
+DATE_ALIGNMENT = Alignment(horizontal="center", vertical="center")
 
-#: Cell-text prefixes that spreadsheet apps may interpret as formulas.
-_FORMULA_PREFIXES = ("=", "+", "-", "@")
 #: Max names per filter dimension in the human-readable summary (bounded).
 _SUMMARY_NAMES_PER_DIMENSION = 5
 
@@ -166,16 +173,13 @@ def default_reports_dir() -> Path:
 def sanitize_text(value: str) -> str:
     """Escape formula-injection prefixes in user-controlled text.
 
-    ``=...`` would otherwise be stored by openpyxl as a real formula cell
-    (``data_type == "f"``); ``+``/``-``/``@`` prefixes are evaluated by
-    some spreadsheet apps on open. A leading apostrophe keeps the value a
-    plain-text cell while Excel displays it without the marker. Only
-    ``str`` instances are touched — numeric values (including negative
-    numbers) pass through unchanged by the caller, which branches on type.
+    Thin re-export of :func:`app.modules.analytics.cells.classify_cell`'s
+    text sanitizer so the XLS, XLSX and PDF writers cannot drift apart. A
+    leading apostrophe keeps the value plain text while Excel displays it
+    without the marker; only ``str`` is touched, so negative numbers pass
+    through unchanged (the writer branches on type before calling this).
     """
-    if value[:1] in _FORMULA_PREFIXES:
-        return "'" + value
-    return value
+    return classify_cell(value).value
 
 
 def format_period(filters: UnifiedFilter) -> str:
@@ -245,6 +249,9 @@ def build_filter_summary(
     return "Фильтры: " + "; ".join(segments)
 
 
+
+
+
 def _lookup_names(db: Session, filters: UnifiedFilter) -> dict[str, dict[str, str]]:
     """Batched id -> display-name maps (≤5 SELECTs, never N+1)."""
     out: dict[str, dict[str, str]] = {}
@@ -266,12 +273,22 @@ def _lookup_names(db: Session, filters: UnifiedFilter) -> dict[str, dict[str, st
     return out
 
 
+#: Public alias: the XLS writer resolves filter display names with the same
+#: batched helper, so both formats can never show different names.
+lookup_filter_names = _lookup_names
+
+
 def _ensure_tz_aware(moment: datetime | None) -> datetime:
+    """Normalize the generation timestamp to a tz-aware UTC datetime."""
     if moment is None:
         return datetime.now(timezone.utc)
     if moment.tzinfo is None:
         return moment.replace(tzinfo=timezone.utc)
     return moment
+
+
+#: Public alias shared with the XLS writer.
+utc_aware = _ensure_tz_aware
 
 
 def generate_xlsx_report(
@@ -286,7 +303,7 @@ def generate_xlsx_report(
 ) -> GeneratedReport:
     """Generate the frozen XLSX workbook from the report dataset.
 
-    ``columns=None`` selects the frozen 12 mandatory ``DEFAULT_COLUMNS``;
+    ``columns=None`` selects the ТЗ default ``DEFAULT_COLUMNS``;
     otherwise the resolved/deduped ``ReportRequest.columns`` order is kept
     verbatim (never sorted). Raises ``UnknownReportColumnError`` /
     ``EmptyReportColumnsError`` (both ``ValueError``) for invalid
@@ -338,41 +355,30 @@ def generate_xlsx_report(
             row_count += 1
             excel_row = DATA_START_ROW + row_count - 1
             for idx, key in enumerate(resolved, start=1):
-                value = row.get(key)
-                if value is None:
+                # Cell semantics are shared with the XLS writer
+                # (app.modules.analytics.cells) so both formats agree on
+                # empties, dates, numerics and formula sanitization.
+                cell_value = classify_cell(row.get(key))
+                cell = ws.cell(row=excel_row, column=idx)
+                if cell_value.kind == "empty":
                     # Contract: missing relations stay EMPTY cells
                     # (never "N/A" / "null" / "-").
-                    cell = ws.cell(row=excel_row, column=idx)
                     cell.border = THIN_BORDER
                     continue
-                if isinstance(value, datetime):
-                    cell = ws.cell(row=excel_row, column=idx, value=value)
+                if cell_value.kind in ("date", "datetime"):
+                    cell.value = cell_value.value
                     cell.number_format = DATE_NUMBER_FORMAT
                     cell.alignment = CENTER_ALIGNMENT
-                    estimate = 16
-                elif isinstance(value, date):
-                    cell = ws.cell(row=excel_row, column=idx, value=value)
-                    cell.number_format = DATE_NUMBER_FORMAT
+                elif cell_value.kind == "number":
+                    cell.value = cell_value.value
                     cell.alignment = CENTER_ALIGNMENT
-                    estimate = 10
-                elif isinstance(value, bool):
-                    cell = ws.cell(row=excel_row, column=idx, value=int(value))
-                    cell.alignment = CENTER_ALIGNMENT
-                    estimate = 1
-                elif isinstance(value, (int, float)):
-                    # Numeric health score etc. stay numeric (never strings).
-                    cell = ws.cell(row=excel_row, column=idx, value=value)
-                    cell.alignment = CENTER_ALIGNMENT
-                    estimate = len(str(value))
                 else:
-                    text = sanitize_text(str(value))
-                    cell = ws.cell(row=excel_row, column=idx, value=text)
+                    cell.value = cell_value.value
                     cell.alignment = TEXT_ALIGNMENT
-                    estimate = min(len(text), 50)
                 cell.border = THIN_BORDER
-                col = idx - 1
-                if estimate > widths[col]:
-                    widths[col] = float(estimate)
+                estimate = estimate_width(cell_value)
+                if estimate > widths[idx - 1]:
+                    widths[idx - 1] = float(estimate)
 
         for idx, width in enumerate(widths, start=1):
             ws.column_dimensions[get_column_letter(idx)].width = min(

@@ -44,7 +44,7 @@ from app.models.catalog import (
     UniversityResponsible,
     Vendor,
 )
-from app.models.interactions import UniversityProduct, UniversityProgram
+from app.models.interactions import Meeting, UniversityProduct, UniversityProgram
 from app.models.workflow_instances import InstanceStage, WorkflowInstance
 from app.models.workflow_templates import WorkflowStage, WorkflowTemplate
 from app.modules.analytics.analytics import AnalyticsService
@@ -129,14 +129,8 @@ def _seed(s: Session) -> dict:
             UniversityResponsible(university_id=delta.id, responsible_id=r2.id),
         ]
     )
-    s.add_all([
-        HealthScoreCurrent(university_id=alpha.id, score=85, status="green",
-                           breakdown={}, reasons=[], input_counters={},
-                           calculated_at=datetime(2026, 9, 1, tzinfo=timezone.utc)),
-        HealthScoreCurrent(university_id=beta.id, score=60, status="yellow",
-                           breakdown={}, reasons=[], input_counters={},
-                           calculated_at=datetime(2026, 9, 1, tzinfo=timezone.utc)),
-    ])
+    # The health-score projection was dropped in migration 000029; progress
+    # now comes from the canonical workflow stage rows seeded below.
     c1 = Contract(
         id=uuid4(), university_id=alpha.id, contract_number="C-001",
         product_id=prod1.id, signed_at=date(2026, 1, 20),
@@ -224,28 +218,24 @@ def _seed(s: Session) -> dict:
     inst_b.current_stage_id = t1.id
     inst_d.current_instance_stage_id = st_d2.id
     inst_d.current_stage_id = t2.id
-    s.add_all(
-        [
-            HealthScoreSnapshot(
-                id=uuid4(), university_id=alpha.id, score=70, status="yellow",
-                breakdown={}, reasons=[],
-                calculated_at=datetime(2026, 8, 1, tzinfo=timezone.utc),
-                period_day=date(2026, 8, 1), trigger_event="daily_cron",
-            ),
-            HealthScoreSnapshot(
-                id=uuid4(), university_id=alpha.id, score=85, status="green",
-                breakdown={}, reasons=[],
-                calculated_at=datetime(2026, 9, 1, tzinfo=timezone.utc),
-                period_day=date(2026, 9, 1), trigger_event="daily_cron",
-            ),
-            HealthScoreSnapshot(
-                id=uuid4(), university_id=beta.id, score=60, status="yellow",
-                breakdown={}, reasons=[],
-                calculated_at=datetime(2026, 9, 1, tzinfo=timezone.utc),
-                period_day=date(2026, 9, 1), trigger_event="daily_cron",
-            ),
-        ]
-    )
+    # The ТЗ period filters on interaction dates, so seed one interaction per
+    # university (in its creation month) for the date-filter tests.
+    s.add_all([
+        Meeting(
+            id=uuid4(), university_id=u.id, meeting_type="online",
+            subject=f"Meeting {n}", participants=[], meeting_at=at,
+            created_by_keycloak_sub="t",
+        )
+        for n, (u, at) in enumerate((
+            (alpha, _utc(2026, 1, 20)),
+            (beta, _utc(2026, 4, 10)),
+            (gamma, _utc(2026, 7, 5)),
+            (delta, _utc(2026, 3, 18)),
+            (epsilon, _utc(2026, 4, 20)),
+        ))
+    ])
+    # Health-score snapshots were dropped in migration 000029 and are no
+    # longer seeded; `workflow_progress` is derived from the stages above.
     return {
         "d1": d1.id, "d2": d2.id,
         "p1": p1.id, "p2": p2.id, "p3": p3.id,
@@ -254,6 +244,17 @@ def _seed(s: Session) -> dict:
         "alpha": alpha.id, "beta": beta.id, "gamma": gamma.id,
         "delta": delta.id, "epsilon": epsilon.id,
     }
+
+
+#: Everything the registry supports. The default selection is only the ТЗ set,
+#: so tests that assert on contract/license/comment values must ask for this.
+EXTENDED = [
+    "university", "direction", "program", "product", "workflow_status",
+    "responsible", "vendor", "contract_number", "license_signed",
+    "license_expires", "transfer_status", "comment",
+    "city", "current_stage", "last_interaction", "workflow_progress",
+    "overdue_tasks",
+]
 
 
 def _fetch(s: Session, f: UnifiedFilter, columns=None, **kw):
@@ -279,7 +280,7 @@ def test_default_columns_are_14_mandatory(fx):
 
 def test_license_row_full_values(fx):
     s, _, _ = fx
-    ds = _fetch(s, UnifiedFilter(), None)
+    ds = _fetch(s, UnifiedFilter(), EXTENDED)
     rows = _by_uni(ds.rows)["Uni Alpha"]
     lic1 = next(r for r in rows if r["contract_number"] == "C-001")
     assert lic1["university"] == "Uni Alpha"
@@ -293,12 +294,12 @@ def test_license_row_full_values(fx):
     assert lic1["comment"] == "L1 comment"
     assert lic1["responsible"] == "Resp One"
     assert lic1["workflow_status"] == "Stage 2"  # current stage wins
-    assert lic1["health_score"] == 85  # latest snapshot, not 70
+    assert lic1["workflow_progress"] == 50  # 1 of 2 stages completed
 
 
 def test_license_without_contract_nulls(fx):
     s, _, _ = fx
-    ds = _fetch(s, UnifiedFilter(), None)
+    ds = _fetch(s, UnifiedFilter(), EXTENDED)
     rows = _by_uni(ds.rows)["Uni Alpha"]
     lic2 = next(r for r in rows if r["license_expires"] == date(2026, 9, 1))
     assert lic2["contract_number"] is None
@@ -310,7 +311,7 @@ def test_license_without_contract_nulls(fx):
 
 def test_fallback_row_uses_latest_contract(fx):
     s, _, _ = fx
-    ds = _fetch(s, UnifiedFilter(), None)
+    ds = _fetch(s, UnifiedFilter(), EXTENDED)
     rows = _by_uni(ds.rows)["Uni Gamma"]
     assert len(rows) == 1
     row = rows[0]
@@ -325,19 +326,21 @@ def test_fallback_row_uses_latest_contract(fx):
     assert row["vendor"] is None
     assert row["responsible"] is None
     assert row["workflow_status"] is None
-    assert row["health_score"] is None
+    assert row["workflow_progress"] is None
 
 
 def test_all_null_fallback_row(fx):
     s, _, _ = fx
-    ds = _fetch(s, UnifiedFilter(), None)
+    ds = _fetch(s, UnifiedFilter(), EXTENDED)
     rows = _by_uni(ds.rows)["Uni Delta"]
     assert len(rows) == 1
     row = rows[0]
     assert row["contract_number"] is None
     assert row["responsible"] == "Resp One; Resp Two"  # sorted aggregate
     assert row["workflow_status"] == "Stage 2"  # current instance stage
-    assert row["health_score"] is None
+    # Stage 1 is `skipped` (excluded from the denominator) and stage 2 is
+    # pending, so 0 of 1 eligible stages completed. A real 0, not NULL.
+    assert row["workflow_progress"] == 0
 
 
 def test_workflow_falls_back_to_program_status(fx):
@@ -351,13 +354,16 @@ def test_workflow_falls_back_to_program_status(fx):
 
 def test_dates_are_typed_not_strings(fx):
     s, _, _ = fx
-    ds = _fetch(s, UnifiedFilter(), None)
+    ds = _fetch(s, UnifiedFilter(), EXTENDED)
     for row in ds.rows:
         if row["license_signed"] is not None:
             assert isinstance(row["license_signed"], date)
         if row["license_expires"] is not None:
             assert isinstance(row["license_expires"], date)
-        assert isinstance(row["health_score"], int) or row["health_score"] is None
+        progress = row["workflow_progress"]
+        assert isinstance(progress, int) or progress is None
+        if progress is not None:
+            assert 0 <= progress <= 100
 
 
 def test_nulls_never_placeholders(fx):
@@ -385,8 +391,14 @@ def test_row_grain_no_cartesian_explosion(fx):
 
 def test_deterministic_ordering(fx):
     s, _, _ = fx
-    first = [(r["university"], r["contract_number"]) for r in _fetch(s, UnifiedFilter(), None).rows]
-    second = [(r["university"], r["contract_number"]) for r in _fetch(s, UnifiedFilter(), None).rows]
+    first = [
+        (r["university"], r["contract_number"])
+        for r in _fetch(s, UnifiedFilter(), EXTENDED).rows
+    ]
+    second = [
+        (r["university"], r["contract_number"])
+        for r in _fetch(s, UnifiedFilter(), EXTENDED).rows
+    ]
     assert first == second
     assert [u for u, _ in first] == [
         "Uni Alpha", "Uni Alpha", "Uni Beta", "Uni Delta", "Uni Epsilon", "Uni Gamma",
@@ -398,13 +410,14 @@ def test_deterministic_ordering(fx):
 
 def test_column_subset_only_requested_keys(fx):
     s, _, _ = fx
-    ds = _fetch(s, UnifiedFilter(), ["university", "health_score"])
-    assert ds.columns == ["university", "health_score"]
+    ds = _fetch(s, UnifiedFilter(), ["university", "workflow_progress"])
+    assert ds.columns == ["university", "workflow_progress"]
     for row in ds.rows:
-        assert set(row.keys()) == {"university", "health_score"}
+        assert set(row.keys()) == {"university", "workflow_progress"}
     by_uni = _by_uni(ds.rows)
-    assert by_uni["Uni Alpha"][0]["health_score"] == 85
-    assert by_uni["Uni Gamma"][0]["health_score"] is None
+    # Alpha: 1 of 2 stages completed. Gamma has no workflow -> NULL (never 0).
+    assert by_uni["Uni Alpha"][0]["workflow_progress"] == 50
+    assert by_uni["Uni Gamma"][0]["workflow_progress"] is None
 
 
 def test_unknown_column_rejected(fx):
@@ -415,10 +428,10 @@ def test_unknown_column_rejected(fx):
 
 def test_duplicate_columns_deduped(fx):
     s, _, _ = fx
-    ds = _fetch(s, UnifiedFilter(), ["university", "university", "health_score"])
-    assert ds.columns == ["university", "health_score"]
+    ds = _fetch(s, UnifiedFilter(), ["university", "university", "workflow_progress"])
+    assert ds.columns == ["university", "workflow_progress"]
     for row in ds.rows:
-        assert set(row.keys()) == {"university", "health_score"}
+        assert set(row.keys()) == {"university", "workflow_progress"}
 
 
 def test_empty_columns_rejected(fx):
@@ -456,14 +469,36 @@ def test_filter_only_relation_without_output_column(fx):
     assert sorted(r["university"] for r in ds.rows) == ["Uni Alpha", "Uni Epsilon"]
 
 
+#: Column set without the batched university-map columns, so the statement
+#: count is exactly the main SELECT plus the responsibles aggregate.
+NO_MAP_COLUMNS = [c for c in EXTENDED if c not in ("last_interaction", "workflow_progress",
+                                                   "overdue_tasks")]
+
+
 def test_query_count_bounded(fx, select_counter):
     s, _, _ = fx
     select_counter["n"] = 0
-    _fetch(s, UnifiedFilter(), None)
+    _fetch(s, UnifiedFilter(), NO_MAP_COLUMNS)
     assert select_counter["n"] == 2  # main SELECT + one batched responsibles query
     select_counter["n"] = 0
-    _fetch(s, UnifiedFilter(), ["university", "health_score"])
-    assert select_counter["n"] == 1  # no responsibles batch needed
+    # Only the university name: a single statement, nothing to batch.
+    _fetch(s, UnifiedFilter(), ["university"])
+    assert select_counter["n"] == 1
+    select_counter["n"] = 0
+    # ``workflow_progress`` needs the active-instance lookup and the stage
+    # aggregate — two extra batched statements, still constant (never N+1).
+    _fetch(s, UnifiedFilter(), ["university", "workflow_progress"])
+    assert select_counter["n"] == 3
+
+
+def test_university_map_columns_add_a_bounded_number_of_queries(fx, select_counter):
+    """The FULL column set must stay bounded, not per-row."""
+    s, _, _ = fx
+    select_counter["n"] = 0
+    rows = _fetch(s, UnifiedFilter(), EXTENDED).rows
+    assert rows, "expected the seeded universities"
+    # 1 main + 1 responsibles + 2 (last_interaction) + 2 (progress) + 1 (overdue).
+    assert select_counter["n"] <= 7, select_counter["n"]
 
 
 # ------------------------------------------------------- unified filter dims
@@ -522,7 +557,8 @@ def test_filter_workflow_statuses(fx):
     assert sorted({r["university"] for r in ds.rows}) == ["Uni Alpha"]
 
 
-def test_filter_dates_on_created_at(fx):
+def test_filter_dates_on_interactions(fx):
+    """ТЗ: the period bounds the interaction date, not ``created_at``."""
     s, _, _ = fx
     ds = _fetch(
         s, UnifiedFilter(date_from=date(2026, 2, 1), date_to=date(2026, 6, 1)),
@@ -575,22 +611,26 @@ def test_dataset_matches_p1_and_analytics_university_sets(fx):
     assert set(AnalyticsService.filtered_university_ids(s, f, today=TODAY)) == p1_ids
 
 
-def test_health_fallback_does_not_reintroduce_snapshot_reads(fx):
+def test_no_health_score_column_survives_in_the_dataset(fx):
+    """The health-score entity is gone; the dataset must not resurrect it.
+
+    Removed with migration 000029: the column is rejected by resolve_columns
+    and no code path reads the dropped ``health_score_current`` table.
+    """
     s, _, ids = fx
-    ds = _fetch(s, UnifiedFilter(university_ids=[ids["gamma"]]), None)
-    assert _by_uni(ds.rows)["Uni Gamma"][0]["health_score"] is None
-    ds = _fetch(s, UnifiedFilter(university_ids=[ids["gamma"]]), None, health_fallback=True)
-    assert _by_uni(ds.rows)["Uni Gamma"][0]["health_score"] is None
-    # Snapshotted universities keep their snapshot values.
-    ds = _fetch(
-        s,
-        UnifiedFilter(university_ids=[ids["alpha"], ids["beta"]]),
-        ["university", "health_score"],
-        health_fallback=True,
+    from app.modules.analytics.columns import (
+        FULL_COLUMNS,
+        UnknownReportColumnError,
+        resolve_columns,
     )
-    by_uni = _by_uni(ds.rows)
-    assert by_uni["Uni Alpha"][0]["health_score"] == 85
-    assert by_uni["Uni Beta"][0]["health_score"] == 60
+
+    assert "health_score" not in resolve_columns(FULL_COLUMNS)  # noqa: F821
+    with pytest.raises(UnknownReportColumnError):
+        resolve_columns(["university", "health_score"])
+    # The default selection is the ТЗ set, which never contained health.
+    ds = _fetch(s, UnifiedFilter(university_ids=[ids["gamma"]]), None)
+    assert all("health_score" not in row for row in ds.rows)
+    assert not any(hasattr(row, "health_score") for row in ds.rows)
 
 
 def test_build_query_uses_shared_service_predicates(fx):

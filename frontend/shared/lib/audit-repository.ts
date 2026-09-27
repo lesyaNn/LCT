@@ -91,7 +91,6 @@ export const auditEntityLabels: Record<string, string> = {
   workflow_instance: 'Workflow',
   workflow_stage: 'Этап Workflow',
   university: 'ВУЗ',
-  teacher: 'Преподаватель',
   document: 'Документ',
   meeting: 'Встреча',
   note: 'Заметка',

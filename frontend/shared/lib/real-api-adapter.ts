@@ -36,7 +36,6 @@ import type {
   CreateWorkflowFromExternalResult,
   ExternalApplication,
   ExternalDataSource,
-  ExternalStudent,
   UniversityExternalData,
 } from './external-integrations-repository';
 
@@ -47,8 +46,6 @@ type ApiUniversity = {
   city: string | null;
   created_at: string;
   updated_at: string;
-  health_score: number | null;
-  health_status: 'green' | 'yellow' | 'red' | null;
 };
 type ApiProgram = { id: string; name: string; direction_name: string; status: ProgramStatus; launch_date: string | null; responsible_name: string | null };
 type ApiLicense = { id: string; license_number: string; product_name: string; vendor_name: string; signed_at: string; expires_at: string; status: string; transfer_status: string; contract_number: string | null };
@@ -103,8 +100,6 @@ function mapProgram(item: ApiProgram): UniversityProgramRow {
     status: item.status,
     launchDate: item.launch_date ?? '',
     responsible: responsible(item.responsible_name),
-    teachersCount: 0,
-    studentsCount: 0,
   };
 }
 
@@ -146,14 +141,12 @@ export async function realGetUniversities(params: UniversityListQuery, signal?: 
       programsCount: 0,
       programStatusCounts: {},
       currentStage: { id: 'unavailable', name: '—', tone: 'neutral' },
-      healthScore: item.health_score ?? 0,
       lastInteractionAt: item.updated_at || item.created_at,
-      attention: item.health_status === 'red',
+      attention: false,
       availability: {
         responsible: false,
         programs: false,
         stage: false,
-        healthScore: item.health_score !== null,
         lastInteraction: false,
       },
     })),
@@ -171,10 +164,8 @@ export async function realGetUniversityPassport(id: string, queryClient?: QueryC
     id: data.university.id,
     name: data.university.name,
     city: data.university.city ?? '—',
-    healthScore: 0,
     metrics: {
       activePrograms: data.programs.filter((item) => item.status === 'active' || item.status === 'launched').length,
-      teachers: { total: 0, ready: 0, attention: 0 },
       licenses: { active: data.licenses.filter((item) => item.status === 'active').length, expiring: data.licenses.filter((item) => item.status === 'expires_soon').length, overdue: data.licenses.filter((item) => item.status === 'expired').length },
       documents: { total: data.documents.length, signed: data.documents.filter((item) => item.status === 'signed').length, overdue: data.documents.filter((item) => item.status === 'expired').length, limited: data.documents.length >= 20 },
     },
@@ -212,7 +203,6 @@ type ExternalDataDto = {
   source: ExternalDataSource;
   mode: 'real' | 'mock' | 'import' | 'unconfigured';
   synced_at: string | null;
-  students: Array<{ id: string; name: string; program_id: string; flow: string | null; progress: number | null; source: 'lms'; synced_at: string | null }>;
   applications: Array<{ id: string; university_id: string; program_id: string; program_name: string; applications_count: number; demand_score: number | null; source: 'website'; synced_at: string | null; workflow_instance_id: string | null }>;
 };
 
@@ -228,7 +218,6 @@ export async function realGetUniversityExternalData(
     source: data.source,
     mode: data.mode,
     syncedAt: data.synced_at,
-    students: data.students.map((row): ExternalStudent => ({ id: row.id, name: row.name, programName: null, flow: row.flow, progress: row.progress, source: 'manual', syncedAt: row.synced_at })),
     applications: data.applications.map((row): ExternalApplication => ({ id: row.id, universityId: row.university_id, programId: row.program_id, programName: row.program_name, applicationsCount: row.applications_count, demandScore: row.demand_score, source: row.source, syncedAt: row.synced_at, workflowInstanceId: row.workflow_instance_id })),
   };
 }
@@ -250,9 +239,9 @@ export async function realCreateWorkflowFromExternal(
   };
 }
 
-export async function realGetExternalDashboardMetrics(): Promise<{ mode: 'real' | 'mock' | 'import'; websiteApplications7d: number | null; lmsStudents: number | null; websiteSyncedAt: string | null; lmsSyncedAt: string | null }> {
-  const data = unwrap(await apiFetch<{ mode: 'real' | 'mock' | 'import'; website_applications_7d: number | null; lms_students: number | null; website_synced_at: string | null; lms_synced_at: string | null }>('/api/v1/integrations/metrics'), 'Не удалось загрузить показатели интеграций.');
-  return { mode: data.mode, websiteApplications7d: data.website_applications_7d, lmsStudents: data.lms_students, websiteSyncedAt: data.website_synced_at, lmsSyncedAt: data.lms_synced_at };
+export async function realGetExternalDashboardMetrics(): Promise<{ mode: 'real' | 'mock' | 'import'; websiteApplications7d: number | null; websiteSyncedAt: string | null }> {
+  const data = unwrap(await apiFetch<{ mode: 'real' | 'mock' | 'import'; website_applications_7d: number | null; website_synced_at: string | null }>('/api/v1/integrations/metrics'), 'Не удалось загрузить показатели интеграций.');
+  return { mode: data.mode, websiteApplications7d: data.website_applications_7d, websiteSyncedAt: data.website_synced_at };
 }
 
 export async function realGetUniversityProducts(id: string, queryClient?: QueryClient): Promise<UniversityProductRow[]> {
@@ -606,7 +595,7 @@ function universityReferenceQuery(page: number): UniversityListQuery {
   return {
     filters: {
       search: '', city: '', externalSource: '', universityIds: [], programIds: [], productIds: [],
-      responsibleIds: [], healthStatuses: [], workflowStageId: '', dateFrom: '', dateTo: '',
+      responsibleIds: [], workflowStageId: '', dateFrom: '', dateTo: '',
     },
     sort: 'name',
     order: 'asc',

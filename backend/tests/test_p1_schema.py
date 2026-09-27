@@ -14,6 +14,7 @@ DB tests need PostgreSQL::
 import os
 import time
 import uuid
+from uuid import uuid4
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
@@ -38,6 +39,7 @@ from app.models.interactions import (
     Document,
     Meeting,
     MeetingDocument,
+    UniversityProgram,
 )
 
 EXPECTED_TABLES = {
@@ -117,7 +119,6 @@ def test_foreign_keys_really_created(engine):
     }
     assert ("licenses", ("university_id",), "universities") in fks
     assert ("licenses", ("product_id",), "it_products") in fks
-    assert ("teacher_programs", ("teacher_id",), "teachers") in fks
     assert ("meeting_documents", ("meeting_id",), "meetings") in fks
     assert ("documents", ("license_id",), "licenses") in fks
     assert len(fks) >= 25
@@ -174,41 +175,21 @@ def test_unique_constraints(db: Session):
         db.commit()
     db.rollback()
 
-    g = _mini_catalog(db, tag="uniq")
-    db.add(
-        Student(
-            external_id="EXT-1",
-            university_id=g["university"].id,
-            program_id=g["program"].id,
-            full_name="С",
-            started_at=date.today(),
-        )
-    )
+    _mini_catalog(db, tag="uniq")
+    db.add(Responsible(id=uuid4(), full_name="Дубль", email="dup@example.local"))
     db.commit()
-    db.add(
-        Student(
-            external_id="EXT-1",
-            university_id=g["university"].id,
-            program_id=g["program"].id,
-            full_name="С2",
-            started_at=date.today(),
-        )
-    )
+    db.add(Responsible(id=uuid4(), full_name="Дубль 2", email="dup@example.local"))
     with pytest.raises(IntegrityError):
         db.commit()
     db.rollback()
 
 
 def test_mn_uniqueness(db: Session):
+    """``university_programs`` is M:N with a unique pair (migration 000004)."""
     g = _mini_catalog(db)
-    t = Teacher(
-        university_id=g["university"].id, full_name="П", email="t@example.local", position=""
-    )
-    db.add(t)
-    db.flush()
-    db.add(TeacherProgram(teacher_id=t.id, program_id=g["program"].id, assigned_at=date.today()))
+    db.add(UniversityProgram(university_id=g["university"].id, program_id=g["program"].id))
     db.commit()
-    db.add(TeacherProgram(teacher_id=t.id, program_id=g["program"].id, assigned_at=date.today()))
+    db.add(UniversityProgram(university_id=g["university"].id, program_id=g["program"].id))
     with pytest.raises(IntegrityError):
         db.commit()
     db.rollback()
@@ -238,27 +219,20 @@ def test_restrict_blocks_parent_delete(db: Session):
     db.rollback()
 
 
-def test_cascade_teacher_children(db: Session):
+def test_cascade_license_children(db: Session):
+    """Deleting a university cascades to its licenses (migration 000002)."""
     g = _mini_catalog(db)
-    t = Teacher(
-        university_id=g["university"].id, full_name="П", email="c@example.local", position=""
-    )
-    db.add(t)
-    db.flush()
-    q = TeacherQualification(teacher_id=t.id, qualification_name="К", obtained_at=date.today())
-    c = TeacherCertificate(
-        teacher_id=t.id,
-        certificate_name="С",
-        issued_by="X",
-        issued_at=date.today(),
-        is_mandatory=True,
-    )
-    db.add_all([q, c])
+    university = g["university"]
+    db.add(License(
+        university_id=university.id, product_id=g["product"].id, contract_id=None,
+        program_id=g["program"].id, direction_id=g["direction"].id,
+        license_number="CASC-1", signed_at=date.today(),
+        expires_at=date.today(), transfer_status_raw="pending", comment=None,
+    ))
     db.commit()
-    db.delete(t)
+    db.delete(university)
     db.commit()
-    assert db.execute(select(TeacherQualification)).scalars().all() == []
-    assert db.execute(select(TeacherCertificate)).scalars().all() == []
+    assert db.execute(select(License).where(License.license_number == "CASC-1")).scalars().all() == []
 
 
 def test_set_null_on_contract_delete(db: Session):
@@ -422,9 +396,6 @@ def test_contract_derived_status(db: Session):
     assert c.derived_status == "expired"
 
 
-# ------------------------------------------------------------ readiness
-
-
 # ------------------------------------------------------------ seed
 
 
@@ -437,8 +408,6 @@ def test_seed_idempotent(engine):
         second = seed_demo(s)
     assert first == second
     assert second["universities"] == 10
-    assert second["teachers"] == 34
-    assert second["students"] > 0
     # no dangling FKs
     with Session(engine) as s:
         for lic in s.execute(select(License)).scalars():
@@ -464,8 +433,8 @@ def test_sql_migration_single_head_chain():
         assert m, f"bad migration filename: {fname}"
         (ups if m.group(2) == "up" else downs).add(m.group(1))
     assert ups == downs, f"unpaired migrations: up^down={ups ^ downs}"
-    assert sorted(ups)[-1] == "000033_product_program"
-    assert len(ups) == 33
+    assert sorted(ups)[-1] == "000034_report_templates_xls_format"
+    assert len(ups) == 34
 
 
 @pytest.mark.skipif(

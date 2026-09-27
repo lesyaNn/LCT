@@ -50,6 +50,10 @@ export const queryKeys = {
     job: (id: string) => ['reports', 'jobs', id] as const,
     filterOptions: ['reports', 'filter-options'] as const,
     templates: ['reports', 'templates'] as const,
+    /** Bounded preview of the current selection; suffixed with the request. */
+    preview: ['reports', 'preview'] as const,
+    /** SQL-aggregated statistics; suffixed with the same request. */
+    statistics: ['reports', 'statistics'] as const,
   },
   audit: {
     all: ['audit'] as const,

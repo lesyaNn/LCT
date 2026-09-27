@@ -1,6 +1,6 @@
 """Isolated metadata for deferred (unmounted) domain modules.
 
-P0-1 fix: pre-UUID / forward-stub models (workflow/documents/health_score/
+P0-1 fix: pre-UUID / forward-stub models (workflow/documents/
 identity) must never pollute the canonical ``Base.metadata`` — otherwise
 SQLite ``create_all`` in tests builds phantom tables that do not exist in
 production (SQL migrations are the sole schema source), and a future

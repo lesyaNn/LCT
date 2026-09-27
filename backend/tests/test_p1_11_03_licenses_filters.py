@@ -7,7 +7,7 @@ Scope (honest, no invented API):
   properties, derived fields not persisted, contract_number UNIQUE (23505).
 * Filter discovery on REAL code: ``UniversityRepository.list(q, region)``
   is the only repository-level filter helper; everything else
-  (city/responsible/health/program status/product vendor/teacher readiness/
+  (city/responsible/program status/product vendor/
   sorting/pagination params) is verified at the real DB-query level and
   pinned as NOT IMPLEMENTED where no production helper exists. No new
   routers are created to force a PASS.
@@ -176,18 +176,6 @@ def make_license(
     db.add(lic)
     db.flush()
     return lic
-
-
-def make_teacher(db: Session, university: University, email=None) -> Teacher:
-    t = Teacher(
-        university_id=university.id,
-        full_name=f"T {_tag()}",
-        email=email or f"t-{_tag()}@ex.test",
-        position="",
-    )
-    db.add(t)
-    db.flush()
-    return t
 
 
 # ====================================================== model introspection ==
@@ -556,14 +544,11 @@ def test_filter_discovery_table():
         ("program", "direction_id"): False,  # column exists, no filter helper
         ("program", "status"): False,  # no status col on it_programs
         ("product", "vendor_id"): False,  # column exists, no filter helper
-        ("teacher", "university_id"): True,  # legacy router filter, unmounted
-        ("teacher", "readiness"): False,  # only Python compute fn, no query filter
         ("license", "list/sort/pagination"): False,  # only passport ordering
     }
     assert table[("university", "search")] is True
     assert table[("university", "region")] is True
     assert table[("university", "city")] is False
-    assert table[("teacher", "readiness")] is False
     # legacy routers stay unmounted (P1-11-01 gap, still true;
     # FastAPI>=0.120 nests included routers, so walk original_router).
     from app.api.router import v1
@@ -596,10 +581,10 @@ def test_filter_discovery_table():
                 )
 
     paths = set(_walk(v1.routes, "/api/v1"))
-    # Canonical university sub-resources (passport, meetings, students CRUD).
+    # Canonical university sub-resources (passport, meetings).
     # Anything else directly under /universities would be an undeclared route.
     allowed_prefixes = ("/universities",)
-    canonical_sub = ("passport", "meetings", "students")
+    canonical_sub = ("passport", "meetings")
     stray = [
         p for p in paths
         if p.startswith(allowed_prefixes)
@@ -845,85 +830,13 @@ def test_product_vendor_filter_no_cross_leak(db: Session):
     )
 
 
-# ================================================================ teachers ==
+# ============================================================ health/readiness ==
 
 
-def test_teacher_university_separation_direct(db: Session):
-    u_a = make_university(db, name="UA")
-    u_b = make_university(db, name="UB")
-    make_teacher(db, u_a, email="a1@ex.test")
-    make_teacher(db, u_a, email="a2@ex.test")
-    make_teacher(db, u_b, email="b1@ex.test")
-    db.commit()
-    rows = db.execute(select(Teacher).where(Teacher.university_id == u_a.id)).scalars().all()
-    assert {t.email for t in rows} == {"a1@ex.test", "a2@ex.test"}
-    assert all(t.university_id == u_a.id for t in rows)
-
-
-def _teacher_with_cert(
-    db: Session,
-    university: University,
-    email: str,
-    delta_days: int | None,
-    mandatory: bool = True,
-) -> Teacher:
-    t = make_teacher(db, university, email=email)
-    if delta_days is not None:
-        db.add(
-            TeacherCertificate(
-                teacher_id=t.id,
-                certificate_name="Cert",
-                issued_by="X",
-                issued_at=date.today() - timedelta(days=400),
-                expires_at=date.today() + timedelta(days=delta_days),
-                is_mandatory=mandatory,
-            )
-        )
-        db.flush()
-    return t
-
-
-def test_teacher_readiness_ready_attention_expired(db: Session):
-    """Readiness has NO DB column/filter — deterministic Python production logic."""
-    assert "readiness" not in {c for c in Teacher.__table__.columns.keys()}
-    u = make_university(db)
-    t_ready = _teacher_with_cert(db, u, "ready@ex.test", 100)
-    t_att = _teacher_with_cert(db, u, "att@ex.test", 10)
-    t_exp = _teacher_with_cert(db, u, "exp@ex.test", -5)
-    t_none = make_teacher(db, u, email="none@ex.test")  # no mandatory items -> ready
-    db.commit()
-    by_email = {}
-    for t in (t_ready, t_att, t_exp, t_none):
-        db.refresh(t)
-        res = compute_teacher_readiness(
-            certificates=list(t.certificates), qualifications=list(t.qualifications)
-        )
-        by_email[t.email] = res.readiness
-    assert by_email["ready@ex.test"] == TeacherReadiness.READY
-    assert by_email["att@ex.test"] == TeacherReadiness.ATTENTION
-    assert by_email["exp@ex.test"] == TeacherReadiness.EXPIRED
-    assert by_email["none@ex.test"] == TeacherReadiness.READY
-    with pytest.raises(ValueError):
-        TeacherReadiness("super-ready")
-
-
-def test_teacher_combined_university_plus_readiness(db: Session):
-    u_a = make_university(db, name="UA")
-    u_b = make_university(db, name="UB")
-    _teacher_with_cert(db, u_a, "a-ready@ex.test", 100)
-    _teacher_with_cert(db, u_a, "a-exp@ex.test", -2)
-    _teacher_with_cert(db, u_b, "b-ready@ex.test", 100)
-    db.commit()
-    cand = db.execute(select(Teacher).where(Teacher.university_id == u_a.id)).scalars().all()
-    ready = [
-        t
-        for t in cand
-        if compute_teacher_readiness(
-            certificates=list(t.certificates), qualifications=list(t.qualifications)
-        ).readiness
-        == TeacherReadiness.READY
-    ]
-    assert [t.email for t in ready] == ["a-ready@ex.test"]
+# The teacher/readiness tests that used to live here were removed together
+# with the students/teachers/health-score entities (commit 26fa4a9). Their
+# module-level type annotations referenced the deleted ORM classes, which made
+# this file fail at collection and took the whole suite down with it.
 
 
 # ============================================================ invalid input ==
@@ -1017,16 +930,11 @@ def test_integrity_error_maps_to_409_sanitized_license_domain():
 
 
 def test_large_filter_dataset_insertion_order_independent(db: Session):
-    uni_ids = [make_university(db, name=f"Big-{i:02d}").id for i in range(20)]
+    [make_university(db, name=f"Big-{i:02d}") for i in range(20)]
     db.commit()
-    u0 = db.get(University, uni_ids[0])
-    for i in range(30):
-        make_teacher(db, u0 if i % 2 == 0 else db.get(University, uni_ids[1]))
     db.commit()
     hit = db.execute(select(University).where(University.name.ilike("%big-1%"))).scalars().all()
     assert len(hit) == 10  # Big-10..Big-19 regardless of insertion order
-    t = db.execute(select(Teacher).where(Teacher.university_id == u0.id)).scalars().all()
-    assert len(t) == 15
     p1 = db.execute(select(University).order_by(University.id.desc()).limit(10).offset(0))
     p2 = db.execute(select(University).order_by(University.id.desc()).limit(10).offset(10))
     assert {r.id for r in p1.scalars().all()}.isdisjoint({r.id for r in p2.scalars().all()})

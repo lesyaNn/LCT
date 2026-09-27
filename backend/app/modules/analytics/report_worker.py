@@ -33,7 +33,7 @@ from __future__ import annotations
 import argparse
 import logging
 import time
-from datetime import datetime, timezone
+
 import uuid
 from pathlib import Path
 
@@ -283,23 +283,18 @@ def main(argv: list[str] | None = None) -> int:
         "--idle-sleep", type=float, default=2.0, help="idle sleep seconds"
     )
     args = parser.parse_args(argv)
-    last_daily_day = None
     while True:
         try:
             run_audit_relay_once()
         except Exception:
             logger.exception("audit outbox relay iteration failed")
         try:
-            now = datetime.now(timezone.utc)
-            if now.hour == 0 and now.minute < 5 and last_daily_day != now.date():
-                from app.db.session import SessionLocal
-                from app.modules.health_score.materialization import run_daily_snapshot_once
-                snapshot_db = SessionLocal()
-                try:
-                    run_daily_snapshot_once(snapshot_db, day=now.date())
-                finally:
-                    snapshot_db.close()
-                last_daily_day = now.date()
+            # Only report/import job execution here. The daily health-score
+            # snapshot that used to run in this block was removed together
+            # with the health_score entity (migration 000029); its import
+            # raised ModuleNotFoundError and, because it sat in front of
+            # run_worker_once(), it silently skipped a whole iteration of
+            # report processing.
             outcome = run_worker_once()
         except Exception:
             logger.exception("report worker iteration failed")

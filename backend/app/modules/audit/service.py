@@ -34,14 +34,12 @@ class AuditAction(StrEnum):
 
 class AuditEntityType(StrEnum):
     UNIVERSITY = "university"
-    TEACHER = "teacher"
     WORKFLOW_INSTANCE = "workflow_instance"
     WORKFLOW_STAGE = "workflow_stage"
     LICENSE = "license"
     CONTRACT = "contract"
     DOCUMENT = "document"
     MEETING = "meeting"
-    STUDENT = "student"
     RESPONSIBLE = "responsible"
     DIRECTION = "direction"
     PROGRAM = "program"

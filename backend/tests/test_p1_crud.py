@@ -16,7 +16,7 @@ Scope (honest, no invented endpoints):
   PG-only assertions are gated on dialect, nothing is mocked.
 
 Known gaps (PARTIAL, see final report): no mounted HTTP CRUD for the six
-entities; legacy ``universities``/``programs``/``teachers`` routers on disk
+entities; legacy ``universities``/``programs`` routers on disk
 are unmounted AND broken vs the P1 schema (int PKs, nonexistent fields).
 """
 
@@ -319,21 +319,9 @@ def test_university_delete_cascades_mn_links_keeps_responsible(db: Session):
 def test_university_delete_restricted_when_in_use(db: Session, engine):
     u = make_university(db)
     d = make_direction(db)
-    p = make_program(db, d)
+    make_program(db, d)
     v = make_vendor(db)
     pr = make_product(db, v)
-    t = Teacher(university_id=u.id, full_name="П", email=f"t-{_tag()}@ex.test", position="")
-    db.add(t)
-    db.flush()
-    db.add(
-        Student(
-            external_id=f"EXT-{_tag()}",
-            university_id=u.id,
-            program_id=p.id,
-            full_name="С",
-            started_at=date.today(),
-        )
-    )
     make_license(db, u, pr)
     db.add(Contract(university_id=u.id, contract_number=f"D-{_tag()}", signed_at=date.today()))
     db.commit()
@@ -460,13 +448,11 @@ def test_program_delete_restricted_by_university_link(db: Session, engine):
         assert _pgcode(ei.value) in {"23503", "23001"}
 
 
-def test_program_delete_restricted_by_teacher_link(db: Session, engine):
+def test_program_delete_restricted_by_enrollment(db: Session, engine):
+    """A program referenced by a university enrollment must not be deleted."""
     u = make_university(db)
     p = make_program(db)
-    t = Teacher(university_id=u.id, full_name="П", email=f"t-{_tag()}@ex.test", position="")
-    db.add(t)
-    db.flush()
-    db.add(TeacherProgram(teacher_id=t.id, program_id=p.id, assigned_at=date.today()))
+    db.add(UniversityProgram(university_id=u.id, program_id=p.id))
     db.commit()
     with pytest.raises(IntegrityError) as ei:
         db.delete(p)
@@ -838,9 +824,8 @@ def test_gap_legacy_university_crud_not_mounted(engine):
         settings.auth_dev_bypass = False
 
 
-def test_gap_program_teacher_crud_not_mounted(engine):
-    """P1-03 shipped: real ``/api/v1/programs`` CRUD is mounted (paginated).
-    ``/api/v1/teachers`` HTTP CRUD is still out of scope -> remains 404."""
+def test_gap_program_crud_not_mounted(engine):
+    """P1-03 shipped: real ``/api/v1/programs`` CRUD is mounted (paginated)."""
     from app.config import settings
     from app.db.session import get_db
     from app.main import app
@@ -856,7 +841,6 @@ def test_gap_program_teacher_crud_not_mounted(engine):
         r = c.get("/api/v1/programs")
         assert r.status_code == 200, r.text
         assert set(r.json()) == {"items", "page", "page_size", "total"}
-        assert c.get("/api/v1/teachers").status_code == 404
     finally:
         app.dependency_overrides.pop(get_db, None)
         settings.auth_dev_bypass = False

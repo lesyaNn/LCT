@@ -58,7 +58,7 @@ SUBSET_6 = [
     "product",
     "workflow_status",
     "responsible",
-    "health_score",
+    "workflow_progress",
 ]
 
 
@@ -124,14 +124,8 @@ def _seed(s: Session) -> dict:
             UniversityResponsible(university_id=delta.id, responsible_id=r2.id),
         ]
     )
-    s.add_all([
-        HealthScoreCurrent(university_id=mgu.id, score=85, status="green",
-                           breakdown={}, reasons=[], input_counters={},
-                           calculated_at=datetime(2026, 9, 1, tzinfo=timezone.utc)),
-        HealthScoreCurrent(university_id=beta.id, score=60, status="yellow",
-                           breakdown={}, reasons=[], input_counters={},
-                           calculated_at=datetime(2026, 9, 1, tzinfo=timezone.utc)),
-    ])
+    # The health-score projection was dropped in migration 000029; progress is
+    # derived from the canonical instance stages seeded below.
     c1 = Contract(
         id=uuid4(), university_id=mgu.id, contract_number="C-001",
         product_id=prod1.id, signed_at=date(2026, 1, 20),
@@ -200,28 +194,6 @@ def _seed(s: Session) -> dict:
     s.flush()
     inst.current_instance_stage_id = st2.id
     inst.current_stage_id = t2.id
-    s.add_all(
-        [
-            HealthScoreSnapshot(
-                id=uuid4(), university_id=mgu.id, score=70, status="yellow",
-                breakdown={}, reasons=[],
-                calculated_at=datetime(2026, 8, 1, tzinfo=timezone.utc),
-                period_day=date(2026, 8, 1), trigger_event="daily_cron",
-            ),
-            HealthScoreSnapshot(
-                id=uuid4(), university_id=mgu.id, score=85, status="green",
-                breakdown={}, reasons=[],
-                calculated_at=datetime(2026, 9, 1, tzinfo=timezone.utc),
-                period_day=date(2026, 9, 1), trigger_event="daily_cron",
-            ),
-            HealthScoreSnapshot(
-                id=uuid4(), university_id=beta.id, score=60, status="yellow",
-                breakdown={}, reasons=[],
-                calculated_at=datetime(2026, 9, 1, tzinfo=timezone.utc),
-                period_day=date(2026, 9, 1), trigger_event="daily_cron",
-            ),
-        ]
-    )
     return {
         "d1": d1.id, "p1": p1.id, "prod1": prod1.id, "r1": r1.id,
         "mgu": mgu.id, "beta": beta.id, "gamma": gamma.id, "delta": delta.id,
@@ -317,7 +289,7 @@ def test_xlsx_rows_match_dataset_rows(fx):
             assert _norm(actual) == _norm(expected), (key, actual, expected)
 
 
-def test_health_and_workflow_come_from_dataset(fx):
+def test_progress_and_workflow_come_from_dataset(fx):
     s, _, _, tmp_path = fx
     ds = Dataset.fetch_rows(s, UnifiedFilter(), SUBSET_6, today=TODAY)
     result = _gen(s, UnifiedFilter(), SUBSET_6, tmp_path)
@@ -325,7 +297,7 @@ def test_health_and_workflow_come_from_dataset(fx):
     ds_by_uni = {}
     for row in ds.rows:
         ds_by_uni.setdefault(row["university"], []).append(row)
-    assert ds_by_uni["МГУ им. Ломоносова"][0]["health_score"] == 85
+    assert ds_by_uni["МГУ им. Ломоносова"][0]["workflow_progress"] == 50
     assert ds_by_uni["МГУ им. Ломоносова"][0]["workflow_status"] == "Этап 2"
     assert ds_by_uni["ВУЗ Дельта"][0]["responsible"] == (
         "Иван Ответственный; Пётр Второй"
@@ -476,7 +448,7 @@ def big_fx(tmp_path):
 def test_large_export_streams_with_correct_row_count(big_fx):
     session, tmp_path = big_fx
     cols = ["university", "product", "contract_number", "license_signed",
-            "license_expires", "comment", "health_score"]
+            "license_expires", "comment", "workflow_progress"]
     out = tmp_path / "big.xlsx"
     result = generate_xlsx_report(
         session, UnifiedFilter(), cols, out, batch_size=500

@@ -128,6 +128,8 @@ class UserRole(str, enum.Enum):
 
 
 class ReportFormat(str, enum.Enum):
+    #: Legacy Excel BIFF8 (ТЗ «XLS»).
+    XLS = "xls"
     XLSX = "xlsx"
     PDF = "pdf"
     JSON = "json"

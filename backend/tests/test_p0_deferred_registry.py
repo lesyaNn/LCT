@@ -69,7 +69,6 @@ DEFERRED_TABLES = frozenset(
 # Router prefixes (without the /api/v1 mount prefix) that must stay
 # unmounted until the reactivation checklist in docs/AUDIT.md (§0) is done.
 # NOTE (P2-08-03): "/health-score" стал production (ranking) и убран отсюда;
-# legacy health_score router при этом остаётся незамаунченным.
 # NOTE (P4-06-01): "/reports" стал production (canonical async reports:
 # POST queued job + status + download, migration 000018) и убран отсюда;
 # legacy demo stub app/modules/reporting (POST /export over an in-memory
@@ -159,7 +158,7 @@ def test_deferred_prefixes_absent_from_openapi_paths():
     """Deferred forward scaffolding must not leak into the prod contract.
 
     Module list mirrors ``docs/AUDIT.md`` (§0): universities-CRUD,
-    teachers-CRUD, programs, workflow, documents, health_score, identity,
+    programs, workflow, documents,
     dashboard, reporting, notifications. P5 mounted audit events and Stage 11
     mounts the canonical /integrations API; old mock fallback is gone.
     """

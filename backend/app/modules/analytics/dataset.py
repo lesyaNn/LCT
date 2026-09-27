@@ -14,9 +14,8 @@ contract (or NULL). Rationale:
 * ``responsible`` is aggregated (``'; '``-joined, sorted) in one batched
   Python-side query — deterministic order without PG-specific
   ordered-aggregate syntax, still a constant 2nd SELECT, never per-row;
-* ``workflow_status`` / ``health_score`` / fallback-contract fields are
-  correlated scalar subqueries (columns, not statements, no fan-out); health
-  reads the materialized ``health_score_current`` projection.
+* ``workflow_status`` and the fallback-contract fields are correlated scalar
+  subqueries (columns, not statements, no fan-out).
 
 Dynamic SELECT/JOINs (P4-02-02): only requested output columns are
 selected; the ``licenses`` join tree is added only when a requested column
@@ -25,10 +24,14 @@ predicates use EXISTS independently of output columns, so e.g.
 ``columns=["university"]`` with ``direction_ids=[D1]`` still filters.
 
 Null behavior: missing LEFT relations surface as ``None`` (never ``""`` /
-``"N/A"``). Dates stay typed ``date`` values; health is ``int 0..100`` or
-``None`` (missing is never 0). Ordering is deterministic:
+``"N/A"``). Dates stay typed ``date`` values. Ordering is deterministic:
 ``University.name, University.id, License.license_number NULLS LAST,
 License.id``.
+
+Two row grains, chosen by the selected columns (not a surprise):
+``University x License`` when at least one license-grain column is selected
+(see :meth:`ReportDatasetService.license_grain_columns`), otherwise one row
+per university — the license join is then not needed at all.
 """
 
 from __future__ import annotations
@@ -39,7 +42,7 @@ from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import case, func, nulls_last, select
-from sqlalchemy.orm import Session, aliased, selectinload
+from sqlalchemy.orm import Session, aliased
 
 from app.models.catalog import (
     Contract,
@@ -62,6 +65,7 @@ from app.modules.analytics.filters import UnifiedFilter
 __all__ = [
     "ReportDataset",
     "ReportDatasetService",
+    "fetch_preview",
 ]
 
 
@@ -174,6 +178,81 @@ class ReportDatasetService:
             select(column).where(Contract.id == latest_id).correlate(University).scalar_subquery()
         )
 
+    # ------------------------------------------------------------ stat labels
+    #
+    # The label expressions below are the SINGLE definition of "what the
+    # report shows in the direction / product / status column". Both the
+    # tabular query (:meth:`build_query`) and the statistics aggregation
+    # (:mod:`app.modules.analytics.stats`) compose these, so a chart can
+    # never label a bucket differently from the table it summarises.
+
+    @staticmethod
+    def direction_label(
+        lic_dir: Any = None, prog_dir: Any = None
+    ) -> Any:
+        """The ``direction`` cell expression (canonical chain, NULL if unset).
+
+        ``lic_dir`` / ``prog_dir`` must be the SAME aliased tables the calling
+        statement joins, otherwise the expression would reference tables that
+        are not in its FROM clause.
+        """
+        lic_dir = lic_dir if lic_dir is not None else aliased(ITDirection)
+        prog_dir = prog_dir if prog_dir is not None else aliased(ITDirection)
+        wf_prog = aliased(ITProgram)
+        wf_prog_dir = aliased(ITDirection)
+        wf_prog_dir_name = (
+            select(wf_prog_dir.name)
+            .select_from(wf_prog)
+            .join(wf_prog_dir, wf_prog_dir.id == wf_prog.direction_id)
+            .where(wf_prog.id == ReportDatasetService._latest_program_id())
+            .correlate(University)
+            .scalar_subquery()
+        )
+        return func.coalesce(lic_dir.name, prog_dir.name, wf_prog_dir_name)
+
+    @staticmethod
+    def program_label(license_program: Any = None) -> Any:
+        """The ``program`` cell expression (same join rule as above)."""
+        license_program = license_program if license_program is not None else ITProgram
+        wf_prog = aliased(ITProgram)
+        wf_prog_name = (
+            select(wf_prog.name)
+            .where(wf_prog.id == ReportDatasetService._latest_program_id())
+            .correlate(University)
+            .scalar_subquery()
+        )
+        return func.coalesce(license_program.name, wf_prog_name)
+
+    @staticmethod
+    def product_label(license_product: Any = None) -> Any:
+        """The ``product`` cell expression (same join rule as above)."""
+        product = license_product if license_product is not None else ITProduct
+        return product.name
+
+    @staticmethod
+    def workflow_status_label() -> Any:
+        """The ``workflow_status`` cell expression (with program fallback)."""
+        return func.coalesce(
+            ReportDatasetService._current_stage_name(
+                ReportDatasetService._latest_instance_id()
+            ),
+            ReportDatasetService._program_fallback_status(),
+        )
+
+    @staticmethod
+    def license_grain_columns() -> tuple[str, ...]:
+        """Columns that force the ``University x License`` row grain.
+
+        Without any of them the dataset needs no license join and yields one
+        row per university. Statistics use this to stay aligned with whatever
+        the table would show.
+        """
+        return tuple(
+            key
+            for key, column in COLUMN_REGISTRY.items()
+            if column.needs_license_join
+        )
+
     # ---------------------------------------------------------------- build
 
     @staticmethod
@@ -196,8 +275,6 @@ class ReportDatasetService:
 
         lic_dir = aliased(ITDirection)
         prog_dir = aliased(ITDirection)
-        wf_prog = aliased(ITProgram)
-        wf_prog_dir = aliased(ITDirection)
         lic_contract = aliased(Contract)
 
         select_list: list[Any] = [University.id.label("_university_id")]
@@ -210,33 +287,20 @@ class ReportDatasetService:
             # Canonical chain (ТЗ): license direct link -> workflow program
             # (chosen at workflow creation). No product fallback: a university
             # without a workflow shows NULL (honest, never invented).
-            latest_prog = ReportDatasetService._latest_program_id()
+            # The label expressions come from the shared *_label() builders so
+            # the statistics aggregation labels buckets identically.
             if "direction" in resolved:
-                wf_prog_dir_name = (
-                    select(wf_prog_dir.name)
-                    .select_from(wf_prog)
-                    .join(wf_prog_dir, wf_prog_dir.id == wf_prog.direction_id)
-                    .where(wf_prog.id == latest_prog)
-                    .correlate(University)
-                    .scalar_subquery()
-                )
                 select_list.append(
-                    func.coalesce(
-                        lic_dir.name, prog_dir.name, wf_prog_dir_name
-                    ).label("direction")
+                    ReportDatasetService.direction_label(lic_dir, prog_dir).label("direction")
                 )
             if "program" in resolved:
-                wf_prog_name = (
-                    select(wf_prog.name)
-                    .where(wf_prog.id == latest_prog)
-                    .correlate(University)
-                    .scalar_subquery()
-                )
                 select_list.append(
-                    func.coalesce(ITProgram.name, wf_prog_name).label("program")
+                    ReportDatasetService.program_label(ITProgram).label("program")
                 )
             if "product" in resolved:
-                select_list.append(ITProduct.name.label("product"))
+                select_list.append(
+                    ReportDatasetService.product_label(ITProduct).label("product")
+                )
             if "vendor" in resolved:
                 select_list.append(Vendor.name.label("vendor"))
             if "license_signed" in resolved:
@@ -282,12 +346,12 @@ class ReportDatasetService:
                         ).label("comment")
                     )
         if "workflow_status" in resolved or "current_stage" in resolved:
-            latest = ReportDatasetService._latest_instance_id()
-            current_name = ReportDatasetService._current_stage_name(latest)
+            current_name = ReportDatasetService._current_stage_name(
+                ReportDatasetService._latest_instance_id()
+            )
             if "workflow_status" in resolved:
-                fallback_status = ReportDatasetService._program_fallback_status()
                 select_list.append(
-                    func.coalesce(current_name, fallback_status).label("workflow_status")
+                    ReportDatasetService.workflow_status_label().label("workflow_status")
                 )
             if "current_stage" in resolved:
                 select_list.append(current_name.label("current_stage"))
@@ -323,7 +387,6 @@ class ReportDatasetService:
         *,
         user: Any | None = None,
         today: date | None = None,
-        health_fallback: bool = False,
     ) -> ReportDataset:
         """Execute the dataset query (1 SELECT, +1 batched when needed).
 
@@ -365,6 +428,67 @@ class ReportDatasetService:
             columns=resolved,
             rows=public_rows,
             total=len(public_rows),
+            university_count=len(universities),
+            university_ids=universities,
+        )
+
+    @staticmethod
+    def fetch_preview(
+        db: Session,
+        filters: UnifiedFilter,
+        columns: list[str] | tuple[str, ...] | None,
+        *,
+        limit: int,
+        user: Any | None = None,
+        today: date | None = None,
+    ) -> ReportDataset:
+        """Bounded synchronous preview (ТЗ §7: filters + preview < 1s).
+
+        Deliberately the SAME filters, the SAME row grain and the SAME
+        selected columns as :meth:`fetch_rows` / :meth:`iterate_rows` — only
+        ``LIMIT`` differs, and it applies **to the preview response only**.
+        An export never goes through here, so an export is never truncated
+        to the preview size.
+
+        Two statements: one ``COUNT`` over the filtered subquery (the real
+        selection size shown in the UI) and one page of rows. The row
+        materialization is shared with :meth:`fetch_rows`, so the preview can
+        never disagree with the exported content.
+        """
+        if limit < 1:
+            raise ValueError("limit must be >= 1")
+        stmt = ReportDatasetService.build_query(filters, columns, today=today)
+        if user is not None:
+            stmt = UnifiedFilterService.apply_security_scope(stmt, user)
+        resolved = list(stmt.get_execution_options().get("_report_columns", ()))
+        need_resp = bool(stmt.get_execution_options().get("_need_responsible_agg"))
+
+        # The COUNT is over the same filtered statement, so it counts the
+        # export, not the preview page.
+        total = int(db.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
+
+        mappings = list(db.execute(stmt.limit(limit).offset(0)).mappings().all())
+        rows = [dict(mapping) for mapping in mappings]
+        if need_resp:
+            ReportDatasetService._attach_responsibles(db, rows)
+        if any(COLUMN_REGISTRY[k].needs_university_maps for k in resolved):
+            ReportDatasetService._attach_extra_maps(db, rows, resolved, today=today)
+        for row in rows:
+            row.pop("_license_id", None)
+        universities = {
+            row["_university_id"]
+            for row in rows
+            if isinstance(row.get("_university_id"), uuid.UUID)
+        }
+        public_rows = [
+            {key: row[key] for key in resolved if key in row} for row in rows
+        ]
+        return ReportDataset(
+            columns=resolved,
+            rows=public_rows,
+            total=total,
+            # Universities on the returned page: the full selection size is
+            # already carried by ``total`` rows and would need another query.
             university_count=len(universities),
             university_ids=universities,
         )
@@ -610,13 +734,7 @@ class ReportDatasetService:
             if "overdue_tasks" in maps and row.get("overdue_tasks") is None:
                 row["overdue_tasks"] = 0
 
-    @staticmethod
-    def _attach_health_fallback(
-        db: Session, rows: list[dict[str, Any]], *, today: date | None = None
-    ) -> None:
-        """Compatibility no-op: missing current rows remain NULL.
 
-        Collection paths must never invoke the canonical calculator per row;
-        the materialization backfill/refresh worker owns population.
-        """
-        return None
+#: Thin functional alias for :meth:`ReportDatasetService.fetch_preview`, so
+#: the router does not reach into the service's private helpers.
+fetch_preview = ReportDatasetService.fetch_preview

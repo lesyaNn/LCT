@@ -102,8 +102,6 @@ class ProgramDetail(BaseModel):
     name: str
     description: str = ""
     direction: DirectionShort | None = None
-    teachers_count: int = 0
-    students_count: int = 0
     created_at: datetime
     updated_at: datetime
 

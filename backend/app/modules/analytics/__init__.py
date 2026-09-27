@@ -1,8 +1,9 @@
 """P4 analytics/reporting shared module (frozen filter contract lives here).
 
 P4-01-01 introduces the single ``UnifiedFilter`` DTO plus one shared
-``UnifiedFilterService``. Analytics, XLSX/PDF/JSON reports, P1 list
-adapters and the frontend all reuse this contract unchanged.
+``UnifiedFilterService``. Analytics, XLS/XLSX/PDF/JSON reports, statistics,
+P1 list adapters and the frontend all reuse this contract unchanged — the
+period is interpreted exactly once, in ``filters``/``filter_service``.
 
 P4-01-02 wires the filter into the P1 universities list (additive AND with
 legacy params) and pins the analytics boundary (``AnalyticsService``).
@@ -16,10 +17,12 @@ with the ``BackgroundTasks`` worker (``report_worker``).
 
 from app.modules.analytics.analytics import AnalyticsService
 from app.modules.analytics.columns import (
+    ADDITIONAL_COLUMNS,
     COLUMN_REGISTRY,
     DEFAULT_COLUMNS,
     MANDATORY_COLUMNS,
     PRESETS,
+    TZ_COLUMNS,
     ReportColumn,
     resolve_columns,
 )
@@ -37,10 +40,12 @@ from app.modules.analytics.reports_router import ReportJobRead
 from app.modules.analytics.xlsx import GeneratedReport, generate_xlsx_report
 
 __all__ = [
+    "ADDITIONAL_COLUMNS",
     "COLUMN_REGISTRY",
     "DEFAULT_COLUMNS",
     "MANDATORY_COLUMNS",
     "PRESETS",
+    "TZ_COLUMNS",
     "AnalyticsService",
     "GeneratedReport",
     "ReportColumn",

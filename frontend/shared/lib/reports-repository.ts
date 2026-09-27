@@ -3,25 +3,23 @@ import { ApiRequestError, ERROR_MESSAGES } from './api-errors';
 import { fromDataSource, isMockDataSource } from './data-source';
 import { periodPresetRange, type PeriodPreset } from './date-period';
 import { queryKeys } from './query-keys';
-import { getCatalogReferenceData } from './catalogs-repository';
 import { type UniversityWorkflowStageStatus } from './universities-repository';
-import { workflowStageStatusSemantics } from './status-semantics';
 import { mockCreateReportJob, mockGetReportJob, mockListReportJobs } from '@/shared/mocks/api-adapter';
 
-export type ReportFormat = 'xlsx' | 'pdf' | 'json';
+export type ReportFormat = 'xls' | 'xlsx' | 'pdf' | 'json';
 
 export type ReportPeriodPreset = PeriodPreset | null;
 export type ReportJobStatus = 'queued' | 'building' | 'ready' | 'failed';
 
+/**
+ * The report page builds a report over the whole registry, so the form only
+ * carries the period. ``ReportRequest`` below still speaks the full
+ * UnifiedFilter shape (entity filters are part of the API contract and are
+ * accepted by the backend) — it just sends empty dimensions.
+ */
 export interface ReportFormValues {
   dateFrom: string;
   dateTo: string;
-  universityIds: string[];
-  directionIds: string[];
-  programIds: string[];
-  productIds: string[];
-  responsibleIds: string[];
-  workflowStatuses: UniversityWorkflowStageStatus[];
   columnIds: string[];
   format: ReportFormat;
 }
@@ -74,15 +72,6 @@ export interface ReportJob {
   request?: ReportRequest;
 }
 
-export interface ReportFilterOptions {
-  universities: Array<{ id: string; name: string }>;
-  directions: Array<{ id: string; name: string }>;
-  programs: Array<{ id: string; name: string }>;
-  products: Array<{ id: string; name: string }>;
-  responsibles: Array<{ id: string; name: string; description?: string }>;
-  workflowStatuses: Array<{ id: UniversityWorkflowStageStatus; name: string }>;
-}
-
 export interface ReportColumnDefinition {
   id: string;
   label: string;
@@ -109,7 +98,7 @@ const realReportsApiCapabilities: ReportsApiCapabilities = {
   // another job with the original request payload.
   retry: true,
   download: true,
-  formats: { xlsx: true, pdf: true, json: true },
+  formats: { xls: true, xlsx: true, pdf: true, json: true },
   filters: true,
   columns: true,
   progress: true,
@@ -121,7 +110,7 @@ export const REPORTS_API_CAPABILITIES: ReportsApiCapabilities = isMockDataSource
   jobList: true,
   retry: true,
   download: true,
-  formats: { xlsx: true, pdf: false, json: false },
+  formats: { xls: false, xlsx: true, pdf: false, json: false },
   filters: true,
   columns: true,
   progress: true,
@@ -132,21 +121,9 @@ export const reportQueryKeys = {
   job: queryKeys.reports.job,
   filterOptions: queryKeys.reports.filterOptions,
   templates: queryKeys.reports.templates,
+  preview: queryKeys.reports.preview,
+  statistics: queryKeys.reports.statistics,
 };
-
-export const reportFilterOptions: ReportFilterOptions = {
-  universities: [],
-  directions: [],
-  programs: [],
-  products: [],
-  responsibles: [],
-  workflowStatuses: (Object.keys(workflowStageStatusSemantics) as UniversityWorkflowStageStatus[]).map((id) => ({ id, name: workflowStageStatusSemantics[id].label })),
-};
-
-export async function getReportFilterOptions(): Promise<ReportFilterOptions> {
-  const refs = await getCatalogReferenceData();
-  return { ...reportFilterOptions, universities: refs.universities, directions: refs.directions, programs: refs.programs, products: refs.products, responsibles: refs.responsibles };
-}
 
 /** Backend column identifiers with UI labels; keys mirror analytics/columns.py. */
 export const reportColumnDefinitions: ReportColumnDefinition[] = [
@@ -169,42 +146,43 @@ export const reportColumnDefinitions: ReportColumnDefinition[] = [
   { id: 'overdue_tasks', label: 'Просроченные задачи' },
 ];
 
-/** Presets mirror backend PRESETS: MINIMAL=12 mandatory, STANDARD=+city+current_stage, FULL=all. */
-export const reportColumnPresetNames = ['Минимум', 'Стандарт', 'Полный'] as const;
-export const DEFAULT_REPORT_COLUMNS = [
+/**
+ * The 5 columns the ТЗ names, in ТЗ order. This is the default selection and
+ * mirrors backend `TZ_COLUMNS` (= `DEFAULT_COLUMNS`).
+ */
+export const TZ_REPORT_COLUMNS = [
   'university',
   'direction',
-  'program',
   'product',
   'workflow_status',
   'responsible',
-  'vendor',
-  'contract_number',
-  'license_signed',
-  'license_expires',
-  'transfer_status',
-  'comment',
-];
+] as const;
+
+/** Presets mirror backend PRESETS: MINIMAL=the ТЗ set, STANDARD adds context, FULL=all. */
+export const reportColumnPresetNames = ['По ТЗ', 'Стандарт', 'Полный'] as const;
+export const DEFAULT_REPORT_COLUMNS: string[] = [...TZ_REPORT_COLUMNS];
 export const reportColumnPresets: Record<(typeof reportColumnPresetNames)[number], string[]> = {
-  Минимум: DEFAULT_REPORT_COLUMNS,
-  Стандарт: [...DEFAULT_REPORT_COLUMNS, 'city', 'current_stage'],
+  'По ТЗ': [...TZ_REPORT_COLUMNS],
+  Стандарт: [...TZ_REPORT_COLUMNS, 'program', 'city', 'current_stage'],
   Полный: reportColumnDefinitions.map((column) => column.id),
 };
 export const REPORT_FORMATS: Array<{ id: ReportFormat; label: string }> = [
+  { id: 'xls', label: 'XLS' },
   { id: 'xlsx', label: 'XLSX' },
   { id: 'pdf', label: 'PDF' },
   { id: 'json', label: 'JSON' },
 ];
 
+/** Narrowing helper for API values that may carry an unknown format. */
+function asReportFormat(value: unknown): ReportFormat {
+  return value === 'xls' || value === 'xlsx' || value === 'pdf' || value === 'json'
+    ? value
+    : 'xlsx';
+}
+
 export const EMPTY_REPORT_FORM: ReportFormValues = {
   dateFrom: '',
   dateTo: '',
-  universityIds: [],
-  directionIds: [],
-  programIds: [],
-  productIds: [],
-  responsibleIds: [],
-  workflowStatuses: [],
   columnIds: DEFAULT_REPORT_COLUMNS,
   format: 'xlsx',
 };
@@ -214,16 +192,35 @@ export function reportPeriodPreset(preset: Exclude<ReportPeriodPreset, null>, no
   return periodPresetRange(preset, now);
 }
 
+/**
+ * The API filter body for a report request. Single source of truth: the job,
+ * preview and statistics endpoints all send exactly this shape.
+ */
+export function reportFiltersPayload(request: ReportRequest) {
+  return {
+    date_from: request.date_from || null,
+    date_to: request.date_to || null,
+    university_ids: request.university_ids,
+    direction_ids: request.direction_ids,
+    program_ids: request.program_ids,
+    product_ids: request.product_ids,
+    responsible_ids: request.responsible_ids,
+    workflow_statuses: request.workflow_statuses,
+  };
+}
+
 export function reportRequestFromForm(values: ReportFormValues): ReportRequest {
   return {
     date_from: values.dateFrom,
     date_to: values.dateTo,
-    university_ids: values.universityIds,
-    direction_ids: values.directionIds,
-    program_ids: values.programIds,
-    product_ids: values.productIds,
-    responsible_ids: values.responsibleIds,
-    workflow_statuses: values.workflowStatuses,
+    // Empty lists mean "this dimension is not filtered" in UnifiedFilter,
+    // which is exactly the intended "report over everything".
+    university_ids: [],
+    direction_ids: [],
+    program_ids: [],
+    product_ids: [],
+    responsible_ids: [],
+    workflow_statuses: [],
     columns: values.columnIds,
     format: values.format,
   };
@@ -235,15 +232,11 @@ export function reportFormFromTemplate(tpl: ReportTemplate): ReportFormValues {
   const columnIds = tpl.columns
     .map((column) => (column === 'software' ? 'product' : column))
     .filter((column) => known.has(column));
+  // Templates saved with entity filters are still valid reports: the entity
+  // dimensions are dropped, the period and columns are kept.
   return {
     dateFrom: tpl.filters.date_from ?? '',
     dateTo: tpl.filters.date_to ?? '',
-    universityIds: tpl.filters.university_ids ?? [],
-    directionIds: tpl.filters.direction_ids ?? [],
-    programIds: tpl.filters.program_ids ?? [],
-    productIds: tpl.filters.product_ids ?? [],
-    responsibleIds: tpl.filters.responsible_ids ?? [],
-    workflowStatuses: tpl.filters.workflow_statuses ?? [],
     columnIds: columnIds.length ? columnIds : [...DEFAULT_REPORT_COLUMNS],
     format: tpl.format,
   };
@@ -296,7 +289,7 @@ export function adaptReportJob(raw: unknown, fallbackId?: string): ReportJob {
   const item = isRecord(raw) ? raw : {};
   const id = stringValue(item.id ?? item.job_id) ?? fallbackId ?? 'unknown';
   const rawFormat = stringValue(item.format ?? (isRecord(item.payload) ? item.payload.format : undefined));
-  const format: ReportFormat = rawFormat === 'pdf' || rawFormat === 'json' ? rawFormat : 'xlsx';
+  const format: ReportFormat = asReportFormat(rawFormat);
   const timestamp = item.created_at ?? item.createdAt ?? item.started_at ?? item.startedAt;
   const createdAt = typeof timestamp === 'number' ? new Date(timestamp * 1000).toISOString() : stringValue(timestamp) ?? new Date().toISOString();
   const result = isRecord(item.result) ? item.result : {};
@@ -327,11 +320,10 @@ function unwrap<T>(result: Awaited<ReturnType<typeof apiFetch<T>>>, message: str
 }
 
 async function createRealReportJob(request: ReportRequest): Promise<ReportJob> {
-  const result = await apiFetch<unknown>('/api/v1/reports', { method: 'POST', body: {
-    format: request.format,
-    filters: { date_from: request.date_from || null, date_to: request.date_to || null, university_ids: request.university_ids, direction_ids: request.direction_ids, program_ids: request.program_ids, product_ids: request.product_ids, responsible_ids: request.responsible_ids, workflow_statuses: request.workflow_statuses },
-    columns: request.columns,
-  } });
+  const result = await apiFetch<unknown>('/api/v1/reports', {
+    method: 'POST',
+    body: { format: request.format, filters: reportFiltersPayload(request), columns: request.columns },
+  });
   return { ...adaptReportJob(unwrap(result, 'Не удалось создать задачу отчёта.')), format: request.format, request };
 }
 
@@ -376,7 +368,7 @@ function adaptReportTemplate(raw: unknown): ReportTemplate {
     name: stringValue(item.name) ?? 'Шаблон',
     ownerSub: stringValue(item.owner_sub ?? item.ownerSub) ?? '',
     isShared: item.is_shared === true || item.isShared === true,
-    format: item.format === 'pdf' || item.format === 'json' ? item.format : 'xlsx',
+    format: asReportFormat(item.format),
     filters: {
       date_from: stringValue(filters.date_from ?? filters.dateFrom) ?? '',
       date_to: stringValue(filters.date_to ?? filters.dateTo) ?? '',
@@ -458,6 +450,117 @@ export async function deleteReportTemplate(templateId: string): Promise<void> {
     real: async () => {
       const result = await apiFetch<unknown>(`/api/v1/reports/templates/${encodeURIComponent(templateId)}`, { method: 'DELETE' });
       unwrap(result, 'Не удалось удалить шаблон.');
+    },
+  });
+}
+
+/* ---------------------------------------------------------------- preview */
+
+/**
+ * First page of the filtered selection (ТЗ step "увидеть актуальную выборку").
+ *
+ * The row cap applies to the PREVIEW response only: `total` is the full
+ * export size, so the UI can say "показано 50 из N" and the export still
+ * contains every row.
+ */
+export interface ReportPreview {
+  columns: string[];
+  rows: Array<Record<string, unknown>>;
+  total: number;
+  universityCount: number;
+  previewLimit: number;
+}
+
+export const REPORT_PREVIEW_LIMIT = 50;
+
+export async function getReportPreview(
+  request: ReportRequest,
+  limit: number = REPORT_PREVIEW_LIMIT,
+): Promise<ReportPreview> {
+  return fromDataSource({
+    mock: async () => ({
+      columns: request.columns,
+      rows: [],
+      total: 0,
+      universityCount: 0,
+      previewLimit: limit,
+    }),
+    real: async () => {
+      const result = await apiFetch<ReportPreview>('/api/v1/reports/preview', {
+        method: 'POST',
+        body: {
+          format: request.format,
+          filters: reportFiltersPayload(request),
+          columns: request.columns,
+          limit,
+        },
+      });
+      return unwrap(result, 'Не удалось получить предпросмотр выборки.');
+    },
+  });
+}
+
+/* ------------------------------------------------------------- statistics */
+
+export interface ReportStatBucket {
+  label: string;
+  count: number;
+}
+
+export interface ReportStatSlice {
+  dimension: string;
+  title: string;
+  /** What the counts mean: report rows or distinct universities. */
+  unit: 'rows' | 'universities';
+  total: number;
+  buckets: ReportStatBucket[];
+}
+
+export interface ReportStatistics {
+  universityCount: number;
+  rowCount: number;
+  columns: string[];
+  slices: ReportStatSlice[];
+}
+
+/**
+ * Aggregated view of the same selection the table shows.
+ *
+ * The buckets come from the same `UnifiedFilter`, so a chart can never
+ * describe a different selection than the exported table.
+ */
+export async function getReportStatistics(request: ReportRequest): Promise<ReportStatistics> {
+  return fromDataSource({
+    mock: async () => ({ universityCount: 0, rowCount: 0, columns: request.columns, slices: [] }),
+    real: async () => {
+      const result = await apiFetch<{
+        university_count: number;
+        row_count: number;
+        columns: string[];
+        slices: Array<{
+          dimension: string;
+          title: string;
+          unit: 'rows' | 'universities';
+          total: number;
+          buckets: Array<{ label: string; count: number }>;
+        }>;
+      }>('/api/v1/reports/statistics', {
+        method: 'POST',
+        body: { filters: reportFiltersPayload(request), columns: request.columns },
+      });
+      const data = unwrap(result, 'Не удалось получить статистику по выборке.');
+      return {
+        universityCount: data.university_count,
+        rowCount: data.row_count,
+        columns: data.columns,
+        slices: data.slices.map((slice) => ({
+          dimension: slice.dimension,
+          title: slice.title,
+          unit: slice.unit,
+          total: slice.total,
+          buckets: slice.buckets,
+        })),
+      };
     },
   });
 }

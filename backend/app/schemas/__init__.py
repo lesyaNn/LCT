@@ -2,7 +2,7 @@
 
 Import everything from here::
 
-    from app.schemas import LicenseStatus, UniversityList, TeacherPassport
+    from app.schemas import LicenseStatus, UniversityList
 """
 
 from app.schemas.common import (  # noqa: F401

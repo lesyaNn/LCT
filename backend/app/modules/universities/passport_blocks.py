@@ -63,7 +63,7 @@ def parse_include(raw: str | None) -> frozenset[PassportInclude]:
     """Centralized ``?include=`` parsing (single place, no string matching).
 
     Normalizes surrounding whitespace, accepts any order
-    (``health_score,audit`` == ``audit,health_score``), tolerates empty
+    (``audit`` alone), tolerates empty
     segments (``include=`` / trailing commas). Unknown tokens raise 422
     (project validation-error style) instead of being silently ignored.
     """
@@ -362,14 +362,6 @@ def get_programs(db, university_id) -> list[ProgramShort]:
     if not program_rows:
         return []
     return _assemble_programs(program_rows)
-
-
-def _removed_teachers_stub():
-    return []
-
-
-def _removed_students_stub():
-    return None
 
 
 # ------------------------------------------------------------- P1-04-03 ---

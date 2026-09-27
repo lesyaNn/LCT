@@ -30,7 +30,7 @@ from app.modules.analytics.pdf import (
     NO_CHART_DATA_TEXT,
     PDFFontUnavailableError,
     PDF_PAGE_SIZE_ORIENTATION,
-    compute_kpi,
+    ReportKpi,
     ensure_pdf_fonts,
     find_dejavu_font_files,
     format_cell_value,
@@ -105,11 +105,22 @@ class _Result:
 
 
 class FakeSession:
-    """Routes by statement shape (same shapes as production)."""
+    """Routes by statement shape (same shapes as production).
 
-    def __init__(self, rows: list[dict], names: dict | None = None):
+    ``map_columns`` opts in to serving the batched university-grain queries
+    that compute ``workflow_progress`` / ``overdue_tasks``: without it those
+    columns come back NULL, exactly like a university with no workflow rows.
+    """
+
+    def __init__(
+        self,
+        rows: list[dict],
+        names: dict | None = None,
+        map_columns: tuple[str, ...] = (),
+    ):
         self._rows = rows
         self._names = names or {}
+        self._map_columns = set(map_columns)
 
     def _owner_uids(self) -> list:
         uids = []
@@ -118,6 +129,24 @@ class FakeSession:
             if uid is not None and uid not in uids:
                 uids.append(uid)
         return uids
+
+    def _stage_rows(self) -> list:
+        """(university_id, stage_status) rows reproducing the target percent.
+
+        The dataset computes ``completed / non_skipped * 100``. Emitting
+        exactly 100 eligible stages per university, ``value`` of them
+        completed, reproduces the requested percentage to the integer.
+        """
+        rows = []
+        for row in self._rows:
+            uid = row.get("_university_id")
+            value = row.get("workflow_progress")
+            if uid is None or value is None:
+                continue
+            done = int(value)
+            rows += [(uid, "completed")] * done
+            rows += [(uid, "pending")] * (100 - done)
+        return rows
 
     def execute(self, stmt, execution_options=None):
         try:
@@ -132,6 +161,23 @@ class FakeSession:
                 if uid is not None and name and (uid, name) not in pairs:
                     pairs.append((uid, name))
             return _Result(pairs=pairs)
+        if "instance_stages" in compiled and "workflow_progress" in self._map_columns:
+            return _Result(pairs=self._stage_rows())
+        if "workflow_tasks" in compiled and "overdue_tasks" in self._map_columns:
+            # (university_id, count) rows for the overdue-task aggregate.
+            return _Result(pairs=[(r["_university_id"], r["overdue_tasks"])
+                                  for r in self._rows
+                                  if r.get("_university_id") is not None
+                                  and r.get("overdue_tasks") is not None])
+        if "workflow_instances" in compiled and "instance_stages" not in compiled:
+            # The active-instance lookup, shared by both map columns.
+            if self._map_columns & {"workflow_progress", "overdue_tasks"}:
+                return _Result(
+                    pairs=[(r["_university_id"], f"i-{i}")
+                           for i, r in enumerate(self._rows)
+                           if r.get("_university_id") is not None]
+                )
+            return _Result(scalars_values=self._owner_uids())
         if "licenses" in compiled or "_university_id" in compiled:
             return _Result(mappings_rows=self._rows)
         return _Result(scalars_values=self._owner_uids())
@@ -318,34 +364,45 @@ def test_format_cell_value_null_dates_numbers_literal():
     assert format_cell_value("university", "МГУ им. Ломоносова") == "МГУ им. Ломоносова"
 
 
-def test_compute_kpi_from_same_dataset():
-    class _Dataset:
-        rows = [
-            {"university": "A", "workflow_progress": 90},
-            {"university": "A", "workflow_progress": 70},
-            {"university": "B", "workflow_progress": None},
-        ]
-        total = 3
-        university_count = 2
-
-    kpi = compute_kpi(_Dataset())
-    assert kpi == {
-        "university_count": 2,
-        "row_count": 3,
-        "avg_health_score": 80.0,
-        "health_scored_rows": 2,
-    }
+def test_kpi_accumulates_from_the_streamed_rows():
+    """KPI comes from the same streamed rows as the table (no second query)."""
+    kpi = ReportKpi()
+    for row in (
+        {"university": "A", "workflow_progress": 90, "overdue_tasks": 1},
+        {"university": "A", "workflow_progress": 70, "overdue_tasks": 0},
+        {"university": "B", "workflow_progress": None, "overdue_tasks": 2},
+    ):
+        kpi.add_row(row)
+    assert kpi.row_count == 3
+    assert kpi.university_count == 2
+    assert kpi.overdue_total == 3
+    assert kpi.avg_workflow_progress == 80.0
+    assert kpi.progress_rows == 2
 
 
-def test_compute_kpi_no_scores_is_none_not_zero():
-    class _Dataset:
-        rows = [{"university": "A", "workflow_progress": None}]
-        total = 1
-        university_count = 1
+def test_kpi_without_progress_is_none_not_zero():
+    """"Нет данных" must stay distinguishable from "нулевой прогресс"."""
+    kpi = ReportKpi()
+    kpi.add_row({"university": "A", "workflow_progress": None})
+    assert kpi.avg_workflow_progress is None
+    assert kpi.progress_rows == 0
 
-    kpi = compute_kpi(_Dataset())
-    assert kpi["avg_health_score"] is None
-    assert kpi["health_scored_rows"] == 0
+
+def test_kpi_counts_zero_progress_distinctly_from_missing():
+    zero = ReportKpi()
+    zero.add_row({"university": "A", "workflow_progress": 0})
+    assert zero.avg_workflow_progress == 0.0
+    assert zero.progress_rows == 1
+
+
+def test_kpi_university_count_falls_back_when_column_absent():
+    """Without the university column the rows carry no name: use the scope."""
+    kpi = ReportKpi()
+    kpi.add_row({"workflow_progress": 50})
+    assert kpi.university_count == 0
+    assert kpi.resolve_university_count(7) == 7
+    kpi.add_row({"university": "A", "workflow_progress": 50})
+    assert kpi.resolve_university_count(7) == 1
 
 
 # ------------------------------------------------------- fonts (P4-04-02)
@@ -402,14 +459,14 @@ def test_pdf_header_and_metadata(tmp_path):
     assert b"token" not in data.lower()
 
 
-def test_pdf_default_columns_are_14_mandatory(tmp_path):
+def test_pdf_default_columns_are_the_five_tz_columns(tmp_path):
     result = _gen(tmp_path, None, [])
     assert result.columns == list(DEFAULT_COLUMNS)
-    assert len(result.columns) == 14
+    assert len(result.columns) == 5
     text = extract_pdf_text(result.path.read_bytes())
     compact = _nospace(text)
-    assert _nospace(COLUMN_REGISTRY["university"].title) in compact
-    assert _nospace(COLUMN_REGISTRY["workflow_progress"].title) in compact
+    for key in DEFAULT_COLUMNS:
+        assert _nospace(COLUMN_REGISTRY[key].title) in compact, key
 
 
 def test_pdf_subset_order_and_content(tmp_path):
@@ -439,7 +496,7 @@ def test_pdf_metadata_rows_period_filters_timestamp_kpi(tmp_path):
     assert "Ключевые показатели" in text
     assert "Количество ВУЗов: 2" in text
     assert "Количество строк" in text
-    assert "Средний Health Score" in text
+    assert "Средний прогресс workflow" in text
 
 
 def test_pdf_neutral_period_when_unset(tmp_path):
@@ -497,7 +554,50 @@ def test_pdf_cyrillic_embedded_via_tounicode_cmap(tmp_path):
     text = extract_pdf_text(data)
     assert "МГУ им. Ломоносова" in text
     assert "Аналитический" in text
-    assert "Зелёный" in text or "Жёлтый" in text or "Красный" in text
+    # Chart labels are Cyrillic too. The progress pie itself has no data here
+    # (``workflow_progress`` is a batched university-map column, and the stub
+    # session serves NULL for it), so the honest expectation is the
+    # "no data" placeholder; the drawn pie is covered by
+    # test_progress_distribution_* / test_progress_chart_* below.
+    assert "Нет данных для построения графика" in text
+
+
+def test_pdf_renders_the_progress_pie_when_progress_exists(tmp_path):
+    """With real progress values the pie is drawn, not replaced by a notice."""
+    rows = [
+        {
+            "university": "МГУ",
+            "workflow_status": "Этап 1",
+            "workflow_progress": 90,
+            "overdue_tasks": 0,
+            "_university_id": uuid4(),
+        },
+        {
+            "university": "ВУЗ Бета",
+            "workflow_status": "Этап 1",
+            "workflow_progress": 10,
+            "overdue_tasks": 3,
+            "_university_id": uuid4(),
+        },
+    ]
+    # The progress column is computed by the batched university-map query, so
+    # the stub session is told to serve the per-column maps for it.
+    session = FakeSession(rows, map_columns=("workflow_progress", "overdue_tasks"))
+    out = tmp_path / "pie.pdf"
+    generate_pdf_report(
+        session, UnifiedFilter(), ["university", "workflow_progress", "overdue_tasks"], out
+    )
+    text = extract_pdf_text(out.read_bytes())
+    # The progress pie is drawn from real values...
+    assert "прогрессу workflow" in text
+    assert "Зелёный" in text and "Красный" in text
+    # ...and it is NOT replaced by the no-data notice (the bar charts for
+    # unselected columns legitimately do show that notice).
+    assert "нет измеренного прогресса" not in text
+    assert "Распределение строк по ИТ-направлениям: Нет данных" in text
+    # The KPI average must come from the same rows the table shows.
+    assert "Средний прогресс workflow, %: 50.0" in text
+    assert "Просроченные задачи: 3" in text
 
 
 def test_pdf_all_visible_text_uses_dejavu_never_helvetica(tmp_path):
@@ -545,7 +645,7 @@ def test_pdf_empty_dataset_still_valid_with_chart_placeholder(tmp_path):
     assert NO_CHART_DATA_TEXT in text
 
 
-def test_pdf_empty_health_and_workflow_skip_charts(tmp_path):
+def test_pdf_empty_progress_and_workflow_skip_charts(tmp_path):
     rows = [
         {
             "university": "ВУЗ Без Данных",
@@ -564,8 +664,8 @@ def test_pdf_empty_health_and_workflow_skip_charts(tmp_path):
 # ------------------------------------------------------- charts
 
 
-def test_health_distribution_uses_canonical_thresholds():
-    from app.modules.analytics.pdf import _health_distribution
+def test_progress_distribution_uses_canonical_thresholds():
+    from app.modules.analytics.pdf import _progress_distribution
 
     rows = [
         {"university": "A", "workflow_progress": 85},  # green boundary
@@ -574,16 +674,16 @@ def test_health_distribution_uses_canonical_thresholds():
         {"university": "D", "workflow_progress": 59},  # red boundary
         {"university": "E", "workflow_progress": None},
     ]
-    counts, grain = _health_distribution(rows, ["university", "workflow_progress"])
+    counts, grain = _progress_distribution(rows, ["university", "workflow_progress"])
     assert counts == {"green": 1, "yellow": 2, "red": 1}
     assert "ВУЗ" in grain
 
 
-def test_health_distribution_row_grain_without_university_column():
-    from app.modules.analytics.pdf import _health_distribution
+def test_progress_distribution_row_grain_without_university_column():
+    from app.modules.analytics.pdf import _progress_distribution
 
     rows = [{"workflow_progress": 90}, {"workflow_progress": 90}, {"workflow_progress": None}]
-    counts, grain = _health_distribution(rows, ["workflow_progress"])
+    counts, grain = _progress_distribution(rows, ["workflow_progress"])
     assert counts == {"green": 2, "yellow": 0, "red": 0}
     assert "строк" in grain
 
@@ -605,9 +705,9 @@ def test_chart_builders_return_dejavu_drawings():
     from reportlab.graphics.charts.piecharts import Pie
     from reportlab.graphics.shapes import Drawing
 
-    from app.modules.analytics.pdf import _health_chart, _workflow_chart
+    from app.modules.analytics.pdf import _progress_chart, _workflow_chart
 
-    drawing = _health_chart({"green": 2, "yellow": 1, "red": 0}, "по ВУЗам")
+    drawing = _progress_chart({"green": 2, "yellow": 1, "red": 0}, "по ВУЗам")
     assert isinstance(drawing, Drawing)
     pies = [el for el in drawing.contents if isinstance(el, Pie)]
     assert len(pies) == 1

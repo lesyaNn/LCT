@@ -1,9 +1,7 @@
 """P1-09-01: demo seed creates 10 universities with full per-uni data.
 
 Locks the acceptance criteria: 10 universities, each with programs,
-teachers, licensed products, contracts, documents, meetings, responsibles
-and students. Health Score distribution itself is P2-owned; P1 guarantees
-the raw signals (green/yellow/red profiles) exist.
+licensed products, contracts, documents, meetings and responsibles.
 """
 
 from sqlalchemy import func, select
@@ -45,11 +43,6 @@ def test_each_university_has_full_profile(seeded_db: Session):
         ).scalar()
         assert 2 <= n_progs <= 3, (uni.name, n_progs)
 
-        n_teachers = seeded_db.execute(
-            select(func.count()).select_from(Teacher).filter_by(university_id=uni.id)
-        ).scalar()
-        assert 2 <= n_teachers <= 5, (uni.name, n_teachers)
-
         n_licenses = seeded_db.execute(
             select(func.count()).select_from(License).filter_by(university_id=uni.id)
         ).scalar()
@@ -69,11 +62,6 @@ def test_each_university_has_full_profile(seeded_db: Session):
             select(func.count()).select_from(Meeting).filter_by(university_id=uni.id)
         ).scalar()
         assert n_meetings >= 3, (uni.name, n_meetings)
-
-        n_students = seeded_db.execute(
-            select(func.count()).select_from(Student).filter_by(university_id=uni.id)
-        ).scalar()
-        assert n_students >= 50, (uni.name, n_students)
 
         assert len(uni.university_responsibles) >= 2, uni.name
 

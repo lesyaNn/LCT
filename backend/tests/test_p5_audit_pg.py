@@ -326,7 +326,7 @@ def test_required_production_hooks(audit_context):
         )).all()) == 1
 
 
-def test_dev2_student_catalog_and_comment_audit(audit_context):
+def test_dev2_program_catalog_and_comment_audit(audit_context):
     engine, client, current, own, _ = audit_context
     current["user"] = CurrentUser(id="admin-sub", name="Admin", roles={"admin"})
     with Session(engine) as db:
@@ -343,7 +343,7 @@ def test_dev2_student_catalog_and_comment_audit(audit_context):
         instance = WorkflowInstance(university_id=own, template_id=template.id)
         db.add(instance)
         db.commit()
-        program_id, instance_id = program.id, instance.id
+        instance_id = instance.id
 
     direction = client.post(
         "/api/v1/directions", json={"code": f"HTTP-{uuid.uuid4().hex[:8]}", "name": "HTTP direction"}
@@ -355,21 +355,21 @@ def test_dev2_student_catalog_and_comment_audit(audit_context):
     ).status_code == 200
     assert client.delete(f"/api/v1/directions/{direction_id}").status_code == 204
 
-    student = client.post(
-        f"/api/v1/universities/{own}/students",
+    meeting = client.post(
+        f"/api/v1/universities/{own}/meetings",
         json={
-            "external_id": f"AUD-{uuid.uuid4().hex}",
-            "program_id": str(program_id),
-            "full_name": "Audit Student",
-            "started_at": "2026-09-01",
+            "meeting_type": "online",
+            "subject": f"AUD-{uuid.uuid4().hex}",
+            "participants": [],
+            "meeting_at": "2026-09-01T12:00:00+00:00",
         },
     )
-    assert student.status_code == 201, student.text
-    student_id = uuid.UUID(student.json()["id"])
+    assert meeting.status_code in (200, 201), meeting.text
+    meeting_id = uuid.UUID(meeting.json()["id"])
     assert client.patch(
-        f"/api/v1/students/{student_id}", json={"group_name": "AUD-2"}
+        f"/api/v1/meetings/{meeting_id}", json={"subject": "Changed"}
     ).status_code == 200
-    assert client.delete(f"/api/v1/students/{student_id}").status_code == 204
+    assert client.delete(f"/api/v1/meetings/{meeting_id}").status_code == 204
 
     comment = client.post(
         f"/api/v1/workflow/instances/{instance_id}/comments",
@@ -386,19 +386,19 @@ def test_dev2_student_catalog_and_comment_audit(audit_context):
         direction_events = db.scalars(
             select(AuditEvent).where(AuditEvent.entity_id == direction_id)
         ).all()
-        student_events = db.scalars(
-            select(AuditEvent).where(AuditEvent.entity_id == student_id)
+        meeting_events = db.scalars(
+            select(AuditEvent).where(AuditEvent.entity_id == meeting_id)
         ).all()
         comment_events = db.scalars(
             select(AuditEvent).where(AuditEvent.entity_id == comment_id)
         ).all()
         assert [event.action for event in direction_events] == ["CREATE", "UPDATE", "DELETE"]
         assert [event.entity_type for event in direction_events] == ["direction"] * 3
-        assert [event.action for event in student_events] == ["CREATE", "UPDATE", "DELETE"]
-        assert [event.entity_type for event in student_events] == ["student"] * 3
+        assert [event.action for event in meeting_events] == ["CREATE", "UPDATE", "DELETE"]
+        assert [event.entity_type for event in meeting_events] == ["meeting"] * 3
         assert [event.action for event in comment_events] == ["CREATE", "UPDATE", "DELETE"]
         assert [event.entity_type for event in comment_events] == ["workflow_comment"] * 3
-        assert all(event.university_id == own for event in student_events + comment_events)
+        assert all(event.university_id == own for event in meeting_events + comment_events)
 
 
 def test_import_job_boundary_has_one_event(audit_context):

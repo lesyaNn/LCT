@@ -13,6 +13,7 @@ from openpyxl import Workbook
 
 from app.config import settings
 from app.core.errors import BusinessException
+from app.core.exceptions import NotFound
 from app.core.security import CurrentUser, get_current_user
 from app.db.session import get_db
 from app.main import app
@@ -61,22 +62,21 @@ def seed(engine):
 def test_mock_sync_read_metrics_and_exact_id_dedup(engine):
     university_id, program_id = seed(engine)
     with Session(engine) as db:
-        lms = service.sync_mock(db, university_id, "lms")
         website = service.sync_mock(db, university_id, "website")
-        assert lms["processed"] == website["processed"] == 1
+        assert website["processed"] == 1
         assert service.sync_mock(db, university_id, "website")["processed"] == 1
-        students = service.university_data(db, university_id, "lms")
         applications = service.university_data(db, university_id, "website")
-        assert students["students"][0]["progress"] is None
-        assert students["students"][0]["source"] == "lms"
-        assert students["synced_at"] is not None
         assert applications["applications"][0]["applications_count"] == 1
         assert applications["applications"][0]["program_id"] == program_id
         assert applications["applications"][0]["demand_score"] is None
-        assert service.metrics(db)["lms_students"] == 1
         assert service.metrics(db)["website_applications_7d"] == 1
         scoped_out = service.metrics(db, CurrentUser(id="outside", roles={"user"}, university_ids=()))
-        assert scoped_out["lms_students"] is None and scoped_out["website_applications_7d"] is None
+        assert scoped_out["website_applications_7d"] is None
+        # The LMS source was removed: it must be rejected, never faked.
+        with pytest.raises(NotFound):
+            service.university_data(db, university_id, "lms")
+        with pytest.raises(NotFound):
+            service.sync_mock(db, university_id, "lms")
         external_id = applications["applications"][0]["id"]
         service.upsert_application(db, {
             "external_id": external_id, "university_id": university_id,
@@ -86,7 +86,6 @@ def test_mock_sync_read_metrics_and_exact_id_dedup(engine):
         db.commit()
         assert db.scalar(select(func.count(ExternalApplication.id))) == 1
         assert db.scalar(select(ExternalApplication.ingest_channel)) == "file"
-        assert db.scalar(select(func.count(Student.id)).where(Student.source == "lms")) == 1
 
 
 def test_xlsx_import_then_website_sync_share_one_application(engine):
@@ -133,7 +132,6 @@ def test_unavailable_never_falls_back_to_mock(engine):
         with pytest.raises(BusinessException) as err:
             service.university_data(db, university_id, "lms")
         assert err.value.code.value == "EXTERNAL_SOURCE_UNAVAILABLE"
-        assert db.scalar(select(func.count(Student.id))) == 0
 
 
 def test_website_without_source_state_is_unconfigured(engine):

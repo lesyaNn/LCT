@@ -4,8 +4,8 @@ Frozen API (``report_jobs`` + background execution)::
 
     POST /api/v1/reports  ->  202 Accepted  {"job_id": "uuid", "status": "queued"}
 
-:func:`create_report_job` validates the request (any of the three frozen
-formats), persists ``build_job_payload(...)`` (filters, resolved columns,
+:func:`create_report_job` validates the request (any format that has a
+generator), persists ``build_job_payload(...)`` (filters, resolved columns,
 format, actor scope) as a ``queued`` ``ReportJob`` and returns the real
 persisted id — never a fake UUID, never a silent synchronous ``200``
 file. Execution is owned by the dedicated worker container
@@ -13,7 +13,7 @@ file. Execution is owned by the dedicated worker container
 jobs — ``BackgroundTasks`` are banned for reports by the spec (they die
 with the API process, block the loop and have no retries).
 
-All three formats (``xlsx`` / ``pdf`` / ``json``) share one validation
+All formats (``xls`` / ``xlsx`` / ``pdf`` / ``json``) share one validation
 path, one job payload shape and one worker entry point
 (:func:`generate_report_file`); every generator reads ONLY from
 ``ReportDatasetService`` with titles ONLY from ``COLUMN_REGISTRY``.
@@ -37,6 +37,7 @@ from app.modules.analytics.json_export import generate_json_report
 from app.modules.analytics.pdf import generate_pdf_report
 from app.modules.analytics.report_request import ReportRequest
 from app.modules.analytics.xlsx import generate_xlsx_report
+from app.modules.analytics.xls import generate_xls_report
 from app.schemas.common import ReportFormat
 
 __all__ = [
@@ -48,6 +49,7 @@ __all__ = [
     "ensure_supported_format",
     "ensure_xlsx",
     "generate_report_file",
+    "supported_formats",
 ]
 
 #: Frozen report/read permission contract (see ``app/core/permissions.py`` —
@@ -65,11 +67,22 @@ class ReportQueuedResponse(BaseModel):
     )
 
 
+def supported_formats() -> frozenset[ReportFormat]:
+    """Formats with a real generator (derived, never a second hardcoded set)."""
+    return frozenset(FORMAT_GENERATORS)
+
+
 def ensure_supported_format(request: ReportRequest) -> None:
-    """Gate a request to the three frozen formats (xlsx | pdf | json)."""
-    if request.format not in (ReportFormat.XLSX, ReportFormat.PDF, ReportFormat.JSON):
+    """Gate a request to the formats that actually have a generator.
+
+    The dispatch table below IS the format list — there is no second
+    hardcoded set to fall out of sync with it.
+    """
+    if request.format not in FORMAT_GENERATORS:
+        supported = ", ".join(sorted(f.value for f in FORMAT_GENERATORS))
         raise ValueError(
-            f"unsupported report format: {request.format!r} (expected one of 'xlsx', 'pdf', 'json')"
+            f"unsupported report format: {request.format.value!r} "
+            f"(expected one of: {supported})"
         )
 
 
@@ -85,8 +98,10 @@ def ensure_xlsx(request: ReportRequest) -> None:
 #: Worker-facing dispatch table (P4-06-01 seam): format -> file generator.
 #: Every generator shares the signature
 #: ``(db, filters, columns, output_path, *, user, generated_at)`` and
-#: returns ``GeneratedReport``.
+#: returns ``GeneratedReport``. This mapping is also the single source of
+#: truth for which formats the API accepts.
 FORMAT_GENERATORS: dict[ReportFormat, Callable[..., Any]] = {
+    ReportFormat.XLS: generate_xls_report,
     ReportFormat.XLSX: generate_xlsx_report,
     ReportFormat.PDF: generate_pdf_report,
     ReportFormat.JSON: generate_json_report,
@@ -125,8 +140,8 @@ def build_job_payload(request: ReportRequest, user: Any) -> dict[str, Any]:
 
     Pure function (no DB, no queue): serializes the validated request plus
     the actor scope the worker must re-apply. ``columns`` are the resolved
-    output columns (default 14 applied, order preserved). Identical shape
-    for ``xlsx`` / ``pdf`` / ``json`` (only ``format`` differs).
+    output columns (ТЗ default applied, order preserved). Identical shape
+    for every format (only ``format`` differs).
     """
     roles = sorted(getattr(user, "roles", None) or [])
     from app.core.policies import get_data_scope

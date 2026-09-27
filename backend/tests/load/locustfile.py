@@ -3,7 +3,7 @@
 Сценарии по РЕАЛЬНОМУ контракту (urrlib-заготовка без locust не запускается;
 для запуска: pip install locust):
   list universities (10) / passport (5) / workflow read (5) /
-  comment (3) / health-score batch (2).
+  comment (3) / report preview + statistics (2).
 
 IDs подхватываются динамически: on_start тянет GET /api/v1/universities
 и строит пул university_ids для passport/batch. Workflow/comment задачи
@@ -72,7 +72,7 @@ class CRMUser(HttpUser):  # type: ignore[valid-type,misc]
             return
         uid = random.choice(self.university_ids)
         self.client.get(
-            f"/api/v1/universities/{uid}/passport?include=health_score",
+            f"/api/v1/universities/{uid}/passport?include=audit",
             name="/universities/{id}/passport",
         )
 
@@ -95,12 +95,16 @@ class CRMUser(HttpUser):  # type: ignore[valid-type,misc]
         )
 
     @task(2)
-    def health_score_batch(self):
-        if not self.university_ids:
-            return
-        ids = ",".join(random.sample(self.university_ids, k=min(10, len(self.university_ids))))
-        self.client.get(
-            "/api/v1/universities/health-score",
-            params={"ids": ids},
-            name="/universities/health-score",
+    def report_preview(self):
+        """The filter-change path the ТЗ caps at 1 second."""
+        payload = {"filters": {}, "columns": None, "limit": 50}
+        self.client.post(
+            "/api/v1/reports/preview", json=payload, name="/reports/preview"
+        )
+
+    @task(2)
+    def report_statistics(self):
+        self.client.post(
+            "/api/v1/reports/statistics", json={"filters": {}},
+            name="/reports/statistics",
         )

@@ -3,8 +3,8 @@
 * ``python -m app.db.seed`` — canonical entry (works from ``backend/``).
 * Idempotent: every entity is get-or-created by its natural unique key, so
   re-runs never duplicate data (verified by tests).
-* Dates are relative to ``date.today()`` so expiry/readiness scenarios
-  (expiring licenses, expired documents, certificate readiness) stay valid
+* Dates are relative to ``date.today()`` so expiry scenarios (expiring
+  licenses, expired documents) stay valid
   whenever the seed runs.
 * Creates the full chain: catalogs -> universities -> programs/products ->
   responsibles -> licenses/contracts ->
@@ -92,26 +92,8 @@ UNIVERSITIES = [
     ("КФУ", "Казань"),
 ]
 
-# P1-09-03 teacher plan: (count, [(readiness, ...)])
-TEACHER_PLAN: dict[str, list[str]] = {
-    "МГУ им. М.В. Ломоносова": ["ready"] * 5,
-    "СПбГУ": ["ready"] * 3 + ["attention"],
-    "НИУ ВШЭ": ["ready"] * 2 + ["attention"] * 2,
-    "МФТИ": ["ready"] * 2 + ["expired"],
-    "ИТМО": ["ready"] * 2 + ["expired"] * 2,
-    "УрФУ": ["attention"] + ["expired"] * 2,
-    "Тюменский государственный университет": ["expired"] * 2,
-    "Дальневосточный федеральный университет": ["ready-nocert"] * 2,
-    "СибГУТИ": ["ready"] * 2 + ["attention", "expired"],
-    "КФУ": ["expired"] * 3,
-}
-
-MANDATORY_CERTS = [
-    "Информационная безопасность",
-    "Методика преподавания ИТ",
-    "Стандарты ФГОС",
-]
-OPTIONAL_CERTS = ["Английский язык", "Soft skills"]
+# The teacher/readiness seed plan was removed together with the
+# students/teachers/health-score entities (commit 26fa4a9).
 
 # P1-09-02 license expiry plan: university -> [days_to_expiry, ...]
 LICENSE_EXPIRY: dict[str, list[int]] = {
@@ -147,7 +129,7 @@ def seed_demo(session: Session, skip_universities: bool | None = None) -> dict:
     ``skip_universities=True`` (or ``SEED_SKIP_UNIVERSITIES=1``) seeds only
     the standalone catalogs (directions/programs/vendors/products) and skips
     everything bound to universities (universities themselves, responsibles,
-    teachers, students, licenses/contracts, meetings, documents, notes) —
+    licenses/contracts, meetings, documents, notes) —
     e.g. to fill universities later via XLSX import.
     """
     if skip_universities is None:

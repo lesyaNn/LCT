@@ -40,7 +40,7 @@ export function workflowStageKey(workflow: UniversityWorkflow, stage: University
 
 const emptyFilters = {
   search: '', city: '', externalSource: '' as const, universityIds: [], programIds: [], productIds: [], responsibleIds: [],
-  healthStatuses: [], workflowStageId: '', dateFrom: '', dateTo: '',
+  workflowStageId: '', dateFrom: '', dateTo: '',
 };
 
 async function universityInstances(university: UniversityListItem): Promise<WorkflowOverviewItem[]> {

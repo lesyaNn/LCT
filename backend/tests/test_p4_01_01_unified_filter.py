@@ -111,8 +111,9 @@ def test_valid_all_fields():
         WorkflowStageStatus.PENDING,
         WorkflowStageStatus.COMPLETED,
     ]
-    # date_from + date_to + 5 id dims + workflow = 8 AND-combined predicates.
-    assert len(UnifiedFilterService.build_university_conditions(f)) == 8
+    # The period is ONE predicate (a single OR-combined interaction EXISTS),
+    # so 5 id dims + workflow + period = 7 AND-combined predicates.
+    assert len(UnifiedFilterService.build_university_conditions(f)) == 7
 
 
 def test_date_from_only_and_date_to_only():
@@ -370,7 +371,29 @@ def test_combined_predicates_count_matches_dimensions():
         date_from=date(2026, 1, 1),
         date_to=date(2026, 12, 31),
     )
-    assert len(UnifiedFilterService.build_university_conditions(f)) == 8
+    # 5 id dims + workflow + the single period predicate.
+    assert len(UnifiedFilterService.build_university_conditions(f)) == 7
+
+
+def test_period_predicate_uses_interactions_not_university_created_at():
+    """ТЗ period = interactions in range, not the university creation date."""
+    f = UnifiedFilter(date_from=date(2026, 9, 1), date_to=date(2026, 9, 30))
+    (predicate,) = UnifiedFilterService.build_university_conditions(f)
+    sql = str(predicate)
+    assert "meetings" in sql and "interaction_notes" in sql
+    assert "universities.created_at" not in sql
+
+
+def test_period_is_a_single_or_combined_predicate():
+    """Both bounds still yield ONE predicate, so dimensions stay separable."""
+    f = UnifiedFilter(date_from=date(2026, 9, 1), date_to=date(2026, 9, 30))
+    assert len(UnifiedFilterService.build_university_conditions(f)) == 1
+    f_open = UnifiedFilter(date_from=date(2026, 9, 1))
+    assert len(UnifiedFilterService.build_university_conditions(f_open)) == 1
+
+
+def test_no_period_applies_no_date_predicate():
+    assert UnifiedFilterService.build_university_conditions(UnifiedFilter()) == []
 
 
 # ------------------------------------------------------------- security scope

@@ -38,7 +38,12 @@ from app.models.catalog import (
     UniversityResponsible,
     Vendor,
 )
-from app.models.interactions import UniversityProduct, UniversityProgram
+from app.models.interactions import (
+    InteractionNote,
+    Meeting,
+    UniversityProduct,
+    UniversityProgram,
+)
 from app.models.workflow_instances import InstanceStage, WorkflowInstance
 from app.models.workflow_templates import WorkflowStage, WorkflowTemplate
 from app.modules.analytics.filter_service import UnifiedFilterService
@@ -96,6 +101,26 @@ def _seed(s: Session) -> dict:
         UniversityResponsible(university_id=delta.id, responsible_id=r1.id),
         UniversityResponsible(university_id=delta.id, responsible_id=r2.id),
     ])
+    # One interaction per university, in the same month as its created_at, so
+    # the date-filter tests keep selecting universities by month while
+    # exercising the ТЗ INTERACTION period instead of ``created_at``.
+    s.add_all([
+        Meeting(id=uuid4(), university_id=u.id, meeting_type="online",
+                subject=f"Meeting {n}", participants=[],
+                meeting_at=at, created_by_keycloak_sub="t")
+        for n, (u, at) in enumerate((
+            (alpha, _utc(2026, 1, 20)),
+            (beta, _utc(2026, 5, 25)),
+            (gamma, _utc(2026, 8, 5)),
+            (delta, _utc(2026, 3, 20)),
+        ))
+    ])
+    # One note in a month no meeting covers, so the two interaction sources are
+    # both exercised: Alpha gets a note in February.
+    s.add(InteractionNote(
+        id=uuid4(), university_id=alpha.id, author_keycloak_sub="t",
+        content="February note", is_internal=True, created_at=_utc(2026, 2, 3),
+    ))
     template = WorkflowTemplate(id=uuid4(), name="Template T")
     s.add(template)
     s.flush()
@@ -372,11 +397,12 @@ def test_within_dimension_or_between_dimensions_and(fx):
 # --------------------------------------------------------------------- dates
 
 
-def test_date_range_on_created_at(fx):
+def test_date_range_on_interactions(fx):
+    """ТЗ: the period bounds the interaction date, not the creation date."""
     s, _ = fx
     assert _name_set(
         s,
-        UnifiedFilter(date_from=date(2026, 2, 1), date_to=date(2026, 6, 1)),
+        UnifiedFilter(date_from=date(2026, 3, 1), date_to=date(2026, 6, 1)),
     ) == {"Uni Beta", "Uni Delta"}
 
 
@@ -387,15 +413,31 @@ def test_date_from_only(fx):
 
 def test_date_to_only(fx):
     s, _ = fx
-    assert _name_set(s, UnifiedFilter(date_to=date(2026, 2, 1))) == {"Uni Alpha"}
+    assert _name_set(s, UnifiedFilter(date_to=date(2026, 1, 31))) == {"Uni Alpha"}
 
 
 def test_date_bounds_inclusive(fx):
     s, _ = fx
+    # Delta's meeting is on 2026-03-20; a single-day range on that exact day
+    # must match, proving both bounds are inclusive.
+    assert _names(
+        s,
+        UnifiedFilter(date_from=date(2026, 3, 20), date_to=date(2026, 3, 20)),
+    ) == ["Uni Delta"]
+    # The same day without an interaction matches nobody.
     assert _names(
         s,
         UnifiedFilter(date_from=date(2026, 3, 15), date_to=date(2026, 3, 15)),
-    ) == ["Uni Delta"]
+    ) == []
+
+
+def test_period_matches_notes_when_there_is_no_meeting(fx):
+    """``interaction_notes.created_at`` is an equally valid interaction."""
+    s, _ = fx
+    # Alpha has a January meeting AND a February note.
+    assert _name_set(
+        s, UnifiedFilter(date_from=date(2026, 2, 1), date_to=date(2026, 2, 28))
+    ) == {"Uni Alpha"}
 
 
 # ------------------------------------------------------------------ duplicates

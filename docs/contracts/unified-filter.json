@@ -84,8 +84,11 @@
   },
   "workflow_status_note": "workflow_statuses filters canonical instance STAGE runtime (instance_stages), not the workflow_instances.status header column (production only ever writes 'active' there, so it carries no filtering signal). Legacy app/modules/workflow tables are never used.",
   "date_semantics": {
-    "decision": "date_from/date_to are inclusive bounds on the report dataset row date. For university queries the row date is universities.created_at (day precision, UTC).",
-    "source": "No P4 freeze in the repo defines the date dimension; this is a centralized documented P4-01-01 decision. No per-entity date columns (workflow due_date, license signed_at, ...) are mixed in without an explicit contract change."
+    "decision": "date_from/date_to are inclusive bounds on the INTERACTION period. A university is selected when it has at least one interaction inside the range: EXISTS a meetings row with meeting_at in range OR EXISTS an interaction_notes row with created_at in range (day precision, UTC).",
+    "source": "ТЗ: 'отчёты по взаимодействиям с вузами за выбранный период'. Both interaction sources are OR-combined inside a single EXISTS, so the selected university set is identical for reports, preview, export and statistics.",
+    "row_grain": "The period decides WHETHER a university is in the selection, not how many rows it yields. Rows keep the dataset grain University LEFT JOIN License (one row per license + one fallback row per license-less university). A university with several interactions in the range still appears as its own set of grain rows, not one row per interaction. A detailed 'one interaction = one row' journal requires a separate product decision and contract change.",
+    "no_interaction": "A university with no meetings and no interaction notes is excluded as soon as any date bound is set. With both bounds null the period is not applied and interaction-less universities stay visible.",
+    "indexes": "Served by the existing composites ix_meetings_univ_meeting_at (university_id, meeting_at) and ix_interaction_notes_univ_created (university_id, created_at)."
   },
   "empty_list_semantics": "[] (or null, normalized to []) means the dimension filter is not applied. Empty lists are never WHERE FALSE.",
   "duplicate_ids": "Duplicate IDs are deduplicated preserving first-seen order; semantics are unchanged for IN queries.",

@@ -1,7 +1,7 @@
 """P5 RBAC matrix for mounted university routes on migrated PostgreSQL 16."""
 
 import os
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 import pytest
@@ -44,13 +44,9 @@ def context():
             meeting_at=datetime(2026, 9, 24, tzinfo=timezone.utc),
             created_by_keycloak_sub="seed",
         )
-        foreign_student = Student(
-            external_id=f"P5-{uuid4().hex}", university_id=a, program_id=program.id,
-            full_name="Foreign Student", started_at=date(2026, 9, 1),
-        )
-        db.add_all([foreign_meeting, foreign_student])
+        db.add(foreign_meeting)
         db.commit()
-        meeting_id, student_id = foreign_meeting.id, foreign_student.id
+        meeting_id = foreign_meeting.id
 
     current = {"user": CurrentUser(id="p5", roles={"user"}, university_ids=(str(b),))}
 
@@ -62,7 +58,7 @@ def context():
     app.dependency_overrides[get_current_user] = lambda: current["user"]
     try:
         with TestClient(app) as client:
-            yield client, current, a, b, c, meeting_id, student_id
+            yield client, current, a, b, c, meeting_id
     finally:
         app.dependency_overrides.pop(get_db, None)
         app.dependency_overrides.pop(get_current_user, None)
@@ -127,19 +123,15 @@ def test_university_collection_detail_and_mutation_matrix(context):
 
 
 def test_foreign_detail_paths_are_concealed_as_404(context):
-    client, current, a, _, _, meeting_id, student_id = context
+    client, current, a, _, _, meeting_id = context
     _as(current, "manager", (str(uuid4()),))
 
     probes = [
         client.get(f"/api/v1/universities/{a}"),
         client.patch(f"/api/v1/universities/{a}", json={"name": "Hidden"}),
-        client.get(f"/api/v1/universities/{a}/health-score"),
         client.get(f"/api/v1/meetings/{meeting_id}"),
         client.patch(f"/api/v1/meetings/{meeting_id}", json={"subject": "Hidden"}),
         client.delete(f"/api/v1/meetings/{meeting_id}"),
-        client.get(f"/api/v1/students/{student_id}"),
-        client.patch(f"/api/v1/students/{student_id}", json={"group_name": "Hidden"}),
-        client.delete(f"/api/v1/students/{student_id}"),
     ]
     for response in probes:
         _not_found(response)

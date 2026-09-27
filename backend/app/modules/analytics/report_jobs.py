@@ -45,8 +45,15 @@ from app.models.report_job import (
     STATUS_READY,
     ReportJob,
 )
+from app.schemas.common import ReportFormat
 
 logger = logging.getLogger("rtk")
+
+#: Formats a job may be stored with: exactly the values of the shared
+#: ``ReportFormat`` enum. This used to be a hand-written tuple that silently
+#: rejected a newly added format (XLS 422'd here while the enum and the worker
+#: both knew about it) — deriving from the enum removes that second source.
+SUPPORTED_JOB_FORMATS: frozenset[str] = frozenset(f.value for f in ReportFormat)
 
 #: Spec retries (P4-06-01): a failed attempt with attempts < MAX is
 #: requeued, otherwise the job goes failed.
@@ -60,7 +67,12 @@ STALE_CLAIM_TIMEOUT = timedelta(minutes=30)
 #: the worker regenerates them. Stored in ``ReportJob.result["cache_version"]``
 #: (no schema change; import jobs own ``result`` for summaries and never
 #: participate in report reuse).
-REPORT_CACHE_VERSION = 6
+#: 6→7: the analytics rework (workflow-bound program/direction chain, new
+#: cell/label builders) changed report content, but the version was not
+#: bumped — so artifacts produced by the *older* code stayed eligible and the
+#: cache served a 0-row XLSX generated at 14:21 to a request whose live
+#: preview showed 6 rows. Bump this on ANY content-affecting change.
+REPORT_CACHE_VERSION = 7
 
 __all__ = [
     "MAX_JOB_ATTEMPTS",
@@ -95,8 +107,15 @@ __all__ = [
 #: Report download window after creation (``expires_at = created + 24h``).
 REPORT_EXPIRY_HOURS = 24
 
-#: Allowed download extensions (frozen ``ReportFormat`` values).
-_JOB_FILENAME_RE = re.compile(r"report_[0-9a-fA-F-]{36}\.(xlsx|pdf|json)")
+#: Allowed download extensions (frozen ``ReportFormat`` values). Built from
+#: the enum rather than hand-listed: the hard-coded ``(xlsx|pdf|json)`` alternation
+#: silently made every freshly generated XLS artifact undownloadable (404
+#: FILE_NOT_FOUND) even though the worker had written it correctly.
+_JOB_FILENAME_RE = re.compile(
+    r"report_[0-9a-fA-F-]{36}\.(?:"
+    + "|".join(sorted(SUPPORTED_JOB_FORMATS))
+    + r")"
+)
 
 #: Secret-looking ``key=value`` fragments are redacted from user errors.
 _SECRET_RE = re.compile(
@@ -194,8 +213,11 @@ def create_job(
     Callers pass the already-validated request (resolved/deduped columns);
     the worker later rehydrates ONLY this snapshot.
     """
-    if format not in ("xlsx", "pdf", "json"):
-        raise ValueError(f"unsupported report format: {format!r}")
+    if format not in SUPPORTED_JOB_FORMATS:
+        raise ValueError(
+            f"unsupported report format: {format!r} "
+            f"(expected one of: {', '.join(sorted(SUPPORTED_JOB_FORMATS))})"
+        )
     now = _utcnow()
     job = ReportJob(
         id=uuid.uuid4(),

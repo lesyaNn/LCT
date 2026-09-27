@@ -21,15 +21,9 @@ class AnalyticsData:
     links: list[Any] = field(default_factory=list)
     existing_pairs: set[tuple[UUID, UUID]] = field(default_factory=set)
     licenses: list[Any] = field(default_factory=list)
-    teachers: list[Any] = field(default_factory=list)
-    teacher_programs: list[Any] = field(default_factory=list)
-    certificates: list[Any] = field(default_factory=list)
-    qualifications: list[Any] = field(default_factory=list)
     instances: list[Any] = field(default_factory=list)
     stages: list[Any] = field(default_factory=list)
     tasks: list[Any] = field(default_factory=list)
-    scores: dict[UUID, Any] = field(default_factory=dict)
-    trend: list[dict] = field(default_factory=list)
 
 
 def selected_rows(db, model, predicate, ids=None, options=()):

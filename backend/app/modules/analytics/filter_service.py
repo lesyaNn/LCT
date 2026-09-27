@@ -18,6 +18,9 @@ Canonical relation mapping (real P1/P2 schema, no legacy tables):
   (product, never vendor).
 * ``responsible_ids`` — ``EXISTS`` ``university_responsibles`` for one of
   the selected responsibles (canonical M:N, no row duplication).
+* ``date_from`` / ``date_to`` — inclusive bounds on the interaction date:
+  ``EXISTS`` a ``meetings`` row in range OR a ``interaction_notes`` row in
+  range (``University -> Meeting`` / ``University -> InteractionNote``).
 * ``workflow_statuses`` — ``EXISTS`` a canonical ``workflow_instances`` row
   of the university whose runtime matches (canonical
   ``workflow_instances`` + ``instance_stages`` only; legacy
@@ -36,10 +39,25 @@ Canonical relation mapping (real P1/P2 schema, no legacy tables):
   filtering signal — see the P4-01-01 report).
 
 Date semantics (centralized documented decision): ``date_from``/``date_to``
-are inclusive bounds on the report dataset row date. For university
-queries the row date is ``universities.created_at`` (day-precision,
-UTC). No per-entity date columns (``due_date``, ``signed_at``, …) are
-mixed in without an explicit contract change.
+are inclusive bounds on the **interaction date** of the university. A
+university enters the selection when it has at least one interaction whose
+date falls inside the range — ``EXISTS`` over ``meetings.meeting_at`` OR
+``interaction_notes.created_at`` (day-precision, UTC). The two interaction
+sources are OR-combined inside one ``EXISTS``; no ``JOIN`` fan-out and no
+row multiplication. Existing composites ``ix_meetings_univ_meeting_at`` and
+``ix_interaction_notes_univ_created`` serve this predicate.
+
+Row-grain note: the period decides **whether** a university is in the
+selection, not how many rows it produces. Rows keep the dataset grain
+``University LEFT JOIN License`` (one row per license + one fallback row
+per license-less university), so a university with several interactions in
+the range still appears as its own set of grain rows. A detailed
+"one interaction = one row" journal would be a separate product decision
+and a separate contract change.
+
+A university with no interactions at all is therefore excluded as soon as
+a period is set. Without a period (both bounds ``None``) nothing is
+filtered by date, so interaction-less universities stay visible.
 
 Combination: dimensions combine with ``AND``; values inside one
 multi-select dimension combine with ``OR`` / ``IN``.
@@ -64,7 +82,7 @@ from sqlalchemy.sql.selectable import Select
 
 from app.core.policies import apply_university_scope
 from app.models.catalog import ITProgram, University, UniversityResponsible
-from app.models.interactions import UniversityProduct, UniversityProgram
+from app.models.interactions import InteractionNote, Meeting, UniversityProduct, UniversityProgram
 from app.models.workflow_instances import InstanceStage, WorkflowInstance
 from app.modules.analytics.filters import UnifiedFilter
 from app.schemas.common import WorkflowStageStatus
@@ -156,15 +174,80 @@ class UnifiedFilterService:
                     list(filters.workflow_statuses), today=today
                 )
             )
-        if filters.date_from is not None:
-            lower = datetime.combine(filters.date_from, time.min, tzinfo=timezone.utc)
-            conds.append(University.created_at >= lower)
-        if filters.date_to is not None:
-            upper = datetime.combine(
-                filters.date_to + timedelta(days=1), time.min, tzinfo=timezone.utc
+        if filters.date_from is not None or filters.date_to is not None:
+            conds.append(
+                UnifiedFilterService._interaction_in_period(
+                    filters.date_from, filters.date_to
+                )
             )
-            conds.append(University.created_at < upper)
         return conds
+
+    @staticmethod
+    def _interaction_in_period(date_from, date_to):
+        """``EXISTS`` at least one interaction inside the inclusive period.
+
+        Two interaction sources are OR-combined: ``meetings.meeting_at`` and
+        ``interaction_notes.created_at``. One open-ended bound simply omits
+        that side of the range; both bounds set narrow it to the closed
+        interval ``[date_from 00:00, date_to+1d 00:00)`` (UTC), which makes
+        ``date_to`` inclusive at day precision. Aggregating the two sources
+        into a single ``EXISTS`` keeps the university row set identical to
+        every other consumer of :class:`UnifiedFilter`.
+        """
+        lower = (
+            datetime.combine(date_from, time.min, tzinfo=timezone.utc)
+            if date_from is not None
+            else None
+        )
+        upper = (
+            datetime.combine(
+                date_to + timedelta(days=1), time.min, tzinfo=timezone.utc
+            )
+            if date_to is not None
+            else None
+        )
+
+        def _bounded(column, value, *, closed: str):
+            if value is None:
+                return None
+            return column >= value if closed == "ge" else column < value
+
+        branches = []
+        meeting_bounds = [
+            bound
+            for bound in (
+                _bounded(Meeting.meeting_at, lower, closed="ge"),
+                _bounded(Meeting.meeting_at, upper, closed="lt"),
+            )
+            if bound is not None
+        ]
+        if meeting_bounds:
+            branches.append(
+                exists(
+                    select(1)
+                    .select_from(Meeting)
+                    .where(Meeting.university_id == University.id, *meeting_bounds)
+                )
+            )
+        note_bounds = [
+            bound
+            for bound in (
+                _bounded(InteractionNote.created_at, lower, closed="ge"),
+                _bounded(InteractionNote.created_at, upper, closed="lt"),
+            )
+            if bound is not None
+        ]
+        if note_bounds:
+            branches.append(
+                exists(
+                    select(1)
+                    .select_from(InteractionNote)
+                    .where(
+                        InteractionNote.university_id == University.id, *note_bounds
+                    )
+                )
+            )
+        return or_(*branches)
 
     @staticmethod
     def _workflow_exists(statuses: list[WorkflowStageStatus], *, today=None):
@@ -219,9 +302,9 @@ class UnifiedFilterService:
         university-level predicates apply unchanged: dimensions combine with
         AND at the university level via EXISTS (never JOIN fan-out, never
         row multiplication). This keeps ``ReportDataset`` university sets
-        identical to the P1 list for one filter. Date semantics are frozen:
-        ``date_from``/``date_to`` bound ``universities.created_at`` (UTC day
-        inclusive), never license/contract dates.
+        identical to the P1 list for one filter. Date semantics: the period
+        bounds the interaction date (``meetings`` / ``interaction_notes``),
+        never license/contract dates and not the university creation date.
         """
         return UnifiedFilterService.apply_to_universities(stmt, filters, today=today)
 

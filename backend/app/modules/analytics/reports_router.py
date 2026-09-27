@@ -13,7 +13,7 @@ admins (``*``) see all jobs; everyone else sees only their own jobs
 (foreign ids -> ``403``, unknown/malformed ids -> ``404``), mirroring the
 workflow ``Forbidden: other university`` convention.
 
-All three frozen formats (``xlsx`` / ``pdf`` / ``json``) share one
+All export formats (``xls`` / ``xlsx`` / ``pdf`` / ``json``) share one
 creation path; unknown formats are rejected with ``422`` by the
 ``ReportFormat`` enum before any persistence.
 
@@ -47,11 +47,13 @@ from app.schemas.errors import ErrorCode
 from app.modules.audit.service import get_audit_db
 from app.models.report_job import JOB_TYPE_REPORT, ReportJob
 from app.modules.analytics import report_jobs as jobs
+from app.modules.analytics.dataset import fetch_preview
 from app.modules.analytics.report_request import ReportRequest
 from app.modules.analytics.report_service import (
     REPORTS_READ_PERMISSION,
     ReportQueuedResponse,
     create_report_job,
+    supported_formats,
 )
 from app.schemas.common import ErrorResponse, PaginatedResponse, ReportFormat
 
@@ -68,12 +70,12 @@ ERROR_RESPONSES: dict[int, dict[str, Any]] = {
     422: {"model": ErrorResponse, "description": "Ошибка валидации ReportRequest"},
 }
 
-#: The router accepts exactly the three frozen export formats.
-SUPPORTED_FORMATS: frozenset[ReportFormat] = frozenset(
-    {ReportFormat.XLSX, ReportFormat.PDF, ReportFormat.JSON}
-)
+#: The router accepts exactly the formats that have a real file generator.
+#: Derived from the dispatch table, never a second hardcoded list.
+SUPPORTED_FORMATS: frozenset[ReportFormat] = supported_formats()
 
 DOWNLOAD_MEDIA_TYPES: dict[str, str] = {
+    ReportFormat.XLS.value: "application/vnd.ms-excel",
     ReportFormat.XLSX.value: (
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     ),
@@ -183,39 +185,25 @@ def preview_report(
     db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(require_permission(REPORTS_READ_PERMISSION)),
 ) -> ReportPreview:
-    from app.modules.analytics.columns import COLUMN_REGISTRY
-    from app.modules.analytics.dataset import ReportDatasetService
-    from app.modules.analytics.filter_service import UnifiedFilterService
+    """Bounded preview of the selection behind the given filters/columns.
 
+    The handler only adapts HTTP to the dataset service — the query, the row
+    materialization and the security scope live in
+    :meth:`ReportDatasetService.fetch_preview`, which is the same code the
+    export uses. ``limit`` caps the preview response only; exports always
+    render the full selection.
+    """
     try:
-        stmt = ReportDatasetService.build_query(request.filters, request.resolved_columns)
+        dataset = fetch_preview(
+            db, request.filters, request.resolved_columns, limit=limit, user=user
+        )
     except ValueError as exc:
         raise BusinessException(ErrorCode.VALIDATION_ERROR) from exc
-    stmt = UnifiedFilterService.apply_security_scope(stmt, user)
-    resolved = list(stmt.get_execution_options().get("_report_columns", ()))
-    total_stmt = select(func.count()).select_from(stmt.subquery())
-    total = int(db.scalar(total_stmt) or 0)
-    mappings = list(db.execute(stmt.limit(limit).offset(0)).mappings().all())
-    rows = [dict(m) for m in mappings[:limit]]
-    if any(COLUMN_REGISTRY[k].needs_responsible_agg for k in resolved):
-        ReportDatasetService._attach_responsibles(db, rows)
-    if any(COLUMN_REGISTRY[k].needs_university_maps for k in resolved):
-        ReportDatasetService._attach_extra_maps(db, rows, resolved)
-    public_rows = [
-        {key: row.get(key) for key in resolved if key in row} for row in rows
-    ]
-    universities = {
-        row["_university_id"] for row in rows
-        if isinstance(row.get("_university_id"), uuid.UUID)
-    }
-    for row in public_rows:
-        row.pop("_university_id", None)
-        row.pop("_license_id", None)
     return ReportPreview(
-        columns=resolved,
-        rows=public_rows,
-        total=total,
-        university_count=len(universities),
+        columns=dataset.columns,
+        rows=dataset.rows,
+        total=dataset.total,
+        university_count=dataset.university_count,
         preview_limit=limit,
     )
 

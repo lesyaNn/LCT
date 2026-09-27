@@ -2,16 +2,17 @@
   "consumers": [
     "P4-02-01 dataset",
     "P4-02-02 column selection",
-    "P4-03-01 export endpoint (xlsx/pdf/json writers)",
+    "P4-03-01 export endpoint (xls/xlsx/pdf/json writers)",
+    "P4 statistics aggregation (same columns, GROUP BY only)",
     "P3 frontend checkbox UI"
   ],
   "data_types": {
     "date": "ISO date value on the wire (dataset layer keeps typed date objects; writers format)",
-    "integer": "health_score int 0..100, null when missing (missing is never 0)",
+    "integer": "workflow_progress int 0..100 / overdue_tasks int >= 0, null when not computable (missing is never 0)",
     "string": "text or null (missing LEFT relations are null, never ''/N/A/-)"
   },
   "defaults": {
-    "columns_omitted": "all 12 mandatory columns in documented order",
+    "columns_omitted": "the 5 ТЗ columns in documented order",
     "duplicates": "deduped preserving first-seen order",
     "empty_list": "422 - at least one column required",
     "unknown_key": "422 - never silently ignored"
@@ -30,12 +31,6 @@
       "source": "canonical chain (ТЗ: направление <- программа <- продукт, привязка задается при создании workflow): COALESCE(licenses.direction_id, license program direction, workflow program direction of the latest instance with a program); NULL when unset (never invented)"
     },
     {
-      "key": "program",
-      "title": "ИТ-программа",
-      "type": "string",
-      "source": "canonical chain: COALESCE(licenses.program_id -> it_programs.name, university workflow program (latest instance with one, chosen at workflow creation)); NULL when unset (never invented)"
-    },
-    {
       "key": "product",
       "title": "ИТ-продукт",
       "type": "string",
@@ -52,6 +47,57 @@
       "title": "Ответственный",
       "type": "string",
       "source": "derived aggregate: university_responsibles -> responsibles.full_name, sorted ascending, joined with '; ' (one row per report row, never fan-out); NULL when no links"
+    }
+  ],
+  "optional_columns_supported": [
+    {
+      "key": "city",
+      "title": "Город",
+      "type": "string",
+      "source": "universities.city (University.city); NULL when unset"
+    },
+    {
+      "key": "current_stage",
+      "title": "Текущий этап",
+      "type": "string",
+      "source": "current InstanceStage.name of the latest workflow_instances row (primary branch of workflow_status WITHOUT the university_programs fallback); NULL when no workflow"
+    },
+    {
+      "key": "last_interaction",
+      "title": "Последнее взаимодействие",
+      "type": "date",
+      "source": "frozen P4-02-02 FULL rule: latest interaction date per university = GREATEST(max(meetings.meeting_at), max(interaction_notes.created_at)); NULL when the university has neither meetings nor notes"
+    },
+    {
+      "key": "workflow_progress",
+      "title": "Прогресс workflow, %",
+      "type": "integer",
+      "source": "frozen P4-02-02 FULL rule (mirrors the Dev-2 matrix): percent of completed instance_stages over non-skipped stages across ACTIVE workflow_instances of the university, nearest integer 0..100; NULL when there are no eligible stages"
+    },
+    {
+      "key": "overdue_tasks",
+      "title": "Просроченные задачи",
+      "type": "integer",
+      "source": "frozen P4-02-02 FULL rule (P2 canonical overdue rule): count of workflow_tasks with status == open and deadline at least 1 day in the past on ACTIVE workflow_instances of the university; 0 when none"
+    }
+  ],
+  "ordering": "University.name ASC, University.id ASC, License.license_number ASC NULLS LAST, License.id ASC (deterministic, never DB natural order)",
+  "presets": {
+    "FULL": "5 ТЗ columns + all 12 additional supported columns (extended + optional)",
+    "MINIMAL": "the 5 ТЗ columns",
+    "STANDARD": "5 ТЗ columns + program + city + current_stage"
+  },
+  "registry": "backend/app/modules/analytics/columns.py (COLUMN_REGISTRY; single source of truth, never duplicated per exporter)",
+  "request_dto": "backend/app/modules/analytics/report_request.py (ReportRequest: format + filters: UnifiedFilter + columns)",
+  "row_grain": "one row per (University x License) via universities LEFT JOIN licenses; license-less universities produce exactly one fallback row; no programs x products x responsibles cartesian product",
+  "task": "P4-02-01 / P4-02-02",
+  "version": "1.2.0",
+  "extended_columns": [
+    {
+      "key": "program",
+      "title": "ИТ-программа",
+      "type": "string",
+      "source": "canonical chain: COALESCE(licenses.program_id -> it_programs.name, university workflow program (latest instance with one, chosen at workflow creation)); NULL when unset (never invented)"
     },
     {
       "key": "vendor",
@@ -90,52 +136,5 @@
       "source": "COALESCE(licenses.comment, licenses.contract_id -> contracts.comment) for license rows; latest contract comment for license-less fallback rows; else NULL (both canonical comment fields exist)"
     }
   ],
-  "optional_columns_supported": [
-    {
-      "key": "city",
-      "title": "Город",
-      "type": "string",
-      "source": "universities.city (University.city); NULL when unset"
-    },
-    {
-      "key": "current_stage",
-      "title": "Текущий этап",
-      "type": "string",
-      "source": "current InstanceStage.name of the latest workflow_instances row (primary branch of workflow_status WITHOUT the university_programs fallback); NULL when no workflow"
-    },
-    {
-      "key": "last_interaction",
-      "title": "Последнее взаимодействие",
-      "type": "date",
-      "source": "frozen P4-02-02 FULL rule: latest interaction date per university = GREATEST(max(meetings.meeting_at), max(interaction_notes.created_at)); NULL when the university has neither meetings nor notes"
-    },
-    {
-      "key": "workflow_progress",
-      "title": "Прогресс workflow, %",
-      "type": "integer",
-      "source": "frozen P4-02-02 FULL rule (mirrors the Dev-2 matrix): percent of completed instance_stages over non-skipped stages across ACTIVE workflow_instances of the university, nearest integer 0..100; NULL when there are no eligible stages"
-    },
-    {
-      "key": "overdue_tasks",
-      "title": "Просроченные задачи",
-      "type": "integer",
-      "source": "frozen P4-02-02 FULL rule (P2 canonical overdue rule): count of workflow_tasks with status == open and deadline at least 1 day in the past on ACTIVE workflow_instances of the university; 0 when none"
-    }
-  ],
-  "optional_columns_unsupported": [
-    "health_score",
-    "teacher_readiness",
-    "software"
-  ],
-  "ordering": "University.name ASC, University.id ASC, License.license_number ASC NULLS LAST, License.id ASC (deterministic, never DB natural order)",
-  "presets": {
-    "FULL": "12 mandatory + all 5 supported optionals",
-    "MINIMAL": "12 mandatory columns",
-    "STANDARD": "12 mandatory + city + current_stage"
-  },
-  "registry": "backend/app/modules/analytics/columns.py (COLUMN_REGISTRY; single source of truth, never duplicated per exporter)",
-  "request_dto": "backend/app/modules/analytics/report_request.py (ReportRequest: format + filters: UnifiedFilter + columns)",
-  "row_grain": "one row per (University x License) via universities LEFT JOIN licenses; license-less universities produce exactly one fallback row; no programs x products x responsibles cartesian product",
-  "task": "P4-02-01 / P4-02-02",
-  "version": "1.1.0"
+  "tz_columns_note": "The ТЗ names exactly five output columns. mandatory_columns is exactly that set and is the default output (resolve_columns(None)). extended_columns are real, supported and individually selectable columns that the ТЗ does not list, so they are optional: asked for -> exported, not asked for -> absent. No column was deleted, none invented."
 }

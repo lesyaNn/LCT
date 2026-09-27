@@ -7,14 +7,16 @@ import pytest
 from pydantic import ValidationError
 
 from app.modules.analytics.columns import (
+    ADDITIONAL_COLUMNS,
     COLUMN_REGISTRY,
     DEFAULT_COLUMNS,
+    EXTENDED_COLUMNS,
     FULL_COLUMNS,
     MANDATORY_COLUMNS,
     OPTIONAL_COLUMNS,
     PRESETS,
     STANDARD_COLUMNS,
-    UNSUPPORTED_OPTIONAL_COLUMNS,
+    TZ_COLUMNS,
     EmptyReportColumnsError,
     UnknownReportColumnError,
     is_known_column,
@@ -38,33 +40,52 @@ EXPECTED_TITLES = {
     "comment": "Комментарий",
 }
 
+#: The five output columns the ТЗ names, in ТЗ order.
+EXPECTED_TZ_TITLES = {
+    "university": "Наименование ВУЗа",
+    "direction": "ИТ-направление",
+    "product": "ИТ-продукт",
+    "workflow_status": "Статус работы",
+    "responsible": "Ответственный",
+}
 
-def test_mandatory_columns_exactly_12_in_order():
-    assert MANDATORY_COLUMNS == tuple(EXPECTED_TITLES.keys())
-    assert len(MANDATORY_COLUMNS) == len(EXPECTED_TITLES)
-    assert len(set(MANDATORY_COLUMNS)) == len(EXPECTED_TITLES)
+
+def test_mandatory_columns_are_exactly_the_five_tz_columns():
+    assert MANDATORY_COLUMNS == tuple(EXPECTED_TZ_TITLES.keys())
+    assert TZ_COLUMNS == MANDATORY_COLUMNS
+    assert len(MANDATORY_COLUMNS) == len(EXPECTED_TZ_TITLES)
+    assert len(set(MANDATORY_COLUMNS)) == len(EXPECTED_TZ_TITLES)
 
 
 def test_mandatory_titles_match_spec():
-    for key, title in EXPECTED_TITLES.items():
+    for key, title in EXPECTED_TZ_TITLES.items():
         assert COLUMN_REGISTRY[key].title == title, key
         assert COLUMN_REGISTRY[key].mandatory is True, key
 
 
+def test_non_tz_columns_are_optional_but_supported():
+    """ТЗ columns are the default, not the only selectable ones."""
+    for key, title in EXPECTED_TITLES.items():
+        assert COLUMN_REGISTRY[key].title == title, key
+    for key in EXTENDED_COLUMNS:
+        assert COLUMN_REGISTRY[key].mandatory is False, key
+        assert is_known_column(key), key
+
+
 def test_registry_single_source_of_truth():
     assert set(COLUMN_REGISTRY) >= set(MANDATORY_COLUMNS)
-    for key in MANDATORY_COLUMNS:
+    for key in COLUMN_REGISTRY:
         entry = COLUMN_REGISTRY[key]
         assert entry.key == key
         assert entry.source, key  # every column documents its canonical source
 
 
-def test_default_columns_are_immutable_14():
-    assert DEFAULT_COLUMNS == MANDATORY_COLUMNS
+def test_default_columns_are_the_immutable_tz_set():
+    assert DEFAULT_COLUMNS == TZ_COLUMNS
     resolved = resolve_columns(None)
-    assert resolved == list(MANDATORY_COLUMNS)
+    assert resolved == list(TZ_COLUMNS)
     resolved.append("university")
-    assert resolve_columns(None) == list(MANDATORY_COLUMNS)
+    assert resolve_columns(None) == list(TZ_COLUMNS)
 
 
 def test_resolve_preserves_order_and_dedupes():
@@ -96,30 +117,31 @@ def test_is_known_column():
 
 
 def test_presets():
-    assert PRESETS["MINIMAL"] == MANDATORY_COLUMNS
-    assert STANDARD_COLUMNS[: len(MANDATORY_COLUMNS)] == MANDATORY_COLUMNS
-    assert set(STANDARD_COLUMNS) == set(MANDATORY_COLUMNS) | {"city", "current_stage"}
-    assert set(FULL_COLUMNS) == set(MANDATORY_COLUMNS) | set(OPTIONAL_COLUMNS)
+    assert PRESETS["MINIMAL"] == TZ_COLUMNS
+    assert STANDARD_COLUMNS[: len(TZ_COLUMNS)] == TZ_COLUMNS
+    assert set(STANDARD_COLUMNS) == set(TZ_COLUMNS) | {"program", "city", "current_stage"}
+    assert set(FULL_COLUMNS) == set(TZ_COLUMNS) | set(ADDITIONAL_COLUMNS)
+    assert set(FULL_COLUMNS) == set(COLUMN_REGISTRY), "FULL must cover the registry"
+    assert ADDITIONAL_COLUMNS == EXTENDED_COLUMNS + OPTIONAL_COLUMNS
     assert set(OPTIONAL_COLUMNS) == {
         "city", "current_stage", "last_interaction", "workflow_progress",
         "overdue_tasks",
     }
-    for key in OPTIONAL_COLUMNS:
+    for key in ADDITIONAL_COLUMNS:
         assert COLUMN_REGISTRY[key].mandatory is False, key
 
 
 def test_full_optionals_frozen():
     for key in ("last_interaction", "workflow_progress", "overdue_tasks"):
         assert key in COLUMN_REGISTRY, key
-        assert key not in UNSUPPORTED_OPTIONAL_COLUMNS, key
 
 
 def test_report_format_reuses_shared_enum():
     import app.modules.analytics.report_request as rr
 
     assert rr.ReportFormat is ReportFormat
-    assert {m.value for m in ReportFormat} == {"xlsx", "pdf", "json"}
-    assert "xls" not in {m.value for m in ReportFormat}
+    # ТЗ: the tabular report must export to XLS, XLSX and PDF (+ JSON kept).
+    assert {m.value for m in ReportFormat} == {"xls", "xlsx", "pdf", "json"}
 
 
 def test_report_request_defaults():
@@ -192,11 +214,14 @@ def test_public_column_contract_matches_registry():
         assert entry["title"] == reg.title, entry["key"]
         assert entry["type"] == reg.data_type, entry["key"]
         assert entry["source"] == reg.source, entry["key"]
+    assert [c["key"] for c in contract["extended_columns"]] == list(EXTENDED_COLUMNS)
+    for entry in contract["extended_columns"]:
+        reg = COLUMN_REGISTRY[entry["key"]]
+        assert entry["title"] == reg.title, entry["key"]
+        assert entry["type"] == reg.data_type, entry["key"]
+        assert entry["source"] == reg.source, entry["key"]
     supported = {c["key"] for c in contract["optional_columns_supported"]}
     assert supported == set(OPTIONAL_COLUMNS)
-    assert set(contract["optional_columns_unsupported"]) == set(
-        UNSUPPORTED_OPTIONAL_COLUMNS
-    )
 
 
 def test_column_module_has_no_second_filter_dto():

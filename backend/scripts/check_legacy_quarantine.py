@@ -4,7 +4,7 @@ Checks (exit 0 = clean, exit 1 = violation):
 1. No ``DEFERRED_PREFIX`` from ``tests/test_p0_deferred_registry.py`` is
    mounted in the production app (``app/api/router.py`` + ``app/main.py``).
 2. Quarantined routers (documents/programs/reporting/identity/dashboard,
-   legacy workflow/health_score routers) carry the ``LEGACY QUARANTINE``
+   legacy workflow routers) carry the ``LEGACY QUARANTINE``
    marker.
 3. No ``limit(200).all()`` + Python-filter pattern (M8 class of bug) remains
    in the quarantined documents router.

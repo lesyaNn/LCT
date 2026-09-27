@@ -14,6 +14,14 @@ matches, while its rows show each license's own direction. License-less
 universities produce exactly one fallback row with business columns resolved
 from the latest contract (or NULL). ``responsible`` is always an aggregated
 ``'; '``-joined string (never a fan-out), ``workflow_status`` is a per-university scalar.
+
+ТЗ columns note: the ТЗ names exactly five output columns (университет,
+ИТ-направление, ИТ-продукт, статус работы, ответственный). They are
+:data:`TZ_COLUMNS` and are the default output. The remaining registry
+entries are real, supported columns that stay individually selectable as
+:data:`ADDITIONAL_COLUMNS` — a report that explicitly asks for them gets
+them, a report that does not is not widened beyond the ТЗ. No column was
+deleted and no field was invented.
 """
 
 from __future__ import annotations
@@ -21,15 +29,17 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 __all__ = [
+    "ADDITIONAL_COLUMNS",
     "COLUMN_REGISTRY",
     "DEFAULT_COLUMNS",
+    "EXTENDED_COLUMNS",
     "FULL_COLUMNS",
     "MANDATORY_COLUMNS",
     "MINIMAL_COLUMNS",
     "OPTIONAL_COLUMNS",
     "PRESETS",
     "STANDARD_COLUMNS",
-    "UNSUPPORTED_OPTIONAL_COLUMNS",
+    "TZ_COLUMNS",
     "EmptyReportColumnsError",
     "ReportColumn",
     "ReportColumnError",
@@ -127,6 +137,7 @@ for _c in [
         "canonical chain: COALESCE(licenses.program_id -> it_programs.name, "
         "university workflow program (latest instance with one, chosen at "
         "workflow creation)); NULL when unset (never invented)",
+        mandatory=False,
         needs_license_join=True,
     ),
     _col(
@@ -161,6 +172,7 @@ for _c in [
         "string",
         "licenses.product_id -> it_products.vendor_id -> vendors.name (Vendor.name); "
         "NULL for fallback rows",
+        mandatory=False,
         needs_license_join=True,
     ),
     _col(
@@ -170,6 +182,7 @@ for _c in [
         "licenses.contract_id -> contracts.contract_number for license rows; "
         "latest contracts row per university (signed_at DESC, expires_at DESC "
         "NULLS LAST, id ASC) for license-less fallback rows; else NULL",
+        mandatory=False,
         needs_license_join=True,
         needs_fallback_contract=True,
     ),
@@ -178,6 +191,7 @@ for _c in [
         "Подписание лицензии",
         "date",
         "licenses.signed_at (License.signed_at, Date); NULL for fallback rows",
+        mandatory=False,
         needs_license_join=True,
     ),
     _col(
@@ -185,6 +199,7 @@ for _c in [
         "Срок действия",
         "date",
         "licenses.expires_at (License.expires_at, Date); NULL for fallback rows",
+        mandatory=False,
         needs_license_join=True,
     ),
     _col(
@@ -194,6 +209,7 @@ for _c in [
         "licenses.transfer_status_raw for license rows (real raw field, no new "
         "enum/constraint); latest contract transfer_status_raw for license-less "
         "fallback rows; else NULL",
+        mandatory=False,
         needs_license_join=True,
         needs_fallback_contract=True,
     ),
@@ -204,6 +220,7 @@ for _c in [
         "COALESCE(licenses.comment, licenses.contract_id -> contracts.comment) "
         "for license rows; latest contract comment for license-less fallback "
         "rows; else NULL (both canonical comment fields exist)",
+        mandatory=False,
         needs_license_join=True,
         needs_fallback_contract=True,
     ),
@@ -259,14 +276,26 @@ for _c in [
     COLUMN_REGISTRY[_c.key] = _c
 del _c
 
-#: Frozen mandatory keys (documented order = default output order).
-MANDATORY_COLUMNS: tuple[str, ...] = (
+#: The 5 columns the ТЗ requires a report to be able to show, in ТЗ order.
+#: They are the default output: ``resolve_columns(None)`` returns exactly
+#: this tuple, so a report that does not choose columns stays within ТЗ.
+TZ_COLUMNS: tuple[str, ...] = (
     "university",
     "direction",
-    "program",
     "product",
     "workflow_status",
     "responsible",
+)
+
+#: Frozen mandatory keys. Mandatory == part of the default selection (the ТЗ
+#: minimum), NOT a technical requirement of the dataset: every column below
+#: stays individually selectable and independently exported.
+MANDATORY_COLUMNS: tuple[str, ...] = TZ_COLUMNS
+
+#: Legal/contract details of the university-product relationship. Supported
+#: and exportable, but not part of the ТЗ column list, therefore optional.
+EXTENDED_COLUMNS: tuple[str, ...] = (
+    "program",
     "vendor",
     "contract_number",
     "license_signed",
@@ -276,35 +305,30 @@ MANDATORY_COLUMNS: tuple[str, ...] = (
 )
 
 #: Supported optional columns: city/current_stage (1.0.0) +
-#: last_interaction/workflow_progress/teacher_readiness/overdue_tasks
-#: (1.1.0, frozen P4-02-02 FULL rules, university-grain batched maps).
+#: last_interaction/workflow_progress/overdue_tasks (1.1.0, frozen
+#: P4-02-02 FULL rules, university-grain batched maps).
 OPTIONAL_COLUMNS: tuple[str, ...] = (
     "city", "current_stage",
     "last_interaction", "workflow_progress",
     "overdue_tasks",
 )
 
-#: Immutable default: all mandatory columns.
-DEFAULT_COLUMNS: tuple[str, ...] = MANDATORY_COLUMNS
+#: Everything selectable on top of the ТЗ default.
+ADDITIONAL_COLUMNS: tuple[str, ...] = EXTENDED_COLUMNS + OPTIONAL_COLUMNS
 
-#: Backend presets. FULL = everything supported (STANDARD + FULL-only maps).
-MINIMAL_COLUMNS: tuple[str, ...] = MANDATORY_COLUMNS
-STANDARD_COLUMNS: tuple[str, ...] = MANDATORY_COLUMNS + ("city", "current_stage")
-FULL_COLUMNS: tuple[str, ...] = MANDATORY_COLUMNS + OPTIONAL_COLUMNS
+#: Immutable default: the ТЗ column set.
+DEFAULT_COLUMNS: tuple[str, ...] = TZ_COLUMNS
+
+#: Backend presets. MINIMAL = ТЗ default; STANDARD adds the most useful
+#: context; FULL = every supported column (STANDARD + FULL-only maps).
+MINIMAL_COLUMNS: tuple[str, ...] = TZ_COLUMNS
+STANDARD_COLUMNS: tuple[str, ...] = TZ_COLUMNS + ("program", "city", "current_stage")
+FULL_COLUMNS: tuple[str, ...] = TZ_COLUMNS + ADDITIONAL_COLUMNS
 PRESETS: dict[str, tuple[str, ...]] = {
     "MINIMAL": MINIMAL_COLUMNS,
     "STANDARD": STANDARD_COLUMNS,
     "FULL": FULL_COLUMNS,
 }
-
-#: Removed columns (students/teachers/health score deleted; software was a
-#: pure alias of product with no separate entity behind it).
-UNSUPPORTED_OPTIONAL_COLUMNS: dict[str, str] = {
-    "health_score": "removed: health score entity deleted",
-    "teacher_readiness": "removed: teachers entity deleted",
-    "software": "removed: pure alias of product (no separate software entity)",
-}
-
 
 def is_known_column(key: str) -> bool:
     """Check a column key against the registry."""
@@ -314,7 +338,7 @@ def is_known_column(key: str) -> bool:
 def resolve_columns(columns: list[str] | tuple[str, ...] | None) -> list[str]:
     """Validate + normalize a column selection (P4-02-02).
 
-    * ``None`` -> all mandatory columns (immutable default copy).
+    * ``None`` -> the ТЗ default columns (:data:`TZ_COLUMNS`, immutable copy);
     * duplicates are collapsed preserving first-seen order;
     * unknown keys raise :class:`UnknownReportColumnError` (never ignored);
     * ``[]`` raises :class:`EmptyReportColumnsError` (at least one required).

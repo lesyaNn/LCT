@@ -1,4 +1,4 @@
-"""Analytics response contract (without students/teachers/health score)."""
+"""Analytics response contract."""
 
 from datetime import date
 from typing import Literal

@@ -5,8 +5,8 @@
   1. GET /health (liveness, без префикса)
   2. GET /api/v1/auth/me (токен валиден)
   3. GET /api/v1/universities (список, JSON-массив)
-  4. GET /api/v1/universities/{id}/passport?include=health_score,audit
-  5. GET /api/v1/universities/health-score?ids=... (batch)
+  4. GET /api/v1/universities/{id}/passport?include=audit
+  5. GET /api/v1/reports/statistics (агрегация по выборке)
   6. POST /api/v1/reports (202) + poll GET /api/v1/reports/{job_id}
   7. GET /api/v1/workflow/instances/{id} + transition (только с --instance/--stage)
 
@@ -80,17 +80,18 @@ class Smoke:
             assert isinstance(b, list)
             first = b[0]
             self.university_id = str(first.get("id"))
-            ids = ",".join(str(u.get("id")) for u in b[:10])
 
             s, b = self.req(
                 "GET",
                 f"/api/v1/universities/{self.university_id}/passport"
-                "?include=" + urllib.parse.quote("health_score,audit"),
+                "?include=audit",
             )
             self.check("passport", s == 200, f"HTTP {s}")
 
-            s, b = self.req("GET", "/api/v1/universities/health-score?ids=" + urllib.parse.quote(ids))
-            self.check("health-score batch", s == 200, f"HTTP {s}")
+            s, b = self.req(
+                "POST", "/api/v1/reports/statistics", {"filters": {}}
+            )
+            self.check("report statistics", s == 200, f"HTTP {s}")
 
             s, b = self.req(
                 "POST",

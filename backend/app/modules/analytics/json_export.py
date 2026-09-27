@@ -159,7 +159,7 @@ def generate_json_report(
 ) -> GeneratedReport:
     """Generate the frozen JSON export from the report dataset.
 
-    ``columns=None`` selects the frozen 12 mandatory ``DEFAULT_COLUMNS``;
+    ``columns=None`` selects the ТЗ default ``DEFAULT_COLUMNS``;
     otherwise the resolved/deduped ``ReportRequest.columns`` order is kept
     verbatim (never sorted). Raises ``UnknownReportColumnError`` /
     ``EmptyReportColumnsError`` (both ``ValueError``) for invalid

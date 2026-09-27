@@ -6,9 +6,13 @@ contract and is deliberately NOT part of this DTO.
 
 Field semantics (frozen):
 
-* ``date_from`` / ``date_to`` — inclusive bounds on the report dataset row
-  date. For university queries the row date is ``universities.created_at``
-  (see :mod:`app.modules.analytics.filter_service` and
+* ``date_from`` / ``date_to`` — inclusive bounds on the **interaction
+  period**: a university is selected when it has at least one interaction
+  inside the range (``meetings.meeting_at`` OR
+  ``interaction_notes.created_at``, day-precision UTC). The period decides
+  membership of a university in the selection, never the row grain — rows
+  stay ``University x License`` (see
+  :mod:`app.modules.analytics.filter_service` and
   ``docs/contracts/unified-filter.json``). ``date_from <= date_to`` is
   enforced; a reversed range is a 422 validation error.
 * ``*_ids`` — multi-select dimensions. An empty list means "filter not
@@ -92,10 +96,16 @@ class UnifiedFilter(BaseModel):
     }
 
     date_from: date | None = Field(
-        default=None, description="Inclusive lower bound (ISO date, YYYY-MM-DD)."
+        default=None,
+        description="Inclusive lower bound of the interaction period "
+        "(ISO date, YYYY-MM-DD). Matches universities with at least one "
+        "meeting or interaction note in range.",
     )
     date_to: date | None = Field(
-        default=None, description="Inclusive upper bound (ISO date, YYYY-MM-DD)."
+        default=None,
+        description="Inclusive upper bound of the interaction period "
+        "(ISO date, YYYY-MM-DD). Matches universities with at least one "
+        "meeting or interaction note in range.",
     )
 
     university_ids: list[uuid.UUID] = Field(

@@ -12,6 +12,7 @@ unmounted; see ``docs/AUDIT.md`` for their reactivation requirements.
 from fastapi import APIRouter
 
 from app.modules.analytics.reports_router import router as reports_router
+from app.modules.analytics.stats_router import router as report_statistics_router
 from app.modules.analytics.report_templates import router as report_templates_router
 from app.modules.admin_users.router import router as admin_users_router
 from app.modules.audit.router import router as audit_router
@@ -39,8 +40,10 @@ v1.include_router(workflow_templates_router)
 v1.include_router(workflow_instances_router)
 v1.include_router(workflow_transitions_router)
 v1.include_router(workflow_attachments_router)
-# Templates BEFORE reports: GET /reports/templates must win over /{job_id}.
+# Templates and statistics BEFORE reports: GET /reports/templates and
+# POST /reports/statistics must win over the generic /{job_id} route.
 v1.include_router(report_templates_router)
+v1.include_router(report_statistics_router)
 v1.include_router(reports_router)
 v1.include_router(audit_router)
 v1.include_router(analytics_router)

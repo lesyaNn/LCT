@@ -1,4 +1,4 @@
-"""Dashboard (minimal, without teachers/health)."""
+"""Dashboard (minimal summary of the university registry)."""
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select

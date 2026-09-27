@@ -1,14 +1,3 @@
-export type HealthStatus = 'green' | 'yellow' | 'red';
-export const healthStatusMeta: Record<HealthStatus, { label: string; tone: 'success' | 'warning' | 'danger' }> = {
-  green: { label: 'Зелёный', tone: 'success' },
-  yellow: { label: 'Жёлтый', tone: 'warning' },
-  red: { label: 'Красный', tone: 'danger' },
-};
-export function getHealthStatus(score: number): HealthStatus {
-  if (score >= 85) return 'green';
-  if (score >= 60) return 'yellow';
-  return 'red';
-}
 import { programStatusLabels, type ProgramStatus } from './dashboard-repository';
 import { apiDownload, apiFetch } from './api-client';
 import { ApiRequestError } from './api-errors';
@@ -63,14 +52,12 @@ export interface UniversityListItem {
   programsCount: number;
   programStatusCounts: ProgramStatusCounts;
   currentStage: UniversityStage;
-  healthScore: number;
   lastInteractionAt: string;
   attention: boolean;
   availability?: {
     responsible: boolean;
     programs: boolean;
     stage: boolean;
-    healthScore: boolean;
     lastInteraction: boolean;
   };
   /** Mock relationship ids mirror the fields expected from the future analytics API. */
@@ -78,7 +65,7 @@ export interface UniversityListItem {
   productIds?: string[];
 }
 
-export type UniversitySortColumn = 'name' | 'responsible' | 'programs' | 'stage' | 'health_score' | 'last_interaction';
+export type UniversitySortColumn = 'name' | 'responsible' | 'programs' | 'stage' | 'last_interaction';
 export type SortOrder = 'asc' | 'desc';
 
 export interface UniversityFilters {
@@ -89,7 +76,6 @@ export interface UniversityFilters {
   programIds: string[];
   productIds: string[];
   responsibleIds: string[];
-  healthStatuses: HealthStatus[];
   workflowStageId: string;
   dateFrom: string;
   dateTo: string;
@@ -123,21 +109,19 @@ export { programStatusLabels };
 
 export const UNIVERSITY_LIST_CAPABILITIES = isMockDataSourceFor('universities')
   ? {
-      filters: { university: true, program: true, product: true, responsible: true, health: true, stage: true, date: true },
-      sorts: { name: true, responsible: true, programs: true, stage: true, health_score: true, last_interaction: true },
-      healthStatusSelection: 'multiple' as const,
+      filters: { university: true, program: true, product: true, responsible: true, stage: true, date: true },
+      sorts: { name: true, responsible: true, programs: true, stage: true, last_interaction: true },
       dateMeaning: 'last-interaction' as const,
     }
   : {
-      filters: { university: true, program: true, product: true, responsible: true, health: true, stage: false, date: true },
-      sorts: { name: true, responsible: false, programs: false, stage: false, health_score: true, last_interaction: false },
-      healthStatusSelection: 'single' as const,
+      filters: { university: true, program: true, product: true, responsible: true, stage: false, date: true },
+      sorts: { name: true, responsible: false, programs: false, stage: false, last_interaction: false },
       dateMeaning: 'created-at' as const,
     };
 
 export const UNIVERSITY_PASSPORT_CAPABILITIES = isMockDataSourceFor('passport')
-  ? { programStatusFilter: true, teacherReadinessFilter: true, documentFilters: true, externalData: true, mutations: true }
-  : { programStatusFilter: true, teacherReadinessFilter: true, documentFilters: false, externalData: true, mutations: false };
+  ? { programStatusFilter: true, documentFilters: true, externalData: true, mutations: true }
+  : { programStatusFilter: true, documentFilters: false, externalData: true, mutations: false };
 // External LMS/website methods share the same Mock ↔ Real repository boundary.
 export {
   createWorkflowFromExternal,
@@ -152,7 +136,6 @@ export type {
   ExternalApplication,
   ExternalDashboardMetrics,
   ExternalDataSource,
-  ExternalStudent,
   UniversityExternalData,
 } from './external-integrations-repository';
 
@@ -184,24 +167,24 @@ const stage = {
 } satisfies Record<string, UniversityStage>;
 
 const universitiesMock: UniversityListItem[] = [
-  { id: 'university-001', name: 'Московский технический университет связи и информатики', city: 'Москва', responsible: responsible.anna, programsCount: 12, programStatusCounts: programCounts(2, 5, 4, 1), currentStage: stage.support, healthScore: 42, lastInteractionAt: '2026-09-19T10:30:00+03:00', attention: true },
-  { id: 'university-002', name: 'Санкт-Петербургский политехнический университет', city: 'Санкт-Петербург', responsible: responsible.boris, programsCount: 8, programStatusCounts: programCounts(1, 4, 3), currentStage: stage.launch, healthScore: 67, lastInteractionAt: '2026-09-17T14:00:00+03:00', attention: true },
-  { id: 'university-003', name: 'Уральский федеральный университет', city: 'Екатеринбург', responsible: responsible.elena, programsCount: 6, programStatusCounts: programCounts(2, 2, 2), currentStage: stage.preparation, healthScore: 58, lastInteractionAt: '2026-09-13T09:15:00+03:00', attention: true },
-  { id: 'university-004', name: 'Казанский федеральный университет', city: 'Казань', responsible: responsible.dmitry, programsCount: 10, programStatusCounts: programCounts(1, 5, 4), currentStage: stage.support, healthScore: 73, lastInteractionAt: '2026-09-18T16:45:00+03:00', attention: true },
-  { id: 'university-005', name: 'Новосибирский государственный университет', city: 'Новосибирск', responsible: responsible.anna, programsCount: 5, programStatusCounts: programCounts(1, 2, 2), currentStage: stage.preparation, healthScore: 88, lastInteractionAt: '2026-09-20T11:10:00+03:00', attention: true },
-  { id: 'university-006', name: 'Дальневосточный федеральный университет', city: 'Владивосток', responsible: responsible.boris, programsCount: 7, programStatusCounts: programCounts(2, 3, 2), currentStage: stage.launch, healthScore: 91, lastInteractionAt: '2026-09-16T13:20:00+03:00', attention: false },
-  { id: 'university-007', name: 'Южный федеральный университет', city: 'Ростов-на-Дону', responsible: responsible.elena, programsCount: 4, programStatusCounts: programCounts(1, 1, 2), currentStage: stage.completed, healthScore: 96, lastInteractionAt: '2026-09-12T15:30:00+03:00', attention: false },
-  { id: 'university-008', name: 'Самарский университет имени академика Королёва', city: 'Самара', responsible: null, programsCount: 3, programStatusCounts: programCounts(1, 2), currentStage: stage.preparation, healthScore: 61, lastInteractionAt: '2026-09-10T08:40:00+03:00', attention: false },
-  { id: 'university-009', name: 'Национальный исследовательский ядерный университет МИФИ', city: 'Москва', responsible: responsible.dmitry, programsCount: 11, programStatusCounts: programCounts(1, 5, 5), currentStage: stage.support, healthScore: 84, lastInteractionAt: '2026-09-15T12:00:00+03:00', attention: false },
-  { id: 'university-010', name: 'Томский государственный университет', city: 'Томск', responsible: responsible.anna, programsCount: 9, programStatusCounts: programCounts(2, 3, 4), currentStage: stage.launch, healthScore: 79, lastInteractionAt: '2026-09-14T17:25:00+03:00', attention: false },
-  { id: 'university-011', name: 'Нижегородский государственный университет имени Лобачевского', city: 'Нижний Новгород', responsible: responsible.boris, programsCount: 2, programStatusCounts: programCounts(1, 1), currentStage: stage.preparation, healthScore: 52, lastInteractionAt: '2026-09-08T10:05:00+03:00', attention: true },
-  { id: 'university-012', name: 'Воронежский государственный университет', city: 'Воронеж', responsible: responsible.elena, programsCount: 6, programStatusCounts: programCounts(1, 3, 2), currentStage: stage.completed, healthScore: 89, lastInteractionAt: '2026-09-19T09:45:00+03:00', attention: false },
-  { id: 'university-013', name: 'Пермский национальный исследовательский политехнический университет', city: 'Пермь', responsible: responsible.dmitry, programsCount: 5, programStatusCounts: programCounts(2, 2, 1), currentStage: stage.support, healthScore: 64, lastInteractionAt: '2026-09-06T14:35:00+03:00', attention: false },
-  { id: 'university-014', name: 'Балтийский федеральный университет имени Иммануила Канта', city: 'Калининград', responsible: null, programsCount: 3, programStatusCounts: programCounts(1, 1, 1), currentStage: stage.launch, healthScore: 76, lastInteractionAt: '2026-09-11T16:10:00+03:00', attention: false },
-  { id: 'university-015', name: 'Сибирский федеральный университет', city: 'Красноярск', responsible: responsible.anna, programsCount: 8, programStatusCounts: programCounts(1, 4, 3), currentStage: stage.support, healthScore: 86, lastInteractionAt: '2026-09-18T09:00:00+03:00', attention: false },
-  { id: 'university-016', name: 'Московский государственный технический университет имени Баумана', city: 'Москва', responsible: responsible.boris, programsCount: 13, programStatusCounts: programCounts(2, 6, 5), currentStage: stage.completed, healthScore: 98, lastInteractionAt: '2026-09-20T13:50:00+03:00', attention: false },
-  { id: 'university-017', name: 'Омский государственный технический университет', city: 'Омск', responsible: responsible.elena, programsCount: 4, programStatusCounts: programCounts(1, 2, 1), currentStage: stage.preparation, healthScore: 35, lastInteractionAt: '2026-09-05T11:30:00+03:00', attention: true },
-  { id: 'university-018', name: 'Саратовский государственный университет', city: 'Саратов', responsible: responsible.dmitry, programsCount: 7, programStatusCounts: programCounts(1, 3, 3), currentStage: stage.launch, healthScore: 82, lastInteractionAt: '2026-09-16T10:20:00+03:00', attention: false },
+  { id: 'university-001', name: 'Московский технический университет связи и информатики', city: 'Москва', responsible: responsible.anna, programsCount: 12, programStatusCounts: programCounts(2, 5, 4, 1), currentStage: stage.support, lastInteractionAt: '2026-09-19T10:30:00+03:00', attention: true },
+  { id: 'university-002', name: 'Санкт-Петербургский политехнический университет', city: 'Санкт-Петербург', responsible: responsible.boris, programsCount: 8, programStatusCounts: programCounts(1, 4, 3), currentStage: stage.launch, lastInteractionAt: '2026-09-17T14:00:00+03:00', attention: true },
+  { id: 'university-003', name: 'Уральский федеральный университет', city: 'Екатеринбург', responsible: responsible.elena, programsCount: 6, programStatusCounts: programCounts(2, 2, 2), currentStage: stage.preparation, lastInteractionAt: '2026-09-13T09:15:00+03:00', attention: true },
+  { id: 'university-004', name: 'Казанский федеральный университет', city: 'Казань', responsible: responsible.dmitry, programsCount: 10, programStatusCounts: programCounts(1, 5, 4), currentStage: stage.support, lastInteractionAt: '2026-09-18T16:45:00+03:00', attention: true },
+  { id: 'university-005', name: 'Новосибирский государственный университет', city: 'Новосибирск', responsible: responsible.anna, programsCount: 5, programStatusCounts: programCounts(1, 2, 2), currentStage: stage.preparation, lastInteractionAt: '2026-09-20T11:10:00+03:00', attention: true },
+  { id: 'university-006', name: 'Дальневосточный федеральный университет', city: 'Владивосток', responsible: responsible.boris, programsCount: 7, programStatusCounts: programCounts(2, 3, 2), currentStage: stage.launch, lastInteractionAt: '2026-09-16T13:20:00+03:00', attention: false },
+  { id: 'university-007', name: 'Южный федеральный университет', city: 'Ростов-на-Дону', responsible: responsible.elena, programsCount: 4, programStatusCounts: programCounts(1, 1, 2), currentStage: stage.completed, lastInteractionAt: '2026-09-12T15:30:00+03:00', attention: false },
+  { id: 'university-008', name: 'Самарский университет имени академика Королёва', city: 'Самара', responsible: null, programsCount: 3, programStatusCounts: programCounts(1, 2), currentStage: stage.preparation, lastInteractionAt: '2026-09-10T08:40:00+03:00', attention: false },
+  { id: 'university-009', name: 'Национальный исследовательский ядерный университет МИФИ', city: 'Москва', responsible: responsible.dmitry, programsCount: 11, programStatusCounts: programCounts(1, 5, 5), currentStage: stage.support, lastInteractionAt: '2026-09-15T12:00:00+03:00', attention: false },
+  { id: 'university-010', name: 'Томский государственный университет', city: 'Томск', responsible: responsible.anna, programsCount: 9, programStatusCounts: programCounts(2, 3, 4), currentStage: stage.launch, lastInteractionAt: '2026-09-14T17:25:00+03:00', attention: false },
+  { id: 'university-011', name: 'Нижегородский государственный университет имени Лобачевского', city: 'Нижний Новгород', responsible: responsible.boris, programsCount: 2, programStatusCounts: programCounts(1, 1), currentStage: stage.preparation, lastInteractionAt: '2026-09-08T10:05:00+03:00', attention: true },
+  { id: 'university-012', name: 'Воронежский государственный университет', city: 'Воронеж', responsible: responsible.elena, programsCount: 6, programStatusCounts: programCounts(1, 3, 2), currentStage: stage.completed, lastInteractionAt: '2026-09-19T09:45:00+03:00', attention: false },
+  { id: 'university-013', name: 'Пермский национальный исследовательский политехнический университет', city: 'Пермь', responsible: responsible.dmitry, programsCount: 5, programStatusCounts: programCounts(2, 2, 1), currentStage: stage.support, lastInteractionAt: '2026-09-06T14:35:00+03:00', attention: false },
+  { id: 'university-014', name: 'Балтийский федеральный университет имени Иммануила Канта', city: 'Калининград', responsible: null, programsCount: 3, programStatusCounts: programCounts(1, 1, 1), currentStage: stage.launch, lastInteractionAt: '2026-09-11T16:10:00+03:00', attention: false },
+  { id: 'university-015', name: 'Сибирский федеральный университет', city: 'Красноярск', responsible: responsible.anna, programsCount: 8, programStatusCounts: programCounts(1, 4, 3), currentStage: stage.support, lastInteractionAt: '2026-09-18T09:00:00+03:00', attention: false },
+  { id: 'university-016', name: 'Московский государственный технический университет имени Баумана', city: 'Москва', responsible: responsible.boris, programsCount: 13, programStatusCounts: programCounts(2, 6, 5), currentStage: stage.completed, lastInteractionAt: '2026-09-20T13:50:00+03:00', attention: false },
+  { id: 'university-017', name: 'Омский государственный технический университет', city: 'Омск', responsible: responsible.elena, programsCount: 4, programStatusCounts: programCounts(1, 2, 1), currentStage: stage.preparation, lastInteractionAt: '2026-09-05T11:30:00+03:00', attention: true },
+  { id: 'university-018', name: 'Саратовский государственный университет', city: 'Саратов', responsible: responsible.dmitry, programsCount: 7, programStatusCounts: programCounts(1, 3, 3), currentStage: stage.launch, lastInteractionAt: '2026-09-16T10:20:00+03:00', attention: false },
 ];
 
 export const universitiesQueryKey = queryKeys.universities.all;
@@ -255,7 +238,6 @@ async function getMockUniversities(params: UniversityListQuery): Promise<Paginat
     if (filters.productIds.length && !filters.productIds.some((id) => item.productIds?.includes(id))) return false;
     if (filters.responsibleIds.length && (!item.responsible || !filters.responsibleIds.includes(item.responsible.id))) return false;
     if (filters.workflowStageId && item.currentStage.id !== filters.workflowStageId) return false;
-    if (filters.healthStatuses.length && !filters.healthStatuses.includes(getHealthStatus(item.healthScore))) return false;
     const interactionDate = item.lastInteractionAt.slice(0, 10);
     if (filters.dateFrom && interactionDate < filters.dateFrom) return false;
     if (filters.dateTo && interactionDate > filters.dateTo) return false;
@@ -267,15 +249,13 @@ async function getMockUniversities(params: UniversityListQuery): Promise<Paginat
       const leftValue = params.sort === 'responsible' ? left.responsible?.name ?? ''
         : params.sort === 'programs' ? left.programsCount
           : params.sort === 'stage' ? left.currentStage.name
-            : params.sort === 'health_score' ? left.healthScore
-              : params.sort === 'last_interaction' ? left.lastInteractionAt
-                : left.name;
+            : params.sort === 'last_interaction' ? left.lastInteractionAt
+              : left.name;
       const rightValue = params.sort === 'responsible' ? right.responsible?.name ?? ''
         : params.sort === 'programs' ? right.programsCount
           : params.sort === 'stage' ? right.currentStage.name
-            : params.sort === 'health_score' ? right.healthScore
-              : params.sort === 'last_interaction' ? right.lastInteractionAt
-                : right.name;
+            : params.sort === 'last_interaction' ? right.lastInteractionAt
+              : right.name;
       return compareValues(leftValue, rightValue) * (params.order === 'desc' ? -1 : 1);
     });
   }
@@ -308,7 +288,6 @@ export type UniversityPassportEventType = 'meeting' | 'document' | 'workflow' | 
 
 export interface UniversityPassportMetrics {
   activePrograms: number;
-  teachers: { total: number; ready: number; attention: number };
   licenses: { active: number; expiring: number; overdue: number };
   documents: { total: number; signed: number; overdue: number; limited?: boolean };
 }
@@ -335,7 +314,6 @@ export interface UniversityPassport {
   id: string;
   name: string;
   city: string;
-  healthScore: number;
   metrics: UniversityPassportMetrics;
   workflow: UniversityPassportWorkflow;
   timeline: UniversityPassportEvent[];
@@ -362,8 +340,6 @@ async function getMockUniversityPassport(id: string): Promise<UniversityPassport
   const launchedPrograms = university.programStatusCounts.launched ?? 0;
   const activePrograms = launchedPrograms + (university.programStatusCounts.active ?? 0);
   const numericId = getUniversityNumericId(id);
-  const teachersTotal = 42 + numericId;
-  const teachersAttention = university.attention ? 8 : 3;
   const workflowStatus: UniversityPassportWorkflow['status'] = university.currentStage.id === stage.completed.id
     ? 'completed'
     : university.attention ? 'attention' : 'in_progress';
@@ -372,10 +348,8 @@ async function getMockUniversityPassport(id: string): Promise<UniversityPassport
     id: university.id,
     name: university.name,
     city: university.city,
-    healthScore: university.healthScore,
     metrics: {
       activePrograms,
-      teachers: { total: teachersTotal, ready: teachersTotal - teachersAttention, attention: teachersAttention },
       licenses: { active: 4 + (numericId % 3), expiring: university.attention ? 2 : 1, overdue: university.attention ? 1 : 0 },
       documents: { total: 24 + numericId, signed: 19 + (numericId % 4), overdue: university.attention ? 2 : 0 },
     },
@@ -981,8 +955,6 @@ export interface UniversityProgramRow {
   status: ProgramStatus;
   launchDate: string;
   responsible: UniversityResponsible | null;
-  teachersCount: number;
-  studentsCount: number;
 }
 
 
@@ -1022,8 +994,6 @@ function getUniversityOrThrow(id: string): UniversityListItem {
       programsCount: university.availability.programs ? university.programsCount : 4,
       programStatusCounts: university.availability.programs ? university.programStatusCounts : programCounts(1, 2, 1),
       currentStage: university.availability.stage ? university.currentStage : stage.preparation,
-      healthScore: university.availability.healthScore ? university.healthScore : 72,
-      attention: university.availability.healthScore ? university.attention : false,
     };
   }
   return university;
@@ -1047,8 +1017,6 @@ async function getMockUniversityPrograms(id: string): Promise<UniversityProgramR
     status: statuses[(index + numericId) % statuses.length],
     launchDate: `2026-${String(((index + numericId) % 9) + 1).padStart(2, '0')}-${String(((index * 3 + numericId) % 20) + 1).padStart(2, '0')}`,
     responsible: university.responsible,
-    teachersCount: 8 + ((index + numericId) % 7),
-    studentsCount: 48 + ((index * 17 + numericId * 5) % 120),
   }));
 }
 

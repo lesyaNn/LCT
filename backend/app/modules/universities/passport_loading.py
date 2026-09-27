@@ -59,7 +59,7 @@ class PassportLoadContext:
 
     Lives only inside one :func:`get_passport` call: every block is
     loaded ONCE and then shared by every DTO that needs it (programs ↔
-    students counts, documents/meetings ↔ timeline, licenses ↔ products
+    documents/meetings ↔ timeline, licenses ↔ products
     license choice). Plain local dataclass — no Redis, no module-level
     cache, no cross-request state.
     """

@@ -287,13 +287,15 @@ def test_freeze_and_autofilter_cover_header_row_6(tmp_path):
     assert ws.auto_filter.ref == "A6:F6"
 
 
-def test_freeze_and_autofilter_default_12(tmp_path):
+def test_freeze_and_autofilter_default_columns(tmp_path):
+    """Default selection is the 5 ТЗ columns, so the header spans A6:E6."""
     result = _gen(tmp_path, None, [])
     assert result.columns == list(DEFAULT_COLUMNS)
+    assert len(DEFAULT_COLUMNS) == 5
     ws = load_workbook(result.path)["Отчёт"]
     assert ws.freeze_panes == "A7"
-    assert ws.auto_filter.ref == "A6:L6"
-    assert [ws.cell(row=HEADER_ROW, column=i).value for i in range(1, 13)] == [
+    assert ws.auto_filter.ref == "A6:E6"
+    assert [ws.cell(row=HEADER_ROW, column=i).value for i in range(1, 6)] == [
         COLUMN_REGISTRY[k].title for k in DEFAULT_COLUMNS
     ]
 

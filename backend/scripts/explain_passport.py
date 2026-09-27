@@ -29,7 +29,6 @@ from sqlalchemy.orm import Session  # noqa: E402
 import app.models  # noqa: E402,F401
 from app.config import settings  # noqa: E402
 from app.models.catalog import University  # noqa: E402
-from app.models.teachers import Teacher  # noqa: E402
 from app.modules.audit.service import AuditService  # noqa: E402
 from app.modules.universities import passport_service as ps  # noqa: E402
 
@@ -150,28 +149,23 @@ def main() -> None:
         ps.get_passport(db, uid, include=frozenset([ps.PassportInclude.AUDIT]))
         db.expire_all()
         ps.get_programs_page(db, uid, 1, 20)
-        db.expire_all()
-        ps.get_teachers_page(db, uid, 1, 20)
     event.remove(engine, "before_cursor_execute", _cap)
 
     labels = [
         "passport_1_university",
         "passport_2_programs",
-        "passport_3_students",
-        "passport_4_teachers",
-        "passport_5_products",
-        "passport_6_licenses_contracts",
-        "passport_7_interactions",
-        "passport_8_responsibles",
+        "passport_3_products",
+        "passport_4_licenses_contracts",
+        "passport_5_interactions",
+        "passport_6_responsibles",
     ]
-    # Two get_passport calls (8 base + 8 repeat + 1 audit) plus
-    # get_programs_page (4) and get_teachers_page (4) = 25.
-    assert len(captured) == 25, f"expected 25 SELECTs, got {len(captured)}"
-    base_captured = captured[:8]
-    audit_captured = [captured[16]]
-    assert base_captured[0][0] == captured[8][0], "repeat call diverged"
-    programs_page_captured = captured[17:21]
-    teachers_page_captured = captured[21:25]
+    # Two get_passport calls (6 base + 6 repeat + 1 audit) plus
+    # get_programs_page (4) = 17.
+    assert len(captured) == 17, f"expected 17 SELECTs, got {len(captured)}"
+    base_captured = captured[:6]
+    audit_captured = [captured[12]]
+    assert base_captured[0][0] == captured[6][0], "repeat call diverged"
+    programs_page_captured = captured[13:17]
 
     # --- extra real code-path statements (same builders the API uses) ---
     extra: list[tuple[str, tuple, tuple]] = []
@@ -186,14 +180,6 @@ def main() -> None:
             .limit(200)
         )
         extra.append(("list_universities_search", q_search.statement, ()))
-        # legacy teachers list (real teachers router code path)
-        q_t = (
-            db.query(Teacher)
-            .filter(Teacher.university_id == uid)
-            .order_by(Teacher.id.desc())
-            .limit(200)
-        )
-        extra.append(("teachers_list_by_university", q_t.statement, ()))
     # compile extras with literal binds (safe test-only constants: one UUID
     # read from the DB itself and one fixed ILIKE pattern).
     from sqlalchemy.dialects import postgresql as pg_dialect
@@ -213,16 +199,12 @@ def main() -> None:
         "programs_page_2_count",
         "programs_page_3_page",
         "programs_page_4_counts",
-        "teachers_page_1_univ",
-        "teachers_page_2_count",
-        "teachers_page_3_ids",
-        "teachers_page_4_rows",
     ]
     results: dict[str, dict] = {}
     with engine.connect() as conn:
         for label, (statement, params) in zip(
             labels + ["passport_9_audit"] + page_labels,
-            base_captured + audit_captured + programs_page_captured + teachers_page_captured,
+            base_captured + audit_captured + programs_page_captured,
         ):
             raw = _explain_captured(conn, statement, params)
             summary = _summarize(raw)
@@ -260,9 +242,8 @@ def main() -> None:
     # paginated subresources + audit use parametrized statements; explain via ORM text
     with Session(engine) as db:
         _, total = ps.get_programs_page(db, uid, 1, 20)
-        _, ttotal = ps.get_teachers_page(db, uid, 1, 20)
         audit_rows = AuditService(db).recent_for_university(uid)
-    print(f"programs total={total} teachers total={ttotal} audit rows={len(audit_rows)}")
+    print(f"programs total={total} audit rows={len(audit_rows)}")
     print(f"raw plans -> {outdir}")
     print(f"today={date.today()} expiry_warning={ps.__name__}")
 

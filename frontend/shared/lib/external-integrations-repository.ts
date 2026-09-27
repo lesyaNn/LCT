@@ -19,16 +19,6 @@ export function externalSourceLabel(source: keyof typeof EXTERNAL_SOURCE_LABELS)
   return EXTERNAL_SOURCE_LABELS[source];
 }
 
-export interface ExternalStudent {
-  id: string;
-  name: string;
-  programName: string | null;
-  flow: string | null;
-  progress: number | null;
-  source: 'manual';
-  syncedAt: string | null;
-}
-
 export interface ExternalApplication {
   id: string;
   universityId: string;
@@ -46,7 +36,6 @@ export interface UniversityExternalData {
   source: ExternalDataSource;
   mode: 'real' | 'mock' | 'import' | 'unconfigured';
   syncedAt: string | null;
-  students: ExternalStudent[];
   applications: ExternalApplication[];
 }
 
@@ -67,9 +56,7 @@ export interface CreateWorkflowFromExternalResult {
 export interface ExternalDashboardMetrics {
   mode: 'real' | 'mock' | 'import';
   websiteApplications7d: number | null;
-  lmsStudents: number | null;
   websiteSyncedAt: string | null;
-  lmsSyncedAt: string | null;
 }
 
 export const universityExternalDataQueryKey = (id: string, source: ExternalDataSource) =>

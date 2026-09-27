@@ -781,7 +781,7 @@ function mockWebsiteApplications(universityId: string): ExternalApplication[] {
 }
 
 export function mockGetUniversityExternalData(universityId: string, source: ExternalDataSource): UniversityExternalData {
-  return { universityId, source, mode: 'mock', syncedAt: mockExternalSyncAt, students: [], applications: mockWebsiteApplications(universityId) };
+  return { universityId, source, mode: 'mock', syncedAt: mockExternalSyncAt, applications: mockWebsiteApplications(universityId) };
 }
 
 export function mockCreateWorkflowFromExternal(input: CreateWorkflowFromExternalInput): CreateWorkflowFromExternalResult {
@@ -809,9 +809,7 @@ export function mockGetExternalDashboardMetrics(): ExternalDashboardMetrics {
   return {
     mode: 'mock',
     websiteApplications7d: 38,
-    lmsStudents: 126,
     websiteSyncedAt: mockExternalSyncAt,
-    lmsSyncedAt: mockExternalSyncAt,
   };
 }
 

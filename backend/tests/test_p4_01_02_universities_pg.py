@@ -27,7 +27,7 @@ from app.models.catalog import (
     University,
     UniversityResponsible,
 )
-from app.models.interactions import UniversityProduct, UniversityProgram
+from app.models.interactions import Meeting, UniversityProduct, UniversityProgram
 from app.models.catalog import ITProduct, Vendor
 
 TEST_URL = os.getenv("TEST_DATABASE_URL", "sqlite://")
@@ -109,6 +109,18 @@ def _seed(s: Session) -> dict:
             UniversityResponsible(university_id=beta.id, responsible_id=r2.id),
         ]
     )
+    # The ТЗ period filters on interaction dates, so the list endpoint needs
+    # real interactions to select by month.
+    s.add_all([
+        Meeting(id=uuid4(), university_id=u.id, meeting_type="online",
+                subject=f"Meeting {n}", participants=[],
+                meeting_at=at, created_by_keycloak_sub="t")
+        for n, (u, at) in enumerate((
+            (alpha, _utc(2026, 1, 20)),
+            (beta, _utc(2026, 4, 10)),
+            (gamma, _utc(2026, 8, 5)),
+        ))
+    ])
     return {
         "d1": d1.id, "d2": d2.id,
         "p1": p1.id, "p2": p2.id, "p3": p3.id,
@@ -225,7 +237,8 @@ def test_unified_and_legacy_combine_with_and(client):
     assert r.json()["total"] == 0
 
 
-def test_unified_date_range_on_created_at(client):
+def test_unified_date_range_on_interactions(client):
+    """ТЗ: the list endpoint applies the same interaction period as reports."""
     c, _ = client
     r = c.get(
         "/api/v1/universities",

@@ -1,25 +1,11 @@
-import type { ExpirationStatus, UpcomingDateStatus } from './formatters';
-import type { ExpirationStatus as _ExpirationStatus } from './formatters';
+import type { UpcomingDateStatus } from './formatters';
 import type { ProgramStatus, UniversityDocumentStatus, UniversityHistoryEventType, UniversityLicenseStatus, UniversityPassportWorkflow, UniversityProductStatus, UniversityWorkflowStageStatus } from './universities-repository';
-export type TeacherReadiness = 'ready' | 'attention' | 'expired';
-export type TeacherCertificateStatus = _ExpirationStatus | 'no_expiry';
 import type { AttentionItem } from './dashboard-repository';
 
 export type SemanticIntent = 'neutral' | 'brand' | 'info' | 'success' | 'warning' | 'danger';
-export type ReadinessIcon = 'success' | 'warning' | 'error';
 export type WorkflowStageIcon = 'check' | 'information' | 'time' | 'skip' | 'error';
 
-export const readinessSemantics: Record<TeacherReadiness, { label: string; intent: SemanticIntent; icon: ReadinessIcon }> = {
-  ready: { label: 'Готов', intent: 'success', icon: 'success' },
-  attention: { label: 'Требует внимания', intent: 'warning', icon: 'warning' },
-  expired: { label: 'Просрочено', intent: 'danger', icon: 'error' },
-};
-
 export const programStatusIntent: Record<ProgramStatus, SemanticIntent> = { planned: 'neutral', active: 'brand', launched: 'success', archived: 'neutral' };
-export const expirationStatusIntent: Record<ExpirationStatus, SemanticIntent> = { current: 'success', expires_soon: 'warning', expired: 'danger' };
-export const expirationStatusLabels: Record<ExpirationStatus, string> = { current: 'Актуально', expires_soon: 'Скоро истекает', expired: 'Просрочено' };
-export const certificateStatusIntent: Record<TeacherCertificateStatus, SemanticIntent> = { ...expirationStatusIntent, no_expiry: 'neutral' };
-export const certificateStatusLabels: Record<TeacherCertificateStatus, string> = { ...expirationStatusLabels, no_expiry: 'Бессрочный' };
 export const upcomingDateIntent: Record<UpcomingDateStatus, SemanticIntent> = { long_term: 'success', approaching: 'warning', urgent: 'danger', overdue: 'danger', unknown: 'neutral' };
 export const licenseStatusIntent: Record<UniversityLicenseStatus, SemanticIntent> = { active: 'success', expires_soon: 'warning', expired: 'danger' };
 export const documentStatusIntent: Record<UniversityDocumentStatus, SemanticIntent> = { signed: 'success', pending: 'warning', expired: 'danger', archived: 'neutral' };

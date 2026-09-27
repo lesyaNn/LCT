@@ -38,14 +38,19 @@ from app.models.catalog import (
     UniversityResponsible,
     Vendor,
 )
-from app.models.interactions import UniversityProduct, UniversityProgram
+from app.models.interactions import (
+    InteractionNote,
+    Meeting,
+    UniversityProduct,
+    UniversityProgram,
+)
 from app.models.workflow_instances import InstanceStage, WorkflowInstance
 from app.models.workflow_templates import WorkflowStage, WorkflowTemplate
 from app.modules.analytics.columns import DEFAULT_COLUMNS
 from app.modules.analytics.dataset import ReportDatasetService as Dataset
 from app.modules.analytics.filters import UnifiedFilter
 from app.modules.analytics.json_export import generate_json_report
-from app.modules.analytics.pdf import compute_kpi, generate_pdf_report
+from app.modules.analytics.pdf import ReportKpi, generate_pdf_report
 from app.modules.analytics.xlsx import HEADER_ROW, generate_xlsx_report
 from tests.test_p4_04_pdf_unit import _nospace, extract_pdf_text
 
@@ -57,7 +62,7 @@ SUBSET_6 = [
     "product",
     "workflow_status",
     "responsible",
-    "health_score",
+    "workflow_progress",
 ]
 
 
@@ -105,14 +110,6 @@ def _seed(s: Session) -> dict:
             UniversityResponsible(university_id=delta.id, responsible_id=r2.id),
         ]
     )
-    s.add_all([
-        HealthScoreCurrent(university_id=mgu.id, score=85, status="green",
-                           breakdown={}, reasons=[], input_counters={},
-                           calculated_at=datetime(2026, 9, 1, tzinfo=timezone.utc)),
-        HealthScoreCurrent(university_id=beta.id, score=60, status="yellow",
-                           breakdown={}, reasons=[], input_counters={},
-                           calculated_at=datetime(2026, 9, 1, tzinfo=timezone.utc)),
-    ])
     c1 = Contract(
         id=uuid4(),
         university_id=mgu.id,
@@ -218,43 +215,47 @@ def _seed(s: Session) -> dict:
     s.flush()
     inst.current_instance_stage_id = st2.id
     inst.current_stage_id = t2.id
-    s.add_all(
-        [
-            HealthScoreSnapshot(
-                id=uuid4(),
-                university_id=mgu.id,
-                score=70,
-                status="yellow",
-                breakdown={},
-                reasons=[],
-                calculated_at=datetime(2026, 8, 1, tzinfo=timezone.utc),
-                period_day=date(2026, 8, 1),
-                trigger_event="daily_cron",
-            ),
-            HealthScoreSnapshot(
-                id=uuid4(),
-                university_id=mgu.id,
-                score=85,
-                status="green",
-                breakdown={},
-                reasons=[],
-                calculated_at=datetime(2026, 9, 1, tzinfo=timezone.utc),
-                period_day=date(2026, 9, 1),
-                trigger_event="daily_cron",
-            ),
-            HealthScoreSnapshot(
-                id=uuid4(),
-                university_id=beta.id,
-                score=60,
-                status="yellow",
-                breakdown={},
-                reasons=[],
-                calculated_at=datetime(2026, 9, 1, tzinfo=timezone.utc),
-                period_day=date(2026, 9, 1),
-                trigger_event="daily_cron",
-            ),
-        ]
+    # Бета gets its own fully-completed instance, so `workflow_progress`
+    # has two different real values (МГУ 50%, Бета 100%) to aggregate.
+    inst_beta = WorkflowInstance(university_id=beta.id, template_id=template.id)
+    s.add(inst_beta)
+    s.flush()
+    st_beta = InstanceStage(
+        instance_id=inst_beta.id,
+        template_stage_id=t1.id,
+        order_index=1,
+        name="Этап 1",
+        status="completed",
+        completed_at=datetime(2026, 5, 1, tzinfo=timezone.utc),
     )
+    s.add(st_beta)
+    s.flush()
+    inst_beta.current_instance_stage_id = None
+    # Every seeded university gets an interaction, because the ТЗ period
+    # filters on the interaction date (meetings / interaction notes), not on
+    # the university creation date. A university without any interaction is
+    # therefore excluded as soon as a period is set — covered explicitly by
+    # test_period_filter_follows_interactions_not_creation_date.
+    s.add_all([
+        Meeting(
+            id=uuid4(),
+            university_id=u.id,
+            meeting_type="online",
+            subject=f"Встреча {n}",
+            participants=[],
+            meeting_at=_utc(2026, 9, 5),
+            created_by_keycloak_sub="tester",
+        )
+        for n, u in enumerate((mgu, beta, gamma, delta))
+    ])
+    s.add(InteractionNote(
+        id=uuid4(),
+        university_id=mgu.id,
+        author_keycloak_sub="tester",
+        content="Заметка о встрече",
+        is_internal=True,
+    ))
+    s.flush()
     return {"mgu": mgu.id, "beta": beta.id, "gamma": gamma.id, "delta": delta.id}
 
 
@@ -278,18 +279,26 @@ def test_pdf_rows_match_dataset_rows(fx):
 
 def test_pdf_kpi_and_charts_from_pg_dataset(fx):
     s, _, _, tmp_path = fx
-    ds = Dataset.fetch_rows(s, UnifiedFilter(), None, today=TODAY)
+    # The default column set is the ТЗ set and does NOT include the progress
+    # column, so a KPI that reports progress has to select it explicitly.
+    cols = [*DEFAULT_COLUMNS, "workflow_progress"]
+    ds = Dataset.fetch_rows(s, UnifiedFilter(), cols, today=TODAY)
     assert ds.total == 5
-    kpi = compute_kpi(ds)
-    assert kpi["university_count"] == 4
-    assert kpi["row_count"] == 5
-    assert kpi["avg_health_score"] == pytest.approx((85 + 85 + 60) / 3, abs=0.05)
-    result = generate_pdf_report(s, UnifiedFilter(), None, tmp_path / "full.pdf")
+    kpi = ReportKpi()
+    for row in ds.rows:
+        kpi.add_row(row)
+    assert kpi.row_count == 5
+    assert kpi.university_count == 4
+    # Row-grain mean over the 3 rows that carry a progress value:
+    # МГУ 1/2 stages (50%) x2 rows + Бета 1/1 (100%) -> 66.7.
+    assert kpi.avg_workflow_progress == pytest.approx(66.7, abs=0.05)
+    result = generate_pdf_report(s, UnifiedFilter(), cols, tmp_path / "full.pdf")
     assert result.row_count == 5
-    assert result.columns == list(DEFAULT_COLUMNS)
+    assert result.columns == cols
     text = _nospace(extract_pdf_text(result.path.read_bytes()))
     assert _nospace("Количество ВУЗов: 4") in text
-    assert _nospace("Зелёный") in text or _nospace("Жёлтый") in text
+    assert _nospace("Средний прогресс workflow, %: 66.7") in text
+    assert _nospace("Зелёный") in text
 
 
 def test_pdf_empty_filter_result_still_valid(fx):
@@ -322,27 +331,34 @@ def test_pdf_scoped_user_matches_dataset_scope(fx):
 # ------------------------------------------------------- JSON over PG dataset
 
 
-def test_json_default_14_types_and_unicode(fx):
+def test_json_default_columns_and_unicode(fx):
     s, _, _, tmp_path = fx
+    # Two exports: the ТЗ default set, and the extended set this test inspects
+    # for contract/license types and fallback rows.
     ds = Dataset.fetch_rows(s, UnifiedFilter(), None, today=TODAY)
-    result = generate_json_report(s, UnifiedFilter(), None, tmp_path / "r.json")
+    generate_json_report(s, UnifiedFilter(), None, tmp_path / "default.json")
+    default_doc = json.loads((tmp_path / "default.json").read_text(encoding="utf-8"))
+    assert [entry["key"] for entry in default_doc["columns"]] == list(DEFAULT_COLUMNS)
+    assert default_doc["totals"]["row_count"] == 5
+
+    extended = [*DEFAULT_COLUMNS, "contract_number", "license_signed",
+                "license_expires", "comment"]
+    result = generate_json_report(s, UnifiedFilter(), extended, tmp_path / "r.json")
     assert result.row_count == ds.total == 5
     doc = json.loads((tmp_path / "r.json").read_text(encoding="utf-8"))
-    assert [entry["key"] for entry in doc["columns"]] == list(DEFAULT_COLUMNS)
     assert all(entry["title"] for entry in doc["columns"])
     assert doc["totals"]["row_count"] == 5
     assert len(doc["rows"]) == 5
     lic1 = next(i for i in doc["rows"] if i.get("contract_number") == "C-001")
     assert lic1["university"] == "МГУ им. Ломоносова"
     assert lic1["product"] == "ПО Защита"
-    assert lic1["health_score"] == 85 and isinstance(lic1["health_score"], int)
+    assert lic1["contract_number"] == "C-001"
     assert lic1["license_signed"] == "2026-02-01"
     assert lic1["license_expires"] == "2027-02-01"
     assert lic1["comment"] == "Комментарий №1"
     gamma = next(i for i in doc["rows"] if i["university"] == "ВУЗ Гамма")
     assert gamma["direction"] is None
     assert gamma["product"] is None
-    assert gamma["health_score"] is None
     assert gamma["contract_number"] == "C-003"  # fallback row
     raw = (tmp_path / "r.json").read_bytes().decode("utf-8")
     assert "МГУ им. Ломоносова" in raw
@@ -421,12 +437,14 @@ def test_cross_format_same_rows_columns_values(fx):
 
 def test_cross_format_filtered_subset(fx):
     s, _, ids, tmp_path = fx
+    # The period is the INTERACTION period (ТЗ), so an interaction must exist
+    # inside the range for the university to be selected.
     filters = UnifiedFilter(
         date_from=date(2026, 1, 1),
         date_to=date(2026, 12, 31),
         university_ids=[ids["mgu"]],
     )
-    cols = ["university", "product", "health_score"]
+    cols = ["university", "product", "workflow_progress"]
     ds = Dataset.fetch_rows(s, filters, cols, today=TODAY)
     assert ds.total == 2
     xlsx = generate_xlsx_report(s, filters, cols, tmp_path / "f.xlsx")
@@ -436,7 +454,9 @@ def test_cross_format_filtered_subset(fx):
     assert xlsx.row_count == pdf.row_count == doc["totals"]["row_count"] == 2
     products = sorted(i["product"] for i in doc["rows"])
     assert products == ["ПО Второе", "ПО Защита"]
-    assert all(i["health_score"] == 85 for i in doc["rows"])
+    # The filter is scoped to МГУ, whose 1-of-2 completed stages give 50%
+    # on both of its license rows.
+    assert {i["workflow_progress"] for i in doc["rows"]} == {50}
 
 
 # ------------------------------------------------------- volume probes
@@ -448,11 +468,24 @@ def test_json_large_export_bounded(fx):
     product = ITProduct(id=uuid4(), vendor_id=vendor.id, name="Массовое ПО")
     s.add_all([vendor, product])
     s.flush()
-    extra_unis, extra_licenses = [], []
+    extra_unis, extra_licenses, extra_meetings = [], [], []
     for i in range(1500):
         uid = uuid4()
         extra_unis.append(
             University(id=uid, name=f"Массовый ВУЗ {i:04d}", created_at=_utc(2026, 6, 1))
+        )
+        # One interaction inside the filtered period: the ТЗ period is the
+        # interaction period, not the university creation date.
+        extra_meetings.append(
+            Meeting(
+                id=uuid4(),
+                university_id=uid,
+                meeting_type="online",
+                subject=f"Встреча {i}",
+                participants=[],
+                meeting_at=_utc(2026, 6, 1),
+                created_by_keycloak_sub="tester",
+            )
         )
         extra_licenses.append(
             License(
@@ -472,6 +505,7 @@ def test_json_large_export_bounded(fx):
     s.add_all(extra_unis)
     s.flush()
     s.add_all(extra_licenses)
+    s.add_all(extra_meetings)
     s.commit()
     filters = UnifiedFilter(date_from=date(2026, 6, 1), date_to=date(2026, 6, 1))
     ds = Dataset.fetch_rows(s, filters, SUBSET_6, today=TODAY)
@@ -484,9 +518,25 @@ def test_json_large_export_bounded(fx):
 
 def test_pdf_multipage_volume(fx):
     s, _, _, tmp_path = fx
+    paging = []
     for i in range(200):
         uid = uuid4()
-        s.add(University(id=uid, name=f"Пейджинговый ВУЗ {i:03d}", created_at=_utc(2026, 6, 2)))
+        paging.append(University(id=uid, name=f"Пейджинговый ВУЗ {i:03d}",
+                                 created_at=_utc(2026, 6, 2)))
+    s.add_all(paging)
+    s.flush()
+    s.add_all([
+        Meeting(
+            id=uuid4(),
+            university_id=u.id,
+            meeting_type="online",
+            subject=f"Пейджинговая встреча {i}",
+            participants=[],
+            meeting_at=_utc(2026, 6, 2),
+            created_by_keycloak_sub="tester",
+        )
+        for i, u in enumerate(paging)
+    ])
     s.commit()
     filters = UnifiedFilter(date_from=date(2026, 6, 2), date_to=date(2026, 6, 2))
     result = generate_pdf_report(s, filters, SUBSET_6, tmp_path / "pages.pdf")

@@ -124,6 +124,7 @@ def test_format_generators_cover_all_formats_with_shared_signature():
     import inspect
 
     assert set(FORMAT_GENERATORS) == {
+        ReportFormat.XLS,
         ReportFormat.XLSX,
         ReportFormat.PDF,
         ReportFormat.JSON,
@@ -170,7 +171,9 @@ def test_generate_report_file_dispatches_per_format(tmp_path):
 
 
 def test_supported_formats_router_matches_service():
-    assert SUPPORTED_FORMATS == frozenset({ReportFormat.XLSX, ReportFormat.PDF, ReportFormat.JSON})
+    assert SUPPORTED_FORMATS == frozenset(FORMAT_GENERATORS), (
+        "the router must accept exactly the formats that have a generator"
+    )
 
 
 def test_ensure_xlsx_rejects_other_formats():
@@ -286,7 +289,7 @@ def test_router_openapi_paths_and_unique_operation_ids():
 
 
 def test_report_format_enum_still_single_source():
-    assert {m.value for m in ReportFormat} == {"xlsx", "pdf", "json"}
+    assert {m.value for m in ReportFormat} == {"xls", "xlsx", "pdf", "json"}
 
 
 def test_report_job_read_never_exposes_filesystem_path():
@@ -315,7 +318,7 @@ def test_public_report_request_contract_matches_code():
     contract = json.loads(contract_path.read_text(encoding="utf-8"))
     assert contract["example"]["format"] == "xlsx"
     assert contract["example"]["columns"] == list(DEFAULT_COLUMNS)
-    assert set(contract["request"]["format"]["values"]) == {"xlsx", "pdf", "json"}
+    assert set(contract["request"]["format"]["values"]) == {"xls", "xlsx", "pdf", "json"}
     assert contract["async_api"]["endpoint"] == "POST /api/v1/reports"
     assert contract["async_api"]["success"] == "202 Accepted"
     assert contract["async_api"]["success_body"] == {

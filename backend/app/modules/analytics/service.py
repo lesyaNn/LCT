@@ -1,4 +1,4 @@
-"""Pure aggregations (without students/teachers/health score)."""
+"""Pure aggregations over the loaded selection."""
 
 from collections import Counter, defaultdict
 from datetime import date

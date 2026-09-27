@@ -274,20 +274,26 @@ def seed_performance(session: Session) -> dict:
         # audit events (spread created_at)
         for a_idx in range(AUDIT_PER_UNIV):
             marker = f"perf-{u_idx:02d}-{a_idx:03d}"
+            # The idempotency probe must use the same key the insert writes
+            # (entity_id is a UUID since migration 000010).
             if session.execute(
                 select(AuditEvent).filter_by(
-                    entity_type="perf", entity_id=u_idx * 1000 + a_idx
+                    entity_type="perf", entity_id=uni.id
                 )
-            ).scalar_one_or_none():
+            ).first():
                 continue
             session.add(
                 AuditEvent(
-                    user_id=1,
+                    # user_id is TEXT and entity_id is UUID since migration
+                    # 000010; the legacy int values no longer fit the columns.
+                    user_id="perf-seed",
                     entity_type="perf",
-                    entity_id=u_idx * 1000 + a_idx,
+                    entity_id=uni.id,
+                    user_name="perf-seed",
                     action="update",
-                    before_data="{}",
-                    after_data='{"marker": "%s"}' % marker,
+                    # The canonical model stores old_value/new_value as JSONB.
+                    old_value={},
+                    new_value={"marker": marker},
                     ip_address="",
                     university_id=uni.id,
                     created_at=_past_ts(RNG.randint(0, 700)),

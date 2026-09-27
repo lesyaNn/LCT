@@ -21,6 +21,7 @@ from app.models.report_job import (
 from app.core.security import CurrentUser
 from app.modules.analytics import report_jobs as jobs
 from app.modules.analytics.report_worker import build_worker_user
+from app.schemas.common import ReportFormat
 
 
 def test_status_contract_is_single_source():
@@ -48,6 +49,27 @@ def test_contained_job_path_accepts_own_artifact(tmp_path, monkeypatch):
     target = tmp_path / f"report_{job_id}.xlsx"
     target.write_bytes(b"x")
     assert jobs.contained_job_path(str(target)) == target.resolve()
+
+
+def test_every_report_format_is_storable_and_downloadable(tmp_path, monkeypatch):
+    """Adding a ReportFormat must not need a matching hand-written edit.
+
+    Regression: XLS was added to the enum and the worker's generator table, but
+    two hard-coded format lists were missed, so an XLS report was rejected at
+    creation (422) and its already-written artifact was not downloadable
+    (404 FILE_NOT_FOUND) — both with no failing test.
+    """
+    monkeypatch.setenv("REPORTS_DIR", str(tmp_path))
+    formats = [f.value for f in ReportFormat]
+    assert set(formats) == set(jobs.SUPPORTED_JOB_FORMATS)
+
+    job_id = uuid.uuid4()
+    for fmt in formats:
+        artifact = tmp_path / f"report_{job_id}.{fmt}"
+        artifact.write_bytes(b"x")
+        assert jobs.contained_job_path(str(artifact)) == artifact.resolve(), (
+            f"artifact of format {fmt!r} is not downloadable"
+        )
 
 
 def test_contained_job_path_rejects_traversal_and_foreign_files(tmp_path, monkeypatch):

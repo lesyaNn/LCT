@@ -16,8 +16,6 @@
 .chips { display: flex; flex-wrap: wrap; gap: var(--rtk-space-1); max-width: 270px; }
 .chip, .chipMore { background: var(--rtk-color-surface-subtle); border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-secondary); display: inline-block; font-size: 11px; max-width: 180px; overflow: hidden; padding: 3px 6px; text-overflow: ellipsis; white-space: nowrap; }
 .chipMore { color: var(--rtk-color-brand); font-weight: 700; }
-.studentPage { display: flex; flex-direction: column; gap: var(--rtk-space-5); }
-.studentSummary { display: grid; gap: var(--rtk-space-3); grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .integrationControls { align-items: flex-end; display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); }
 .integrationMeta { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); }
 .integrationMeta time { color: var(--rtk-color-text-tertiary); font-size: 11px; white-space: nowrap; }
@@ -80,7 +78,6 @@
   .filter select { min-height: 48px; }
   .actionLink, .iconAction, .inlineDetails summary { align-items: center; display: inline-flex; min-height: 44px; }
   .iconAction { min-width: 44px; }
-  .studentSummary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .filtersRow { align-items: stretch; flex-direction: column; }
   .meetingDetails summary { align-items: center; display: flex; min-height: 44px; }
   .responsiblesGrid { grid-template-columns: 1fr; }
@@ -89,5 +86,4 @@
   .meetingSurface { padding: var(--rtk-space-4); }
 }
 @media (max-width: 420px) {
-  .studentSummary { gap: var(--rtk-space-2); }
 }

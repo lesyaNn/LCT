@@ -12,7 +12,7 @@ def test_audit_writer_never_owns_business_commit():
     event = AuditService(db).log_event(
         context=AuditContext("actor", "Actor", "admin"),
         action=AuditAction.UPDATE,
-        entity_type="student",
+        entity_type="university",
         entity_id=uuid4(),
         old_value={"password": "must-not-be-kept"},
         new_value={"status": "active"},

@@ -4,7 +4,8 @@ Data comes ONLY from :class:`ReportDatasetService` (same filters, same row
 grain, same selected columns, same workflow values as the dataset).
 Column titles come ONLY from ``COLUMN_REGISTRY`` — there is no second
 ``PDF_COLUMN_MAPPING``. ``UnifiedFilter`` semantics stay frozen (date bounds
-on ``universities.created_at``, AND between dimensions, OR/IN within).
+on the interaction period — meetings / interaction notes, AND between
+dimensions, OR/IN within).
 
 Presentation helpers (title text, period text, human-readable filter
 summary, result metadata, width ratios) are reused from
@@ -48,6 +49,7 @@ file is removed and no partial file is left behind.
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -66,7 +68,7 @@ __all__ = [
     "NO_CHART_DATA_TEXT",
     "PDF_PAGE_SIZE_ORIENTATION",
     "PDFFontUnavailableError",
-    "compute_kpi",
+    "ReportKpi",
     "ensure_pdf_fonts",
     "find_dejavu_font_files",
     "format_cell_value",
@@ -196,37 +198,77 @@ def format_cell_value(key: str, value: Any) -> str:
     return str(value)
 
 
-def compute_kpi(dataset: Any) -> dict[str, Any]:
-    """KPI block from the SAME filtered dataset as the table.
+@dataclass
+class ReportKpi:
+    """KPI counters accumulated while streaming the report dataset.
 
-    ``Количество ВУЗов`` = ``dataset.university_count``,
-    ``Количество строк`` = ``dataset.total`` (University × License grain),
-    ``Средний балл`` = mean of non-null score values (``health_score`` when
-    present, else ``workflow_progress`` proxy; ``None`` when no scores —
-    never 0), ``Просроченные задачи`` = sum of ``overdue_tasks`` (0 when
-    none). Security scope matches the table by construction (one dataset
-    object).
+    The PDF renders one filtered dataset, so the KPI block must be derived
+    from exactly those rows. Accumulating inline during the single streaming
+    pass keeps that guarantee (no second query, no second dataset object)
+    and removes the previous duplicate implementation, which was dead code
+    that the generator never called and which disagreed with it on the
+    average-score key.
+
+    ``avg_workflow_progress`` is the mean of the non-null
+    ``workflow_progress`` values (percent), or ``None`` when no row carries
+    a progress value — never 0, so "нет данных" stays distinguishable from
+    "нулевой прогресс".
     """
-    rows = list(getattr(dataset, "rows", []) or [])
-    scores = [
-        _score_value(row)
-        for row in rows
-        if isinstance(row, dict) and _score_value(row) is not None
-    ]
-    avg = round(sum(scores) / len(scores), 1) if scores else None
-    overdue_total = 0
-    for row in rows:
-        if isinstance(row, dict):
-            value = row.get("overdue_tasks")
-            if isinstance(value, (int, float)) and not isinstance(value, bool):
-                overdue_total += int(value)
-    return {
-        "university_count": int(getattr(dataset, "university_count", 0) or 0),
-        "row_count": int(getattr(dataset, "total", len(rows)) or 0),
-        "avg_health_score": avg,
-        "health_scored_rows": len(scores),
-        "overdue_total": overdue_total,
-    }
+
+    row_count: int = 0
+    overdue_total: int = 0
+    progress_sum: float = 0.0
+    progress_rows: int = 0
+    _university_names: set[str] = field(default_factory=set, repr=False)
+
+    def add_row(self, row: dict[str, Any]) -> None:
+        self.row_count += 1
+        name = row.get("university")
+        if isinstance(name, str) and name:
+            self._university_names.add(name)
+        overdue = row.get("overdue_tasks")
+        if isinstance(overdue, (int, float)) and not isinstance(overdue, bool):
+            self.overdue_total += int(overdue)
+        progress = row.get("workflow_progress")
+        if isinstance(progress, (int, float)) and not isinstance(progress, bool):
+            self.progress_sum += float(progress)
+            self.progress_rows += 1
+
+    @property
+    def university_count(self) -> int:
+        """Distinct universities seen in the streamed rows."""
+        return len(self._university_names)
+
+    def resolve_university_count(self, fallback: int) -> int:
+        """Use the streamed names when available, else the scope-wide count.
+
+        When the ``university`` column is not selected the rows carry no
+        name, so the distinct set stays empty and the caller supplies the
+        filtered university count instead of reporting a wrong 0.
+        """
+        return len(self._university_names) or fallback
+
+    @property
+    def avg_workflow_progress(self) -> float | None:
+        """Mean progress in percent, or ``None`` when nothing was measured."""
+        if not self.progress_rows:
+            return None
+        return round(self.progress_sum / self.progress_rows, 1)
+
+
+def _scope_university_count(db: Any, filters: Any, user: Any) -> int:
+    """Universities matching the filter, used when rows carry no name.
+
+    Needed only when the ``university`` column is not selected, so the KPI
+    still reports the real selection size instead of 0. A failure here must
+    not break the export: the count degrades to 0 rather than 500.
+    """
+    from app.modules.analytics.analytics import AnalyticsService
+
+    try:
+        return len(AnalyticsService.filtered_university_ids(db, filters, user=user))
+    except Exception:
+        return 0
 
 
 def _ensure_tz_aware(moment: datetime | None) -> datetime:
@@ -241,37 +283,41 @@ def _ensure_tz_aware(moment: datetime | None) -> datetime:
 # Charts (reportlab native drawings; only real dataset values)
 # ---------------------------------------------------------------------------
 
-#: Score thresholds for the health pie (frozen: green >= 85, yellow >= 60).
-_SCORE_GREEN_MIN = 85
-_SCORE_YELLOW_MIN = 60
+#: Progress thresholds for the pie (frozen: green >= 85, yellow >= 60).
+_PROGRESS_GREEN_MIN = 85
+_PROGRESS_YELLOW_MIN = 60
 
 
-def _score_value(row: dict[str, Any]) -> float | None:
-    """Score for the health pie: ``health_score`` when present, else the
-    ``workflow_progress`` proxy (both numeric 0..100, never bool)."""
-    for key in ("health_score", "workflow_progress"):
-        value = row.get(key)
-        if isinstance(value, (int, float)) and not isinstance(value, bool):
-            return float(value)
+def _progress_value(row: dict[str, Any]) -> float | None:
+    """Workflow progress of a row in percent (numeric 0..100, never bool).
+
+    The only source is the ``workflow_progress`` column. Looking up a column
+    that is not in the registry is pointless: the lookup would always fall
+    through, while the label and the KPI would claim a metric the report
+    never resolved.
+    """
+    value = row.get("workflow_progress")
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
     return None
 
 
-def _score_status(score: float) -> str:
-    """green / yellow / red bucket for one score (frozen thresholds)."""
-    if score >= _SCORE_GREEN_MIN:
+def _progress_status(progress: float) -> str:
+    """green / yellow / red bucket for one progress value (frozen thresholds)."""
+    if progress >= _PROGRESS_GREEN_MIN:
         return "green"
-    if score >= _SCORE_YELLOW_MIN:
+    if progress >= _PROGRESS_YELLOW_MIN:
         return "yellow"
     return "red"
 
 
-def _health_distribution(
+def _progress_distribution(
     rows: list[dict[str, Any]], resolved: list[str]
 ) -> tuple[dict[str, int], str]:
-    """Count green/yellow/red scores (frozen 85/60 thresholds, local helper).
+    """Count green/yellow/red progress values (frozen 85/60 thresholds).
 
     Per-university grain when the ``university`` column is selected
-    (first non-null score per university name), else row grain. The
+    (first non-null progress per university name), else row grain. The
     returned grain label is rendered in the chart title (honest label).
     """
     per_university = "university" in resolved
@@ -279,24 +325,24 @@ def _health_distribution(
         seen: dict[str, float] = {}
         for row in rows:
             name = row.get("university")
-            score = _score_value(row)
-            if name is None or score is None:
+            progress = _progress_value(row)
+            if name is None or progress is None:
                 continue
             key = str(name)
             if key not in seen:
-                seen[key] = score
-        scores = list(seen.values())
+                seen[key] = progress
+        values = list(seen.values())
         grain = "по ВУЗам"
     else:
-        scores = [
-            score
+        values = [
+            progress
             for row in rows
-            if (score := _score_value(row)) is not None
+            if (progress := _progress_value(row)) is not None
         ]
         grain = "по строкам отчёта"
     counts = {"green": 0, "yellow": 0, "red": 0}
-    for score in scores:
-        counts[_score_status(score)] += 1
+    for progress in values:
+        counts[_progress_status(progress)] += 1
     return counts, grain
 
 
@@ -334,8 +380,8 @@ def _workflow_distribution(
     return _column_distribution(rows, resolved, "workflow_status")
 
 
-def _health_chart(counts: dict[str, int], grain: str) -> Any:
-    """Pie drawing: score-status distribution (DejaVu labels)."""
+def _progress_chart(counts: dict[str, int], grain: str) -> Any:
+    """Pie drawing: progress-status distribution (DejaVu labels)."""
     from reportlab.graphics.charts.piecharts import Pie
     from reportlab.graphics.shapes import Drawing, String
     from reportlab.lib.colors import HexColor
@@ -349,7 +395,7 @@ def _health_chart(counts: dict[str, int], grain: str) -> Any:
     title = String(
         230,
         155,
-        f"Распределение {grain} по баллу готовности",
+        f"Распределение {grain} по прогрессу workflow, %",
         fontName=FONT_BOLD,
         fontSize=10,
         textAnchor="middle",
@@ -441,7 +487,7 @@ def generate_pdf_report(
 ) -> _xlsx.GeneratedReport:
     """Generate the frozen PDF report from the report dataset.
 
-    ``columns=None`` selects the frozen 12 mandatory ``DEFAULT_COLUMNS``;
+    ``columns=None`` selects the ТЗ default ``DEFAULT_COLUMNS``;
     otherwise the resolved/deduped ``ReportRequest.columns`` order is kept
     verbatim (never sorted). Raises ``UnknownReportColumnError`` /
     ``EmptyReportColumnsError`` (both ``ValueError``) for invalid
@@ -469,34 +515,13 @@ def generate_pdf_report(
         # university_count uses distinct university names when the column is
         # selected, else the filtered university scope (same predicate set).
         rows: list[dict[str, Any]] = []
-        university_names: set[str] = set()
-        overdue_total = 0
+        kpi = ReportKpi()
         for row in ReportDatasetService.iterate_rows(db, filters, resolved, user=user):
             rows.append(row)
-            name = row.get("university")
-            if isinstance(name, str) and name:
-                university_names.add(name)
-            overdue = row.get("overdue_tasks")
-            if isinstance(overdue, (int, float)) and not isinstance(overdue, bool):
-                overdue_total += int(overdue)
-        if "university" in resolved:
-            university_count = len(university_names)
-        else:
-            from app.modules.analytics.analytics import AnalyticsService
-
-            try:
-                university_count = len(
-                    AnalyticsService.filtered_university_ids(
-                        db, filters, user=user
-                    )
-                )
-            except Exception:
-                university_count = 0
-        kpi = {
-            "university_count": university_count,
-            "row_count": len(rows),
-            "overdue_total": overdue_total,
-        }
+            kpi.add_row(row)
+        university_count = kpi.resolve_university_count(
+            _scope_university_count(db, filters, user)
+        )
 
         page = landscape(A4)
         margin = 12 * mm
@@ -542,12 +567,13 @@ def generate_pdf_report(
             Spacer(1, 4 * mm),
             Paragraph("Ключевые показатели", heading_style),
         ]
-        avg_text = str(kpi["avg_health_score"]) if kpi["avg_health_score"] is not None else "—"
+        avg_progress = kpi.avg_workflow_progress
         kpi_lines = (
-            f"Количество ВУЗов: {kpi['university_count']}",
-            f"Количество строк (лицензий): {kpi['row_count']}",
-            f"Средний балл готовности: {avg_text}",
-            f"Просроченные задачи: {kpi['overdue_total']}",
+            f"Количество ВУЗов: {university_count}",
+            f"Количество строк (лицензий): {kpi.row_count}",
+            f"Средний прогресс workflow, %: "
+            f"{avg_progress if avg_progress is not None else '—'}",
+            f"Просроченные задачи: {kpi.overdue_total}",
         )
         for line in kpi_lines:
             story.append(Paragraph(_xml_escape(line), body_style))
@@ -590,13 +616,13 @@ def generate_pdf_report(
         story.append(table)
 
         story.append(Paragraph("Графики", heading_style))
-        counts, grain = _health_distribution(rows, resolved)
+        counts, grain = _progress_distribution(rows, resolved)
         if sum(counts.values()) > 0:
-            story.append(_health_chart(counts, grain))
+            story.append(_progress_chart(counts, grain))
         else:
             story.append(
                 Paragraph(
-                    _xml_escape(f"{NO_CHART_DATA_TEXT} (нет баллов готовности)"),
+                    _xml_escape(f"{NO_CHART_DATA_TEXT} (нет измеренного прогресса workflow)"),
                     body_style,
                 )
             )

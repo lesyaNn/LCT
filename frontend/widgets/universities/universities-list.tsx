@@ -30,9 +30,6 @@ import { TableShell } from '@/shared/ui/rtk/table-shell';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { TableSkeleton } from '@/shared/ui/skeleton';
 import {
-  getHealthStatus,
-  healthStatusMeta,
-  type HealthStatus,
 } from '@/shared/lib/universities-repository';
 import {
   getUniversities,
@@ -55,11 +52,6 @@ import styles from './universities-list.module.css';
 
 const DEFAULT_PAGE_SIZE = 8;
 const PAGE_SIZE_OPTIONS = [8, 12, 20];
-const HEALTH_STATUS_OPTIONS: Array<{ value: HealthStatus; label: string }> = [
-  { value: 'green', label: healthStatusMeta.green.label },
-  { value: 'yellow', label: healthStatusMeta.yellow.label },
-  { value: 'red', label: healthStatusMeta.red.label },
-];
 
 type SearchParamsLike = {
   get: (name: string) => string | null;
@@ -69,8 +61,7 @@ type SearchParamsLike = {
 type UniversityUrlState = UniversityListQuery;
 type QueryPatch = Record<string, string | number | string[] | null>;
 
-const SORT_COLUMNS = new Set<UniversitySortColumn>(['name', 'responsible', 'programs', 'stage', 'health_score', 'last_interaction']);
-const HEALTH_STATUSES = new Set<HealthStatus>(['green', 'yellow', 'red']);
+const SORT_COLUMNS = new Set<UniversitySortColumn>(['name', 'responsible', 'programs', 'stage', 'last_interaction']);
 
 function normalizeFilters(filters: UniversityFilters): UniversityFilters {
   return {
@@ -80,7 +71,6 @@ function normalizeFilters(filters: UniversityFilters): UniversityFilters {
     programIds: [...filters.programIds].sort(),
     productIds: [...filters.productIds].sort(),
     responsibleIds: [...filters.responsibleIds].sort(),
-    healthStatuses: [...filters.healthStatuses].sort(),
   };
 }
 
@@ -92,10 +82,6 @@ function parsePositiveInteger(value: string | null, fallback: number): number {
 function parseUrlState(searchParams: SearchParamsLike): UniversityUrlState {
   const sortValue = searchParams.get('sort');
   const parseList = (key: string) => (searchParams.get(key) ?? '').split(',').map((value) => value.trim()).filter(Boolean);
-  const parsedHealthStatuses = parseList('health_status').filter((value): value is HealthStatus => HEALTH_STATUSES.has(value as HealthStatus));
-  const healthStatuses = UNIVERSITY_LIST_CAPABILITIES.healthStatusSelection === 'single'
-    ? parsedHealthStatuses.slice(-1)
-    : parsedHealthStatuses;
   const pageSizeValue = parsePositiveInteger(searchParams.get('page_size'), DEFAULT_PAGE_SIZE);
   const rawDateFrom = searchParams.get('date_from') ?? '';
   const rawDateTo = searchParams.get('date_to') ?? '';
@@ -111,7 +97,6 @@ function parseUrlState(searchParams: SearchParamsLike): UniversityUrlState {
       programIds: parseList('program'),
       productIds: parseList('product'),
       responsibleIds: parseList('responsible'),
-      healthStatuses,
       workflowStageId: searchParams.get('stage') ?? '',
       dateFrom,
       dateTo,
@@ -134,7 +119,6 @@ const EMPTY_FILTERS: UniversityFilters = {
   programIds: [],
   productIds: [],
   responsibleIds: [],
-  healthStatuses: [],
   workflowStageId: '',
   dateFrom: '',
   dateTo: '',
@@ -149,7 +133,7 @@ function filtersFromState(state: UniversityUrlState): UniversityFilters {
 function hasActiveFilters(filters: UniversityFilters): boolean {
   return Boolean(
     filters.search || filters.city || filters.externalSource || filters.universityIds.length || filters.programIds.length ||
-    filters.productIds.length || filters.responsibleIds.length || filters.healthStatuses.length ||
+    filters.productIds.length || filters.responsibleIds.length ||
     filters.workflowStageId || filters.dateFrom || filters.dateTo,
   );
 }
@@ -166,7 +150,6 @@ function parseStoredFilters(value: string | null): UniversityFilters | null {
       programIds: Array.isArray(parsed.programIds) ? parsed.programIds.filter((item): item is string => typeof item === 'string') : [],
       productIds: Array.isArray(parsed.productIds) ? parsed.productIds.filter((item): item is string => typeof item === 'string') : [],
       responsibleIds: Array.isArray(parsed.responsibleIds) ? parsed.responsibleIds.filter((item): item is string => typeof item === 'string') : [],
-      healthStatuses: Array.isArray(parsed.healthStatuses) ? parsed.healthStatuses.filter((item): item is HealthStatus => HEALTH_STATUSES.has(item as HealthStatus)) : [],
       search: typeof parsed.search === 'string' ? parsed.search : '',
       city: typeof parsed.city === 'string' ? parsed.city : '',
       externalSource: parsed.externalSource === 'lms' || parsed.externalSource === 'website' ? parsed.externalSource : '',
@@ -192,7 +175,6 @@ function filtersPatch(filters: UniversityFilters): QueryPatch {
     program: filters.programIds,
     product: filters.productIds,
     responsible: filters.responsibleIds,
-    health_status: filters.healthStatuses,
     stage: filters.workflowStageId || null,
     date_from: filters.dateFrom || null,
     date_to: filters.dateTo || null,
@@ -235,11 +217,6 @@ function formatRelativeTime(isoDate: string): string {
 
 function formatFullDate(isoDate: string): string {
   return new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(isoDate));
-}
-
-function StatusBadge({ status }: { status: HealthStatus }) {
-  const meta = healthStatusMeta[status];
-  return <SemanticStatusBadge intent={meta.tone}>{meta.label}</SemanticStatusBadge>;
 }
 
 function StageBadge({ item }: { item: UniversityListItem }) {
@@ -327,7 +304,6 @@ function Filters({ state, options, catalogsLoading, catalogsUnavailable, searchI
         </Select>
       </label>
       <MultiSelect label="Ответственный" labelPlacement="outside" options={options.responsibles.map((person) => ({ id: person.id, name: person.name, description: person.role }))} values={filters.responsibleIds} onChange={(values) => onPatch({ responsible: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
-      <MultiSelect label="Health Score" labelPlacement="outside" options={HEALTH_STATUS_OPTIONS.map((option) => ({ id: option.value, name: option.label }))} values={filters.healthStatuses} onChange={(values) => onPatch({ health_status: UNIVERSITY_LIST_CAPABILITIES.healthStatusSelection === 'single' ? values.slice(-1) : values, page: 1 })} renderOption={(option) => <StatusBadge status={option.id as HealthStatus} />} hint={UNIVERSITY_LIST_CAPABILITIES.healthStatusSelection === 'single' ? 'Backend поддерживает выбор одного статуса.' : undefined} />
       <label className={styles.field} title={!UNIVERSITY_LIST_CAPABILITIES.filters.stage ? 'Backend пока не публикует фильтр по текущему этапу.' : undefined}>
         <span>Текущий этап</span>
         <Select disabled={!UNIVERSITY_LIST_CAPABILITIES.filters.stage} value={filters.workflowStageId} onChange={(event) => onPatch({ stage: event.target.value, page: 1 })}>
@@ -355,7 +331,6 @@ function universityActiveFilters(filters: UniversityFilters, options: University
   if (filters.city) chips.push({ key: 'city', label: `Город: ${filters.city}`, patch: { city: null, page: 1 } });
   if (filters.externalSource) chips.push({ key: 'external_source', label: filters.externalSource === 'lms' ? 'Источник: LMS' : 'Источник: сайт', patch: { external_source: null, page: 1 } });
   if (filters.responsibleIds.length) chips.push({ key: 'responsible', label: `Ответственный: ${selectedNames(filters.responsibleIds, options.responsibles)}`, patch: { responsible: null, page: 1 } });
-  if (filters.healthStatuses.length) chips.push({ key: 'health_status', label: `Health Score: ${selectedNames(filters.healthStatuses, HEALTH_STATUS_OPTIONS.map((option) => ({ id: option.value, name: option.label })))}`, patch: { health_status: null, page: 1 } });
   if (filters.workflowStageId) chips.push({ key: 'stage', label: `Этап: ${options.stages.find((item) => item.id === filters.workflowStageId)?.name ?? filters.workflowStageId}`, patch: { stage: null, page: 1 } });
   if (filters.dateFrom || filters.dateTo) chips.push({ key: 'date', label: `Период: ${filters.dateFrom || '…'} — ${filters.dateTo || '…'}`, patch: { date_from: null, date_to: null, page: 1 } });
   return chips.map(({ key, label, patch }) => ({ id: key, label, onRemove: () => onPatch(patch) }));
@@ -384,7 +359,6 @@ function MobileUniversityCards({ items }: { items: UniversityListItem[] }) {
             <strong>{item.name}</strong>
             <AttentionIndicator active={item.attention} />
           </div>
-          <div className={styles.mobileCardScore}><span>Health Score</span>{item.availability?.healthScore === false ? <strong>—</strong> : <><strong>{item.healthScore}</strong><StatusBadge status={getHealthStatus(item.healthScore)} /></>}</div>
           <dl className={styles.mobileDetails}>
             <div><dt>Этап</dt><dd><StageBadge item={item} /></dd></div>
             <div><dt>Ответственный</dt><dd>{item.responsible?.name ?? '—'}</dd></div>
@@ -520,7 +494,6 @@ export function UniversitiesList() {
     { id: 'responsible', accessorFn: (row) => row.responsible?.name ?? '', enableSorting: UNIVERSITY_LIST_CAPABILITIES.sorts.responsible, header: 'Ответственный', cell: ({ row }) => row.original.responsible?.name ?? '—' },
     { id: 'programs', accessorFn: (row) => row.programsCount, enableSorting: UNIVERSITY_LIST_CAPABILITIES.sorts.programs, header: 'Программы', cell: ({ row }) => <ProgramsCell item={row.original} /> },
     { id: 'stage', accessorFn: (row) => row.currentStage.name, enableSorting: UNIVERSITY_LIST_CAPABILITIES.sorts.stage, header: 'Текущий этап', cell: ({ row }) => <StageBadge item={row.original} /> },
-    { id: 'health_score', accessorFn: (row) => row.healthScore, enableSorting: UNIVERSITY_LIST_CAPABILITIES.sorts.health_score, header: 'Health Score', cell: ({ row }) => row.original.availability?.healthScore === false ? '—' : <div className={styles.healthCell}><strong>{row.original.healthScore}</strong><StatusBadge status={getHealthStatus(row.original.healthScore)} /></div> },
     { id: 'last_interaction', accessorFn: (row) => row.lastInteractionAt, enableSorting: UNIVERSITY_LIST_CAPABILITIES.sorts.last_interaction, header: 'Последнее взаимодействие', cell: ({ row }) => row.original.availability?.lastInteraction === false ? '—' : <time dateTime={row.original.lastInteractionAt} title={formatFullDate(row.original.lastInteractionAt)}>{formatRelativeTime(row.original.lastInteractionAt)}</time> },
     { id: 'attention', enableSorting: false, header: 'Attention', cell: ({ row }) => <AttentionIndicator active={row.original.attention} /> },
   ], []);
@@ -549,7 +522,6 @@ export function UniversitiesList() {
     state.filters.programIds.length,
     state.filters.productIds.length,
     state.filters.responsibleIds.length,
-    state.filters.healthStatuses.length,
     state.filters.workflowStageId,
     state.filters.dateFrom || state.filters.dateTo,
   ].filter(Boolean).length;
