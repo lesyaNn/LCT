@@ -119,11 +119,10 @@ export async function listWizardProducts(directionId: string, signal?: AbortSign
     domain: 'catalogs',
     signal,
     mock: async () => {
-      const page = mockListCatalogItems({ type: 'products', search: '', showInactive: true, page: 1, pageSize: 100 });
-      return page.items.flatMap((item) => {
-        if (item.type !== 'products' || !item.isActive) return [];
-        return [{ id: item.id, name: item.name, vendorName: item.vendorName, version: item.version }];
-      });
+      const page = mockListCatalogItems({ type: 'products', search: '', page: 1, pageSize: 100 });
+      return page.items.flatMap((item) => item.type === 'products'
+        ? [{ id: item.id, name: item.name, vendorName: item.vendorName, version: item.version }]
+        : []);
     },
     real: async () => (await allPages<ApiProduct>(
       `products?direction_id=${encodeURIComponent(directionId)}`,

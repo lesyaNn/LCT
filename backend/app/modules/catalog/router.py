@@ -24,8 +24,15 @@ from app.modules.analytics.filters import UnifiedFilter, get_unified_filter
 from app.modules.audit.service import get_audit_db
 from app.modules.catalog import passport_relations, service
 from app.modules.catalog.schemas import (
+    ContractCreate,
+    ContractDetail,
+    ContractRead,
+    ContractUpdate,
     DirectionDetail,
     DirectionRead,
+    LicenseCreate,
+    LicenseRead,
+    LicenseUpdate,
     ProductDetail,
     ProductRead,
     PrimaryResponsibleChange,
@@ -73,6 +80,8 @@ ProgramSortBy = Literal["name", "created_at"]
 ProductSortBy = Literal["name", "version", "created_at"]
 VendorSortBy = Literal["name", "created_at"]
 ResponsibleSortBy = Literal["full_name", "email", "created_at"]
+ContractSortBy = Literal["contract_number", "signed_at", "expires_at", "created_at"]
+LicenseSortBy = Literal["license_number", "signed_at", "expires_at", "created_at"]
 SortOrder = Literal["asc", "desc"]
 
 
@@ -661,8 +670,206 @@ def delete_vendor(
     service.delete_vendor(db, vendor_id)
 
 
-# ----------------------------------------------------------- responsibles
+# ---------------------------------------------------- contracts & licenses
+#
+# University-scoped business records (P1-06-01). ``vendor`` is resolved via
+# the product: Contract has no vendor_id column by design. Both lists apply
+# the caller's university scope, so a manager never sees foreign rows.
 
+
+@router.post(
+    "/contracts",
+    response_model=ContractDetail,
+    status_code=201,
+    tags=["Contracts"],
+    summary="Create contract",
+)
+def create_contract(
+    data: ContractCreate,
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+) -> ContractDetail:
+    ensure_university_visible(data.university_id, user)
+    return service.create_contract(db, data)
+
+
+@router.get(
+    "/contracts",
+    response_model=PaginatedResponse[ContractRead],
+    tags=["Contracts"],
+    summary="List contracts (paginated, search, filters, sorting)",
+)
+def list_contracts(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    search: str | None = Query(default=None, description="Case-insensitive match on contract number"),
+    university_id: uuid.UUID | None = Query(default=None, description="Only contracts of this university"),
+    product_id: uuid.UUID | None = Query(default=None, description="Only contracts for this product"),
+    status: Literal["draft", "signed", "active", "expired", "terminated"] | None = Query(
+        default=None, description="Derived status (never stored): draft/signed/active/expired/terminated"
+    ),
+    sort_by: ContractSortBy = Query(default="contract_number"),
+    sort_order: SortOrder = Query(default="asc"),
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(READ),
+) -> PaginatedResponse[ContractRead]:
+    items, total = service.list_contract_page(
+        db, page=page, page_size=page_size, search=_norm(search),
+        university_id=university_id, product_id=product_id, status=status,
+        sort_by=sort_by, sort_order=sort_order, user=user,
+    )
+    return PaginatedResponse(items=items, page=page, page_size=page_size, total=total)
+
+
+@router.get(
+    "/contracts/{contract_id}",
+    response_model=ContractDetail,
+    tags=["Contracts"],
+    summary="Get contract by id (with its licenses)",
+)
+def get_contract(
+    contract_id: uuid.UUID,
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(READ),
+) -> ContractDetail:
+    detail = service.get_contract_detail(db, contract_id)
+    ensure_university_visible(detail.university_id, user)
+    return detail
+
+
+@router.patch(
+    "/contracts/{contract_id}",
+    response_model=ContractDetail,
+    tags=["Contracts"],
+    summary="Update contract",
+)
+def patch_contract(
+    contract_id: uuid.UUID,
+    data: ContractUpdate,
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+) -> ContractDetail:
+    detail = service.get_contract_detail(db, contract_id)
+    ensure_university_visible(detail.university_id, user)
+    if data.university_id is not None:
+        ensure_university_visible(data.university_id, user)
+    return service.patch_contract(db, contract_id, data)
+
+
+@router.delete(
+    "/contracts/{contract_id}",
+    response_model=None,
+    status_code=204,
+    tags=["Contracts"],
+    summary="Hard-delete contract (409 while licenses reference it)",
+)
+def delete_contract(
+    contract_id: uuid.UUID,
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+) -> None:
+    detail = service.get_contract_detail(db, contract_id)
+    ensure_university_visible(detail.university_id, user)
+    service.delete_contract(db, contract_id)
+
+
+@router.post(
+    "/licenses",
+    response_model=LicenseRead,
+    status_code=201,
+    tags=["Licenses"],
+    summary="Create license",
+)
+def create_license(
+    data: LicenseCreate,
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+) -> LicenseRead:
+    ensure_university_visible(data.university_id, user)
+    return service.create_license(db, data)
+
+
+@router.get(
+    "/licenses",
+    response_model=PaginatedResponse[LicenseRead],
+    tags=["Licenses"],
+    summary="List licenses (paginated, search, filters, sorting)",
+)
+def list_licenses(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    search: str | None = Query(default=None, description="Case-insensitive match on license number"),
+    university_id: uuid.UUID | None = Query(default=None, description="Only licenses of this university"),
+    product_id: uuid.UUID | None = Query(default=None, description="Only licenses for this product"),
+    status: Literal["active", "expires_soon", "expired"] | None = Query(
+        default=None, description="Derived status (never stored): active/expires_soon/expired"
+    ),
+    sort_by: LicenseSortBy = Query(default="license_number"),
+    sort_order: SortOrder = Query(default="asc"),
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(READ),
+) -> PaginatedResponse[LicenseRead]:
+    items, total = service.list_license_page(
+        db, page=page, page_size=page_size, search=_norm(search),
+        university_id=university_id, product_id=product_id, status=status,
+        sort_by=sort_by, sort_order=sort_order, user=user,
+    )
+    return PaginatedResponse(items=items, page=page, page_size=page_size, total=total)
+
+
+@router.get(
+    "/licenses/{license_id}",
+    response_model=LicenseRead,
+    tags=["Licenses"],
+    summary="Get license by id",
+)
+def get_license(
+    license_id: uuid.UUID,
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(READ),
+) -> LicenseRead:
+    detail = service.get_license_detail(db, license_id)
+    ensure_university_visible(detail.university_id, user)
+    return detail
+
+
+@router.patch(
+    "/licenses/{license_id}",
+    response_model=LicenseRead,
+    tags=["Licenses"],
+    summary="Update license",
+)
+def patch_license(
+    license_id: uuid.UUID,
+    data: LicenseUpdate,
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+) -> LicenseRead:
+    detail = service.get_license_detail(db, license_id)
+    ensure_university_visible(detail.university_id, user)
+    if data.university_id is not None:
+        ensure_university_visible(data.university_id, user)
+    return service.patch_license(db, license_id, data)
+
+
+@router.delete(
+    "/licenses/{license_id}",
+    response_model=None,
+    status_code=204,
+    tags=["Licenses"],
+    summary="Hard-delete license",
+)
+def delete_license(
+    license_id: uuid.UUID,
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+) -> None:
+    detail = service.get_license_detail(db, license_id)
+    ensure_university_visible(detail.university_id, user)
+    service.delete_license(db, license_id)
+
+
+# ----------------------------------------------------------- responsibles
 
 @router.post(
     "/responsibles",

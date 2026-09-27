@@ -14,9 +14,11 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import Conflict, NotFound
 from app.models.catalog import (
+    Contract,
     ITDirection,
     ITProduct,
     ITProgram,
+    License,
     Responsible,
     University,
     UniversityResponsible,
@@ -24,8 +26,15 @@ from app.models.catalog import (
 )
 from app.modules.catalog import repository as repo
 from app.modules.catalog.schemas import (
+    ContractCreate,
+    ContractDetail,
+    ContractRead,
+    ContractUpdate,
     DirectionDetail,
     DirectionRead,
+    LicenseCreate,
+    LicenseRead,
+    LicenseUpdate,
     ProductDetail,
     ProductRead,
     ProgramDetail,
@@ -47,6 +56,7 @@ from app.schemas.catalog import (
     ProgramShort,
     VendorShort,
 )
+from app.schemas.licenses import LicenseShort
 
 # -------------------------------------------------------------- universities
 
@@ -469,7 +479,15 @@ def list_responsible_page(
         sort_by=sort_by,
         sort_order=sort_order,
     )
-    return [ResponsibleRead.model_validate(r) for r in rows], total
+    # Universities for the whole page in ONE extra query, so a list page costs
+    # two queries instead of one per row.
+    grouped = repo.responsible_universities_by_id(db, [r.id for r in rows])
+    items = []
+    for r in rows:
+        item = ResponsibleRead.model_validate(r)
+        item.universities = [UniversityRead.model_validate(u) for u in grouped.get(r.id, [])]
+        items.append(item)
+    return items, total
 
 
 def get_responsible_detail(db: Session, responsible_id: uuid.UUID) -> ResponsibleDetail:
@@ -481,6 +499,150 @@ def get_responsible_detail(db: Session, responsible_id: uuid.UUID) -> Responsibl
         UniversityRead.model_validate(u) for u in repo.responsible_universities(db, responsible_id)
     ]
     return detail
+
+
+# ----------------------------------------------------- contracts & licenses
+
+
+def _agreement_labels(db: Session) -> tuple[dict[uuid.UUID, str], dict[uuid.UUID, uuid.UUID]]:
+    """(id -> label for every referenced entity, product -> vendor) in one pass."""
+    return repo._agreement_names(db, None), repo._vendor_id_by_product(db)
+
+
+def _fill_contract(db: Session, dto: ContractRead, obj: Contract) -> ContractRead:
+    names, product_vendor = _agreement_labels(db)
+    dto.university_name = names.get(obj.university_id, "")
+    dto.product_name = names.get(obj.product_id) if obj.product_id else None
+    dto.vendor_name = names.get(product_vendor[obj.product_id]) if obj.product_id else None
+    dto.license_count = repo.contract_license_counts(db, [obj.id]).get(obj.id, 0)
+    return dto
+
+
+def _fill_license(db: Session, dto: LicenseRead, obj: License) -> LicenseRead:
+    names, product_vendor = _agreement_labels(db)
+    dto.university_name = names.get(obj.university_id, "")
+    dto.product_name = names.get(obj.product_id, "")
+    dto.vendor_name = names.get(product_vendor.get(obj.product_id)) if obj.product_id else None
+    dto.contract_number = names.get(obj.contract_id) if obj.contract_id else None
+    dto.program_name = names.get(obj.program_id) if obj.program_id else None
+    dto.direction_name = names.get(obj.direction_id) if obj.direction_id else None
+    return dto
+
+
+def list_contract_page(
+    db: Session, *, page: int, page_size: int, search: str | None,
+    university_id: uuid.UUID | None, product_id: uuid.UUID | None,
+    status: str | None, sort_by: str, sort_order: str, user=None,
+) -> tuple[list[ContractRead], int]:
+    rows, total = repo.list_contracts(
+        db, page=page, page_size=page_size, search=search, university_id=university_id,
+        product_id=product_id, status=status, sort_by=sort_by, sort_order=sort_order, user=user,
+    )
+    names, product_vendor = _agreement_labels(db)
+    counts = repo.contract_license_counts(db, [r.id for r in rows])
+    items = []
+    for r in rows:
+        dto = ContractRead.model_validate(r)
+        dto.university_name = names.get(r.university_id, "")
+        dto.product_name = names.get(r.product_id) if r.product_id else None
+        dto.vendor_name = names.get(product_vendor[r.product_id]) if r.product_id else None
+        dto.license_count = counts.get(r.id, 0)
+        items.append(dto)
+    return items, total
+
+
+def get_contract_detail(db: Session, contract_id: uuid.UUID) -> ContractDetail:
+    obj = repo.get_contract(db, contract_id)
+    if obj is None:
+        raise NotFound("Contract not found")
+    detail = ContractDetail.model_validate(obj)
+    _fill_contract(db, detail, obj)
+    detail.licenses = [
+        LicenseShort.model_validate(lic) for lic in repo.contract_licenses(db, contract_id)
+    ]
+    return detail
+
+
+def create_contract(db: Session, data: ContractCreate) -> ContractDetail:
+    obj = repo.add_and_flush(db, Contract(**data.model_dump()))
+    return get_contract_detail(db, obj.id)
+
+
+def patch_contract(db: Session, contract_id: uuid.UUID, data: ContractUpdate) -> ContractDetail:
+    obj = repo.get_contract(db, contract_id)
+    if obj is None:
+        raise NotFound("Contract not found")
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(obj, field, value)
+    repo.save(db, obj)
+    return get_contract_detail(db, obj.id)
+
+
+def delete_contract(db: Session, contract_id: uuid.UUID) -> None:
+    """Hard delete, but only while no license points at the contract.
+
+    The FK is declared ON DELETE SET NULL, so a plain delete would silently
+    orphan every license of that contract. Refuse with 409 instead and let the
+    user re-point the licenses first.
+    """
+    if repo.get_contract(db, contract_id) is None:
+        raise NotFound("Contract not found")
+    if repo.contract_license_counts(db, [contract_id]).get(contract_id, 0) > 0:
+        raise Conflict("Contract still has licenses")
+    repo.delete_by_id(db, Contract, contract_id)
+
+
+def list_license_page(
+    db: Session, *, page: int, page_size: int, search: str | None,
+    university_id: uuid.UUID | None, product_id: uuid.UUID | None,
+    status: str | None, sort_by: str, sort_order: str, user=None,
+) -> tuple[list[LicenseRead], int]:
+    rows, total = repo.list_licenses(
+        db, page=page, page_size=page_size, search=search, university_id=university_id,
+        product_id=product_id, status=status, sort_by=sort_by, sort_order=sort_order, user=user,
+    )
+    names, product_vendor = _agreement_labels(db)
+    items = []
+    for r in rows:
+        dto = LicenseRead.model_validate(r)
+        dto.university_name = names.get(r.university_id, "")
+        dto.product_name = names.get(r.product_id, "")
+        dto.vendor_name = names.get(product_vendor.get(r.product_id)) if r.product_id else None
+        dto.contract_number = names.get(r.contract_id) if r.contract_id else None
+        dto.program_name = names.get(r.program_id) if r.program_id else None
+        dto.direction_name = names.get(r.direction_id) if r.direction_id else None
+        items.append(dto)
+    return items, total
+
+
+def get_license_detail(db: Session, license_id: uuid.UUID) -> LicenseRead:
+    obj = repo.get_license(db, license_id)
+    if obj is None:
+        raise NotFound("License not found")
+    return _fill_license(db, LicenseRead.model_validate(obj), obj)
+
+
+def create_license(db: Session, data: LicenseCreate) -> LicenseRead:
+    obj = repo.add_and_flush(db, License(**data.model_dump()))
+    return get_license_detail(db, obj.id)
+
+
+def patch_license(db: Session, license_id: uuid.UUID, data: LicenseUpdate) -> LicenseRead:
+    obj = repo.get_license(db, license_id)
+    if obj is None:
+        raise NotFound("License not found")
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(obj, field, value)
+    repo.save(db, obj)
+    return get_license_detail(db, obj.id)
+
+
+def delete_license(db: Session, license_id: uuid.UUID) -> None:
+    """Licenses reference only products (RESTRICT is on the product side), so
+    a license can be removed once no contract still expects it."""
+    if repo.get_license(db, license_id) is None:
+        raise NotFound("License not found")
+    repo.delete_by_id(db, License, license_id)
 
 
 def create_responsible(

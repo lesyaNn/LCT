@@ -79,6 +79,33 @@ the seeded user's role/scope, but creates uniquely named test records.
 Afterward, `docker compose -p team26-admin-users-e2e -f docker-compose.yml -f
 docker-compose.admin-users-e2e.yml down -v` removes only the disposable stand.
 
+## Catalog management
+
+`catalogs-real.spec.ts` drives `/admin/catalogs` against the real backend: it
+asserts that all seven catalogs (universities, directions, programs, vendors,
+products, agreements, responsibles) are listed, that the responsibles table
+shows real university names, and that vendors stay a catalog of their own
+rather than aliasing the agreements tab. It then performs a vendor
+create → edit → delete round-trip, creates and deletes a program with its
+mandatory direction reference, round-trips a contract and a licence through
+the combined tab (the licence is created under the contract, deleted first, and
+only then does the contract become deletable), and finally asserts that
+deleting a still referenced direction is refused by the backend `409` and
+explained in the confirmation dialog. It is opt-in and self-cleaning — every
+record it creates carries `Date.now()` in its name or number and is deleted
+again — but it reads live reference data, so run it on a disposable stand:
+
+```bash
+cd frontend
+E2E_BASE_URL=http://localhost:3000 \
+E2E_MANAGER_USERNAME=... E2E_MANAGER_PASSWORD=... \
+npm run test:e2e:catalogs
+```
+
+Use an account whose data scope reaches at least one university, otherwise the
+Вузы tab legitimately renders the empty state. The catalog write endpoints
+require the `admin` or `manager` role.
+
 ## External integrations (Stage 11)
 
 `external-integrations-real.spec.ts` uses the actual backend endpoints with

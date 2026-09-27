@@ -9,12 +9,15 @@ JOIN inside the page statement — never a query per item. Detail loaders use
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
+from datetime import date, timedelta
 
-from sqlalchemy import delete as sa_delete
+from sqlalchemy import and_, delete as sa_delete
 from sqlalchemy import exists, func, inspect, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.policies import apply_university_scope
+from app.models.enums import EXPIRY_WARNING_DAYS
 from app.models.catalog import (
     Contract,
     ITDirection,
@@ -38,6 +41,14 @@ _AUDIT_FIELDS = {
     ITProduct: ("vendor_id", "name", "version"),
     Responsible: ("full_name", "email", "phone", "role", "keycloak_sub"),
     UniversityResponsible: ("university_id", "responsible_id", "role_in_university", "is_primary"),
+    Contract: (
+        "university_id", "contract_number", "product_id", "signed_at",
+        "expires_at", "status_raw", "transfer_status_raw", "comment",
+    ),
+    License: (
+        "university_id", "product_id", "contract_id", "program_id", "direction_id",
+        "license_number", "signed_at", "expires_at", "transfer_status_raw", "comment",
+    ),
 }
 
 _AUDIT_ENTITY_TYPES = {
@@ -48,6 +59,8 @@ _AUDIT_ENTITY_TYPES = {
     ITProduct: "product",
     Responsible: "responsible",
     UniversityResponsible: "responsible",
+    Contract: "contract",
+    License: "license",
 }
 
 
@@ -59,9 +72,11 @@ def _audit_write(db: Session, obj, action: AuditAction, *, old=None, new=None):
     if "audit_context" not in db.info or type(obj) not in _AUDIT_FIELDS:
         return
     entity_type = _AUDIT_ENTITY_TYPES[type(obj)]
-    university_id = obj.university_id if isinstance(obj, UniversityResponsible) else (
-        obj.id if isinstance(obj, University) else None
-    )
+    # Contracts and licenses are university-scoped too, so the audit row keeps
+    # the university for scope-filtered audit views.
+    university_id = obj.university_id if isinstance(
+        obj, (UniversityResponsible, Contract, License)
+    ) else (obj.id if isinstance(obj, University) else None)
     AuditService(db).log_event(
         context=context_for(db), action=action, entity_type=entity_type,
         entity_id=obj.id, university_id=university_id,
@@ -596,7 +611,212 @@ def responsible_universities(db: Session, responsible_id: uuid.UUID) -> list[Uni
     )
 
 
+def responsible_universities_by_id(
+    db: Session, responsible_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, list[University]]:
+    """Universities for a whole page of responsibles, ONE query (no N+1).
+
+    Returns a map responsible_id -> universities, keeping the per-responsible
+    order of responsible_universities (name asc, id asc) so the list and the
+    detail endpoint agree.
+    """
+    ids = list(dict.fromkeys(responsible_ids))
+    if not ids:
+        return {}
+    rows = db.execute(
+        select(UniversityResponsible.responsible_id, University)
+        .join(University, University.id == UniversityResponsible.university_id)
+        .where(UniversityResponsible.responsible_id.in_(ids))
+        .order_by(
+            UniversityResponsible.responsible_id.asc(),
+            University.name.asc(),
+            University.id.asc(),
+        )
+    ).all()
+    grouped: dict[uuid.UUID, list[University]] = {}
+    for responsible_id, university in rows:
+        grouped.setdefault(responsible_id, []).append(university)
+    return grouped
+
+
 # ------------------------------------------------------------------- links
+
+
+# ------------------------------------------------------------- agreements
+#
+# Contracts and licenses are university-scoped business records (P1-06-01).
+# ``vendor`` is resolved through ``product`` - there is deliberately no
+# ``vendor_id`` column on Contract. Both lists scope by university_id so a
+# manager never sees rows outside their universities.
+
+
+CONTRACT_SORT = {
+    "contract_number": Contract.contract_number,
+    "signed_at": Contract.signed_at,
+    "expires_at": Contract.expires_at,
+    "created_at": Contract.created_at,
+}
+
+LICENSE_SORT = {
+    "license_number": License.license_number,
+    "signed_at": License.signed_at,
+    "expires_at": License.expires_at,
+    "created_at": License.created_at,
+}
+
+
+def _agreement_names(db: Session, model) -> dict[uuid.UUID, str]:
+    """id -> label for every entity an agreement can point at, ONE query each.
+
+    The agreement tables keep only FK ids; the list endpoint needs the labels
+    to render, and per-row lookups would be N+1. Contracts are included so a
+    license can show its contract number.
+    """
+    out: dict[uuid.UUID, str] = {}
+    for entity, column in (
+        (University, University.name),
+        (ITProduct, ITProduct.name),
+        (ITDirection, ITDirection.name),
+        (ITProgram, ITProgram.name),
+        (Vendor, Vendor.name),
+        (Contract, Contract.contract_number),
+    ):
+        for row in db.execute(select(entity.id, column)).all():
+            out[row[0]] = row[1]
+    return out
+
+
+def _vendor_id_by_product(db: Session) -> dict[uuid.UUID, uuid.UUID]:
+    """product_id -> vendor_id, ONE query (Contract has no vendor column)."""
+    return dict(db.execute(select(ITProduct.id, ITProduct.vendor_id)).all())
+
+
+def contract_license_counts(db: Session, contract_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, int]:
+    """Licenses per contract for a whole page, ONE query (no N+1)."""
+    ids = list(dict.fromkeys(contract_ids))
+    if not ids:
+        return {}
+    rows = db.execute(
+        select(License.contract_id, func.count(License.id))
+        .where(License.contract_id.in_(ids))
+        .group_by(License.contract_id)
+    ).all()
+    return {row[0]: int(row[1]) for row in rows if row[0] is not None}
+
+
+def list_contracts(
+    db: Session, *, page: int, page_size: int, search: str | None,
+    university_id: uuid.UUID | None, product_id: uuid.UUID | None,
+    status: str | None, sort_by: str, sort_order: str, user=None,
+) -> tuple[list[Contract], int]:
+    conds = []
+    if search:
+        conds.append(Contract.contract_number.ilike(like_pattern(search), escape="\\"))
+    if university_id is not None:
+        conds.append(Contract.university_id == university_id)
+    if product_id is not None:
+        conds.append(Contract.product_id == product_id)
+    if status is not None:
+        # Derived status lives in a @property, so the filter is expressed on
+        # the raw state plus the date window the property reads.
+        if status == "terminated":
+            conds.append(Contract.status_raw == "terminated")
+        elif status == "draft":
+            conds.append(Contract.status_raw == "draft")
+        elif status == "expired":
+            conds.append(
+                and_(
+                    Contract.status_raw != "terminated",
+                    Contract.status_raw != "draft",
+                    Contract.expires_at.is_not(None),
+                    Contract.expires_at < date.today(),
+                )
+            )
+        else:
+            conds.append(
+                and_(
+                    Contract.status_raw.notin_(("terminated", "draft")),
+                    or_(
+                        Contract.expires_at.is_(None),
+                        Contract.expires_at >= date.today(),
+                    ),
+                )
+            )
+    count = apply_university_scope(
+        select(func.count()).select_from(Contract).where(*conds), Contract.university_id, user
+    ) if user is not None else select(func.count()).select_from(Contract).where(*conds)
+    total = int(db.execute(count).scalar() or 0)
+    stmt = select(Contract).where(*conds)
+    if user is not None:
+        stmt = apply_university_scope(stmt, Contract.university_id, user)
+    rows = db.execute(
+        stmt.order_by(*_order(Contract, CONTRACT_SORT, sort_by, sort_order))
+        .limit(page_size).offset((page - 1) * page_size)
+    ).scalars().all()
+    return list(rows), total
+
+
+def get_contract(db: Session, contract_id: uuid.UUID) -> Contract | None:
+    return db.get(Contract, contract_id)
+
+
+def contract_by_number(db: Session, contract_number: str) -> Contract | None:
+    return db.execute(
+        select(Contract).where(Contract.contract_number == contract_number)
+    ).scalar_one_or_none()
+
+
+def contract_licenses(db: Session, contract_id: uuid.UUID) -> list[License]:
+    """Licenses of one contract, ONE query."""
+    return list(
+        db.execute(
+            select(License)
+            .where(License.contract_id == contract_id)
+            .order_by(License.signed_at.desc(), License.id.asc())
+        )
+        .scalars()
+        .all()
+    )
+
+
+def list_licenses(
+    db: Session, *, page: int, page_size: int, search: str | None,
+    university_id: uuid.UUID | None, product_id: uuid.UUID | None,
+    status: str | None, sort_by: str, sort_order: str, user=None,
+) -> tuple[list[License], int]:
+    conds = []
+    if search:
+        conds.append(License.license_number.ilike(like_pattern(search), escape="\\"))
+    if university_id is not None:
+        conds.append(License.university_id == university_id)
+    if product_id is not None:
+        conds.append(License.product_id == product_id)
+    if status is not None:
+        if status == "expired":
+            conds.append(License.expires_at < date.today())
+        elif status == "expires_soon":
+            conds.append(and_(
+                License.expires_at >= date.today(),
+                License.expires_at <= date.today() + timedelta(days=EXPIRY_WARNING_DAYS),
+            ))
+        else:
+            conds.append(License.expires_at > date.today() + timedelta(days=EXPIRY_WARNING_DAYS))
+    count = apply_university_scope(
+        select(func.count()).select_from(License).where(*conds), License.university_id, user
+    ) if user is not None else select(func.count()).select_from(License).where(*conds)
+    total = int(db.execute(count).scalar() or 0)
+    stmt = select(License).where(*conds)
+    if user is not None:
+        stmt = apply_university_scope(stmt, License.university_id, user)
+    rows = db.execute(
+        stmt.order_by(*_order(License, LICENSE_SORT, sort_by, sort_order))
+        .limit(page_size).offset((page - 1) * page_size)
+    ).scalars().all()
+    return list(rows), total
+
+
+def get_license(db: Session, license_id: uuid.UUID) -> License | None:
+    return db.get(License, license_id)
 
 
 def get_link(

@@ -4,7 +4,7 @@ import { queryKeys } from './query-keys';
 import { ApiRequestError } from './api-errors';
 import { getExpirationStatus } from './formatters';
 import type { ImportExecuteResponse, ImportRunOptions } from './import-repository';
-import type { CatalogInput, CatalogItem, CatalogListQuery, CatalogListResult, CatalogReferenceData, CatalogType, ResponsibleCatalogItem } from './catalogs-repository';
+import type { AgreementCatalogItem, AgreementKind, AgreementStatus, CatalogContact, ContractStatusRaw, TransferStatus, CatalogInput, CatalogItem, CatalogListQuery, CatalogListResult, CatalogReferenceData, CatalogType, ResponsibleCatalogItem } from './catalogs-repository';
 import type {
   AdminUser,
   AdminUserListQuery,
@@ -502,25 +502,105 @@ function catalogTimestamp(value: unknown): string {
   return stringValue(value) || new Date().toISOString();
 }
 
+function catalogContacts(value: unknown): CatalogContact[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.flatMap((entry) => {
+    if (!isRecord(entry)) return [];
+    return [{
+      id: stringValue(entry.id),
+      fullName: stringValue(entry.full_name),
+      email: stringValue(entry.email),
+      phone: stringValue(entry.phone),
+      communicationMethod: stringValue(entry.communication_method),
+    }];
+  });
+}
+
+/** Contracts and licenses share the UI tab but are separate API resources. */
+export function catalogResourcePath(type: CatalogType, kind?: AgreementKind): string {
+  return type === 'agreements' ? kind ?? 'contracts' : type;
+}
+
+function agreementItem(value: unknown): AgreementCatalogItem {
+  const item = isRecord(value) ? value : {};
+  const base = {
+    type: 'agreements' as const,
+    id: stringValue(item.id),
+    createdAt: catalogTimestamp(item.created_at),
+    updatedAt: catalogTimestamp(item.updated_at),
+    universityId: stringValue(item.university_id),
+    universityName: stringValue(item.university_name),
+    productId: stringValue(item.product_id),
+    productName: stringValue(item.product_name),
+    vendorName: stringValue(item.vendor_name),
+    transferStatus: stringValue(item.transfer_status_raw) as TransferStatus,
+    comment: stringValue(item.comment),
+  };
+  if (stringValue(item.license_number)) {
+    return {
+      ...base,
+      kind: 'licenses',
+      name: stringValue(item.license_number),
+      licenseNumber: stringValue(item.license_number),
+      contractId: stringValue(item.contract_id),
+      contractNumber: stringValue(item.contract_number),
+      programId: stringValue(item.program_id),
+      programName: stringValue(item.program_name),
+      directionId: stringValue(item.direction_id),
+      directionName: stringValue(item.direction_name),
+      signedAt: stringValue(item.signed_at),
+      expiresAt: stringValue(item.expires_at),
+      status: stringValue(item.status) as AgreementStatus,
+    };
+  }
+  return {
+    ...base,
+    kind: 'contracts',
+    name: stringValue(item.contract_number),
+    contractNumber: stringValue(item.contract_number),
+    signedAt: stringValue(item.signed_at),
+    expiresAt: stringValue(item.expires_at),
+    status: stringValue(item.status) as AgreementStatus,
+    statusRaw: stringValue(item.status_raw) as ContractStatusRaw,
+    licenseCount: typeof item.license_count === 'number' ? item.license_count : 0,
+  };
+}
+
 function catalogItem(type: CatalogType, value: unknown): CatalogItem {
   const item = isRecord(value) ? value : {};
   const base = {
     id: stringValue(item.id),
     name: stringValue(item.name ?? item.full_name),
-    isActive: item.is_active !== false,
     createdAt: catalogTimestamp(item.created_at),
     updatedAt: catalogTimestamp(item.updated_at),
   };
   if (type === 'universities') return { ...base, type, city: stringValue(item.city) };
   if (type === 'products') {
     const vendor = isRecord(item.vendor) ? item.vendor : {};
-    const contacts = Array.isArray(item.contacts) ? item.contacts.flatMap((value) => {
-      if (!isRecord(value)) return [];
-      return [{ id: stringValue(value.id), fullName: stringValue(value.full_name), email: stringValue(value.email), phone: stringValue(value.phone), communicationMethod: stringValue(value.communication_method) }];
-    }) : undefined;
-    return { ...base, type, version: stringValue(item.version), vendorId: stringValue(item.vendor_id ?? vendor.id), vendorName: stringValue(item.vendor_name ?? vendor.name), programId: stringValue(item.program_id), programName: stringValue(item.program_name), contacts };
+    return {
+      ...base,
+      type,
+      version: stringValue(item.version),
+      vendorId: stringValue(item.vendor_id ?? vendor.id),
+      vendorName: stringValue(item.vendor_name ?? vendor.name),
+      programId: stringValue(item.program_id),
+      programName: stringValue(item.program_name),
+      contacts: catalogContacts(item.contacts),
+    };
   }
   if (type === 'directions') return { ...base, type, code: stringValue(item.code) };
+  if (type === 'programs') {
+    const direction = isRecord(item.direction) ? item.direction : {};
+    return {
+      ...base,
+      type,
+      directionId: stringValue(item.direction_id ?? direction.id),
+      directionName: stringValue(item.direction_name ?? direction.name),
+      description: stringValue(item.description),
+    };
+  }
+  if (type === 'vendors') return { ...base, type, contacts: catalogContacts(item.contacts) };
+  if (type === 'agreements') return agreementItem(item);
   const universities = Array.isArray(item.universities) ? item.universities : [];
   return {
     ...base,
@@ -546,12 +626,13 @@ function catalogPayloadPage(value: unknown, query: CatalogListQuery): CatalogLis
 export async function realListCatalogItems(query: CatalogListQuery, signal?: AbortSignal): Promise<CatalogListResult> {
   const params = new URLSearchParams({ page: String(query.page), page_size: String(query.pageSize) });
   if (query.search.trim()) params.set('search', query.search.trim());
-  const data = unwrap(await apiFetch<unknown>(`/api/v1/${query.type}?${params}`, { signal }), 'Не удалось загрузить каталог.');
+  const resource = catalogResourcePath(query.type, query.agreementKind);
+  const data = unwrap(await apiFetch<unknown>(`/api/v1/${resource}?${params}`, { signal }), 'Не удалось загрузить каталог.');
   return catalogPayloadPage(data, query);
 }
 
-export async function realGetCatalogItem(type: CatalogType, id: string, signal?: AbortSignal): Promise<CatalogItem> {
-  const data = unwrap(await apiFetch<unknown>(`/api/v1/${type}/${encodeURIComponent(id)}`, { signal }), 'Не удалось загрузить запись каталога.');
+export async function realGetCatalogItem(type: CatalogType, id: string, signal?: AbortSignal, kind?: AgreementKind): Promise<CatalogItem> {
+  const data = unwrap(await apiFetch<unknown>(`/api/v1/${catalogResourcePath(type, kind)}/${encodeURIComponent(id)}`, { signal }), 'Не удалось загрузить запись каталога.');
   return catalogItem(type, data);
 }
 
@@ -616,13 +697,14 @@ async function allUniversityReferencePages(signal?: AbortSignal): Promise<Univer
 }
 
 export async function realGetCatalogReferenceData(signal?: AbortSignal): Promise<CatalogReferenceData> {
-  const [vendors, universities, products, directions, programs, responsibles] = await Promise.all([
+  const [vendors, universities, products, directions, programs, responsibles, contracts] = await Promise.all([
     allReferencePages('vendors', 'Не удалось загрузить список вендоров.', signal),
     allUniversityReferencePages(signal),
     allReferencePages('products', 'Не удалось загрузить список продуктов.', signal),
     allReferencePages('directions', 'Не удалось загрузить список направлений.', signal),
     allReferencePages('programs', 'Не удалось загрузить список программ.', signal),
     allReferencePages('responsibles', 'Не удалось загрузить список ответственных.', signal),
+    allReferencePages('contracts', 'Не удалось загрузить список договоров.', signal),
   ]);
   return {
     vendors: referenceItems(vendors),
@@ -631,6 +713,7 @@ export async function realGetCatalogReferenceData(signal?: AbortSignal): Promise
     directions: referenceItems(directions, ['name'], ['code']),
     programs: referenceItems(programs, ['name'], ['direction_name']),
     responsibles: referenceItems(responsibles, ['full_name', 'name'], ['role', 'email']),
+    contracts: referenceItems(contracts, ['contract_number'], ['university_name']),
   };
 }
 
@@ -638,6 +721,34 @@ function catalogWriteBody(input: CatalogInput): Record<string, unknown> {
   if (input.type === 'universities') return { name: input.name, city: input.city || null };
   if (input.type === 'products') return { name: input.name, vendor_id: input.vendorId, program_id: input.programId || null, version: input.version };
   if (input.type === 'directions') return { name: input.name, code: input.code };
+  if (input.type === 'programs') return { name: input.name, direction_id: input.directionId, description: input.description };
+  if (input.type === 'vendors') return { name: input.name };
+  if (input.type === 'agreements' && input.kind === 'contracts') {
+    return {
+      university_id: input.universityId,
+      contract_number: input.contractNumber,
+      product_id: input.productId || null,
+      signed_at: input.signedAt,
+      expires_at: input.expiresAt || null,
+      status_raw: input.statusRaw,
+      transfer_status_raw: input.transferStatus,
+      comment: input.comment || null,
+    };
+  }
+  if (input.type === 'agreements' && input.kind === 'licenses') {
+    return {
+      university_id: input.universityId,
+      product_id: input.productId,
+      license_number: input.licenseNumber,
+      contract_id: input.contractId || null,
+      program_id: input.programId || null,
+      direction_id: input.directionId || null,
+      signed_at: input.signedAt,
+      expires_at: input.expiresAt,
+      transfer_status_raw: input.transferStatus,
+      comment: input.comment || null,
+    };
+  }
   return { full_name: input.name, email: input.email, phone: input.phone || null, role: input.role };
 }
 
@@ -655,7 +766,7 @@ async function syncResponsibleUniversities(responsibleId: string, currentIds: st
 }
 
 export async function realCreateCatalogItem(input: CatalogInput): Promise<CatalogItem> {
-  const data = unwrap(await apiFetch<unknown>(`/api/v1/${input.type}`, { method: 'POST', body: catalogWriteBody(input) }), 'Не удалось добавить запись каталога.');
+  const data = unwrap(await apiFetch<unknown>(`/api/v1/${catalogResourcePath(input.type, input.type === 'agreements' ? input.kind : undefined)}`, { method: 'POST', body: catalogWriteBody(input) }), 'Не удалось добавить запись каталога.');
   const created = catalogItem(input.type, data);
   if (input.type === 'responsibles' && input.universityIds.length) {
     await syncResponsibleUniversities(created.id, [], input.universityIds);
@@ -666,7 +777,7 @@ export async function realCreateCatalogItem(input: CatalogInput): Promise<Catalo
 
 export async function realUpdateCatalogItem(id: string, input: CatalogInput): Promise<CatalogItem> {
   const current = input.type === 'responsibles' ? await realGetCatalogItem(input.type, id) as ResponsibleCatalogItem : null;
-  const data = unwrap(await apiFetch<unknown>(`/api/v1/${input.type}/${encodeURIComponent(id)}`, { method: 'PATCH', body: catalogWriteBody(input) }), 'Не удалось сохранить запись каталога.');
+  const data = unwrap(await apiFetch<unknown>(`/api/v1/${catalogResourcePath(input.type, input.type === 'agreements' ? input.kind : undefined)}/${encodeURIComponent(id)}`, { method: 'PATCH', body: catalogWriteBody(input) }), 'Не удалось сохранить запись каталога.');
   const updated = catalogItem(input.type, data);
   if (input.type === 'responsibles') {
     await syncResponsibleUniversities(id, current?.universityIds ?? [], input.universityIds);
@@ -675,9 +786,6 @@ export async function realUpdateCatalogItem(id: string, input: CatalogInput): Pr
   return updated;
 }
 
-export function realSetCatalogItemActive(_type: CatalogType, _id: string, _active: boolean): never {
-  void _type;
-  void _id;
-  void _active;
-  throw new ApiRequestError(501, { code: 'CATALOG_SOFT_DELETE_UNAVAILABLE' }, 'Текущий backend не публикует soft activate/deactivate contract.');
+export async function realDeleteCatalogItem(type: CatalogType, id: string, kind?: AgreementKind): Promise<void> {
+  unwrap(await apiFetch<unknown>(`/api/v1/${catalogResourcePath(type, kind)}/${encodeURIComponent(id)}`, { method: 'DELETE' }), 'Не удалось удалить запись каталога.');
 }

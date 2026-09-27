@@ -1,6 +1,6 @@
 import type { AuditEvent, AuditListQuery, AuditListResult } from '@/shared/lib/audit-repository';
 import type { ImportExecuteResponse, ImportJob, ImportRunOptions } from '@/shared/lib/import-repository';
-import type { CatalogInput, CatalogItem, CatalogListQuery, CatalogListResult, CatalogReferenceData, CatalogType, ResponsibleCatalogItem } from '@/shared/lib/catalogs-repository';
+import type { AgreementStatus, CatalogInput, CatalogItem, CatalogListQuery, CatalogListResult, CatalogReferenceData, CatalogType, ResponsibleCatalogItem } from '@/shared/lib/catalogs-repository';
 import { ApiRequestError } from '@/shared/lib/api-errors';
 import type {
   AdminUser,
@@ -742,7 +742,7 @@ export function mockResetAdminUserPassword(id: string): { status: 'requested'; a
 }
 
 export function mockListResponsibleCandidates(): ResponsibleCandidate[] {
-  return responsibleCatalogItems().filter((item) => item.isActive).map((item) => ({ id: item.id, name: item.name, email: item.email, role: item.role }));
+  return responsibleCatalogItems().map((item) => ({ id: item.id, name: item.name, email: item.email, role: item.role }));
 }
 
 export function mockAssignUniversityResponsible(input: ResponsibleAssignmentInput): void {
@@ -816,32 +816,33 @@ export function mockGetExternalDashboardMetrics(): ExternalDashboardMetrics {
 // -------------------------------------------------------------- catalog CRUD
 
 const catalogSeedTimestamp = '2026-09-20T09:00:00.000Z';
-const mockVendors = [
-  { id: 'vendor-rostelecom', name: 'Ростелеком' },
-  { id: 'vendor-red-soft', name: 'РЕД СОФТ' },
-  { id: 'vendor-kontur', name: 'Контур' },
-];
 
 const catalogSeeds: CatalogItem[] = [
-  { id: 'university-001', type: 'universities', name: 'Московский технический университет связи и информатики', city: 'Москва', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
-  { id: 'university-002', type: 'universities', name: 'Санкт-Петербургский политехнический университет', city: 'Санкт-Петербург', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
-  { id: 'university-003', type: 'universities', name: 'Уральский федеральный университет', city: 'Екатеринбург', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
-  { id: 'university-004', type: 'universities', name: 'Казанский федеральный университет', city: 'Казань', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
-  { id: 'university-005', type: 'universities', name: 'Новосибирский государственный университет', city: 'Новосибирск', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
-  { id: 'university-archived', type: 'universities', name: 'Архивный демонстрационный ВУЗ', city: 'Москва', isActive: false, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
-  { id: 'product-professional-retraining', type: 'products', name: 'Профессиональная переподготовка', vendorId: 'vendor-rostelecom', vendorName: 'Ростелеком', programId: '', programName: '', version: '2026', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
-  { id: 'product-short-courses', type: 'products', name: 'Короткие курсы', vendorId: 'vendor-kontur', vendorName: 'Контур', programId: '', programName: '', version: '3.2', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
-  { id: 'product-corporate-track', type: 'products', name: 'Корпоративный трек', vendorId: 'vendor-rostelecom', vendorName: 'Ростелеком', programId: '', programName: '', version: '2026.1', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
-  { id: 'product-archived', type: 'products', name: 'Архивный продукт', vendorId: 'vendor-red-soft', vendorName: 'РЕД СОФТ', programId: '', programName: '', version: '1.0', isActive: false, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
-  { id: 'direction-data', type: 'directions', name: 'Аналитика данных', code: 'data', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
-  { id: 'direction-cybersecurity', type: 'directions', name: 'Информационная безопасность', code: 'cybersecurity', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
-  { id: 'direction-management', type: 'directions', name: 'ИТ-менеджмент', code: 'it-management', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
-  { id: 'direction-archived', type: 'directions', name: 'Архивное направление', code: 'archive', isActive: false, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
-  { id: 'responsible-anna', type: 'responsibles', name: 'Анна Иванова', email: 'anna.ivanova@example.ru', phone: '+7 495 000-00-01', role: 'Куратор проекта', universityIds: ['university-001', 'university-005'], isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
-  { id: 'responsible-boris', type: 'responsibles', name: 'Борис Петров', email: 'boris.petrov@example.ru', phone: '+7 495 000-00-02', role: 'Менеджер', universityIds: ['university-002', 'university-004'], isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
-  { id: 'responsible-elena', type: 'responsibles', name: 'Елена Смирнова', email: 'elena.smirnova@example.ru', phone: '+7 495 000-00-03', role: 'Координатор программы', universityIds: ['university-003'], isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
-  { id: 'responsible-dmitry', type: 'responsibles', name: 'Дмитрий Волков', email: 'dmitry.volkov@example.ru', phone: '', role: 'Менеджер', universityIds: ['university-004'], isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
-  { id: 'responsible-archived', type: 'responsibles', name: 'Архивный ответственный', email: 'archive@example.ru', phone: '', role: 'Координатор', universityIds: [], isActive: false, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'university-001', type: 'universities', name: 'Московский технический университет связи и информатики', city: 'Москва', createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'university-002', type: 'universities', name: 'Санкт-Петербургский политехнический университет', city: 'Санкт-Петербург', createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'university-003', type: 'universities', name: 'Уральский федеральный университет', city: 'Екатеринбург', createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'university-004', type: 'universities', name: 'Казанский федеральный университет', city: 'Казань', createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'university-005', type: 'universities', name: 'Новосибирский государственный университет', city: 'Новосибирск', createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'product-professional-retraining', type: 'products', name: 'Профессиональная переподготовка', vendorId: 'vendor-rostelecom', vendorName: 'Ростелеком', programId: '', programName: '', version: '2026', createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'product-short-courses', type: 'products', name: 'Короткие курсы', vendorId: 'vendor-kontur', vendorName: 'Контур', programId: '', programName: '', version: '3.2', createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'product-corporate-track', type: 'products', name: 'Корпоративный трек', vendorId: 'vendor-rostelecom', vendorName: 'Ростелеком', programId: '', programName: '', version: '2026.1', createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'direction-data', type: 'directions', name: 'Аналитика данных', code: 'data', createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'direction-cybersecurity', type: 'directions', name: 'Информационная безопасность', code: 'cybersecurity', createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'direction-management', type: 'directions', name: 'ИТ-менеджмент', code: 'it-management', createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'program-data-analytics', type: 'programs', name: 'Аналитика данных', directionId: 'direction-data', directionName: 'Аналитика данных', description: 'Программа по аналитике данных', createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'program-cybersecurity', type: 'programs', name: 'Кибербезопасность', directionId: 'direction-cybersecurity', directionName: 'Информационная безопасность', description: 'Программа по защите информации', createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'program-it-management', type: 'programs', name: 'ИТ-менеджмент', directionId: 'direction-management', directionName: 'ИТ-менеджмент', description: '', createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'vendor-rostelecom', type: 'vendors', name: 'Ростелеком', createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'vendor-red-soft', type: 'vendors', name: 'РЕД СОФТ', createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'vendor-kontur', type: 'vendors', name: 'Контур', createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'responsible-anna', type: 'responsibles', name: 'Анна Иванова', email: 'anna.ivanova@example.ru', phone: '+7 495 000-00-01', role: 'Куратор проекта', universityIds: ['university-001', 'university-005'], createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'responsible-boris', type: 'responsibles', name: 'Борис Петров', email: 'boris.petrov@example.ru', phone: '+7 495 000-00-02', role: 'Менеджер', universityIds: ['university-002', 'university-004'], createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'responsible-elena', type: 'responsibles', name: 'Елена Смирнова', email: 'elena.smirnova@example.ru', phone: '+7 495 000-00-03', role: 'Координатор программы', universityIds: ['university-003'], createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'responsible-dmitry', type: 'responsibles', name: 'Дмитрий Волков', email: 'dmitry.volkov@example.ru', phone: '', role: 'Менеджер', universityIds: ['university-004'], createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'contract-15-2026', type: 'agreements', kind: 'contracts', name: '15/2026', contractNumber: '15/2026', universityId: 'university-001', universityName: 'Донецкий национальный технический университет', productId: '', productName: '', vendorName: '', signedAt: '2026-01-15', expiresAt: '', status: 'active', statusRaw: 'signed', transferStatus: 'transferred', licenseCount: 2, comment: '', createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'contract-16-2026', type: 'agreements', kind: 'contracts', name: '16/2026', contractNumber: '16/2026', universityId: 'university-002', universityName: 'Санкт-Петербургский политехнический университет', productId: 'product-short-courses', productName: 'Короткие курсы', vendorName: 'Контур', signedAt: '2026-03-10', expiresAt: '2026-09-01', status: 'expired', statusRaw: 'signed', transferStatus: 'accepted', licenseCount: 0, comment: '', createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'license-15-2026-corporate', type: 'agreements', kind: 'licenses', name: '15/2026-Корпоративный трек', licenseNumber: '15/2026-Корпоративный трек', universityId: 'university-001', universityName: 'Донецкий национальный технический университет', productId: 'product-corporate-track', productName: 'Корпоративный трек', vendorName: 'Ростелеком', contractId: 'contract-15-2026', contractNumber: '15/2026', programId: 'program-data-analytics', programName: 'Аналитика данных', directionId: 'direction-data', directionName: 'Аналитика данных', signedAt: '2026-01-20', expiresAt: '2027-01-31', status: 'active', transferStatus: 'transferred', comment: '', createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'license-15-2026-retraining', type: 'agreements', kind: 'licenses', name: '15/2026-Переподготовка', licenseNumber: '15/2026-Переподготовка', universityId: 'university-001', universityName: 'Донецкий национальный технический университет', productId: 'product-professional-retraining', productName: 'Профессиональная переподготовка', vendorName: 'Ростелеком', contractId: 'contract-15-2026', contractNumber: '15/2026', programId: 'program-data-analytics', programName: 'Аналитика данных', directionId: 'direction-data', directionName: 'Аналитика данных', signedAt: '2026-01-20', expiresAt: '2026-10-05', status: 'expires_soon', transferStatus: 'accepted', comment: 'Истекает в октябре', createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
 ];
 
 const mockCatalogs = new Map<CatalogType, Map<string, CatalogItem>>();
@@ -867,13 +868,22 @@ function catalogSearchText(item: CatalogItem): string {
   if (item.type === 'universities') return `${item.name} ${item.city}`;
   if (item.type === 'products') return `${item.name} ${item.vendorName} ${item.version}`;
   if (item.type === 'directions') return `${item.name} ${item.code}`;
+  if (item.type === 'programs') return `${item.name} ${item.directionName} ${item.description}`;
+  if (item.type === 'vendors') return item.name;
+  if (item.type === 'agreements') {
+    return item.kind === 'licenses'
+      ? `${item.licenseNumber} ${item.universityName} ${item.vendorName} ${item.productName} ${item.contractNumber}`
+      : `${item.contractNumber} ${item.universityName} ${item.vendorName} ${item.productName}`;
+  }
   return `${item.name} ${item.email} ${item.role}`;
 }
 
 export function mockListCatalogItems(query: CatalogListQuery): CatalogListResult {
   const search = query.search.trim().toLocaleLowerCase('ru-RU');
+  const kind = query.type === 'agreements' ? query.agreementKind ?? 'contracts' : undefined;
   const filtered = [...catalogGroup(query.type).values()]
-    .filter((item) => (query.showInactive || item.isActive) && (!search || catalogSearchText(item).toLocaleLowerCase('ru-RU').includes(search)))
+    .filter((item) => (kind ? item.type === 'agreements' && item.kind === kind : true))
+    .filter((item) => !search || catalogSearchText(item).toLocaleLowerCase('ru-RU').includes(search))
     .sort((left, right) => left.name.localeCompare(right.name, 'ru'));
   const start = (query.page - 1) * query.pageSize;
   return { items: filtered.slice(start, start + query.pageSize).map(cloneCatalogItem), page: query.page, pageSize: query.pageSize, total: filtered.length };
@@ -887,17 +897,13 @@ export function mockGetCatalogItem(type: CatalogType, itemId: string): CatalogIt
 
 export function mockGetCatalogReferenceData(): CatalogReferenceData {
   return {
-    vendors: mockVendors.map((item) => ({ ...item })),
-    universities: [...catalogGroup('universities').values()].filter((item) => item.type === 'universities' && item.isActive).map((item) => ({ id: item.id, name: item.name })),
-    products: [...catalogGroup('products').values()].flatMap((item) => item.type === 'products' && item.isActive ? [{ id: item.id, name: item.name, description: item.vendorName }] : []),
-    directions: [...catalogGroup('directions').values()].flatMap((item) => item.type === 'directions' && item.isActive ? [{ id: item.id, name: item.name, description: item.code }] : []),
-    programs: [
-      { id: 'program-data-analytics', name: 'Аналитика данных' },
-      { id: 'program-digital-economy', name: 'Цифровая экономика' },
-      { id: 'program-it-management', name: 'ИТ-менеджмент' },
-      { id: 'program-cybersecurity', name: 'Кибербезопасность' },
-    ],
-    responsibles: [...catalogGroup('responsibles').values()].flatMap((item) => item.type === 'responsibles' && item.isActive ? [{ id: item.id, name: item.name, description: item.role || item.email }] : []),
+    vendors: [...catalogGroup('vendors').values()].flatMap((item) => item.type === 'vendors' ? [{ id: item.id, name: item.name }] : []),
+    universities: [...catalogGroup('universities').values()].filter((item) => item.type === 'universities').map((item) => ({ id: item.id, name: item.name })),
+    products: [...catalogGroup('products').values()].flatMap((item) => item.type === 'products' ? [{ id: item.id, name: item.name, description: item.vendorName }] : []),
+    directions: [...catalogGroup('directions').values()].flatMap((item) => item.type === 'directions' ? [{ id: item.id, name: item.name, description: item.code }] : []),
+    programs: [...catalogGroup('programs').values()].flatMap((item) => item.type === 'programs' ? [{ id: item.id, name: item.name, description: item.directionName }] : []),
+    responsibles: [...catalogGroup('responsibles').values()].flatMap((item) => item.type === 'responsibles' ? [{ id: item.id, name: item.name, description: item.role || item.email }] : []),
+    contracts: [...catalogGroup('agreements').values()].flatMap((item) => item.type === 'agreements' && item.kind === 'contracts' ? [{ id: item.id, name: item.contractNumber, description: item.universityName }] : []),
   };
 }
 
@@ -905,17 +911,61 @@ function duplicateCatalogItem(input: CatalogInput, exceptId?: string): boolean {
   const values = [...catalogGroup(input.type).values()].filter((item) => item.id !== exceptId);
   if (input.type === 'universities') return values.some((item) => item.name.toLocaleLowerCase('ru-RU') === input.name.toLocaleLowerCase('ru-RU'));
   if (input.type === 'directions') return values.some((item) => item.type === 'directions' && item.code.toLocaleLowerCase('ru-RU') === input.code.toLocaleLowerCase('ru-RU'));
+  if (input.type === 'programs') return values.some((item) => item.type === 'programs' && item.directionId === input.directionId && item.name.toLocaleLowerCase('ru-RU') === input.name.toLocaleLowerCase('ru-RU'));
+  if (input.type === 'vendors') return values.some((item) => item.name.toLocaleLowerCase('ru-RU') === input.name.toLocaleLowerCase('ru-RU'));
   if (input.type === 'products') return values.some((item) => item.type === 'products' && item.vendorId === input.vendorId && item.name.toLocaleLowerCase('ru-RU') === input.name.toLocaleLowerCase('ru-RU') && item.version === input.version);
+  if (input.type === 'agreements' && input.kind === 'contracts') return values.some((item) => item.type === 'agreements' && item.kind === 'contracts' && item.contractNumber === input.contractNumber);
+  if (input.type === 'agreements') return values.some((item) => item.type === 'agreements' && item.kind === 'licenses' && item.licenseNumber === input.licenseNumber && item.productId === input.productId);
   return values.some((item) => item.type === 'responsibles' && item.email.toLocaleLowerCase('ru-RU') === input.email.toLocaleLowerCase('ru-RU'));
 }
 
 function catalogItemFromInput(input: CatalogInput, current?: CatalogItem): CatalogItem {
   const timestamp = now();
-  const base = { id: current?.id ?? id(input.type.slice(0, -1)), name: input.name, isActive: current?.isActive ?? true, createdAt: current?.createdAt ?? timestamp, updatedAt: timestamp };
-  if (input.type === 'universities') return { ...base, type: input.type, city: input.city };
-  if (input.type === 'products') return { ...base, type: input.type, vendorId: input.vendorId, vendorName: mockVendors.find((item) => item.id === input.vendorId)?.name ?? '—', programId: input.programId, programName: '', version: input.version };
-  if (input.type === 'directions') return { ...base, type: input.type, code: input.code };
-  return { ...base, type: input.type, email: input.email, phone: input.phone, role: input.role, universityIds: [...input.universityIds] };
+  const base = { id: current?.id ?? id(input.type.slice(0, -1)), createdAt: current?.createdAt ?? timestamp, updatedAt: timestamp };
+  if (input.type === 'universities') return { ...base, type: input.type, name: input.name, city: input.city };
+  if (input.type === 'products') return { ...base, type: input.type, name: input.name, vendorId: input.vendorId, vendorName: catalogGroup('vendors').get(input.vendorId)?.name ?? '—', programId: input.programId, programName: catalogGroup('programs').get(input.programId)?.name ?? '', version: input.version };
+  if (input.type === 'directions') return { ...base, type: input.type, name: input.name, code: input.code };
+  if (input.type === 'programs') return { ...base, type: input.type, name: input.name, directionId: input.directionId, directionName: catalogGroup('directions').get(input.directionId)?.name ?? '', description: input.description };
+  if (input.type === 'vendors') return { ...base, type: input.type, name: input.name };
+  if (input.type === 'agreements' && input.kind === 'contracts') {
+    const product = catalogGroup('products').get(input.productId);
+    return {
+      ...base, type: input.type, kind: 'contracts', name: input.contractNumber, contractNumber: input.contractNumber,
+      universityId: input.universityId, universityName: catalogGroup('universities').get(input.universityId)?.name ?? '',
+      productId: input.productId, productName: product?.name ?? '',
+      vendorName: product && product.type === 'products' ? catalogGroup('vendors').get(product.vendorId)?.name ?? '' : '',
+      signedAt: input.signedAt, expiresAt: input.expiresAt, status: agreementStatus(input.statusRaw, input.expiresAt),
+      statusRaw: input.statusRaw, transferStatus: input.transferStatus,
+      licenseCount: [...catalogGroup('agreements').values()].filter((item) => item.type === 'agreements' && item.kind === 'licenses' && item.contractId === base.id).length,
+      comment: input.comment,
+    };
+  }
+  if (input.type === 'agreements') {
+    const product = catalogGroup('products').get(input.productId);
+    const contract = input.contractId ? catalogGroup('agreements').get(input.contractId) : undefined;
+    return {
+      ...base, type: input.type, kind: 'licenses', name: input.licenseNumber, licenseNumber: input.licenseNumber,
+      universityId: input.universityId, universityName: catalogGroup('universities').get(input.universityId)?.name ?? '',
+      productId: input.productId, productName: product?.name ?? '',
+      vendorName: product && product.type === 'products' ? catalogGroup('vendors').get(product.vendorId)?.name ?? '' : '',
+      contractId: input.contractId, contractNumber: contract && contract.type === 'agreements' && contract.kind === 'contracts' ? contract.contractNumber : '',
+      programId: input.programId, programName: catalogGroup('programs').get(input.programId)?.name ?? '',
+      directionId: input.directionId, directionName: catalogGroup('directions').get(input.directionId)?.name ?? '',
+      signedAt: input.signedAt, expiresAt: input.expiresAt, status: agreementStatus('signed', input.expiresAt),
+      transferStatus: input.transferStatus, comment: input.comment,
+    };
+  }
+  return { ...base, type: input.type, name: input.name, email: input.email, phone: input.phone, role: input.role, universityIds: [...input.universityIds] };
+}
+
+/** Mirrors backend/app/services/license_status.py so mock tables stay consistent. */
+function agreementStatus(statusRaw: string, expiresAt: string, today = new Date()): AgreementStatus {
+  if (statusRaw === 'terminated' || statusRaw === 'draft') return statusRaw;
+  if (!expiresAt) return 'active';
+  const diffDays = Math.ceil((new Date(`${expiresAt}T00:00:00Z`).getTime() - today.getTime()) / 86_400_000);
+  if (diffDays < 0) return 'expired';
+  if (diffDays <= 30) return 'expires_soon';
+  return 'active';
 }
 
 export function mockCreateCatalogItem(input: CatalogInput): CatalogItem {
@@ -933,9 +983,21 @@ export function mockUpdateCatalogItem(itemId: string, input: CatalogInput): Cata
   return cloneCatalogItem(item);
 }
 
-export function mockSetCatalogItemActive(type: CatalogType, itemId: string, active: boolean): CatalogItem {
-  const current = mockGetCatalogItem(type, itemId);
-  const item = { ...current, isActive: active, updatedAt: now() } as CatalogItem;
-  catalogGroup(type).set(item.id, item);
-  return cloneCatalogItem(item);
+export function mockDeleteCatalogItem(type: CatalogType, itemId: string): void {
+  mockGetCatalogItem(type, itemId);
+  if (catalogDeleteBlockers[type](catalogGroup, itemId)) {
+    throw new ApiRequestError(409, { code: 'CONFLICT' }, 'Запись используется в других данных и не может быть удалена.');
+  }
+  catalogGroup(type).delete(itemId);
 }
+
+/** Mirrors the backend ON DELETE RESTRICT contract for the seeded relations. */
+const catalogDeleteBlockers: Readonly<Record<CatalogType, (group: (type: CatalogType) => Map<string, CatalogItem>, itemId: string) => boolean>> = {
+  universities: () => false,
+  directions: (group, itemId) => [...group('programs').values()].some((item) => item.type === 'programs' && item.directionId === itemId),
+  programs: (group, itemId) => [...group('products').values()].some((item) => item.type === 'products' && item.programId === itemId),
+  vendors: (group, itemId) => [...group('products').values()].some((item) => item.type === 'products' && item.vendorId === itemId),
+  products: () => false,
+  responsibles: () => false,
+  agreements: (group, itemId) => [...group('agreements').values()].some((item) => item.type === 'agreements' && item.kind === 'licenses' && item.contractId === itemId),
+};
