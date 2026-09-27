@@ -40,6 +40,7 @@ from app.models.report_job import (  # noqa: F401
     STATUS_READY,
     ReportJob,
 )
+from app.models.report_template import ReportTemplate  # noqa: F401
 from app.models.interactions import (  # noqa: F401
     Document,
     InteractionNote,
@@ -90,4 +91,5 @@ __all__ = [
     "ExternalApplication",
     "ExternalSyncState",
     "ReportJob",
+    "ReportTemplate",
 ]

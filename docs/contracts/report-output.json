@@ -40,13 +40,13 @@
   },
   "json": {
     "shape": {
-      "generated_at": "tz-aware ISO8601 string",
+      "metadata": "report_name/version/generator/generated_at/generated_by",
       "filters": "all 8 UnifiedFilter fields, raw serialized (stable order)",
-      "columns": "resolved output column keys (default = all 14 mandatory)",
-      "total": "row count (University x License grain)",
-      "items": "one object per row with ONLY the selected columns in selected order"
+      "columns": "resolved output column keys with titles (default = all 12 mandatory)",
+      "rows": "one object per row with ONLY the selected columns in selected order",
+      "totals": "row_count + universities (distinct names or null when university column not selected)"
     },
-    "key_order": ["generated_at", "filters", "columns", "total", "items"],
+    "key_order": ["metadata", "filters", "columns", "rows", "totals"],
     "types": {
       "uuid": "string",
       "date": "ISO YYYY-MM-DD",
@@ -67,7 +67,7 @@
     "expiry": "expires_at = created_at + 24h (tz-aware); download of expired jobs -> 410 Gone; cleanup_expired_report_jobs() removes expired artifacts (run_cleanup_once for daily cron/CLI)",
     "download": {
       "ready": "200 file with Content-Disposition attachment report_<job_id>.<ext>",
-      "not_ready_or_failed": "409 Conflict (controlled, never 500)",
+      "not_ready_or_failed": "400 REPORT_NOT_READY (controlled, never 500)",
       "expired_or_missing_file": "410 Gone",
       "path_safety": "stored file_path containment-checked against REPORTS_ROOT (traversal-safe)"
     },
@@ -79,7 +79,7 @@
   },
   "consistency": {
     "rule": "for identical filters+columns, ReportDataset / XLSX / PDF table / JSON items carry the same rows, columns and values (presentation formatting aside)",
-    "nulls": "None everywhere (empty XLSX/PDF cell, JSON null)",
+    "nulls": "None everywhere (empty XLSX/PDF cell, JSON null), except overdue_tasks which is 0 when none",
     "scope": "same UnifiedFilter + same actor security intersection in every format"
   }
 }

@@ -25,7 +25,7 @@ import styles from './catalogs-page.module.css';
 const required = (max: number, message: string) => z.string().max(max, `Максимум ${max} символов.`).refine((value) => value.trim().length > 0, message);
 const schemas = {
   universities: z.object({ name: required(512, 'Укажите название ВУЗа.'), city: z.string().max(256, 'Максимум 256 символов.') }),
-  products: z.object({ name: required(512, 'Укажите название продукта.'), vendorId: required(64, 'Выберите вендора.'), version: z.string().max(128, 'Максимум 128 символов.') }),
+  products: z.object({ name: required(512, 'Укажите название продукта.'), vendorId: required(64, 'Выберите вендора.'), programId: z.string().max(64), version: z.string().max(128, 'Максимум 128 символов.') }),
   directions: z.object({ name: required(512, 'Укажите название направления.'), code: required(64, 'Укажите код направления.') }),
   responsibles: z.object({ name: required(512, 'Укажите ФИО.'), email: required(512, 'Укажите email.'), phone: z.string().max(64, 'Максимум 64 символа.'), role: z.string().max(256, 'Максимум 256 символов.'), universityIds: z.array(z.string()) }),
 } as const;
@@ -34,6 +34,7 @@ type CatalogFormValues = {
   name: string;
   city: string;
   vendorId: string;
+  programId: string;
   version: string;
   code: string;
   email: string;
@@ -46,6 +47,7 @@ const allFieldsSchema = z.object({
   name: z.string(),
   city: z.string(),
   vendorId: z.string(),
+  programId: z.string(),
   version: z.string(),
   code: z.string(),
   email: z.string(),
@@ -64,13 +66,14 @@ function catalogFormSchema(type: CatalogType) {
   });
 }
 
-const formFields = ['name', 'city', 'vendorId', 'version', 'code', 'email', 'phone', 'role', 'universityIds'] as const;
+const formFields = ['name', 'city', 'vendorId', 'programId', 'version', 'code', 'email', 'phone', 'role', 'universityIds'] as const;
 
 function valuesFor(type: CatalogType, item?: CatalogItem | null): CatalogFormValues {
   return {
     name: item?.name ?? '',
     city: item?.type === 'universities' ? item.city : '',
     vendorId: item?.type === 'products' ? item.vendorId : '',
+    programId: item?.type === 'products' ? item.programId : '',
     version: item?.type === 'products' ? item.version : '',
     code: item?.type === 'directions' ? item.code : '',
     email: item?.type === 'responsibles' ? item.email : '',
@@ -82,7 +85,7 @@ function valuesFor(type: CatalogType, item?: CatalogItem | null): CatalogFormVal
 
 function inputFor(type: CatalogType, values: CatalogFormValues): CatalogInput {
   if (type === 'universities') return { type, name: values.name.trim(), city: values.city.trim() };
-  if (type === 'products') return { type, name: values.name.trim(), vendorId: values.vendorId, version: values.version.trim() };
+  if (type === 'products') return { type, name: values.name.trim(), vendorId: values.vendorId, programId: values.programId, version: values.version.trim() };
   if (type === 'directions') return { type, name: values.name.trim(), code: values.code.trim() };
   return { type, name: values.name.trim(), email: values.email.trim(), phone: values.phone.trim(), role: values.role.trim(), universityIds: values.universityIds };
 }
@@ -97,6 +100,7 @@ function fieldMap(type: CatalogType): Record<string, keyof CatalogFormValues> {
   return {
     full_name: 'name',
     vendor_id: 'vendorId',
+    program_id: 'programId',
     university_ids: 'universityIds',
     ...(type === 'directions' ? { direction_code: 'code' as const } : {}),
   };
@@ -161,7 +165,7 @@ export function CatalogFormModal({ type, item, references, pending, onClose, onS
     {detailQuery.isError ? <FormErrorBanner>Не удалось загрузить связи с ВУЗами. Закройте форму и попробуйте снова.</FormErrorBanner> : null}
     <FormField label={type === 'responsibles' ? 'ФИО' : 'Название'} htmlFor={nameField.id} required error={nameField.error} errorId={nameField.errorId}><Input id={nameField.id} autoFocus maxLength={512} disabled={pending || detailLoading} aria-invalid={Boolean(nameField.error)} aria-describedby={nameField.error ? nameField.errorId : undefined} {...register('name')} /></FormField>
     {type === 'universities' ? (() => { const meta = field('city'); return <FormField label="Город" htmlFor={meta.id} error={meta.error} errorId={meta.errorId} hint="Город указывается отдельно от региона."><Input id={meta.id} maxLength={256} disabled={pending} aria-invalid={Boolean(meta.error)} aria-describedby={meta.error ? meta.errorId : undefined} {...register('city')} /></FormField>; })() : null}
-    {type === 'products' ? <div className={styles.formGrid}>{(() => { const meta = field('vendorId'); return <FormField label="Вендор" htmlFor={meta.id} required error={meta.error} errorId={meta.errorId}><Select id={meta.id} disabled={pending} aria-invalid={Boolean(meta.error)} aria-describedby={meta.error ? meta.errorId : undefined} {...register('vendorId')}><option value="">Выберите вендора</option>{references.vendors.map((vendor) => <option value={vendor.id} key={vendor.id}>{vendor.name}</option>)}</Select></FormField>; })()}{(() => { const meta = field('version'); return <FormField label="Версия" htmlFor={meta.id} error={meta.error} errorId={meta.errorId}><Input id={meta.id} maxLength={128} disabled={pending} aria-invalid={Boolean(meta.error)} aria-describedby={meta.error ? meta.errorId : undefined} {...register('version')} /></FormField>; })()}</div> : null}
+    {type === 'products' ? <div className={styles.formGrid}>{(() => { const meta = field('vendorId'); return <FormField label="Вендор" htmlFor={meta.id} required error={meta.error} errorId={meta.errorId}><Select id={meta.id} disabled={pending} aria-invalid={Boolean(meta.error)} aria-describedby={meta.error ? meta.errorId : undefined} {...register('vendorId')}><option value="">Выберите вендора</option>{references.vendors.map((vendor) => <option value={vendor.id} key={vendor.id}>{vendor.name}</option>)}</Select></FormField>; })()}{(() => { const meta = field('programId'); return <FormField label="ИТ-программа" htmlFor={meta.id} error={meta.error} errorId={meta.errorId} hint="Программа определяет направление продукта."><Select id={meta.id} disabled={pending} aria-invalid={Boolean(meta.error)} aria-describedby={meta.error ? meta.errorId : undefined} {...register('programId')}><option value="">Без программы</option>{references.programs.map((program) => <option value={program.id} key={program.id}>{program.name}</option>)}</Select></FormField>; })()}{(() => { const meta = field('version'); return <FormField label="Версия" htmlFor={meta.id} error={meta.error} errorId={meta.errorId}><Input id={meta.id} maxLength={128} disabled={pending} aria-invalid={Boolean(meta.error)} aria-describedby={meta.error ? meta.errorId : undefined} {...register('version')} /></FormField>; })()}</div> : null}
     {type === 'directions' ? (() => { const meta = field('code'); return <FormField label="Код" htmlFor={meta.id} required error={meta.error} errorId={meta.errorId}><Input id={meta.id} maxLength={64} disabled={pending} aria-invalid={Boolean(meta.error)} aria-describedby={meta.error ? meta.errorId : undefined} {...register('code')} /></FormField>; })() : null}
     {type === 'responsibles' ? <><div className={styles.formGrid}>{(() => { const meta = field('email'); return <FormField label="Email" htmlFor={meta.id} required error={meta.error} errorId={meta.errorId}><Input id={meta.id} type="email" maxLength={512} disabled={pending || detailLoading} aria-invalid={Boolean(meta.error)} aria-describedby={meta.error ? meta.errorId : undefined} {...register('email')} /></FormField>; })()}{(() => { const meta = field('phone'); return <FormField label="Телефон" htmlFor={meta.id} error={meta.error} errorId={meta.errorId}><Input id={meta.id} maxLength={64} disabled={pending || detailLoading} aria-invalid={Boolean(meta.error)} aria-describedby={meta.error ? meta.errorId : undefined} {...register('phone')} /></FormField>; })()}</div>{(() => { const meta = field('role'); return <FormField label="Роль" htmlFor={meta.id} error={meta.error} errorId={meta.errorId} hint="Укажите должность или роль ответственного."><Input id={meta.id} maxLength={256} disabled={pending || detailLoading} aria-invalid={Boolean(meta.error)} aria-describedby={meta.error ? meta.errorId : undefined} {...register('role')} /></FormField>; })()}<Controller control={control} name="universityIds" render={({ field: universityField }) => <div className={styles.multiField}><span>Доступные ВУЗы</span><MultiSelect label="ВУЗы" options={references.universities} values={universityField.value} onChange={universityField.onChange} searchable loading={detailLoading} disabled={pending || detailLoading || detailQuery.isError} /></div>} /></> : null}
     <div className={styles.modalActions}><Button type="button" variant="ghost" disabled={pending} onClick={onClose}>Отмена</Button><Button type="submit" variant="primary" loading={pending} disabled={pending || detailLoading || detailQuery.isError}>{item ? 'Сохранить' : 'Добавить'}</Button></div>

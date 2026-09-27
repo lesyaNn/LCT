@@ -286,7 +286,6 @@ def test_license_row_full_values(fx):
     assert lic1["direction"] == "Direction One"
     assert lic1["program"] == "Program 1"
     assert lic1["product"] == "Product 1"
-    assert lic1["software"] == "Product 1"  # intentional alias
     assert lic1["vendor"] == "Vendor V"
     assert lic1["license_signed"] == date(2026, 2, 1)
     assert lic1["license_expires"] == date(2027, 2, 1)
@@ -324,7 +323,6 @@ def test_fallback_row_uses_latest_contract(fx):
     assert row["program"] is None
     assert row["product"] is None
     assert row["vendor"] is None
-    assert row["software"] is None
     assert row["responsible"] is None
     assert row["workflow_status"] is None
     assert row["health_score"] is None

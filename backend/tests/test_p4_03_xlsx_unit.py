@@ -287,13 +287,13 @@ def test_freeze_and_autofilter_cover_header_row_6(tmp_path):
     assert ws.auto_filter.ref == "A6:F6"
 
 
-def test_freeze_and_autofilter_default_14(tmp_path):
+def test_freeze_and_autofilter_default_12(tmp_path):
     result = _gen(tmp_path, None, [])
     assert result.columns == list(DEFAULT_COLUMNS)
     ws = load_workbook(result.path)["Отчёт"]
     assert ws.freeze_panes == "A7"
-    assert ws.auto_filter.ref == "A6:M6"
-    assert [ws.cell(row=HEADER_ROW, column=i).value for i in range(1, 14)] == [
+    assert ws.auto_filter.ref == "A6:L6"
+    assert [ws.cell(row=HEADER_ROW, column=i).value for i in range(1, 13)] == [
         COLUMN_REGISTRY[k].title for k in DEFAULT_COLUMNS
     ]
 

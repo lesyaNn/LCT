@@ -5,7 +5,7 @@ Every consumer (XLSX/PDF/JSON writers, frontend checkbox UI via
 here. Nothing is duplicated per exporter.
 
 Row-grain note (see :mod:`app.modules.analytics.dataset`): business columns
-(direction/program/product/vendor/software/contract/license/transfer/comment)
+(direction/program/product/vendor/contract/license/transfer/comment)
 are read from the report row's own ``licenses`` row (``License.program_id``,
 ``License.product_id``, ``License.contract_id``). ``university_programs`` /
 ``university_products`` stay FILTER-only inputs (``UnifiedFilter`` EXISTS
@@ -114,15 +114,19 @@ for _c in [
         "direction",
         "ИТ-направление",
         "string",
-        "licenses.program_id -> it_programs.direction_id -> it_directions.name "
-        "(COALESCE licenses.direction_id, program direction); NULL for fallback rows",
+        "canonical chain (ТЗ: направление <- программа <- продукт, привязка "
+        "задается при создании workflow): COALESCE(licenses.direction_id, "
+        "license program direction, workflow program direction of the latest "
+        "instance with a program); NULL when unset (never invented)",
         needs_license_join=True,
     ),
     _col(
         "program",
         "ИТ-программа",
         "string",
-        "licenses.program_id -> it_programs.name (ITProgram.name); NULL for fallback rows",
+        "canonical chain: COALESCE(licenses.program_id -> it_programs.name, "
+        "university workflow program (latest instance with one, chosen at "
+        "workflow creation)); NULL when unset (never invented)",
         needs_license_join=True,
     ),
     _col(
@@ -157,14 +161,6 @@ for _c in [
         "string",
         "licenses.product_id -> it_products.vendor_id -> vendors.name (Vendor.name); "
         "NULL for fallback rows",
-        needs_license_join=True,
-    ),
-    _col(
-        "software",
-        "ПО",
-        "string",
-        "intentional alias of product: licenses.product_id -> it_products.name "
-        "(no separate software model/field exists)",
         needs_license_join=True,
     ),
     _col(
@@ -272,7 +268,6 @@ MANDATORY_COLUMNS: tuple[str, ...] = (
     "workflow_status",
     "responsible",
     "vendor",
-    "software",
     "contract_number",
     "license_signed",
     "license_expires",
@@ -302,10 +297,12 @@ PRESETS: dict[str, tuple[str, ...]] = {
     "FULL": FULL_COLUMNS,
 }
 
-#: Removed columns (students/teachers/health score deleted).
+#: Removed columns (students/teachers/health score deleted; software was a
+#: pure alias of product with no separate entity behind it).
 UNSUPPORTED_OPTIONAL_COLUMNS: dict[str, str] = {
     "health_score": "removed: health score entity deleted",
     "teacher_readiness": "removed: teachers entity deleted",
+    "software": "removed: pure alias of product (no separate software entity)",
 }
 
 

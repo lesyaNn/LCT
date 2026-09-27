@@ -53,8 +53,18 @@ logger = logging.getLogger("rtk")
 MAX_JOB_ATTEMPTS = 3
 STALE_CLAIM_TIMEOUT = timedelta(minutes=30)
 
+#: Artifact reuse version (ТЗ §7 cache). Bump whenever dataset semantics,
+#: column registry, exporters OR the underlying catalog data change in a
+#: way that alters report content (backfills, re-imports): stale artifacts
+#: (older version or no version stamp) are never copied onto new jobs —
+#: the worker regenerates them. Stored in ``ReportJob.result["cache_version"]``
+#: (no schema change; import jobs own ``result`` for summaries and never
+#: participate in report reuse).
+REPORT_CACHE_VERSION = 6
+
 __all__ = [
     "MAX_JOB_ATTEMPTS",
+    "REPORT_CACHE_VERSION",
     "REPORT_EXPIRY_HOURS",
     "REPORT_JOB_STATUSES",
     "STATUS_BUILDING",
@@ -66,6 +76,8 @@ __all__ = [
     "cleanup_expired_report_jobs",
     "contained_job_path",
     "create_job",
+    "find_inflight_duplicate",
+    "find_ready_reusable",
     "get_job",
     "job_file_path",
     "job_filename",
@@ -100,6 +112,9 @@ def reports_root() -> Path:
     exporters read it); ``REPORTS_ROOT`` (``settings.reports_root``) wins
     when both are set.
     """
+    root_env = os.getenv("REPORTS_ROOT")
+    if root_env:
+        return Path(root_env)
     legacy = os.getenv("REPORTS_DIR")
     if legacy:
         return Path(legacy)
@@ -263,6 +278,99 @@ def list_visible_jobs(
             stmt.where(ReportJob.actor_sub == getattr(user, "id", None))
         ).scalars().all()
     )
+
+
+def _params_match(
+    job: ReportJob,
+    *,
+    format: str,
+    filters: dict[str, Any],
+    columns: list[str],
+) -> bool:
+    """Same output params (format + serialized filters + resolved columns)."""
+    return (
+        job.format == format
+        and (job.filters or {}) == (filters or {})
+        and list(job.columns or []) == list(columns or [])
+    )
+
+
+def find_inflight_duplicate(
+    db: Session,
+    *,
+    format: str,
+    filters: dict[str, Any],
+    columns: list[str],
+    actor_sub: str,
+) -> ReportJob | None:
+    """Oldest queued/building report of this actor with identical params.
+
+    Used for request dedup (ТЗ §7: повторные запросы не плодят очередь):
+    the caller returns the existing id instead of persisting a new row.
+    Only ``job_type='report'`` rows participate; expired rows are ignored.
+    """
+    now = _utcnow()
+    stmt = (
+        select(ReportJob)
+        .where(
+            ReportJob.job_type == "report",
+            ReportJob.status.in_([STATUS_QUEUED, STATUS_BUILDING]),
+            ReportJob.actor_sub == actor_sub,
+            ReportJob.format == format,
+            ReportJob.expires_at > now,
+        )
+        .order_by(ReportJob.created_at.asc())
+        .limit(25)
+    )
+    for job in db.execute(stmt).scalars().all():
+        if _params_match(job, format=format, filters=filters, columns=columns):
+            return job
+    return None
+
+
+def find_ready_reusable(
+    db: Session,
+    *,
+    format: str,
+    filters: dict[str, Any],
+    columns: list[str],
+    actor_sub: str,
+    exclude_id: Any = None,
+) -> ReportJob | None:
+    """Freshest ready report of this actor with identical params + live file.
+
+    The worker copies the artifact instead of regenerating (ТЗ §7 кэш
+    повторных запросов). Only artifacts stamped with the current
+    ``REPORT_CACHE_VERSION`` are eligible — anything older (or unstamped,
+    e.g. created before versioning existed) forces regeneration instead
+    of serving stale content. Returns ``None`` when nothing reusable
+    exists.
+    """
+    now = _utcnow()
+    stmt = (
+        select(ReportJob)
+        .where(
+            ReportJob.job_type == "report",
+            ReportJob.status == STATUS_READY,
+            ReportJob.actor_sub == actor_sub,
+            ReportJob.format == format,
+            ReportJob.expires_at > now,
+        )
+        .order_by(ReportJob.created_at.desc())
+        .limit(25)
+    )
+    for job in db.execute(stmt).scalars().all():
+        if exclude_id is not None and job.id == exclude_id:
+            continue
+        if not _params_match(job, format=format, filters=filters, columns=columns):
+            continue
+        result = job.result if isinstance(job.result, dict) else {}
+        if result.get("cache_version") != REPORT_CACHE_VERSION:
+            continue
+        path = contained_job_path(job.file_path)
+        if path is not None and path.is_file():
+            return job
+    return None
 
 
 def mark_building(db: Session, job: ReportJob) -> bool:

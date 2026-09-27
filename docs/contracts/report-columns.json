@@ -11,7 +11,7 @@
     "string": "text or null (missing LEFT relations are null, never ''/N/A/-)"
   },
   "defaults": {
-    "columns_omitted": "all 13 mandatory columns in documented order",
+    "columns_omitted": "all 12 mandatory columns in documented order",
     "duplicates": "deduped preserving first-seen order",
     "empty_list": "422 - at least one column required",
     "unknown_key": "422 - never silently ignored"
@@ -27,13 +27,13 @@
       "key": "direction",
       "title": "ИТ-направление",
       "type": "string",
-      "source": "licenses.program_id -> it_programs.direction_id -> it_directions.name (COALESCE licenses.direction_id, program direction); NULL for fallback rows"
+      "source": "canonical chain (ТЗ: направление <- программа <- продукт, привязка задается при создании workflow): COALESCE(licenses.direction_id, license program direction, workflow program direction of the latest instance with a program); NULL when unset (never invented)"
     },
     {
       "key": "program",
       "title": "ИТ-программа",
       "type": "string",
-      "source": "licenses.program_id -> it_programs.name (ITProgram.name); NULL for fallback rows"
+      "source": "canonical chain: COALESCE(licenses.program_id -> it_programs.name, university workflow program (latest instance with one, chosen at workflow creation)); NULL when unset (never invented)"
     },
     {
       "key": "product",
@@ -58,12 +58,6 @@
       "title": "Вендор",
       "type": "string",
       "source": "licenses.product_id -> it_products.vendor_id -> vendors.name (Vendor.name); NULL for fallback rows"
-    },
-    {
-      "key": "software",
-      "title": "ПО",
-      "type": "string",
-      "source": "intentional alias of product: licenses.product_id -> it_products.name (no separate software model/field exists)"
     },
     {
       "key": "contract_number",
@@ -130,13 +124,14 @@
   ],
   "optional_columns_unsupported": [
     "health_score",
-    "teacher_readiness"
+    "teacher_readiness",
+    "software"
   ],
   "ordering": "University.name ASC, University.id ASC, License.license_number ASC NULLS LAST, License.id ASC (deterministic, never DB natural order)",
   "presets": {
-    "FULL": "14 mandatory + all 6 supported optionals",
-    "MINIMAL": "14 mandatory columns",
-    "STANDARD": "14 mandatory + city + current_stage"
+    "FULL": "12 mandatory + all 5 supported optionals",
+    "MINIMAL": "12 mandatory columns",
+    "STANDARD": "12 mandatory + city + current_stage"
   },
   "registry": "backend/app/modules/analytics/columns.py (COLUMN_REGISTRY; single source of truth, never duplicated per exporter)",
   "request_dto": "backend/app/modules/analytics/report_request.py (ReportRequest: format + filters: UnifiedFilter + columns)",

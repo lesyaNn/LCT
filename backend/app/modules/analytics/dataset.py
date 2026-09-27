@@ -4,7 +4,6 @@ Row grain (frozen decision): **one row per (University × License)** via
 ``universities LEFT JOIN licenses``; universities without licenses produce
 exactly one fallback row with business columns resolved from the latest
 contract (or NULL). Rationale:
-
 * business detail (direction/program/product/vendor/contract/license) lives
   on the license row itself (``License.program_id/product_id/contract_id``),
   so joining it fans out exactly once per real business line — never the
@@ -133,6 +132,28 @@ class ReportDatasetService:
         )
 
     @staticmethod
+    def _latest_program_id() -> Any:
+        """Program chosen at workflow creation (latest instance that has one).
+
+        The creation wizard binds direction -> program -> product and the API
+        validates it (program linked to the university); the report reads it
+        back here. Latest by ``updated_at`` (mirrors ``_latest_instance_id``),
+        ``NULL`` when the university has no workflow with a program — the
+        caller then falls through to the product catalog link.
+        """
+        return (
+            select(WorkflowInstance.program_id)
+            .where(
+                WorkflowInstance.university_id == University.id,
+                WorkflowInstance.program_id.is_not(None),
+            )
+            .order_by(WorkflowInstance.updated_at.desc(), WorkflowInstance.id.asc())
+            .limit(1)
+            .correlate(University)
+            .scalar_subquery()
+        )
+
+    @staticmethod
     def _latest_contract_id() -> Any:
         return (
             select(Contract.id)
@@ -175,6 +196,8 @@ class ReportDatasetService:
 
         lic_dir = aliased(ITDirection)
         prog_dir = aliased(ITDirection)
+        wf_prog = aliased(ITProgram)
+        wf_prog_dir = aliased(ITDirection)
         lic_contract = aliased(Contract)
 
         select_list: list[Any] = [University.id.label("_university_id")]
@@ -184,14 +207,36 @@ class ReportDatasetService:
             select_list.append(University.city.label("city"))
         if need_license:
             select_list.append(License.id.label("_license_id"))
+            # Canonical chain (ТЗ): license direct link -> workflow program
+            # (chosen at workflow creation). No product fallback: a university
+            # without a workflow shows NULL (honest, never invented).
+            latest_prog = ReportDatasetService._latest_program_id()
             if "direction" in resolved:
-                select_list.append(func.coalesce(lic_dir.name, prog_dir.name).label("direction"))
+                wf_prog_dir_name = (
+                    select(wf_prog_dir.name)
+                    .select_from(wf_prog)
+                    .join(wf_prog_dir, wf_prog_dir.id == wf_prog.direction_id)
+                    .where(wf_prog.id == latest_prog)
+                    .correlate(University)
+                    .scalar_subquery()
+                )
+                select_list.append(
+                    func.coalesce(
+                        lic_dir.name, prog_dir.name, wf_prog_dir_name
+                    ).label("direction")
+                )
             if "program" in resolved:
-                select_list.append(ITProgram.name.label("program"))
+                wf_prog_name = (
+                    select(wf_prog.name)
+                    .where(wf_prog.id == latest_prog)
+                    .correlate(University)
+                    .scalar_subquery()
+                )
+                select_list.append(
+                    func.coalesce(ITProgram.name, wf_prog_name).label("program")
+                )
             if "product" in resolved:
                 select_list.append(ITProduct.name.label("product"))
-            if "software" in resolved:
-                select_list.append(ITProduct.name.label("software"))
             if "vendor" in resolved:
                 select_list.append(Vendor.name.label("vendor"))
             if "license_signed" in resolved:
@@ -400,6 +445,10 @@ class ReportDatasetService:
                 uid = row.get("_university_id")
                 for col, mmap in extra_maps.items():
                     row[col] = mmap.get(uid) if isinstance(uid, uuid.UUID) else None
+            # Contract parity with fetch_rows/_attach_extra_maps:
+            # overdue_tasks is 0 when none (never null/missing in exports).
+            if "overdue_tasks" in exec_resolved and row.get("overdue_tasks") is None:
+                row["overdue_tasks"] = 0
             row.pop("_license_id", None)
             yield {key: row[key] for key in exec_resolved if key in row}
 

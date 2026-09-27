@@ -3,7 +3,7 @@
 Data comes ONLY from :class:`ReportDatasetService` (same filters, same row
 grain, same selected columns, same values as the dataset). There is no
 second ``JSON_COLUMN_MAPPING``: every item contains exactly the resolved
-output keys in ``ReportRequest.columns`` order (``None`` = all 14
+output keys in ``ReportRequest.columns`` order (``None`` = all 12
 mandatory columns); internal keys (``_university_id`` / ``_license_id``)
 are never emitted.
 
@@ -54,7 +54,6 @@ files are removed and no partial file is left behind.
 from __future__ import annotations
 
 import json
-import os
 import uuid
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -107,8 +106,14 @@ def _generated_by(user: Any | None) -> str | None:
 
 
 def default_reports_dir() -> Path:
-    """Configurable reports storage root (never the public static root)."""
-    return Path(os.getenv("REPORTS_DIR", "/app/reports"))
+    """Configurable reports storage root (never the public static root).
+
+    Delegates to ``report_jobs.reports_root`` so exporters and the job
+    layer never disagree (``REPORTS_ROOT`` wins, ``REPORTS_DIR`` legacy).
+    """
+    from app.modules.analytics import report_jobs as _jobs
+
+    return _jobs.reports_root()
 
 
 def serialize_json_value(value: Any) -> Any:
@@ -154,7 +159,7 @@ def generate_json_report(
 ) -> GeneratedReport:
     """Generate the frozen JSON export from the report dataset.
 
-    ``columns=None`` selects the frozen 14 mandatory ``DEFAULT_COLUMNS``;
+    ``columns=None`` selects the frozen 12 mandatory ``DEFAULT_COLUMNS``;
     otherwise the resolved/deduped ``ReportRequest.columns`` order is kept
     verbatim (never sorted). Raises ``UnknownReportColumnError`` /
     ``EmptyReportColumnsError`` (both ``ValueError``) for invalid

@@ -174,7 +174,8 @@ def seed_demo(session: Session, skip_universities: bool | None = None) -> dict:
         )
         programs[name] = p
 
-    # --- vendors / products ---
+    # --- vendors / products (program links are NOT seeded: binding is
+    # specified at workflow creation or via the catalog UI, never invented) ---
     products = []
     for vendor_name, prods in VENDORS_PRODUCTS:
         v, _ = _get_or_create(session, Vendor, {}, name=vendor_name)
@@ -317,6 +318,8 @@ def seed_demo(session: Session, skip_universities: bool | None = None) -> dict:
                 {
                     "university_id": uni.id,
                     "product_id": prod.id,
+                    # No program/direction links here: binding is specified
+                    # at workflow creation (or directly on the license).
                     "contract_id": contract.id,
                     "signed_at": signed,
                     "expires_at": expires,

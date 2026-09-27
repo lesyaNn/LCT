@@ -91,6 +91,7 @@ class ITProgram(UUIDPKMixin, TimestampMixin, Base):
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
 
     direction: Mapped["ITDirection"] = relationship(back_populates="programs")
+    products: Mapped[list["ITProduct"]] = relationship(back_populates="program")
 
 
 class Vendor(UUIDPKMixin, TimestampMixin, Base):
@@ -108,6 +109,7 @@ class ITProduct(UUIDPKMixin, TimestampMixin, Base):
         UniqueConstraint("vendor_id", "name", "version",
                          name="uq_it_products_vendor_name_version"),
         Index("ix_it_products_vendor_id", "vendor_id"),
+        Index("ix_it_products_program_id", "program_id"),
     )
 
     vendor_id: Mapped[uuid.UUID] = mapped_column(
@@ -115,10 +117,17 @@ class ITProduct(UUIDPKMixin, TimestampMixin, Base):
                    ondelete="RESTRICT"),
         nullable=False,
     )
+    program_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("it_programs.id", name="fk_it_products_program_id_it_programs",
+                   ondelete="SET NULL"),
+        nullable=True,
+        default=None,
+    )
     name: Mapped[str] = mapped_column(String(512), nullable=False)
     version: Mapped[str] = mapped_column(String(128), nullable=False, default="")
 
     vendor: Mapped["Vendor"] = relationship(back_populates="products")
+    program: Mapped["ITProgram | None"] = relationship(back_populates="products")
     contacts: Mapped[list["VendorContact"]] = relationship(back_populates="product")
     licenses: Mapped[list["License"]] = relationship(back_populates="product")
     direction_links: Mapped[list["ProductDirection"]] = relationship(

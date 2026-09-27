@@ -189,14 +189,44 @@ def _run_claimed_job(db: Session, job: ReportJob) -> str:
         )
 
     filters = UnifiedFilter.model_validate(job.filters or {})
+    # Columns=None means "all mandatory" (never [] which would 422-loop).
+    stored_columns = list(job.columns or [])
     request = ReportRequest(
         format=ReportFormat(job.format),
         filters=filters,
-        columns=list(job.columns or []),
+        columns=stored_columns or None,
     )
     output = Path(job.file_path) if job.file_path else jobs.job_file_path(
         job.id, job.format
     )
+    # Cache hit (ТЗ §7): an identical fresh ready job of the same actor —
+    # copy its artifact instead of regenerating.
+    try:
+        reusable = jobs.find_ready_reusable(
+            db,
+            format=job.format,
+            filters=UnifiedFilter.model_validate(job.filters or {}).model_dump(mode="json"),
+            columns=request.resolved_columns,
+            actor_sub=job.actor_sub or "",
+            exclude_id=job.id,
+        )
+    except Exception:
+        reusable = None
+    if reusable is not None:
+        import shutil
+
+        try:
+            source = jobs.contained_job_path(reusable.file_path)
+            assert source is not None and source.is_file()
+            output.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, output)
+            job.result = {"cache_version": jobs.REPORT_CACHE_VERSION}
+            jobs.mark_ready(
+                db, job, file_path=output, file_size=output.stat().st_size
+            )
+            return "ready"
+        except Exception:
+            logger.warning("report worker cache copy failed id=%s", job.id)
     try:
         generated = generate_report_file(
             db, request, output, user=worker_user, generated_at=None
@@ -211,6 +241,7 @@ def _run_claimed_job(db: Session, job: ReportJob) -> str:
         outcome = jobs.requeue_or_fail(db, job, exc)
         logger.exception("report worker failed id=%s", job.id)
         return outcome
+    job.result = {"cache_version": jobs.REPORT_CACHE_VERSION}
     jobs.mark_ready(db, job, file_path=generated.path, file_size=generated.size_bytes)
     return "ready"
 

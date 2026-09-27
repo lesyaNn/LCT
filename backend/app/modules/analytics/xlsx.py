@@ -38,7 +38,6 @@ removed and no partial file is left behind.
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -107,7 +106,6 @@ MIN_COLUMN_WIDTHS: dict[str, int | float] = {
     "workflow_status": 20,
     "responsible": 20,
     "vendor": 20,
-    "software": 25,
     "contract_number": 18,
     "license_signed": 14,
     "license_expires": 14,
@@ -116,6 +114,8 @@ MIN_COLUMN_WIDTHS: dict[str, int | float] = {
     "workflow_progress": 12,
     "city": 15,
     "current_stage": 20,
+    "last_interaction": 14,
+    "overdue_tasks": 12,
 }
 DEFAULT_MIN_WIDTH: int | float = 15
 MAX_COLUMN_WIDTH: int | float = 60
@@ -152,8 +152,15 @@ class GeneratedReport:
 
 
 def default_reports_dir() -> Path:
-    """Configurable reports storage root (never the public static root)."""
-    return Path(os.getenv("REPORTS_DIR", "/app/reports"))
+    """Configurable reports storage root (never the public static root).
+
+    Single source of truth lives in ``report_jobs.reports_root``
+    (``REPORTS_ROOT`` wins, ``REPORTS_DIR`` legacy alias); this wrapper
+    exists for exporter call sites and tests.
+    """
+    from app.modules.analytics import report_jobs as _jobs
+
+    return _jobs.reports_root()
 
 
 def sanitize_text(value: str) -> str:
@@ -279,7 +286,7 @@ def generate_xlsx_report(
 ) -> GeneratedReport:
     """Generate the frozen XLSX workbook from the report dataset.
 
-    ``columns=None`` selects the frozen 14 mandatory ``DEFAULT_COLUMNS``;
+    ``columns=None`` selects the frozen 12 mandatory ``DEFAULT_COLUMNS``;
     otherwise the resolved/deduped ``ReportRequest.columns`` order is kept
     verbatim (never sorted). Raises ``UnknownReportColumnError`` /
     ``EmptyReportColumnsError`` (both ``ValueError``) for invalid

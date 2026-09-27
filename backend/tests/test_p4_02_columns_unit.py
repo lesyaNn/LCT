@@ -31,7 +31,6 @@ EXPECTED_TITLES = {
     "workflow_status": "Статус работы",
     "responsible": "Ответственный",
     "vendor": "Вендор",
-    "software": "ПО",
     "contract_number": "Номер договора",
     "license_signed": "Подписание лицензии",
     "license_expires": "Срок действия",
@@ -40,7 +39,7 @@ EXPECTED_TITLES = {
 }
 
 
-def test_mandatory_columns_exactly_14_in_order():
+def test_mandatory_columns_exactly_12_in_order():
     assert MANDATORY_COLUMNS == tuple(EXPECTED_TITLES.keys())
     assert len(MANDATORY_COLUMNS) == len(EXPECTED_TITLES)
     assert len(set(MANDATORY_COLUMNS)) == len(EXPECTED_TITLES)

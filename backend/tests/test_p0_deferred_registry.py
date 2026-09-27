@@ -3,7 +3,7 @@
 Pins the resolution of the "two schema universes" blocker:
 * canonical ``Base.metadata`` contains exactly the SQL-managed tables
   (P1 tables + B1 workflow tables from 000011-000014 + 1 P4 report job
-  table ``report_jobs`` from 000018);
+  table ``report_jobs`` from 000018 + ``report_templates`` from 000032);
 * pre-UUID / stub models live on ``DeferredBase`` metadata only;
 * deferred routers are importable but NOT mounted in the production app;
 * ``AuditEvent.user_id`` accepts Keycloak ``sub``; entity identity is UUID (000021).
@@ -48,6 +48,7 @@ CANON_TABLES = frozenset(
         "workflow_tasks",
         "instance_stages",
         "report_jobs",
+        "report_templates",
         "audit_outbox",
         "external_applications",
         "external_sync_states",

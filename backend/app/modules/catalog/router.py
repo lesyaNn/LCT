@@ -490,7 +490,8 @@ def create_product(
     _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
 ) -> ProductDetail:
     return service.create_product(
-        db, vendor_id=data.vendor_id, name=data.name, version=data.version
+        db, vendor_id=data.vendor_id, program_id=data.program_id,
+        name=data.name, version=data.version,
     )
 
 
@@ -550,8 +551,10 @@ def patch_product(
     db: Session = Depends(get_audit_db),
     _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
 ) -> ProductDetail:
+    program_id = data.program_id if "program_id" in data.model_fields_set else service.UNSET
     return service.patch_product(
-        db, product_id, vendor_id=data.vendor_id, name=data.name, version=data.version
+        db, product_id, vendor_id=data.vendor_id, name=data.name,
+        version=data.version, program_id=program_id,
     )
 
 

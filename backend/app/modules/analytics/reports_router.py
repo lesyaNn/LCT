@@ -82,9 +82,18 @@ DOWNLOAD_MEDIA_TYPES: dict[str, str] = {
 }
 
 
+class ReportPreview(BaseModel):
+    """Bounded synchronous preview (ТЗ §7: фильтры и предпросмотр < 1с)."""
+
+    columns: list[str] = Field(description="Resolved output column keys.")
+    rows: list[dict[str, Any]] = Field(description="First N dataset rows.")
+    total: int = Field(description="Total dataset row count.")
+    university_count: int = Field(description="Distinct universities on the preview page.")
+    preview_limit: int = Field(description="Applied row cap.")
+
+
 class ReportJobRead(BaseModel):
     """Status view of a report job (never exposes the filesystem path)."""
-
     model_config = {"from_attributes": True}
 
     id: uuid.UUID = Field(description="Persistent ReportJob id.")
@@ -156,6 +165,61 @@ def create_report(
     return queued
 
 
+@router.post(
+    "/preview",
+    response_model=ReportPreview,
+    summary="Предпросмотр отчёта (первые строки, без файла)",
+    description=(
+        "Синхронно возвращает первые N строк датасета для тех же "
+        "filters+columns (тот же scope пользователя). Тяжёлые выгрузки "
+        "по-прежнему идут через очередь jobs."
+    ),
+    responses={401: ERROR_RESPONSES[401], 403: ERROR_RESPONSES[403],
+               422: ERROR_RESPONSES[422]},
+)
+def preview_report(
+    request: ReportRequest,
+    limit: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(require_permission(REPORTS_READ_PERMISSION)),
+) -> ReportPreview:
+    from app.modules.analytics.columns import COLUMN_REGISTRY
+    from app.modules.analytics.dataset import ReportDatasetService
+    from app.modules.analytics.filter_service import UnifiedFilterService
+
+    try:
+        stmt = ReportDatasetService.build_query(request.filters, request.resolved_columns)
+    except ValueError as exc:
+        raise BusinessException(ErrorCode.VALIDATION_ERROR) from exc
+    stmt = UnifiedFilterService.apply_security_scope(stmt, user)
+    resolved = list(stmt.get_execution_options().get("_report_columns", ()))
+    total_stmt = select(func.count()).select_from(stmt.subquery())
+    total = int(db.scalar(total_stmt) or 0)
+    mappings = list(db.execute(stmt.limit(limit).offset(0)).mappings().all())
+    rows = [dict(m) for m in mappings[:limit]]
+    if any(COLUMN_REGISTRY[k].needs_responsible_agg for k in resolved):
+        ReportDatasetService._attach_responsibles(db, rows)
+    if any(COLUMN_REGISTRY[k].needs_university_maps for k in resolved):
+        ReportDatasetService._attach_extra_maps(db, rows, resolved)
+    public_rows = [
+        {key: row.get(key) for key in resolved if key in row} for row in rows
+    ]
+    universities = {
+        row["_university_id"] for row in rows
+        if isinstance(row.get("_university_id"), uuid.UUID)
+    }
+    for row in public_rows:
+        row.pop("_university_id", None)
+        row.pop("_license_id", None)
+    return ReportPreview(
+        columns=resolved,
+        rows=public_rows,
+        total=total,
+        university_count=len(universities),
+        preview_limit=limit,
+    )
+
+
 @router.get(
     "",
     response_model=PaginatedResponse[ReportJobRead],
@@ -221,6 +285,17 @@ def download_report_job(
     path = jobs.contained_job_path(job.file_path)
     if path is None or not path.is_file():
         raise BusinessException(ErrorCode.FILE_NOT_FOUND)
+    if "audit_context" in db.info:
+        from app.modules.audit.service import AuditAction, AuditService, context_for
+
+        AuditService(db).log_event(
+            context=context_for(db, user.id or ""),
+            action=AuditAction.REPORT_DOWNLOAD,
+            entity_type="report",
+            entity_id=job.id,
+            new_value={"format": job.format, "file_size": job.file_size},
+        )
+        db.commit()
     filename = f"report_{job.id}.{job.format}"
     return FileResponse(
         path,

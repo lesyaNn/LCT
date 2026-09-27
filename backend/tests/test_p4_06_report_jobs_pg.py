@@ -256,7 +256,7 @@ def test_xlsx_file_contains_linked_business_fields(pg):
         s.add(UniversityResponsible(id=uuid4(), university_id=ids["Альфа"],
                                     responsible_id=person.id, is_primary=True))
         s.commit()
-    columns = ["university", "vendor", "software", "contract_number",
+    columns = ["university", "vendor", "contract_number",
                "license_signed", "license_expires", "transfer_status", "responsible", "comment"]
     client = _client(_admin())
     response = client.post("/reports", json={"format": "xlsx", "columns": columns,
@@ -739,10 +739,10 @@ def test_migration_chain_latest_is_report_jobs():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     versions = [v for v, _, _ in module._discover()]
-    assert versions[-1] == "000031_workflow_instances_product_unique"
-    assert len(versions) == 31
+    assert versions[-1] == "000033_product_program"
+    assert len(versions) == 33
     assert "report_jobs" in module.EXPECTED_TABLES
-    assert module.EXPECTED_TABLES[-1] == "product_directions"
+    assert module.EXPECTED_TABLES[-1] == "report_templates"
 
 
 def test_report_job_model_matches_migration_columns():

@@ -451,7 +451,7 @@ def list_products(
     sort_by: str,
     sort_order: str,
 ) -> tuple[list[tuple], int]:
-    """Page rows are (ITProduct, vendor_name) tuples — JOIN, no N+1."""
+    """Page rows are (ITProduct, vendor_name, program_name) tuples — JOINs, no N+1."""
     conds = []
     if search:
         conds.append(ITProduct.name.ilike(like_pattern(search), escape="\\"))
@@ -468,8 +468,9 @@ def list_products(
     total = db.execute(select(func.count()).select_from(from_clause).where(*conds)).scalar() or 0
     rows = list(
         db.execute(
-            select(ITProduct, Vendor.name)
+            select(ITProduct, Vendor.name, ITProgram.name)
             .join(Vendor, Vendor.id == ITProduct.vendor_id)
+            .outerjoin(ITProgram, ITProgram.id == ITProduct.program_id)
             .where(*conds)
             .order_by(*_order(ITProduct, PRODUCT_SORT, sort_by, sort_order))
             .limit(page_size)
@@ -480,10 +481,11 @@ def list_products(
 
 
 def get_product(db: Session, product_id: uuid.UUID) -> tuple | None:
-    """(ITProduct, Vendor|None), ONE statement."""
+    """(ITProduct, Vendor|None, ITProgram|None), ONE statement."""
     return db.execute(
-        select(ITProduct, Vendor)
+        select(ITProduct, Vendor, ITProgram)
         .outerjoin(Vendor, Vendor.id == ITProduct.vendor_id)
+        .outerjoin(ITProgram, ITProgram.id == ITProduct.program_id)
         .where(ITProduct.id == product_id)
     ).first()
 

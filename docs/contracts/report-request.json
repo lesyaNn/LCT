@@ -38,7 +38,7 @@
     },
     "columns": {
       "type": "string[] | null",
-      "default": "null = all 14 mandatory columns in documented order",
+      "default": "null = all 12 mandatory columns in documented order",
       "rules": "duplicates deduped first-seen; unknown keys 422; [] 422",
       "order": "output column order strictly follows the resolved request order (never sorted)"
     }
@@ -63,7 +63,6 @@
       "workflow_status",
       "responsible",
       "vendor",
-      "software",
       "contract_number",
       "license_signed",
       "license_expires",
@@ -109,7 +108,7 @@
         "workflow_statuses": []
       },
       "columns": null,
-      "note": "columns=null selects all 14 mandatory columns; export shape is {generated_at, filters, columns, total, items} (see report-output.json)"
+      "note": "columns=null selects all 12 mandatory columns; export shape is {metadata, filters, columns, rows, totals} (see report-output.json)"
     }
   },
   "async_api": {

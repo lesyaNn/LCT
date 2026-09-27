@@ -8,6 +8,7 @@ per-endpoint, never leaked to the client.
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -286,9 +287,12 @@ def delete_program(db: Session, program_id: uuid.UUID) -> None:
 # ---------------------------------------------------------------- products
 
 
-def _product_read(prod: ITProduct, vendor_name: str | None) -> ProductRead:
+def _product_read(
+    prod: ITProduct, vendor_name: str | None, program_name: str | None = None
+) -> ProductRead:
     item = ProductRead.model_validate(prod)
     item.vendor_name = vendor_name
+    item.program_name = program_name
     return item
 
 
@@ -313,24 +317,42 @@ def list_product_page(
         sort_by=sort_by,
         sort_order=sort_order,
     )
-    return [_product_read(prod, vendor_name) for prod, vendor_name in rows], total
+    return [_product_read(prod, vendor_name, program_name) for prod, vendor_name, program_name in rows], total
 
 
 def get_product_detail(db: Session, product_id: uuid.UUID) -> ProductDetail:
     row = repo.get_product(db, product_id)
     if row is None:
         raise NotFound("Product not found")
-    prod, vendor = row
+    prod, vendor, program = row
     detail = ProductDetail.model_validate(prod)
     detail.vendor_name = vendor.name if vendor is not None else None
     detail.vendor = VendorShort.model_validate(vendor) if vendor is not None else None
+    detail.program_name = program.name if program is not None else None
     detail.contacts = [VendorContactRead.model_validate(contact) for contact in repo.product_contacts(db, product_id)]
     return detail
 
 
-def create_product(db: Session, *, vendor_id: uuid.UUID, name: str, version: str) -> ProductDetail:
-    obj = repo.add_and_flush(db, ITProduct(vendor_id=vendor_id, name=name, version=version))
+def _require_program(db: Session, program_id: uuid.UUID) -> None:
+    if repo.get_program(db, program_id) is None:
+        raise NotFound("Program not found")
+
+
+def create_product(
+    db: Session, *, vendor_id: uuid.UUID, name: str, version: str,
+    program_id: uuid.UUID | None = None,
+) -> ProductDetail:
+    if program_id is not None:
+        _require_program(db, program_id)
+    obj = repo.add_and_flush(
+        db, ITProduct(vendor_id=vendor_id, program_id=program_id, name=name, version=version)
+    )
     return get_product_detail(db, obj.id)
+
+
+#: Sentinel for patch omit (field absent from the body = leave unchanged;
+#: explicit null clears the product->program link).
+UNSET: Any = object()
 
 
 def patch_product(
@@ -340,6 +362,7 @@ def patch_product(
     vendor_id: uuid.UUID | None,
     name: str | None,
     version: str | None,
+    program_id: uuid.UUID | None | Any = UNSET,
 ) -> ProductDetail:
     row = repo.get_product(db, product_id)
     if row is None:
@@ -351,6 +374,10 @@ def patch_product(
         prod.name = name
     if version is not None:
         prod.version = version
+    if program_id is not UNSET:
+        if program_id is not None:
+            _require_program(db, program_id)
+        prod.program_id = program_id
     repo.save(db, prod)
     return get_product_detail(db, product_id)
 

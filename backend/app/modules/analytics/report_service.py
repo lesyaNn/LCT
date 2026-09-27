@@ -8,9 +8,10 @@ Frozen API (``report_jobs`` + background execution)::
 formats), persists ``build_job_payload(...)`` (filters, resolved columns,
 format, actor scope) as a ``queued`` ``ReportJob`` and returns the real
 persisted id — never a fake UUID, never a silent synchronous ``200``
-file. The router schedules :func:`generate_report_task` via FastAPI
-``BackgroundTasks`` AFTER the commit, so a persistence failure never
-starts a worker.
+file. Execution is owned by the dedicated worker container
+(``python -m app.modules.analytics.report_worker``); the API only creates
+jobs — ``BackgroundTasks`` are banned for reports by the spec (they die
+with the API process, block the loop and have no retries).
 
 All three formats (``xlsx`` / ``pdf`` / ``json``) share one validation
 path, one job payload shape and one worker entry point
@@ -148,11 +149,14 @@ def create_report_job(db: Session, request: ReportRequest, user: Any) -> ReportQ
     """Validate + persist a report job (``status=queued``) and return its id.
 
     Ordering (never a fake id): validate -> persist -> commit -> return the
-    persisted ``job.id``. The caller (router) schedules the background
-    worker AFTER this commit; a persistence failure raises before any
+    persisted ``job.id``. The dedicated worker container picks the job up
+    via ``claim_next_job``; a persistence failure raises before any
     worker is ever started. ``columns`` are stored already resolved
     (default applied, order preserved, deduped) so the worker never
     depends on a changed client request.
+
+    Dedup (ТЗ §7): an identical queued/building job of the same actor is
+    returned as-is instead of persisting a duplicate row.
     """
     from app.modules.analytics import report_jobs as jobs
 
@@ -160,6 +164,15 @@ def create_report_job(db: Session, request: ReportRequest, user: Any) -> ReportQ
     UnifiedFilter.model_validate(request.filters.model_dump(mode="json"))
     payload = build_job_payload(request, user)
     actor = payload["actor"]
+    duplicate = jobs.find_inflight_duplicate(
+        db,
+        format=payload["format"],
+        filters=payload["filters"],
+        columns=payload["columns"],
+        actor_sub=actor["sub"],
+    )
+    if duplicate is not None:
+        return ReportQueuedResponse(job_id=str(duplicate.id), status="queued")
     job = jobs.create_job(
         db,
         format=payload["format"],

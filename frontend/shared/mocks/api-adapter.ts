@@ -831,10 +831,10 @@ const catalogSeeds: CatalogItem[] = [
   { id: 'university-004', type: 'universities', name: 'Казанский федеральный университет', city: 'Казань', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
   { id: 'university-005', type: 'universities', name: 'Новосибирский государственный университет', city: 'Новосибирск', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
   { id: 'university-archived', type: 'universities', name: 'Архивный демонстрационный ВУЗ', city: 'Москва', isActive: false, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
-  { id: 'product-professional-retraining', type: 'products', name: 'Профессиональная переподготовка', vendorId: 'vendor-rostelecom', vendorName: 'Ростелеком', version: '2026', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
-  { id: 'product-short-courses', type: 'products', name: 'Короткие курсы', vendorId: 'vendor-kontur', vendorName: 'Контур', version: '3.2', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
-  { id: 'product-corporate-track', type: 'products', name: 'Корпоративный трек', vendorId: 'vendor-rostelecom', vendorName: 'Ростелеком', version: '2026.1', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
-  { id: 'product-archived', type: 'products', name: 'Архивный продукт', vendorId: 'vendor-red-soft', vendorName: 'РЕД СОФТ', version: '1.0', isActive: false, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'product-professional-retraining', type: 'products', name: 'Профессиональная переподготовка', vendorId: 'vendor-rostelecom', vendorName: 'Ростелеком', programId: '', programName: '', version: '2026', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'product-short-courses', type: 'products', name: 'Короткие курсы', vendorId: 'vendor-kontur', vendorName: 'Контур', programId: '', programName: '', version: '3.2', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'product-corporate-track', type: 'products', name: 'Корпоративный трек', vendorId: 'vendor-rostelecom', vendorName: 'Ростелеком', programId: '', programName: '', version: '2026.1', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
+  { id: 'product-archived', type: 'products', name: 'Архивный продукт', vendorId: 'vendor-red-soft', vendorName: 'РЕД СОФТ', programId: '', programName: '', version: '1.0', isActive: false, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
   { id: 'direction-data', type: 'directions', name: 'Аналитика данных', code: 'data', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
   { id: 'direction-cybersecurity', type: 'directions', name: 'Информационная безопасность', code: 'cybersecurity', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
   { id: 'direction-management', type: 'directions', name: 'ИТ-менеджмент', code: 'it-management', isActive: true, createdAt: catalogSeedTimestamp, updatedAt: catalogSeedTimestamp },
@@ -915,7 +915,7 @@ function catalogItemFromInput(input: CatalogInput, current?: CatalogItem): Catal
   const timestamp = now();
   const base = { id: current?.id ?? id(input.type.slice(0, -1)), name: input.name, isActive: current?.isActive ?? true, createdAt: current?.createdAt ?? timestamp, updatedAt: timestamp };
   if (input.type === 'universities') return { ...base, type: input.type, city: input.city };
-  if (input.type === 'products') return { ...base, type: input.type, vendorId: input.vendorId, vendorName: mockVendors.find((item) => item.id === input.vendorId)?.name ?? '—', version: input.version };
+  if (input.type === 'products') return { ...base, type: input.type, vendorId: input.vendorId, vendorName: mockVendors.find((item) => item.id === input.vendorId)?.name ?? '—', programId: input.programId, programName: '', version: input.version };
   if (input.type === 'directions') return { ...base, type: input.type, code: input.code };
   return { ...base, type: input.type, email: input.email, phone: input.phone, role: input.role, universityIds: [...input.universityIds] };
 }

@@ -351,7 +351,7 @@ def test_null_relations_are_empty_cells(fx):
     assert gamma_row is not None
     cols = list(DEFAULT_COLUMNS)
     for key in ("direction", "program", "product", "license_signed",
-                "license_expires", "vendor", "software"):
+                "license_expires", "vendor"):
         assert ws.cell(row=gamma_row, column=cols.index(key) + 1).value is None
     assert ws.cell(row=gamma_row, column=cols.index("contract_number") + 1).value == (
         "C-003"

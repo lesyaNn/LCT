@@ -39,6 +39,8 @@ export interface ProductCatalogItem extends CatalogItemBase {
   type: 'products';
   vendorId: string;
   vendorName: string;
+  programId: string;
+  programName: string;
   version: string;
   contacts?: Array<{ id: string; fullName: string; email: string; phone: string; communicationMethod: string }>;
 }
@@ -60,7 +62,7 @@ export type CatalogItem = UniversityCatalogItem | ProductCatalogItem | Direction
 
 export type CatalogInput =
   | { type: 'universities'; name: string; city: string }
-  | { type: 'products'; name: string; vendorId: string; version: string }
+  | { type: 'products'; name: string; vendorId: string; programId: string; version: string }
   | { type: 'directions'; name: string; code: string }
   | { type: 'responsibles'; name: string; email: string; phone: string; role: string; universityIds: string[] };
 

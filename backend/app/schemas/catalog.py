@@ -124,6 +124,7 @@ class ProductShort(BaseModel):
 
 class ProductBase(BaseModel):
     vendor_id: uuid.UUID
+    program_id: uuid.UUID | None = Field(default=None, description="Программа продукта (иерархия ТЗ: направление <- программа <- продукт).")
     name: str = Field(min_length=1, max_length=512, examples=["РЕД ОС"])
     version: str = Field(default="", max_length=128, examples=["8"])
 
@@ -134,6 +135,7 @@ class ProductCreate(ProductBase):
 
 class ProductUpdate(BaseModel):
     vendor_id: uuid.UUID | None = None
+    program_id: uuid.UUID | None = None
     name: str | None = Field(default=None, min_length=1, max_length=512)
     version: str | None = Field(default=None, max_length=128)
 

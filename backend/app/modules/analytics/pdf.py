@@ -1,7 +1,7 @@
 """P4-04-01/02 PDF report generator (production exporter, no SQL inside).
 
 Data comes ONLY from :class:`ReportDatasetService` (same filters, same row
-grain, same selected columns, same health/workflow values as the dataset).
+grain, same selected columns, same workflow values as the dataset).
 Column titles come ONLY from ``COLUMN_REGISTRY`` — there is no second
 ``PDF_COLUMN_MAPPING``. ``UnifiedFilter`` semantics stay frozen (date bounds
 on ``universities.created_at``, AND between dimensions, OR/IN within).
@@ -17,11 +17,13 @@ Layout (frozen)::
     2. period (same text as XLSX, neutral ``Период: не задан`` when unset)
     3. applied filters (human-readable summary, UUID names batched, no N+1)
     4. ``Сформирован: <tz-aware timestamp>``
-    5. KPI block (same filtered dataset: universities / rows / avg health)
+    5. KPI block (same filtered dataset: universities / rows / avg score / overdue)
     6. table (selected columns in ``ReportRequest.columns`` order, titles
        from ``COLUMN_REGISTRY``, header repeated on every page)
-    7. charts (health-status distribution + workflow-status distribution,
-       reportlab native drawings — no matplotlib runtime dependency)
+    7. charts (score pie with frozen 85/60 thresholds + distributions by
+       workflow status / direction / product / responsible when those columns
+       are selected, reportlab native drawings — no matplotlib runtime
+       dependency; only real dataset values, never mocks)
 
 Cyrillic (P4-04-02): every string is rendered with ``DejaVuSans`` /
 ``DejaVuSans-Bold`` registered ONCE via :func:`ensure_pdf_fonts`
@@ -32,11 +34,7 @@ and no font file is served to users. Without a usable font the generator
 raises :class:`PDFFontUnavailableError` instead of producing mojibake
 with Helvetica.
 
-Charts use the canonical P2 thresholds via
-status helper (never hardcoded
-``85``/``60`` here). Chart 1 groups per university when the ``university``
-column is selected (first non-null health per university name), otherwise
-it falls back to row grain; the chart title always states the grain.
+Charts render only real dataset values (no mocks, no invented learners/flows).
 Empty datasets still produce a valid PDF: chart sections render
 ``Нет данных для построения графика``.
 
@@ -182,7 +180,7 @@ def format_cell_value(key: str, value: Any) -> str:
 
     * ``None`` -> ``""`` (empty cell, never ``None``/``null``/``N/A``/``-``);
     * ``date``/``datetime`` -> ``DD.MM.YYYY`` (semantics untouched);
-    * ``health_score`` stays numeric ``0..100`` (never recomputed here);
+    * integers stay numeric text (``overdue_tasks`` is 0 when none, never null);
     * user text is literal (PDF executes no formulas, so no XLSX-style
       apostrophe escaping is applied).
     """
@@ -203,24 +201,31 @@ def compute_kpi(dataset: Any) -> dict[str, Any]:
 
     ``Количество ВУЗов`` = ``dataset.university_count``,
     ``Количество строк`` = ``dataset.total`` (University × License grain),
-    ``Средний Health Score`` = mean of non-null ``health_score`` values
-    (``None`` when no scores — never 0). Security scope matches the table
-    by construction (one dataset object).
+    ``Средний балл`` = mean of non-null score values (``health_score`` when
+    present, else ``workflow_progress`` proxy; ``None`` when no scores —
+    never 0), ``Просроченные задачи`` = sum of ``overdue_tasks`` (0 when
+    none). Security scope matches the table by construction (one dataset
+    object).
     """
     rows = list(getattr(dataset, "rows", []) or [])
     scores = [
-        row["health_score"]
+        _score_value(row)
         for row in rows
-        if isinstance(row, dict)
-        and isinstance(row.get("health_score"), (int, float))
-        and not isinstance(row.get("health_score"), bool)
+        if isinstance(row, dict) and _score_value(row) is not None
     ]
     avg = round(sum(scores) / len(scores), 1) if scores else None
+    overdue_total = 0
+    for row in rows:
+        if isinstance(row, dict):
+            value = row.get("overdue_tasks")
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                overdue_total += int(value)
     return {
         "university_count": int(getattr(dataset, "university_count", 0) or 0),
         "row_count": int(getattr(dataset, "total", len(rows)) or 0),
         "avg_health_score": avg,
         "health_scored_rows": len(scores),
+        "overdue_total": overdue_total,
     }
 
 
@@ -233,63 +238,84 @@ def _ensure_tz_aware(moment: datetime | None) -> datetime:
 
 
 # ---------------------------------------------------------------------------
-# Charts (reportlab native drawings; canonical P2 thresholds only)
+# Charts (reportlab native drawings; only real dataset values)
 # ---------------------------------------------------------------------------
+
+#: Score thresholds for the health pie (frozen: green >= 85, yellow >= 60).
+_SCORE_GREEN_MIN = 85
+_SCORE_YELLOW_MIN = 60
+
+
+def _score_value(row: dict[str, Any]) -> float | None:
+    """Score for the health pie: ``health_score`` when present, else the
+    ``workflow_progress`` proxy (both numeric 0..100, never bool)."""
+    for key in ("health_score", "workflow_progress"):
+        value = row.get(key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return float(value)
+    return None
+
+
+def _score_status(score: float) -> str:
+    """green / yellow / red bucket for one score (frozen thresholds)."""
+    if score >= _SCORE_GREEN_MIN:
+        return "green"
+    if score >= _SCORE_YELLOW_MIN:
+        return "yellow"
+    return "red"
 
 
 def _health_distribution(
     rows: list[dict[str, Any]], resolved: list[str]
 ) -> tuple[dict[str, int], str]:
-    """Count green/yellow/red via canonical ``get_health_status``.
+    """Count green/yellow/red scores (frozen 85/60 thresholds, local helper).
 
     Per-university grain when the ``university`` column is selected
-    (first non-null health per university name), else row grain. The
+    (first non-null score per university name), else row grain. The
     returned grain label is rendered in the chart title (honest label).
     """
     per_university = "university" in resolved
     if per_university:
-        seen: dict[str, int] = {}
+        seen: dict[str, float] = {}
         for row in rows:
             name = row.get("university")
-            score = row.get("health_score")
-            if (
-                name is None
-                or score is None
-                or isinstance(score, bool)
-                or not isinstance(score, (int, float))
-            ):
+            score = _score_value(row)
+            if name is None or score is None:
                 continue
             key = str(name)
             if key not in seen:
-                seen[key] = int(score)
+                seen[key] = score
         scores = list(seen.values())
         grain = "по ВУЗам"
     else:
         scores = [
-            int(row["health_score"])
+            score
             for row in rows
-            if isinstance(row.get("health_score"), (int, float))
-            and not isinstance(row.get("health_score"), bool)
+            if (score := _score_value(row)) is not None
         ]
         grain = "по строкам отчёта"
     counts = {"green": 0, "yellow": 0, "red": 0}
     for score in scores:
-        counts[get_health_status(int(score)).value] += 1
+        counts[_score_status(score)] += 1
     return counts, grain
 
 
-def _workflow_distribution(
-    rows: list[dict[str, Any]], resolved: list[str]
+def _column_distribution(
+    rows: list[dict[str, Any]], resolved: list[str], column: str
 ) -> list[tuple[str, int]]:
-    """Count rows per non-null ``workflow_status`` (bounded, stable order)."""
-    if "workflow_status" not in resolved:
+    """Count rows per non-null value of ``column`` (bounded, stable order).
+
+    Returns [] when the column is not selected — the caller then renders
+    the honest ``NO_CHART_DATA_TEXT`` placeholder instead of inventing data.
+    """
+    if column not in resolved:
         return []
     counts: dict[str, int] = {}
     for row in rows:
-        status = row.get("workflow_status")
-        if status is None:
+        value = row.get(column)
+        if value is None:
             continue
-        label = str(status)
+        label = str(value)
         if label:
             counts[label] = counts.get(label, 0) + 1
     ordered = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
@@ -301,8 +327,15 @@ def _workflow_distribution(
     return ordered
 
 
+def _workflow_distribution(
+    rows: list[dict[str, Any]], resolved: list[str]
+) -> list[tuple[str, int]]:
+    """Count rows per non-null ``workflow_status`` (bounded, stable order)."""
+    return _column_distribution(rows, resolved, "workflow_status")
+
+
 def _health_chart(counts: dict[str, int], grain: str) -> Any:
-    """Pie drawing: health-status distribution (DejaVu labels)."""
+    """Pie drawing: score-status distribution (DejaVu labels)."""
     from reportlab.graphics.charts.piecharts import Pie
     from reportlab.graphics.shapes import Drawing, String
     from reportlab.lib.colors import HexColor
@@ -316,7 +349,7 @@ def _health_chart(counts: dict[str, int], grain: str) -> Any:
     title = String(
         230,
         155,
-        f"Распределение {grain} по статусу Health Score",
+        f"Распределение {grain} по баллу готовности",
         fontName=FONT_BOLD,
         fontSize=10,
         textAnchor="middle",
@@ -343,6 +376,11 @@ def _health_chart(counts: dict[str, int], grain: str) -> Any:
 
 def _workflow_chart(distribution: list[tuple[str, int]]) -> Any:
     """Horizontal bar drawing: rows per workflow status (DejaVu labels)."""
+    return _bar_chart("Распределение строк по статусу работы", distribution)
+
+
+def _bar_chart(heading: str, distribution: list[tuple[str, int]]) -> Any:
+    """Horizontal bar drawing for a generic distribution (DejaVu labels)."""
     from reportlab.graphics.charts.barcharts import HorizontalBarChart
     from reportlab.graphics.shapes import Drawing, String
     from reportlab.lib.colors import HexColor
@@ -354,7 +392,7 @@ def _workflow_chart(distribution: list[tuple[str, int]]) -> Any:
     title = String(
         230,
         height + 22,
-        "Распределение строк по статусу работы",
+        heading,
         fontName=FONT_BOLD,
         fontSize=10,
         textAnchor="middle",
@@ -403,7 +441,7 @@ def generate_pdf_report(
 ) -> _xlsx.GeneratedReport:
     """Generate the frozen PDF report from the report dataset.
 
-    ``columns=None`` selects the frozen 14 mandatory ``DEFAULT_COLUMNS``;
+    ``columns=None`` selects the frozen 12 mandatory ``DEFAULT_COLUMNS``;
     otherwise the resolved/deduped ``ReportRequest.columns`` order is kept
     verbatim (never sorted). Raises ``UnknownReportColumnError`` /
     ``EmptyReportColumnsError`` (both ``ValueError``) for invalid
@@ -428,22 +466,36 @@ def generate_pdf_report(
         # Stream the dataset cursor. We retain only transformed table rows for
         # ReportLab's LongTable; ORM mappings are never materialized by
         # fetch_rows or list(iterator). KPI counters are accumulated inline.
+        # university_count uses distinct university names when the column is
+        # selected, else the filtered university scope (same predicate set).
         rows: list[dict[str, Any]] = []
-        university_ids: set[Any] = set()
-        score_sum = 0.0
-        score_count = 0
+        university_names: set[str] = set()
+        overdue_total = 0
         for row in ReportDatasetService.iterate_rows(db, filters, resolved, user=user):
             rows.append(row)
-            if row.get("university") is not None:
-                university_ids.add(row.get("university"))
-            score = row.get("health_score")
-            if isinstance(score, (int, float)) and not isinstance(score, bool):
-                score_sum += float(score)
-                score_count += 1
+            name = row.get("university")
+            if isinstance(name, str) and name:
+                university_names.add(name)
+            overdue = row.get("overdue_tasks")
+            if isinstance(overdue, (int, float)) and not isinstance(overdue, bool):
+                overdue_total += int(overdue)
+        if "university" in resolved:
+            university_count = len(university_names)
+        else:
+            from app.modules.analytics.analytics import AnalyticsService
+
+            try:
+                university_count = len(
+                    AnalyticsService.filtered_university_ids(
+                        db, filters, user=user
+                    )
+                )
+            except Exception:
+                university_count = 0
         kpi = {
-            "university_count": len(university_ids),
+            "university_count": university_count,
             "row_count": len(rows),
-            "avg_health_score": round(score_sum / score_count, 2) if score_count else None,
+            "overdue_total": overdue_total,
         }
 
         page = landscape(A4)
@@ -494,7 +546,8 @@ def generate_pdf_report(
         kpi_lines = (
             f"Количество ВУЗов: {kpi['university_count']}",
             f"Количество строк (лицензий): {kpi['row_count']}",
-            f"Средний Health Score: {avg_text}",
+            f"Средний балл готовности: {avg_text}",
+            f"Просроченные задачи: {kpi['overdue_total']}",
         )
         for line in kpi_lines:
             story.append(Paragraph(_xml_escape(line), body_style))
@@ -541,13 +594,36 @@ def generate_pdf_report(
         if sum(counts.values()) > 0:
             story.append(_health_chart(counts, grain))
         else:
-            story.append(Paragraph(_xml_escape(NO_CHART_DATA_TEXT), body_style))
+            story.append(
+                Paragraph(
+                    _xml_escape(f"{NO_CHART_DATA_TEXT} (нет баллов готовности)"),
+                    body_style,
+                )
+            )
         story.append(Spacer(1, 4 * mm))
-        distribution = _workflow_distribution(rows, resolved)
-        if distribution:
-            story.append(_workflow_chart(distribution))
-        else:
-            story.append(Paragraph(_xml_escape(NO_CHART_DATA_TEXT), body_style))
+        chart_specs = (
+            ("Распределение строк по статусу работы", "workflow_status"),
+            ("Распределение строк по ИТ-направлениям", "direction"),
+            ("Распределение строк по ИТ-продуктам", "product"),
+            ("Нагрузка на ответственных", "responsible"),
+        )
+        for heading, column in chart_specs:
+            distribution = _column_distribution(rows, resolved, column)
+            if distribution:
+                story.append(_bar_chart(heading, distribution))
+            else:
+                reason = (
+                    "колонка не выбрана"
+                    if column not in resolved
+                    else "нет данных"
+                )
+                story.append(
+                    Paragraph(
+                        _xml_escape(f"{heading}: {NO_CHART_DATA_TEXT} ({reason})"),
+                        body_style,
+                    )
+                )
+            story.append(Spacer(1, 4 * mm))
 
         doc.build(story, onFirstPage=_footer, onLaterPages=_footer)
         tmp_path.replace(final_path)

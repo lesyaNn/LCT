@@ -529,7 +529,7 @@ function catalogItem(type: CatalogType, value: unknown): CatalogItem {
       if (!isRecord(value)) return [];
       return [{ id: stringValue(value.id), fullName: stringValue(value.full_name), email: stringValue(value.email), phone: stringValue(value.phone), communicationMethod: stringValue(value.communication_method) }];
     }) : undefined;
-    return { ...base, type, version: stringValue(item.version), vendorId: stringValue(item.vendor_id ?? vendor.id), vendorName: stringValue(item.vendor_name ?? vendor.name), contacts };
+    return { ...base, type, version: stringValue(item.version), vendorId: stringValue(item.vendor_id ?? vendor.id), vendorName: stringValue(item.vendor_name ?? vendor.name), programId: stringValue(item.program_id), programName: stringValue(item.program_name), contacts };
   }
   if (type === 'directions') return { ...base, type, code: stringValue(item.code) };
   const universities = Array.isArray(item.universities) ? item.universities : [];
@@ -647,7 +647,7 @@ export async function realGetCatalogReferenceData(signal?: AbortSignal): Promise
 
 function catalogWriteBody(input: CatalogInput): Record<string, unknown> {
   if (input.type === 'universities') return { name: input.name, city: input.city || null };
-  if (input.type === 'products') return { name: input.name, vendor_id: input.vendorId, version: input.version };
+  if (input.type === 'products') return { name: input.name, vendor_id: input.vendorId, program_id: input.programId || null, version: input.version };
   if (input.type === 'directions') return { name: input.name, code: input.code };
   return { full_name: input.name, email: input.email, phone: input.phone || null, role: input.role };
 }

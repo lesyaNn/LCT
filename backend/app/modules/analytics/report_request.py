@@ -64,7 +64,7 @@ class ReportRequest(BaseModel):
     )
     columns: ColumnsField = Field(
         default=None,
-        description="Output column keys (registry). None = all 14 mandatory columns; "
+        description="Output column keys (registry). None = all 12 mandatory columns; "
         "duplicates are deduped preserving order; unknown keys are 422; "
         "[] is 422 (at least one column required).",
     )

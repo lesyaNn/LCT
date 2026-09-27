@@ -48,14 +48,14 @@ const pageSize = 8;
 
 function secondaryFields(item: CatalogItem): Array<{ label: string; value: string }> {
   if (item.type === 'universities') return [{ label: 'Город', value: item.city || '—' }];
-  if (item.type === 'products') return [{ label: 'Вендор', value: item.vendorName || '—' }, { label: 'Версия', value: item.version || '—' }];
+  if (item.type === 'products') return [{ label: 'Вендор', value: item.vendorName || '—' }, { label: 'Программа', value: item.programName || '—' }, { label: 'Версия', value: item.version || '—' }];
   if (item.type === 'directions') return [{ label: 'Код', value: item.code }];
   return [{ label: 'Email', value: item.email }, { label: 'Роль', value: item.role || '—' }, { label: 'ВУЗы', value: item.universityIds.length ? String(item.universityIds.length) : 'Нет' }];
 }
 
 function tableHeaders(type: CatalogType): string[] {
   if (type === 'universities') return ['Название', 'Город'];
-  if (type === 'products') return ['Название', 'Вендор', 'Версия'];
+  if (type === 'products') return ['Название', 'Вендор', 'Программа', 'Версия'];
   if (type === 'directions') return ['Название', 'Код'];
   return ['ФИО', 'Email', 'Роль', 'ВУЗы'];
 }

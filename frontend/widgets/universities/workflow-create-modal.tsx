@@ -170,7 +170,7 @@ export function WorkflowCreateModal({ universityId, onClose, onCreated }: {
 
           <label className={styles.field}>
             <span>Программа обучения</span>
-            <Select value={activeProgramId} disabled={!activeDirectionId} onChange={(event) => setProgramId(event.target.value)}>
+            <Select value={activeProgramId} disabled={!activeDirectionId} onChange={(event) => { setProgramId(event.target.value); setProductId(''); }}>
               <option value="">Выберите программу</option>
               {programOptions.map((program) => (
                 <option key={program.id} value={program.id}>
@@ -186,7 +186,7 @@ export function WorkflowCreateModal({ universityId, onClose, onCreated }: {
 
           <label className={styles.field}>
             <span>Продукт</span>
-            <Select value={activeProductId} disabled={!activeDirectionId} onChange={(event) => setProductId(event.target.value)}>
+            <Select value={activeProductId} disabled={!activeProgramId} onChange={(event) => setProductId(event.target.value)}>
               <option value="">Выберите продукт (необязательно)</option>
               {productOptions.map((product) => (
                 <option key={product.id} value={product.id}>
@@ -194,8 +194,9 @@ export function WorkflowCreateModal({ universityId, onClose, onCreated }: {
                 </option>
               ))}
             </Select>
-            {activeDirectionId && productsQuery.isPending ? <em>Загрузка продуктов…</em> : null}
-            {activeDirectionId && !productsQuery.isPending && !productOptions.length ? (
+            {!activeProgramId ? <em>Сначала выберите программу обучения.</em> : null}
+            {activeProgramId && productsQuery.isPending ? <em>Загрузка продуктов…</em> : null}
+            {activeProgramId && !productsQuery.isPending && !productOptions.length ? (
               <em>В направлении пока нет продуктов — продукт можно выбрать позже.</em>
             ) : null}
             <em>Продукт выбирается на перспективу: на него планируется получить лицензию, наличие лицензии не требуется.</em>

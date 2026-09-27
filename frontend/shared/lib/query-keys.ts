@@ -49,6 +49,7 @@ export const queryKeys = {
     jobs: ['reports', 'jobs'] as const,
     job: (id: string) => ['reports', 'jobs', id] as const,
     filterOptions: ['reports', 'filter-options'] as const,
+    templates: ['reports', 'templates'] as const,
   },
   audit: {
     all: ['audit'] as const,

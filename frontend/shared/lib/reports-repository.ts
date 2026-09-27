@@ -18,6 +18,7 @@ export interface ReportFormValues {
   dateTo: string;
   universityIds: string[];
   directionIds: string[];
+  programIds: string[];
   productIds: string[];
   responsibleIds: string[];
   workflowStatuses: UniversityWorkflowStageStatus[];
@@ -30,11 +31,31 @@ export interface ReportRequest {
   date_to: string;
   university_ids: string[];
   direction_ids: string[];
+  program_ids: string[];
   product_ids: string[];
   responsible_ids: string[];
   workflow_statuses: UniversityWorkflowStageStatus[];
   columns: string[];
   format: ReportFormat;
+}
+
+export interface ReportTemplate {
+  id: string;
+  name: string;
+  ownerSub: string;
+  isShared: boolean;
+  format: ReportFormat;
+  filters: {
+    date_from: string;
+    date_to: string;
+    university_ids: string[];
+    direction_ids: string[];
+    program_ids: string[];
+    product_ids: string[];
+    responsible_ids: string[];
+    workflow_statuses: UniversityWorkflowStageStatus[];
+  };
+  columns: string[];
 }
 
 export interface ReportJob {
@@ -44,6 +65,8 @@ export interface ReportJob {
   status: ReportJobStatus;
   progress: number | null;
   createdAt: string;
+  expiresAt?: string;
+  fileSize?: number;
   error?: string;
   errorCode?: string;
   downloadUrl?: string;
@@ -54,6 +77,7 @@ export interface ReportJob {
 export interface ReportFilterOptions {
   universities: Array<{ id: string; name: string }>;
   directions: Array<{ id: string; name: string }>;
+  programs: Array<{ id: string; name: string }>;
   products: Array<{ id: string; name: string }>;
   responsibles: Array<{ id: string; name: string; description?: string }>;
   workflowStatuses: Array<{ id: UniversityWorkflowStageStatus; name: string }>;
@@ -107,11 +131,13 @@ export const reportQueryKeys = {
   jobs: queryKeys.reports.jobs,
   job: queryKeys.reports.job,
   filterOptions: queryKeys.reports.filterOptions,
+  templates: queryKeys.reports.templates,
 };
 
 export const reportFilterOptions: ReportFilterOptions = {
   universities: [],
   directions: [],
+  programs: [],
   products: [],
   responsibles: [],
   workflowStatuses: (Object.keys(workflowStageStatusSemantics) as UniversityWorkflowStageStatus[]).map((id) => ({ id, name: workflowStageStatusSemantics[id].label })),
@@ -119,7 +145,7 @@ export const reportFilterOptions: ReportFilterOptions = {
 
 export async function getReportFilterOptions(): Promise<ReportFilterOptions> {
   const refs = await getCatalogReferenceData();
-  return { ...reportFilterOptions, universities: refs.universities, directions: refs.directions, products: refs.products, responsibles: refs.responsibles };
+  return { ...reportFilterOptions, universities: refs.universities, directions: refs.directions, programs: refs.programs, products: refs.products, responsibles: refs.responsibles };
 }
 
 /** Backend column identifiers with UI labels; keys mirror analytics/columns.py. */
@@ -131,7 +157,6 @@ export const reportColumnDefinitions: ReportColumnDefinition[] = [
   { id: 'workflow_status', label: 'Статус работы' },
   { id: 'responsible', label: 'Ответственный' },
   { id: 'vendor', label: 'Вендор' },
-  { id: 'software', label: 'ПО' },
   { id: 'contract_number', label: 'Номер договора' },
   { id: 'license_signed', label: 'Подписание лицензии' },
   { id: 'license_expires', label: 'Срок действия' },
@@ -144,12 +169,25 @@ export const reportColumnDefinitions: ReportColumnDefinition[] = [
   { id: 'overdue_tasks', label: 'Просроченные задачи' },
 ];
 
-/** Existing UI presets built from the supported backend columns. */
+/** Presets mirror backend PRESETS: MINIMAL=12 mandatory, STANDARD=+city+current_stage, FULL=all. */
 export const reportColumnPresetNames = ['Минимум', 'Стандарт', 'Полный'] as const;
-export const DEFAULT_REPORT_COLUMNS = reportColumnDefinitions.slice(0, 13).map((column) => column.id);
+export const DEFAULT_REPORT_COLUMNS = [
+  'university',
+  'direction',
+  'program',
+  'product',
+  'workflow_status',
+  'responsible',
+  'vendor',
+  'contract_number',
+  'license_signed',
+  'license_expires',
+  'transfer_status',
+  'comment',
+];
 export const reportColumnPresets: Record<(typeof reportColumnPresetNames)[number], string[]> = {
   Минимум: DEFAULT_REPORT_COLUMNS,
-  Стандарт: reportColumnDefinitions.slice(0, 16).map((column) => column.id),
+  Стандарт: [...DEFAULT_REPORT_COLUMNS, 'city', 'current_stage'],
   Полный: reportColumnDefinitions.map((column) => column.id),
 };
 export const REPORT_FORMATS: Array<{ id: ReportFormat; label: string }> = [
@@ -163,6 +201,7 @@ export const EMPTY_REPORT_FORM: ReportFormValues = {
   dateTo: '',
   universityIds: [],
   directionIds: [],
+  programIds: [],
   productIds: [],
   responsibleIds: [],
   workflowStatuses: [],
@@ -181,11 +220,32 @@ export function reportRequestFromForm(values: ReportFormValues): ReportRequest {
     date_to: values.dateTo,
     university_ids: values.universityIds,
     direction_ids: values.directionIds,
+    program_ids: values.programIds,
     product_ids: values.productIds,
     responsible_ids: values.responsibleIds,
     workflow_statuses: values.workflowStatuses,
     columns: values.columnIds,
     format: values.format,
+  };
+}
+
+export function reportFormFromTemplate(tpl: ReportTemplate): ReportFormValues {
+  // Migrate pre-removal selections: 'software' was a pure alias of 'product'.
+  const known = new Set(reportColumnDefinitions.map((column) => column.id));
+  const columnIds = tpl.columns
+    .map((column) => (column === 'software' ? 'product' : column))
+    .filter((column) => known.has(column));
+  return {
+    dateFrom: tpl.filters.date_from ?? '',
+    dateTo: tpl.filters.date_to ?? '',
+    universityIds: tpl.filters.university_ids ?? [],
+    directionIds: tpl.filters.direction_ids ?? [],
+    programIds: tpl.filters.program_ids ?? [],
+    productIds: tpl.filters.product_ids ?? [],
+    responsibleIds: tpl.filters.responsible_ids ?? [],
+    workflowStatuses: tpl.filters.workflow_statuses ?? [],
+    columnIds: columnIds.length ? columnIds : [...DEFAULT_REPORT_COLUMNS],
+    format: tpl.format,
   };
 }
 
@@ -243,6 +303,9 @@ export function adaptReportJob(raw: unknown, fallbackId?: string): ReportJob {
   const rawProgress = item.progress ?? result.progress;
   const progress = typeof rawProgress === 'number' && Number.isFinite(rawProgress) ? Math.max(0, Math.min(100, rawProgress)) : null;
   const errorCode = reportErrorCode(item, result);
+  const expiresAt = stringValue(item.expires_at ?? item.expiresAt);
+  const rawSize = item.file_size ?? item.fileSize ?? result.file_size;
+  const fileSize = typeof rawSize === 'number' && Number.isFinite(rawSize) ? rawSize : undefined;
   return {
     id,
     name: reportName(item, format),
@@ -250,6 +313,8 @@ export function adaptReportJob(raw: unknown, fallbackId?: string): ReportJob {
     status: reportStatus(item.status),
     progress,
     createdAt,
+    expiresAt,
+    fileSize,
     error: reportErrorMessage(item, result, errorCode),
     errorCode,
     downloadUrl: item.status === 'ready' ? `/api/v1/reports/${encodeURIComponent(id)}/download` : undefined,
@@ -264,7 +329,7 @@ function unwrap<T>(result: Awaited<ReturnType<typeof apiFetch<T>>>, message: str
 async function createRealReportJob(request: ReportRequest): Promise<ReportJob> {
   const result = await apiFetch<unknown>('/api/v1/reports', { method: 'POST', body: {
     format: request.format,
-    filters: { date_from: request.date_from || null, date_to: request.date_to || null, university_ids: request.university_ids, direction_ids: request.direction_ids, product_ids: request.product_ids, responsible_ids: request.responsible_ids, workflow_statuses: request.workflow_statuses },
+    filters: { date_from: request.date_from || null, date_to: request.date_to || null, university_ids: request.university_ids, direction_ids: request.direction_ids, program_ids: request.program_ids, product_ids: request.product_ids, responsible_ids: request.responsible_ids, workflow_statuses: request.workflow_statuses },
     columns: request.columns,
   } });
   return { ...adaptReportJob(unwrap(result, 'Не удалось создать задачу отчёта.')), format: request.format, request };
@@ -300,4 +365,99 @@ export async function downloadReportJob(jobId: string): Promise<Blob> {
   const result = await apiDownload(`/api/v1/reports/${encodeURIComponent(jobId)}/download`);
   if (!result.ok) throw new ApiRequestError(result.status, result.body, 'Не удалось скачать отчёт.', result.error);
   return result.data;
+}
+
+function adaptReportTemplate(raw: unknown): ReportTemplate {
+  const item = isRecord(raw) ? raw : {};
+  const filters = isRecord(item.filters) ? item.filters : {};
+  const asIds = (value: unknown): string[] => (Array.isArray(value) ? value.map((v) => String(v)) : []);
+  return {
+    id: stringValue(item.id) ?? 'unknown',
+    name: stringValue(item.name) ?? 'Шаблон',
+    ownerSub: stringValue(item.owner_sub ?? item.ownerSub) ?? '',
+    isShared: item.is_shared === true || item.isShared === true,
+    format: item.format === 'pdf' || item.format === 'json' ? item.format : 'xlsx',
+    filters: {
+      date_from: stringValue(filters.date_from ?? filters.dateFrom) ?? '',
+      date_to: stringValue(filters.date_to ?? filters.dateTo) ?? '',
+      university_ids: asIds(filters.university_ids ?? filters.universityIds),
+      direction_ids: asIds(filters.direction_ids ?? filters.directionIds),
+      program_ids: asIds(filters.program_ids ?? filters.programIds),
+      product_ids: asIds(filters.product_ids ?? filters.productIds),
+      responsible_ids: asIds(filters.responsible_ids ?? filters.responsibleIds),
+      workflow_statuses: asIds(filters.workflow_statuses ?? filters.workflowStatuses) as UniversityWorkflowStageStatus[],
+    },
+    columns: asIds(item.columns),
+  };
+}
+
+const mockTemplates = new Map<string, ReportTemplate>();
+
+export async function listReportTemplates(): Promise<ReportTemplate[]> {
+  return fromDataSource({
+    mock: async () => [...mockTemplates.values()].sort((a, b) => a.name.localeCompare(b.name)),
+    real: async () => {
+      const result = await apiFetch<unknown[]>('/api/v1/reports/templates');
+      return unwrap(result, 'Не удалось загрузить шаблоны отчётов.').map(adaptReportTemplate);
+    },
+  });
+}
+
+export async function createReportTemplate(name: string, request: ReportRequest, isShared = false): Promise<ReportTemplate> {
+  return fromDataSource({
+    mock: async () => {
+      const tpl: ReportTemplate = {
+        id: `tpl-${Date.now()}`,
+        name,
+        ownerSub: 'mock-user',
+        isShared: false,
+        format: request.format,
+        filters: {
+          date_from: request.date_from,
+          date_to: request.date_to,
+          university_ids: request.university_ids,
+          direction_ids: request.direction_ids,
+          program_ids: request.program_ids,
+          product_ids: request.product_ids,
+          responsible_ids: request.responsible_ids,
+          workflow_statuses: request.workflow_statuses,
+        },
+        columns: request.columns,
+      };
+      mockTemplates.set(tpl.id, tpl);
+      return tpl;
+    },
+    real: async () => {
+      const result = await apiFetch<unknown>('/api/v1/reports/templates', {
+        method: 'POST',
+        body: {
+          name,
+          format: request.format,
+          filters: {
+            date_from: request.date_from || null,
+            date_to: request.date_to || null,
+            university_ids: request.university_ids,
+            direction_ids: request.direction_ids,
+            program_ids: request.program_ids,
+            product_ids: request.product_ids,
+            responsible_ids: request.responsible_ids,
+            workflow_statuses: request.workflow_statuses,
+          },
+          columns: request.columns,
+          is_shared: isShared,
+        },
+      });
+      return adaptReportTemplate(unwrap(result, 'Не удалось сохранить шаблон.'));
+    },
+  });
+}
+
+export async function deleteReportTemplate(templateId: string): Promise<void> {
+  return fromDataSource({
+    mock: async () => { mockTemplates.delete(templateId); },
+    real: async () => {
+      const result = await apiFetch<unknown>(`/api/v1/reports/templates/${encodeURIComponent(templateId)}`, { method: 'DELETE' });
+      unwrap(result, 'Не удалось удалить шаблон.');
+    },
+  });
 }

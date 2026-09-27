@@ -195,6 +195,8 @@ class ProductRead(BaseModel):
     id: uuid.UUID
     vendor_id: uuid.UUID
     vendor_name: str | None = None
+    program_id: uuid.UUID | None = None
+    program_name: str | None = None
     name: str
     version: str = ""
     created_at: datetime
@@ -204,7 +206,7 @@ class ProductRead(BaseModel):
 
 
 class ProductDetail(ProductRead):
-    # Many-to-one parent, joined in the same statement.
+    # Many-to-one parents, joined in the same statement.
     vendor: VendorShort | None = None
     contacts: list["VendorContactRead"] = Field(default_factory=list)
 
