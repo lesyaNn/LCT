@@ -32,6 +32,10 @@
 .fileNameButton:hover { text-decoration: underline; }
 .fileNameButton:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
 .fileError { color: var(--rtk-color-danger); display: block; font-size: 11px; }
+.documentForm { display: flex; flex-direction: column; gap: var(--rtk-space-4); }
+.documentForm label { display: flex; flex-direction: column; gap: var(--rtk-space-2); font-size: 13px; font-weight: 600; }
+.documentForm input[type='file'] { max-width: 100%; }
+.documentFormActions { display: flex; justify-content: flex-end; gap: var(--rtk-space-2); }
 .iconAction { align-items: center; background: transparent; border: 0; color: var(--rtk-color-brand); cursor: pointer; display: inline-flex; justify-content: center; min-height: 32px; min-width: 32px; padding: var(--rtk-space-1); }
 .iconAction:hover { color: var(--rtk-color-brand-hover); }
 .iconAction:disabled { color: var(--rtk-color-text-tertiary); cursor: not-allowed; }

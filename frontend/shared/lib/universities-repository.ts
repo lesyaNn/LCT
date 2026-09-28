@@ -770,7 +770,7 @@ function getWorkflowStageStatus(index: number, currentIndex: number, attention: 
   }
   if (index === currentIndex && currentIndex < workflowStageNames.length - 1) return 'current';
   if (index < currentIndex) return index === 2 && numericId % 2 === 0 ? 'skipped' : 'completed';
-  if (index === currentIndex + 1 && attention) return 'overdue';
+  if (index === currentIndex + 1 && attention) return 'pending';
   return 'pending';
 }
 
@@ -887,7 +887,7 @@ export function getApiUniversityWorkflow(instance: WorkflowInstanceApiRecord): U
     const isCurrent = stage.id === instance.current_instance_stage_id;
     const status: UniversityWorkflowStageStatus = stage.status === 'completed' || stage.status === 'skipped'
       ? stage.status
-      : stage.is_overdue ? 'overdue' : isCurrent ? 'current' : 'pending';
+      : isCurrent ? stage.is_overdue ? 'overdue' : 'current' : 'pending';
     return {
       id: stage.id,
       templateStageId: stage.template_stage_id,
@@ -1287,6 +1287,16 @@ export async function getUniversityDocuments(id: string, page = 1, pageSize = 20
 
 export async function downloadUniversityDocument(universityId: string, documentId: string): Promise<Blob> {
   return unwrapApiResult(await apiDownload(`/api/v1/universities/${encodeURIComponent(universityId)}/passport/documents/${encodeURIComponent(documentId)}/download`));
+}
+
+export type UniversityDocumentType = 'contract' | 'license' | 'act' | 'protocol' | 'other';
+
+export async function createUniversityDocument(universityId: string, input: { type: UniversityDocumentType; title: string; file: File }): Promise<void> {
+  const body = new FormData();
+  body.append('document_type', input.type);
+  body.append('title', input.title);
+  body.append('file', input.file, input.file.name);
+  unwrapApiResult(await apiUploadFormData(`/api/v1/universities/${encodeURIComponent(universityId)}/passport/documents`, body));
 }
 
 /** Typed frontend adapter for the future university meetings endpoint. */

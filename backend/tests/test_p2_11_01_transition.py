@@ -236,6 +236,12 @@ def test_comments_create_edit_windows(db):
     assert all(isinstance(c, WorkflowComment) for c in listed)
 
 
+def test_future_stage_comment_is_read_only(db):
+    instance, rows, stages = _graph(db)
+    with pytest.raises(BadTransition, match="current stage"):
+        service.add_comment(db, instance.id, WorkflowCommentCreate(content="Рано", stage_id=stages[1].id), "author")
+
+
 # ---------------------------------------------------------------- rollback
 
 

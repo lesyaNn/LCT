@@ -41,7 +41,10 @@ function EventType({ type }: { type: UniversityHistoryEventType }) {
 }
 
 function EventDetails({ event }: { event: UniversityHistoryEvent }) {
-  const hasChanges = event.auditEvent ? summarizeAuditEvent(event.auditEvent).changes.length > 0 : Boolean(event.oldValues || event.newValues);
+  const hasChanges = event.auditEvent
+    ? summarizeAuditEvent(event.auditEvent).changes.length > 0
+    : Boolean((event.oldValues && Object.keys(event.oldValues).length) || (event.newValues && Object.keys(event.newValues).length))
+      && JSON.stringify(event.oldValues ?? {}) !== JSON.stringify(event.newValues ?? {});
   return <div className={styles.eventDetails}>
     {event.details && !event.action.includes(event.details) ? <p>{event.details}</p> : null}
     {event.attachment ? <ul className={styles.attachmentList}><AttachmentRow attachment={{ id: event.attachment.id, fileName: event.attachment.fileName, fileType: '', fileSize: '', mimeType: event.attachment.mimeType }} instanceId={event.attachment.instanceId} canDelete={false} onOpen={() => undefined} onDelete={() => undefined} compact /></ul> : null}
@@ -81,5 +84,5 @@ export function UniversityHistory({ id }: { id: string }) {
   });
   const resetFilters = () => setFilters({ type: 'all', dateFrom: '', dateTo: '', userId: '', entityId: '' });
 
-  return <div className={styles.page}>{filterSupported ? <HistoryFilters filters={filters} options={options} onChange={onChange} onReset={resetFilters} /> : <p className={styles.capabilityNote}>Показаны последние события. Фильтры полной истории пока недоступны.</p>}{query.isPending ? <TableSkeleton rows={6} columns={5} label="Загрузка истории университета" /> : !query.data ? <RouteErrorState compact onRetry={() => void query.refetch()} /> : query.data.length ? <HistoryTable events={query.data} /> : <EmptyState icon={<HistoryAction size={22} fill="currentColor" />} title={filtered ? 'По заданным фильтрам события не найдены' : 'Событий пока нет'} description={filtered ? 'Измените условия поиска или сбросьте фильтры.' : 'История появится после первого события.'} primaryAction={filtered ? { label: 'Сбросить фильтры', onClick: resetFilters, variant: 'secondary' } : undefined} />}</div>;
+  return <div className={styles.page}>{filterSupported ? <HistoryFilters filters={filters} options={options} onChange={onChange} onReset={resetFilters} /> : null}{query.isPending ? <TableSkeleton rows={6} columns={5} label="Загрузка истории университета" /> : !query.data ? <RouteErrorState compact onRetry={() => void query.refetch()} /> : query.data.length ? <HistoryTable events={query.data} /> : <EmptyState icon={<HistoryAction size={22} fill="currentColor" />} title={filtered ? 'По заданным фильтрам события не найдены' : 'Событий пока нет'} description={filtered ? 'Измените условия поиска или сбросьте фильтры.' : 'История появится после первого события.'} primaryAction={filtered ? { label: 'Сбросить фильтры', onClick: resetFilters, variant: 'secondary' } : undefined} />}</div>;
 }

@@ -7,7 +7,7 @@ logic here (architecture rule API -> Service -> Model/Repository).
 import uuid
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -16,6 +16,7 @@ from app.core.permissions import require_permission
 from app.core.policies import ensure_university_access
 from app.core.security import CurrentUser
 from app.modules.universities.passport_schemas import (
+    DocumentShort,
     PaginatedDocuments,
     PaginatedPrograms,
     UniversityPassport,
@@ -31,6 +32,9 @@ from app.modules.universities.history_service import university_history
 from app.modules.workflow_attachments.router import get_storage
 from app.modules.workflow_attachments.storage import StorageBackend
 from app.models.interactions import Document
+from app.schemas.common import DocumentType
+from app.modules.universities.document_service import create_document
+from app.modules.universities.passport_blocks import document_to_short
 
 router = APIRouter(prefix="/universities", tags=["universities-passport"])
 
@@ -104,6 +108,31 @@ def get_university_passport_documents(
         search=search, document_type=document_type, status=status,
     )
     return PaginatedDocuments(items=items, page=page, page_size=page_size, total=total, types=types)
+
+
+@router.post(
+    "/{university_id}/passport/documents",
+    response_model=DocumentShort,
+    status_code=201,
+    summary="Upload a university business document",
+)
+def upload_university_document(
+    university_id: uuid.UUID,
+    document_type: DocumentType = Form(...),
+    title: str = Form(min_length=1, max_length=1024),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    storage: StorageBackend = Depends(get_storage),
+    user: CurrentUser = Depends(require_permission("university.edit")),
+) -> DocumentShort:
+    ensure_university_access(university_id, user)
+    document = create_document(
+        db, storage, university_id=university_id,
+        document_type=document_type.value, title=title,
+        filename=file.filename, content_type=file.content_type,
+        stream=file.file, actor_sub=user.id,
+    )
+    return document_to_short(document)
 
 
 @router.get(

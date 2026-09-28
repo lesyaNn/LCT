@@ -386,6 +386,14 @@ def get_comment_or_404(db: Session, comment_id: uuid.UUID) -> WorkflowComment:
     return comment
 
 
+def _ensure_current_comment_stage(db: Session, instance: WorkflowInstance, stage_id: uuid.UUID | None) -> None:
+    if stage_id is None:
+        return  # General instance discussion has no stage anchor.
+    current = db.get(InstanceStage, instance.current_instance_stage_id) if instance.current_instance_stage_id else None
+    if instance.status != "active" or current is None or current.template_stage_id != stage_id:
+        raise BadTransition("Only the current stage comments can be changed")
+
+
 def delete_comment(
     db: Session, comment_id: uuid.UUID, actor: str, actor_roles: set[str]
 ) -> WorkflowComment:
@@ -395,6 +403,7 @@ def delete_comment(
     the caller deletes after authorizing the instance.
     """
     comment = get_comment_or_404(db, comment_id)
+    _ensure_current_comment_stage(db, get_instance_or_404(db, comment.instance_id), comment.stage_id)
     is_admin = "admin" in (actor_roles or set())
     if comment.author_keycloak_sub != actor and not is_admin:
         raise BadTransition("Only the author or an admin can delete a comment")
@@ -419,6 +428,7 @@ def add_comment(
 ) -> WorkflowComment:
     """Create a comment anchored to the instance (P2-04-01)."""
     instance = get_instance_or_404(db, instance_id)
+    _ensure_current_comment_stage(db, instance, data.stage_id)
     if data.stage_id is not None:
         stage = db.get(WorkflowStage, data.stage_id)
         if stage is None or stage.template_id != instance.template_id:
@@ -450,6 +460,7 @@ def add_comment_with_files(
     from app.modules.workflow_attachments.storage import StorageError
 
     instance = get_instance_or_404(db, instance_id)
+    _ensure_current_comment_stage(db, instance, data.stage_id)
     if data.stage_id is not None:
         stage = db.get(WorkflowStage, data.stage_id)
         if stage is None or stage.template_id != instance.template_id:
@@ -496,6 +507,7 @@ def edit_comment(
     comment = db.get(WorkflowComment, comment_id)
     if comment is None:
         raise NotFound("Workflow comment not found")
+    _ensure_current_comment_stage(db, get_instance_or_404(db, comment.instance_id), comment.stage_id)
     is_admin = "admin" in (actor_roles or set())
     if comment.author_keycloak_sub != actor and not is_admin:
         raise BadTransition("Only the author or an admin can edit a comment")

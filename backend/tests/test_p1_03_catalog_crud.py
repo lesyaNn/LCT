@@ -631,9 +631,12 @@ def test_vendor_contacts_are_editable_and_visible_through_product(client):
 
 def test_passport_documents_filter_and_authenticated_download(client, db, tmp_path, monkeypatch):
     from app.models.interactions import Document
+    from app.modules.workflow_attachments.router import get_storage
+    from app.modules.workflow_attachments.storage import LocalStorageBackend
 
     university = _uni(client)
     monkeypatch.setattr(settings, "storage_root", str(tmp_path))
+    app.dependency_overrides[get_storage] = lambda: LocalStorageBackend(tmp_path)
     (tmp_path / "jury.txt").write_bytes(b"jury document")
     db.add_all([
         Document(university_id=uuid.UUID(university["id"]), document_type="contract", title="Жюри", file_path="jury.txt", file_name="jury.txt", file_size=13, mime_type="text/plain", status_raw="signed", uploaded_by_keycloak_sub="test"),
@@ -649,6 +652,14 @@ def test_passport_documents_filter_and_authenticated_download(client, db, tmp_pa
     assert document["file_available"] is True
     assert client.get(f"{base}/{document['id']}/download").content == b"jury document"
     assert client.get(base, params={"document_type": "license"}).json()["items"][0]["file_available"] is False
+    try:
+        uploaded = client.post(base, data={"document_type": "act", "title": "Новый акт"}, files={"file": ("act.pdf", b"act bytes", "application/pdf")})
+        assert uploaded.status_code == 201, uploaded.text
+        assert uploaded.json()["file_available"] is True
+        assert client.get(f"{base}/{uploaded.json()['id']}/download").content == b"act bytes"
+        assert client.get(base, params={"document_type": "act"}).json()["total"] == 1
+    finally:
+        app.dependency_overrides.pop(get_storage, None)
 
 
 def test_vendor_duplicate_name_409(client):

@@ -445,7 +445,11 @@ def get_documents_page(
         .order_by(Document.created_at.desc(), Document.id.desc())
         .offset((page - 1) * page_size).limit(page_size)
     ).all()
-    return [DocumentShort(
+    return [document_to_short(row) for row in rows], total, list(types)
+
+
+def document_to_short(row: Document) -> DocumentShort:
+    return DocumentShort(
         id=row.id, document_type=row.document_type, title=row.title,
         file_name=row.file_name, file_size=row.file_size,
         file_available=bool(document_storage_path(row.file_path)),
@@ -453,7 +457,7 @@ def get_documents_page(
         expires_at=row.expires_at, status=row.status_raw,
         uploaded_by=row.uploaded_by_keycloak_sub,
         created_at=_ensure_tz(row.created_at),
-    ) for row in rows], total, list(types)
+    )
 
 
 def document_storage_path(file_path: str) -> Path | None:

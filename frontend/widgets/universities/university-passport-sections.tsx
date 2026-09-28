@@ -17,7 +17,7 @@ import { Avatar } from '@/shared/ui/rtk/avatar';
 import { Drawer } from '@/shared/ui/rtk/drawer';
 import { Modal } from '@/shared/ui/rtk/modal';
 import { EmptyState } from '@/shared/ui/empty-state';
-import { Select, TextArea } from '@/shared/ui/rtk/form-controls';
+import { Input, Select, TextArea } from '@/shared/ui/rtk/form-controls';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { BackgroundRefreshNotice } from '@/shared/ui/background-refresh-notice';
@@ -42,6 +42,7 @@ import {
   getUniversityLicenses,
   getUniversityDocuments,
   downloadUniversityDocument,
+  createUniversityDocument,
   getUniversityMeetings,
   deleteUniversityMeeting,
   getUniversityResponsibles,
@@ -50,6 +51,7 @@ import {
   universityProgramsQueryKey,
   universityLicensesQueryKey,
   universityDocumentsPageQueryKey,
+  universityDocumentsQueryKey,
   universityMeetingsQueryKey,
   universityPassportQueryKey,
   universityResponsiblesQueryKey,
@@ -61,6 +63,7 @@ import {
   type UniversityLicenseStatus,
   type UniversityDocumentRow,
   type UniversityDocumentStatus,
+  type UniversityDocumentType,
   type UniversityMeetingRow,
   type UniversityMeetingType,
   UNIVERSITY_PASSPORT_CAPABILITIES,
@@ -278,6 +281,11 @@ function LicensesSection({ id }: { id: string }) {
   return <section className={styles.section} aria-label="Лицензии"><FilterToolbar embedded compact label="Фильтры лицензий" controls={() => <FilterField label="Статус"><Select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as UniversityLicenseStatus | 'all')}><option value="all">Все статусы</option>{Object.entries(licenseStatusLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</Select></FilterField>} activeFilters={statusFilter === 'all' ? [] : [{ id: 'status', label: `Статус: ${licenseStatusLabels[statusFilter]}`, onRemove: () => setStatusFilter('all') }]} mobileCount={statusFilter === 'all' ? 0 : 1} /><PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Лицензии пока не добавлены" /></section>;
 }
 
+const documentTypeLabels: Record<UniversityDocumentType, string> = {
+  contract: 'Договор', license: 'Лицензия', act: 'Акт', protocol: 'Протокол', other: 'Иное',
+};
+const documentTypeLabel = (value: string) => documentTypeLabels[value as UniversityDocumentType] ?? value;
+
 function DocumentFile({ row, universityId }: { row: UniversityDocumentRow; universityId: string }) {
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState('');
@@ -299,17 +307,36 @@ function DocumentFile({ row, universityId }: { row: UniversityDocumentRow; unive
 }
 
 function DocumentsSection({ id }: { id: string }) {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<UniversityDocumentStatus | 'all'>('all');
   const [page, setPage] = useState(1);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newType, setNewType] = useState<UniversityDocumentType>('other');
+  const [newTitle, setNewTitle] = useState('');
+  const [newFile, setNewFile] = useState<File | null>(null);
+  const [createError, setCreateError] = useState('');
+  const canCreate = hasPermission(user, 'university.edit') && !isMockDataSourceFor('passport');
+  const create = useMutation({
+    mutationFn: () => createUniversityDocument(id, { type: newType, title: newTitle.trim(), file: newFile! }),
+    onSuccess: async () => {
+      setCreateOpen(false); setNewTitle(''); setNewFile(null); setCreateError(''); setPage(1);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: universityDocumentsQueryKey(id) }),
+        queryClient.invalidateQueries({ queryKey: universityPassportQueryKey(id) }),
+      ]);
+    },
+    onError: (cause) => setCreateError(normalizeApiError(cause).message),
+  });
   useEffect(() => { const timer = window.setTimeout(() => setDebouncedSearch(search), 250); return () => window.clearTimeout(timer); }, [search]);
   const query = useQuery({ queryKey: universityDocumentsPageQueryKey(id, page, debouncedSearch, typeFilter, statusFilter), queryFn: ({ signal }) => getUniversityDocuments(id, page, 20, debouncedSearch, typeFilter, statusFilter, signal), placeholderData: keepPreviousData, staleTime: 30_000 });
   const types = query.data?.types ?? [];
   const rows = query.data?.items ?? [];
   const columns: PassportTableColumn<UniversityDocumentRow>[] = [
-    { id: 'name', label: 'Документ', render: (row) => <><strong className={styles.primaryCell}>{row.name}</strong><span className={styles.secondaryCell}>{row.type}</span></> },
+    { id: 'name', label: 'Документ', render: (row) => <><strong className={styles.primaryCell}>{row.name}</strong><span className={styles.secondaryCell}>{documentTypeLabel(row.type)}</span></> },
     { id: 'file', label: 'Файл', render: (row) => <DocumentFile row={row} universityId={id} /> },
     { id: 'status', label: 'Статус', render: (row) => <DocumentStatusBadge status={row.status} /> },
     { id: 'signedAt', label: 'Подписан', render: (row) => row.signedAt ? formatDate(row.signedAt) : '—' },
@@ -317,7 +344,7 @@ function DocumentsSection({ id }: { id: string }) {
     { id: 'uploadedAt', label: 'Дата', render: (row) => formatDate(row.uploadedAt) },
   ];
   const mobileFields: PassportMobileField<UniversityDocumentRow>[] = [
-    { label: 'Документ', render: (row) => <><strong className={styles.primaryCell}>{row.name}</strong><span className={styles.secondaryCell}>{row.type}</span></> },
+    { label: 'Документ', render: (row) => <><strong className={styles.primaryCell}>{row.name}</strong><span className={styles.secondaryCell}>{documentTypeLabel(row.type)}</span></> },
     { label: 'Файл', render: (row) => <DocumentFile row={row} universityId={id} /> },
     { label: 'Статус', render: (row) => <DocumentStatusBadge status={row.status} /> },
     { label: 'Дата', render: (row) => formatDate(row.uploadedAt) },
@@ -325,7 +352,7 @@ function DocumentsSection({ id }: { id: string }) {
   const reset = () => { setSearch(''); setDebouncedSearch(''); setTypeFilter('all'); setStatusFilter('all'); setPage(1); };
   if (query.isPending) return <section className={styles.section} aria-label="Документы"><PassportTableSkeleton /></section>;
   if (!query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
-  return <section className={styles.section} aria-label="Документы"><FilterToolbar embedded label="Фильтры документов" controls={() => <><SearchField label="Поиск документа" value={search} placeholder="Название или файл" onChange={(value) => { setSearch(value); setPage(1); }} /><FilterField label="Тип"><Select value={typeFilter} onChange={(event) => { setTypeFilter(event.target.value); setPage(1); }}><option value="all">Все типы</option>{types.map((type) => <option value={type} key={type}>{type}</option>)}</Select></FilterField><FilterField label="Статус"><Select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value as UniversityDocumentStatus | 'all'); setPage(1); }}><option value="all">Все статусы</option>{Object.entries(documentStatusLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</Select></FilterField></>} onReset={reset} resetDisabled={!search && typeFilter === 'all' && statusFilter === 'all'} activeFilters={[...(search ? [{ id: 'search', label: `Поиск: ${search}`, onRemove: () => { setSearch(''); setPage(1); } }] : []), ...(typeFilter !== 'all' ? [{ id: 'type', label: `Тип: ${typeFilter}`, onRemove: () => { setTypeFilter('all'); setPage(1); } }] : []), ...(statusFilter !== 'all' ? [{ id: 'status', label: `Статус: ${documentStatusLabels[statusFilter]}`, onRemove: () => { setStatusFilter('all'); setPage(1); } }] : [])]} mobileCount={Number(Boolean(search)) + Number(typeFilter !== 'all') + Number(statusFilter !== 'all')} /><PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage={search || typeFilter !== 'all' || statusFilter !== 'all' ? 'Документы не найдены' : 'Документы пока не добавлены'} serverPagination={{ page, pageSize: 20, total: query.data.total, onPageChange: setPage }} /></section>;
+  return <section className={styles.section} aria-label="Документы"><FilterToolbar embedded label="Фильтры документов" controls={() => <><SearchField label="Поиск документа" value={search} placeholder="Название или файл" onChange={(value) => { setSearch(value); setPage(1); }} /><FilterField label="Тип"><Select value={typeFilter} onChange={(event) => { setTypeFilter(event.target.value); setPage(1); }}><option value="all">Все типы</option>{types.map((type) => <option value={type} key={type}>{documentTypeLabel(type)}</option>)}</Select></FilterField><FilterField label="Статус"><Select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value as UniversityDocumentStatus | 'all'); setPage(1); }}><option value="all">Все статусы</option>{Object.entries(documentStatusLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</Select></FilterField></>} actions={canCreate ? <Button variant="primary" size="s" type="button" onClick={() => setCreateOpen(true)}>Добавить документ</Button> : undefined} onReset={reset} resetDisabled={!search && typeFilter === 'all' && statusFilter === 'all'} activeFilters={[...(search ? [{ id: 'search', label: `Поиск: ${search}`, onRemove: () => { setSearch(''); setPage(1); } }] : []), ...(typeFilter !== 'all' ? [{ id: 'type', label: `Тип: ${documentTypeLabel(typeFilter)}`, onRemove: () => { setTypeFilter('all'); setPage(1); } }] : []), ...(statusFilter !== 'all' ? [{ id: 'status', label: `Статус: ${documentStatusLabels[statusFilter]}`, onRemove: () => { setStatusFilter('all'); setPage(1); } }] : [])]} mobileCount={Number(Boolean(search)) + Number(typeFilter !== 'all') + Number(statusFilter !== 'all')} /><PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage={search || typeFilter !== 'all' || statusFilter !== 'all' ? 'Документы не найдены' : 'Документы пока не добавлены'} serverPagination={{ page, pageSize: 20, total: query.data.total, onPageChange: setPage }} />{createOpen ? <Modal title="Добавить документ" onClose={() => { if (!create.isPending) setCreateOpen(false); }}><form className={styles.documentForm} onSubmit={(event) => { event.preventDefault(); if (newTitle.trim() && newFile) create.mutate(); }}><label>Тип документа<Select value={newType} disabled={create.isPending} onChange={(event) => setNewType(event.target.value as UniversityDocumentType)}>{Object.entries(documentTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></label><label>Название<Input value={newTitle} maxLength={1024} required disabled={create.isPending} onChange={(event) => setNewTitle(event.target.value)} /></label><label>Файл<input type="file" required disabled={create.isPending} onChange={(event) => setNewFile(event.target.files?.[0] ?? null)} /></label>{createError ? <p role="alert" className={styles.fileError}>{createError}</p> : null}<div className={styles.documentFormActions}><Button variant="ghost" size="s" type="button" disabled={create.isPending} onClick={() => setCreateOpen(false)}>Отмена</Button><Button variant="primary" size="s" type="submit" disabled={!newTitle.trim() || !newFile || create.isPending} loading={create.isPending}>Сохранить</Button></div></form></Modal> : null}</section>;
 }
 
 function MeetingParticipants({ participants }: { participants: UniversityMeetingRow['participants'] }) {

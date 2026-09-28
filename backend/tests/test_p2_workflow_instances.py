@@ -655,6 +655,7 @@ def test_set_instance_responsible_assign_clear_and_unlinked(db):
 
 
 def test_stage_responsible_override_inheritance_and_clear(db):
+    from app.core.exceptions import BadTransition
     from app.models.catalog import UniversityResponsible
     from app.models.workflow_instances import InstanceStage
     from app.modules.workflow_instances import service as instance_service
@@ -669,6 +670,8 @@ def test_stage_responsible_override_inheritance_and_clear(db):
     stages = [InstanceStage(instance_id=g["instance"].id, order_index=index, name=f"Stage {index}")
               for index in range(1, 4)]
     db.add_all(stages)
+    db.flush()
+    g["instance"].current_instance_stage_id = stages[1].id
     db.commit()
 
     detail = instance_service.get_instance_detail(db, g["instance"].id)
@@ -685,6 +688,10 @@ def test_stage_responsible_override_inheritance_and_clear(db):
     detail = instance_service.set_instance_stage_responsible(db, g["instance"].id, stages[1].id, None)
     assert [stage.responsible_name for stage in detail.stages] == ["Волков В.В."] * 3
     assert detail.stages[1].responsible_id is None
+
+    with pytest.raises(BadTransition):
+        instance_service.set_instance_stage_responsible(db, g["instance"].id, stages[2].id, other.id)
+    db.rollback()
 
 
 def test_assign_all_replaces_stage_overrides_in_one_operation(db):
@@ -759,6 +766,8 @@ def test_stage_responsible_rejects_foreign_stage_and_unlinked_person(db):
     second = _mini_instance(db)
     stage = InstanceStage(instance_id=second["instance"].id, order_index=1, name="Other stage")
     db.add(stage)
+    db.flush()
+    second["instance"].current_instance_stage_id = stage.id
     db.commit()
     with pytest.raises(NotFound):
         instance_service.set_instance_stage_responsible(db, first["instance"].id, stage.id, None)

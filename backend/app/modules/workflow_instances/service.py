@@ -553,10 +553,10 @@ def set_instance_stage_responsible(
     """Set one runtime stage override; None restores the workflow default."""
     instance = get_instance_or_404(db, instance_id)
     stage = db.get(InstanceStage, stage_id)
-    if instance.status == "archived":
-        raise BadTransition("Archived Workflow cannot be changed")
     if stage is None or stage.instance_id != instance_id:
         raise NotFound("Workflow stage not found")
+    if instance.status != "active" or instance.current_instance_stage_id != stage_id:
+        raise BadTransition("Only the current stage responsible can be changed")
     if responsible_id is not None:
         if db.get(Responsible, responsible_id) is None:
             raise NotFound("Responsible not found")

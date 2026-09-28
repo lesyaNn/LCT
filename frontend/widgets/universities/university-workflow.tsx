@@ -69,10 +69,10 @@ function StageStatusIcon({ status, size = 16 }: { status: UniversityWorkflowStag
 }
 
 function StageDeadline({ stage }: { stage: UniversityWorkflowStage }) {
-  if (!stage.deadline) return <span>Не установлен</span>;
+  if (!stage.deadline) return null;
   const relative = getRelativeDueDateRu(stage.deadline);
   const isOverdue = stage.status === 'overdue';
-  const showRelative = stage.status === 'current' || stage.status === 'pending' || isOverdue;
+  const showRelative = stage.status === 'current' || isOverdue;
   const relativeLabel = isOverdue ? relative.overdueLabel ?? relative.label : relative.label;
   const dueSoon = !isOverdue ? relative.dueSoonLabel : null;
   return (
@@ -85,7 +85,7 @@ function StageDeadline({ stage }: { stage: UniversityWorkflowStage }) {
 
 function StageAssignee({ stage }: { stage: UniversityWorkflowStage }) {
   const responsible = stage.responsible;
-  if (!responsible) return <span className={`${styles.stageResponsible} ${styles.unassigned}`}>Не назначен</span>;
+  if (!responsible) return null;
   const email = responsible.email ?? 'Email не указан';
   const role = responsible.role ?? 'Роль не указана';
   return (
@@ -188,16 +188,20 @@ function WorkflowHistorySection({ idPrefix, instanceId, events, stages, userId, 
 function WorkflowStageDetails({ stage, stages, workflow, instanceId, universityId, userId, canManage, idPrefix, onTransitionOpen, onTransitionClose, onTransitionSuccess, onNotify, tasksState, attachmentsState, historyState, historyEvents, historyActorName, allowedTargets, rollbackTargets }: { stage: UniversityWorkflowStage; stages: UniversityWorkflowStage[]; workflow: UniversityWorkflow; instanceId: string; universityId?: string | null; userId?: string | null; canManage: boolean; idPrefix: string; onTransitionOpen: () => void; onTransitionClose: () => void; onTransitionSuccess: () => void; onNotify: (notification: WorkflowTransitionNotification) => void; tasksState?: WorkflowResourceState; attachmentsState?: WorkflowResourceState; historyState?: WorkflowResourceState; historyEvents: WorkflowHistoryEvent[]; historyActorName?: string; allowedTargets?: WorkflowTransitionTarget[]; rollbackTargets?: WorkflowTransitionTarget[] }) {
   const semantics = workflowStageStatusSemantics[stage.status];
   const headingId = `${idPrefix}-stage-details-title`;
+  const activeStage = workflow.currentStage?.id === stage.id && (stage.status === 'current' || stage.status === 'overdue');
+  const editableStage = canManage && activeStage && isRealWorkflowMode();
+  const hasFacts = Boolean(stage.deadline || stage.responsible || stage.startedAt || stage.completedAt);
   return (
     <section className={`${styles.detailPanel} ${styles[`detail-${stage.status}`]}`} aria-labelledby={headingId} id={idPrefix}>
       <div className={styles.detailHeader}><div><h2 id={headingId}>{stage.name}</h2></div><StatusBadge intent={semantics.intent} icon={<StageStatusIcon status={stage.status} />}>{semantics.label}</StatusBadge></div>
       <CompletionSummary stage={stage} />
-      <section className={styles.detailSection} aria-labelledby={`${idPrefix}-overview-title`}><div className={styles.detailSectionHeading}><h3 id={`${idPrefix}-overview-title`}><InformationStroke size={18} fill="currentColor" />Основная информация</h3></div><dl className={styles.detailFacts}><div><dt>{stage.status === 'completed' ? 'Дедлайн был' : 'Дедлайн'}</dt><dd className={stage.status === 'overdue' ? styles.overdue : undefined}><WorkflowDeadlineField instanceId={instanceId} stage={stage} canManage={canManage && workflow.currentStage?.id === stage.id && isRealWorkflowMode()} onNotify={onNotify} /></dd></div>{stage.startedAt ? <div><dt>Начат</dt><dd><time dateTime={stage.startedAt}>{formatDateTimeRu(stage.startedAt)}</time></dd></div> : null}{stage.completedAt && stage.status !== 'completed' ? <div><dt>Завершён</dt><dd><time dateTime={stage.completedAt}>{formatDateTimeRu(stage.completedAt)}</time></dd></div> : null}<div><dt>Ответственный этапа</dt><dd><WorkflowStageResponsibleField instanceId={instanceId} workflow={workflow} stage={stage} canManage={canManage && isRealWorkflowMode()} onNotify={onNotify} /></dd></div></dl></section>
-      <WorkflowStageTasks stage={stage} instanceId={instanceId} canEdit={canManage && isRealWorkflowMode()} state={tasksState} />
-      <WorkflowComments instanceId={instanceId} stageId={stage.templateStageId ?? stage.id} comments={stage.comments} readOnly={!canManage || (stage.status !== 'current' && stage.status !== 'overdue')} onNotify={onNotify} />
-      {attachmentsState?.loading ? <ListSkeleton items={2} /> : attachmentsState?.error ? <ErrorState title="Не удалось загрузить вложения" headingLevel={3} onRetry={attachmentsState.retry} /> : stage.attachments.length ? <><WorkflowAttachments instanceId={instanceId} stageId={stage.id} attachments={stage.attachments} uploadEnabled={false} readOnly={!canManage || (stage.status !== 'current' && stage.status !== 'overdue')} onNotify={onNotify} />{attachmentsState?.hasMore ? <Button variant="ghost" size="s" type="button" loading={attachmentsState.loadingMore} onClick={attachmentsState.loadMore}>Загрузить ещё вложения</Button> : null}</> : null}
+      {!activeStage && stage.status !== 'completed' && stage.status !== 'skipped' ? <p className={styles.futureNotice}>Этап ещё не начат. Он станет доступен после завершения предыдущего.</p> : null}
+      {hasFacts || editableStage ? <section className={styles.detailSection} aria-labelledby={`${idPrefix}-overview-title`}><div className={styles.detailSectionHeading}><h3 id={`${idPrefix}-overview-title`}><InformationStroke size={18} fill="currentColor" />Основная информация</h3></div><dl className={styles.detailFacts}>{stage.deadline ? <div><dt>{stage.status === 'completed' ? 'Дедлайн был' : 'Дедлайн'}</dt><dd className={stage.status === 'overdue' ? styles.overdue : undefined}><WorkflowDeadlineField instanceId={instanceId} stage={stage} canManage={editableStage} onNotify={onNotify} /></dd></div> : null}{stage.startedAt ? <div><dt>Начат</dt><dd><time dateTime={stage.startedAt}>{formatDateTimeRu(stage.startedAt)}</time></dd></div> : null}{stage.completedAt ? <div><dt>Завершён</dt><dd><time dateTime={stage.completedAt}>{formatDateTimeRu(stage.completedAt)}</time></dd></div> : null}{stage.responsible ? <div><dt>Ответственный этапа</dt><dd><WorkflowStageResponsibleField instanceId={instanceId} workflow={workflow} stage={stage} canManage={editableStage} onNotify={onNotify} /></dd></div> : null}</dl>{editableStage && (!stage.deadline || !stage.responsible) ? <div className={styles.missingFactActions}>{!stage.responsible ? <WorkflowStageResponsibleField instanceId={instanceId} workflow={workflow} stage={stage} canManage onNotify={onNotify} /> : null}{!stage.deadline ? <WorkflowDeadlineField instanceId={instanceId} stage={stage} canManage onNotify={onNotify} /> : null}</div> : null}</section> : null}
+      <WorkflowStageTasks stage={stage} instanceId={instanceId} canEdit={editableStage} state={tasksState} />
+      <WorkflowComments instanceId={instanceId} stageId={stage.templateStageId ?? stage.id} comments={stage.comments} readOnly={!canManage || !activeStage} onNotify={onNotify} />
+      {attachmentsState?.loading ? <ListSkeleton items={2} /> : attachmentsState?.error ? <ErrorState title="Не удалось загрузить вложения" headingLevel={3} onRetry={attachmentsState.retry} /> : stage.attachments.length ? <><WorkflowAttachments instanceId={instanceId} stageId={stage.id} attachments={stage.attachments} uploadEnabled={false} readOnly={!canManage || !activeStage} onNotify={onNotify} />{attachmentsState?.hasMore ? <Button variant="ghost" size="s" type="button" loading={attachmentsState.loadingMore} onClick={attachmentsState.loadMore}>Загрузить ещё вложения</Button> : null}</> : null}
       <WorkflowHistorySection idPrefix={idPrefix} instanceId={instanceId} events={historyEvents} stages={stages} userId={userId ?? undefined} userName={historyActorName} state={historyState} />
-      <StageActionPanel stage={stage} stages={stages} instanceId={instanceId} universityId={universityId} userId={userId} canManage={canManage} allowedTargets={allowedTargets} rollbackTargets={rollbackTargets} onTransitionOpen={onTransitionOpen} onTransitionClose={onTransitionClose} onTransitionSuccess={onTransitionSuccess} onNotify={onNotify} />
+      <StageActionPanel stage={stage} stages={stages} instanceId={instanceId} universityId={universityId} userId={userId} canManage={editableStage} allowedTargets={allowedTargets} rollbackTargets={rollbackTargets} onTransitionOpen={onTransitionOpen} onTransitionClose={onTransitionClose} onTransitionSuccess={onTransitionSuccess} onNotify={onNotify} />
     </section>
   );
 }
@@ -236,9 +240,9 @@ function WorkflowStageResponsibleField({ instanceId, workflow, stage, canManage,
   const close = () => { if (!save.isPending) { setOpen(false); setConfirmReplace(false); } };
   const unchanged = assignAll ? value === (workflow.responsibleId ?? '') && !overriddenStages : value === (stage.responsibleOverrideId ?? '');
   return <>
-    <span className={styles.factValue}>{stage.responsible?.name ?? 'Не назначен'}</span>
-    {canManage && hasPermission(user, 'university_responsible.manage') ? <Tooltip content="Редактировать ответственного этапа"><IconButton icon={<Edit size={18} fill="currentColor" />} label="Редактировать ответственного этапа" size={18} onClick={() => { setValue(stage.responsibleOverrideId ?? ''); setAssignAll(false); setConfirmReplace(false); setOpen(true); }} /></Tooltip> : null}
-    <small className={styles.responsibleSource}>{stage.responsibleOverrideId ? 'Для этого этапа' : 'Как у всего Workflow'}</small>
+    {stage.responsible ? <span className={styles.factValue}>{stage.responsible.name}</span> : null}
+    {canManage && hasPermission(user, 'university_responsible.manage') ? stage.responsible ? <Tooltip content="Редактировать ответственного этапа"><IconButton icon={<Edit size={18} fill="currentColor" />} label="Редактировать ответственного этапа" size={18} onClick={() => { setValue(stage.responsibleOverrideId ?? ''); setAssignAll(false); setConfirmReplace(false); setOpen(true); }} /></Tooltip> : <Button variant="ghost" size="s" type="button" onClick={() => { setValue(''); setAssignAll(false); setConfirmReplace(false); setOpen(true); }}>+ Ответственный</Button> : null}
+    {stage.responsible ? <small className={styles.responsibleSource}>{stage.responsibleOverrideId ? 'Для этого этапа' : 'Как у всего Workflow'}</small> : null}
     {open ? <Modal title="Ответственный этого этапа" onClose={close}><div className={styles.editForm}>
       {confirmReplace ? <><p role="alert">Индивидуальные назначения {overriddenStages} этапов будут заменены выбранным ответственным.</p><div className={styles.editActions}><Button variant="ghost" size="s" type="button" onClick={() => setConfirmReplace(false)}>Назад</Button><Button variant="primary" size="s" type="button" loading={save.isPending} onClick={() => save.mutate()}>Назначить на весь Workflow</Button></div></> : <>
         <label>Назначение<Select value={value} disabled={responsiblesQuery.isPending || save.isPending} onChange={(event) => setValue(event.target.value)}>
@@ -269,7 +273,7 @@ function WorkflowDeadlineField({ instanceId, stage, canManage, onNotify }: { ins
     },
     onError: (cause) => onNotify({ intent: 'error', title: 'Дедлайн не сохранён', message: normalizeApiError(cause).message }),
   });
-  return <><StageDeadline stage={stage} />{canManage ? <Tooltip content={stage.deadline ? 'Редактировать дедлайн' : 'Установить дедлайн'}><IconButton icon={<Edit size={18} fill="currentColor" />} label={stage.deadline ? 'Редактировать дедлайн' : 'Установить дедлайн'} size={18} onClick={() => { setValue(stage.deadline); setOpen(true); }} /></Tooltip> : null}{open ? <Modal title="Дедлайн этапа" onClose={() => { if (!save.isPending) setOpen(false); }}><div className={styles.editForm}><label>Дата<Input type="date" value={value} disabled={save.isPending} onChange={(event) => setValue(event.target.value)} /></label><div className={styles.editActions}><Button variant="ghost" size="s" type="button" disabled={save.isPending} onClick={() => setOpen(false)}>Отмена</Button><Button variant="primary" size="s" type="button" loading={save.isPending} disabled={save.isPending || value === stage.deadline} onClick={() => save.mutate()}>Сохранить</Button></div></div></Modal> : null}</>;
+  return <><StageDeadline stage={stage} />{canManage ? stage.deadline ? <Tooltip content="Редактировать дедлайн"><IconButton icon={<Edit size={18} fill="currentColor" />} label="Редактировать дедлайн" size={18} onClick={() => { setValue(stage.deadline); setOpen(true); }} /></Tooltip> : <Button variant="ghost" size="s" type="button" onClick={() => { setValue(''); setOpen(true); }}>+ Дедлайн</Button> : null}{open ? <Modal title="Дедлайн этапа" onClose={() => { if (!save.isPending) setOpen(false); }}><div className={styles.editForm}><label>Дата<Input type="date" value={value} disabled={save.isPending} onChange={(event) => setValue(event.target.value)} /></label><div className={styles.editActions}><Button variant="ghost" size="s" type="button" disabled={save.isPending} onClick={() => setOpen(false)}>Отмена</Button><Button variant="primary" size="s" type="button" loading={save.isPending} disabled={save.isPending || value === stage.deadline} onClick={() => save.mutate()}>Сохранить</Button></div></div></Modal> : null}</>;
 }
 
 function WorkflowHeader({ workflow }: { workflow: UniversityWorkflow }) {
