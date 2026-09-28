@@ -42,5 +42,5 @@
 .skeleton span:nth-child(2) { width: 82%; }
 .skeleton span:nth-child(3) { width: 64%; }
 @keyframes commentsShimmer { from { opacity: .55; } 50% { opacity: 1; } to { opacity: .55; } }
-@media (max-width: 480px) { .commentHeader { align-items: flex-start; flex-wrap: wrap; } .commentHeader > button { margin-left: 40px; } .commentText { margin-left: 0; } .editorFooter { align-items: flex-start; flex-direction: column; } .editorActions { width: 100%; } .editorActions > button { flex: 1 1 auto; } }
+@media (max-width: 480px) { .commentHeader { align-items: flex-start; flex-wrap: wrap; } .commentText { margin-left: 0; } .editorFooter { align-items: flex-start; flex-direction: column; } .editorActions { width: 100%; } .editorActions > button { flex: 1 1 auto; } }
 @media (prefers-reduced-motion: reduce) { .skeleton span { animation: none; } }

@@ -9,8 +9,9 @@ interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   icon: BuiltInIcon | ReactNode;
   label: string;
   size?: number;
+  intent?: 'default' | 'danger';
 }
 
-export function IconButton({ icon, label, size = 20, className = '', ...props }: IconButtonProps) {
-  return <button className={`${styles.button} ${className}`} aria-label={label} title={props.title ?? label} type="button" {...props}>{typeof icon === 'string' ? <Icon name={icon as BuiltInIcon} size={size} /> : icon}</button>;
+export function IconButton({ icon, label, size = 20, intent = 'default', className = '', ...props }: IconButtonProps) {
+  return <button className={`${styles.button} ${intent === 'danger' ? styles.danger : ''} ${className}`} aria-label={label} title={props.title ?? label} type="button" {...props}>{typeof icon === 'string' ? <Icon name={icon as BuiltInIcon} size={size} /> : icon}</button>;
 }

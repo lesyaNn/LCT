@@ -16,12 +16,12 @@ test('full Workflow history, comment edit with file, and shared modals', async (
   await login(page);
   await page.goto(`/workflows/${instanceId}`);
   const history = page.locator('section[aria-labelledby$="-transition-title"]');
-  await expect(history.getByRole('heading', { name: 'История Workflow' })).toBeVisible();
+  await expect(history.locator('summary').first()).toContainText('История Workflow');
   const events = history.locator('ol > li');
-  await expect(events.first()).toBeVisible();
+  await expect(events.first()).toBeAttached();
   const before = await events.count();
   expect(before).toBeGreaterThanOrEqual(3);
-  await expect(history.getByText('Этап изменён').first()).toBeVisible();
+  await expect(history.getByText('Этап изменён').first()).toBeAttached();
   const stageButtons = page.locator('section[aria-labelledby$="-stages-title"] button');
   await stageButtons.first().click();
   await expect(events).toHaveCount(before);
@@ -35,6 +35,8 @@ test('full Workflow history, comment edit with file, and shared modals', async (
   await comments.locator('input[type="file"]').setInputFiles({ name: `${marker}.pdf`, mimeType: 'application/pdf', buffer: Buffer.from('history file') });
   await comments.getByRole('button', { name: 'Отправить' }).click();
   await expect(comments.getByText(marker, { exact: true })).toBeVisible();
+  await history.locator('details').first().locator('summary').first().click();
+  await history.locator('details details').filter({ hasText: marker }).first().locator('summary').click();
   await expect(history.getByText(marker, { exact: true })).toBeVisible();
   await expect(history.getByRole('button', { name: `Скачать ${marker}.pdf` })).toBeVisible();
 
@@ -43,6 +45,8 @@ test('full Workflow history, comment edit with file, and shared modals', async (
   await comments.getByRole('button', { name: 'Сохранить' }).click();
   await expect(history.getByText(`${marker}-edited`, { exact: true })).toBeVisible();
   await page.reload();
+  await history.locator('details').first().locator('summary').first().click();
+  await history.locator('details details').filter({ hasText: `${marker}-edited` }).first().locator('summary').click();
   await expect(history.getByText(`${marker}-edited`, { exact: true })).toBeVisible();
   await expect(history.getByRole('button', { name: `Скачать ${marker}.pdf` })).toBeVisible();
   const download = page.waitForEvent('download');
@@ -72,7 +76,7 @@ test('full Workflow history, comment edit with file, and shared modals', async (
     const info = page.locator('section[aria-labelledby$="-overview-title"]');
     for (const [field, title] of [['Дедлайн', 'Дедлайн этапа'], ['Ответственный Workflow', 'Ответственный Workflow']] as const) {
       const row = info.locator('div').filter({ has: page.getByText(field, { exact: true }) }).last();
-      await row.getByRole('button', { name: /Установить|Изменить|Назначить/ }).click();
+      await row.getByRole('button', { name: /Установить|Редактировать|Назначить/ }).click();
       const dialog = page.getByRole('dialog', { name: title });
       const heading = await dialog.getByRole('heading', { name: title }).boundingBox();
       const close = await dialog.getByRole('button', { name: 'Закрыть' }).boundingBox();

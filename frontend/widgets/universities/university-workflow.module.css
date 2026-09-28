@@ -28,7 +28,6 @@
 .instanceProgress { background: var(--rtk-color-surface-subtle); border-radius: 999px; height: 6px; overflow: hidden; width: 100%; }
 .instanceProgress span { background: var(--rtk-color-brand); display: block; height: 100%; }
 .instanceFacts { color: var(--rtk-color-text-secondary); font-size: 12px; overflow-wrap: anywhere; }
-.instanceOpen { align-items: center; color: var(--rtk-color-brand); display: inline-flex; font-size: 12px; font-weight: 700; gap: var(--rtk-space-1); }
 .historyDisclosure { border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); min-width: 0; }
 .historyDisclosure summary { align-items: center; cursor: pointer; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); list-style: none; padding: var(--rtk-space-3); }
 .historyDisclosure summary::-webkit-details-marker { display: none; }
@@ -38,7 +37,7 @@
 .historyGroups { display: flex; flex-direction: column; gap: var(--rtk-space-2); padding: var(--rtk-space-2); }
 .historyGroups .transitionList { margin: 0; padding: var(--rtk-space-2); }
 .taskRow { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); }
-.taskRow > span { flex: 1 1 160px; overflow-wrap: anywhere; }
+.taskLabel { flex: 1 1 160px; overflow-wrap: anywhere; }
 .taskRow > input[type='checkbox'] { flex: 0 0 auto; }
 .taskRow > input:not([type='checkbox']) { flex: 1 1 160px; }
 .taskAdd { display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); margin-top: var(--rtk-space-2); }
@@ -143,7 +142,7 @@
 .taskProgress { height: 6px; margin: 0; }
 .taskList { display: flex; flex-direction: column; gap: var(--rtk-space-2); }
 .taskList label { align-items: center; color: var(--rtk-color-text-secondary); display: flex; font-size: 13px; gap: var(--rtk-space-2); }
-.taskList input { accent-color: var(--rtk-color-brand); height: 16px; width: 16px; }
+.taskList input[type='checkbox'] { accent-color: var(--rtk-color-brand); height: 16px; width: 16px; }
 .taskCompleted { color: var(--rtk-color-text-tertiary); text-decoration: line-through; }
 .transitionList { display: flex; flex-direction: column; gap: var(--rtk-space-3); }
 .transitionList li { border-left: 2px solid var(--rtk-color-border); padding-left: var(--rtk-space-3); }

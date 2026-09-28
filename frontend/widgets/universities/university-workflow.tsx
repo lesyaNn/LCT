@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Attachment from '@atomaro/icons/24/action/Attachment';
-import ArrowRight from '@atomaro/icons/24/navigation/ArrowRight';
+import Edit from '@atomaro/icons/24/editor/Edit';
 import CheckLarge from '@atomaro/icons/24/navigation/CheckLarge';
 import Comments from '@atomaro/icons/24/communication/Comments';
 import ErrorStroke from '@atomaro/icons/24/alert/ErrorStroke';
@@ -36,6 +36,7 @@ import { EmptyState } from '@/shared/ui/empty-state';
 import { ErrorState } from '@/shared/ui/error-state';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { Tooltip } from '@/shared/ui/rtk/tooltip';
+import { IconButton } from '@/shared/ui/rtk/icon-button';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { ListSkeleton, Skeleton, SkeletonGroup } from '@/shared/ui/skeleton';
 import { Toast } from '@/shared/ui/rtk/toast';
@@ -226,7 +227,7 @@ function WorkflowResponsibleField({ instanceId, workflow, canManage, onNotify }:
     onError: (cause) => onNotify({ intent: 'error', title: 'Ответственный не сохранён', message: normalizeApiError(cause).message }),
   });
   return (
-    <><span className={styles.factValue}>{workflow.responsibleName ?? 'Не назначен'}</span>{canManage ? <Button variant="ghost" size="s" type="button" onClick={() => { setValue(workflow.responsibleId ?? ''); setOpen(true); }}>{workflow.responsibleId ? 'Изменить' : 'Назначить'}</Button> : null}{open ? <Modal title="Ответственный Workflow" onClose={() => { if (!save.isPending) setOpen(false); }}><div className={styles.editForm}><label>Ответственный<Select value={value} disabled={responsiblesQuery.isPending || save.isPending} onChange={(event) => setValue(event.target.value)}><option value="">Не назначен</option>{options.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>{responsiblesQuery.isError ? <p role="alert">Не удалось загрузить ответственных вуза.</p> : null}{value ? <p className={styles.externalHint}>{[options.find((item) => item.id === value)?.email, options.find((item) => item.id === value)?.phone].filter(Boolean).join(' · ')}</p> : null}<div className={styles.editActions}><Button variant="ghost" size="s" type="button" disabled={save.isPending} onClick={() => setOpen(false)}>Отмена</Button><Button variant="primary" size="s" type="button" loading={save.isPending} disabled={save.isPending || responsiblesQuery.isPending || value === (workflow.responsibleId ?? '') || Boolean(value && !options.some((item) => item.id === value))} onClick={() => save.mutate()}>Сохранить</Button></div></div></Modal> : null}</>
+    <><span className={styles.factValue}>{workflow.responsibleName ?? 'Не назначен'}</span>{canManage ? <Tooltip content={workflow.responsibleId ? 'Редактировать ответственного' : 'Назначить ответственного'}><IconButton icon={<Edit size={18} fill="currentColor" />} label={workflow.responsibleId ? 'Редактировать ответственного' : 'Назначить ответственного'} size={18} onClick={() => { setValue(workflow.responsibleId ?? ''); setOpen(true); }} /></Tooltip> : null}{open ? <Modal title="Ответственный Workflow" onClose={() => { if (!save.isPending) setOpen(false); }}><div className={styles.editForm}><label>Ответственный<Select value={value} disabled={responsiblesQuery.isPending || save.isPending} onChange={(event) => setValue(event.target.value)}><option value="">Не назначен</option>{options.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>{responsiblesQuery.isError ? <p role="alert">Не удалось загрузить ответственных вуза.</p> : null}{value ? <p className={styles.externalHint}>{[options.find((item) => item.id === value)?.email, options.find((item) => item.id === value)?.phone].filter(Boolean).join(' · ')}</p> : null}<div className={styles.editActions}><Button variant="ghost" size="s" type="button" disabled={save.isPending} onClick={() => setOpen(false)}>Отмена</Button><Button variant="primary" size="s" type="button" loading={save.isPending} disabled={save.isPending || responsiblesQuery.isPending || value === (workflow.responsibleId ?? '') || Boolean(value && !options.some((item) => item.id === value))} onClick={() => save.mutate()}>Сохранить</Button></div></div></Modal> : null}</>
   );
 }
 
@@ -246,7 +247,7 @@ function WorkflowDeadlineField({ instanceId, stage, canManage, onNotify }: { ins
     },
     onError: (cause) => onNotify({ intent: 'error', title: 'Дедлайн не сохранён', message: normalizeApiError(cause).message }),
   });
-  return <><StageDeadline stage={stage} />{canManage ? <Button variant="ghost" size="s" type="button" onClick={() => { setValue(stage.deadline); setOpen(true); }}>{stage.deadline ? 'Изменить' : 'Установить'}</Button> : null}{open ? <Modal title="Дедлайн этапа" onClose={() => { if (!save.isPending) setOpen(false); }}><div className={styles.editForm}><label>Дата<Input type="date" value={value} disabled={save.isPending} onChange={(event) => setValue(event.target.value)} /></label><div className={styles.editActions}><Button variant="ghost" size="s" type="button" disabled={save.isPending} onClick={() => setOpen(false)}>Отмена</Button><Button variant="primary" size="s" type="button" loading={save.isPending} disabled={save.isPending || value === stage.deadline} onClick={() => save.mutate()}>Сохранить</Button></div></div></Modal> : null}</>;
+  return <><StageDeadline stage={stage} />{canManage ? <Tooltip content={stage.deadline ? 'Редактировать дедлайн' : 'Установить дедлайн'}><IconButton icon={<Edit size={18} fill="currentColor" />} label={stage.deadline ? 'Редактировать дедлайн' : 'Установить дедлайн'} size={18} onClick={() => { setValue(stage.deadline); setOpen(true); }} /></Tooltip> : null}{open ? <Modal title="Дедлайн этапа" onClose={() => { if (!save.isPending) setOpen(false); }}><div className={styles.editForm}><label>Дата<Input type="date" value={value} disabled={save.isPending} onChange={(event) => setValue(event.target.value)} /></label><div className={styles.editActions}><Button variant="ghost" size="s" type="button" disabled={save.isPending} onClick={() => setOpen(false)}>Отмена</Button><Button variant="primary" size="s" type="button" loading={save.isPending} disabled={save.isPending || value === stage.deadline} onClick={() => save.mutate()}>Сохранить</Button></div></div></Modal> : null}</>;
 }
 
 function WorkflowHeader({ workflow }: { workflow: UniversityWorkflow }) {
@@ -400,12 +401,12 @@ function RealUniversityWorkflow({ id }: { id: string; canAdvance: boolean }) {
       <ol className={styles.instanceList}>
         {instances.map((item) => (
           <li key={item.id} className={styles.instanceItem}>
-            <Link className={styles.instanceButton} href={`/workflows/${item.id}`}>
+            <Link className={styles.instanceButton} href={`/workflows/${item.id}`} onKeyDown={(event) => { if (event.key === ' ') { event.preventDefault(); event.currentTarget.click(); } }}>
               <strong>{item.program_name || 'Без программы'}</strong>
               {(() => {
                 const current = item.stages.find((stage) => stage.id === item.current_instance_stage_id || stage.template_stage_id === item.current_stage_id) ?? item.stages.find((stage) => stage.status === 'current');
                 const completed = item.stages.filter((stage) => stage.status === 'completed').length;
-                return <><span className={styles.instanceStage}>{current ? <>Текущий этап: <b>{current.name}</b></> : 'Этап завершён'}</span><span className={styles.instanceMeta}><span>{completed} из {item.stages.length} этапов</span><StatusBadge intent={item.is_overdue ? 'danger' : item.status === 'completed' ? 'success' : 'info'}>{item.is_overdue ? 'Просрочен' : instanceStatusLabel(item.status)}</StatusBadge></span><span className={styles.instanceProgress} role="progressbar" aria-label="Прогресс Workflow" aria-valuemin={0} aria-valuemax={item.stages.length} aria-valuenow={completed}><span style={{ width: `${item.stages.length ? completed / item.stages.length * 100 : 0}%` }} /></span><span className={styles.instanceFacts}>Ответственный: {item.responsible_name || 'Не назначен'}{item.due_date ? ` · Дедлайн: ${formatDateRu(item.due_date)}` : ''}</span><span className={styles.instanceOpen}>Открыть Workflow <ArrowRight size={16} fill="currentColor" /></span></>;
+                return <><span className={styles.instanceStage}>{current ? <>Текущий этап: <b>{current.name}</b></> : 'Этап завершён'}</span><span className={styles.instanceMeta}><span>{completed} из {item.stages.length} этапов</span><StatusBadge intent={item.is_overdue ? 'danger' : item.status === 'completed' ? 'success' : 'brand'}>{item.is_overdue ? 'Просрочен' : instanceStatusLabel(item.status)}</StatusBadge></span><span className={styles.instanceProgress} role="progressbar" aria-label="Прогресс Workflow" aria-valuemin={0} aria-valuemax={item.stages.length} aria-valuenow={completed}><span style={{ width: `${item.stages.length ? completed / item.stages.length * 100 : 0}%` }} /></span>{item.responsible_name || item.due_date ? <span className={styles.instanceFacts}>{item.responsible_name}{item.responsible_name && item.due_date ? ' · ' : null}{item.due_date ? `Дедлайн: ${formatDateRu(item.due_date)}` : null}</span> : null}</>;
               })()}
             </Link>
           </li>
