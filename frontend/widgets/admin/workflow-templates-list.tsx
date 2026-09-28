@@ -29,6 +29,7 @@ export function WorkflowTemplatesList() {
   const createTemplate = useCreateWorkflowTemplate();
   const updateTemplate = useUpdateWorkflowTemplate();
   const [createOpen, setCreateOpen] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
   const [notification, setNotification] = useState<NormalizedApiError | null>(null);
   const [retireCandidate, setRetireCandidate] = useState<{ id: string; name: string } | null>(null);
   const [retireError, setRetireError] = useState<string | null>(null);
@@ -50,12 +51,14 @@ export function WorkflowTemplatesList() {
   };
 
   if (query.isError && !query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
+  const visibleTemplates = query.data?.items.filter((template) => showInactive || template.isActive) ?? [];
+  const inactiveCount = query.data?.items.filter((template) => !template.isActive).length ?? 0;
 
   return <div className={styles.page}>
     <header className={styles.editorHeader}><div><h1>Шаблоны Workflow</h1><p className={styles.description}>Управляйте набором и порядком этапов для новых процессов.</p></div><Button type="button" variant="primary" size="m" onClick={() => setCreateOpen(true)}><AddLarge size={18} fill="currentColor" />Новый шаблон</Button></header>
     <section className={styles.templateSurface} aria-labelledby="templates-heading">
-      <div className={styles.surfaceHeader}><div><h2 id="templates-heading">Все шаблоны</h2><p>{query.data ? `Всего: ${query.data.total}` : 'Загрузка…'}</p></div></div>
-      {query.isPending ? <ListSkeleton items={4} withAvatar={false} /> : query.data?.items.length ? <ul className={styles.templateList}>{query.data.items.map((template) => <li key={template.id}>
+      <div className={styles.surfaceHeader}><div><h2 id="templates-heading">Шаблоны Workflow</h2><p>{query.data ? `Активных: ${query.data.items.length - inactiveCount}` : 'Загрузка…'}</p></div>{inactiveCount ? <Button type="button" variant="ghost" size="s" onClick={() => setShowInactive((current) => !current)}>{showInactive ? 'Скрыть отключённые' : `Показать отключённые (${inactiveCount})`}</Button> : null}</div>
+      {query.isPending ? <ListSkeleton items={4} withAvatar={false} /> : visibleTemplates.length ? <ul className={styles.templateList}>{visibleTemplates.map((template) => <li key={template.id}>
         <div><div className={styles.templateTitle}><h3>{template.name}</h3><span className={template.isActive ? styles.activeBadge : styles.inactiveBadge}>{template.isActive ? 'Активен' : 'Отключён'}</span></div>{visibleWorkflowDescription(template.description) ? <p>{template.description}</p> : null}</div>
         <div className={styles.headerActions}>
           {!demoMode && template.isActive ? <Button type="button" variant="ghost" size="s" disabled={updateTemplate.isPending} onClick={() => { setRetireError(null); setRetireCandidate({ id: template.id, name: template.name }); }}>Отключить</Button> : null}

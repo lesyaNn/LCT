@@ -166,7 +166,7 @@ export async function logoutFromKeycloak(): Promise<void> {
   const keycloak = await ensureKeycloak();
   sessionExpiredRedirectArmed = false;
   try {
-    await keycloak.logout({ redirectUri: `${window.location.origin}/login` });
+    await keycloak.logout({ redirectUri: `${window.location.origin}/login?openAuth=1` });
   } finally {
     keycloak.clearToken();
   }

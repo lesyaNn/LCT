@@ -12,7 +12,7 @@
 
 Workflow instances (P1-09-02 progress table) are P2-owned tables and are
 intentionally NOT seeded here. The P2-01-04 standard
-14-stage workflow *template* IS seeded here via ``seed_workflow_templates``
+Workflow templates are not seeded by this fixture
 (idempotent, runs after ``migrate``).
 """
 
@@ -47,7 +47,6 @@ from app.models.interactions import (
     UniversityProgram,
 )
 
-from app.db.seed_workflow import seed_workflow_templates
 
 SYSTEM_SUB = "system-seed"
 
@@ -422,10 +421,7 @@ def seed_demo(session: Session, skip_universities: bool | None = None) -> dict:
 
     session.commit()
 
-    wf_stats = seed_workflow_templates(session)
-
     stats = _collect_stats(session)
-    stats.update(wf_stats)
     return stats
 
 

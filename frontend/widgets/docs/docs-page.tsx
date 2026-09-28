@@ -63,7 +63,8 @@ const markdownComponents: Components = {
 };
 
 function ArticleContent({ article }: { article: DocsArticle }) {
-  return <article className={styles.article} aria-labelledby="docs-article-title"><header className={styles.articleHeader}><p className={styles.articleSection}>{article.sectionTitle}</p><h1 id="docs-article-title">{article.title}</h1></header><div className={styles.markdown}><ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>{article.content}</ReactMarkdown></div></article>;
+  const faq = article.id === 'help/faq' ? article.content.split(/^### /m).slice(1).map((entry) => { const [question, ...answer] = entry.split('\n'); return { question: question.trim(), answer: answer.join('\n').trim() }; }) : [];
+  return <article className={styles.article} aria-labelledby="docs-article-title"><header className={styles.articleHeader}><p className={styles.articleSection}>{article.sectionTitle}</p><h1 id="docs-article-title">{article.title}</h1></header><div className={styles.markdown}>{article.id === 'help/faq' ? <div className={styles.faqList}>{faq.map(({ question, answer }) => <details className={styles.faqItem} key={question}><summary>{question}</summary><div><ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm]}>{answer}</ReactMarkdown></div></details>)}</div> : <ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>{article.content}</ReactMarkdown>}</div></article>;
 }
 
 function DocsLanding({ docs }: { docs: DocsSnapshot }) {

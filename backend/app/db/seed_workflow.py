@@ -70,53 +70,8 @@ STAGES_14: list[tuple[str, bool]] = [
 
 
 def seed_workflow_templates(session: Session) -> dict:
-    """Upsert the standard template + its 14 stages. Returns counts."""
-    template = session.execute(
-        select(WorkflowTemplate).where(WorkflowTemplate.name == TEMPLATE_NAME)
-    ).scalar_one_or_none()
-    if template is None:
-        template = WorkflowTemplate(name=TEMPLATE_NAME, description=TEMPLATE_DESCRIPTION)
-        session.add(template)
-        session.flush()
-    elif template.description == LEGACY_TEMPLATE_DESCRIPTION:
-        template.description = TEMPLATE_DESCRIPTION
-
-    for position, (name, is_required) in enumerate(STAGES_14, start=1):
-        stage = session.execute(
-            select(WorkflowStage).where(
-                WorkflowStage.template_id == template.id,
-                WorkflowStage.order_index == position,
-            )
-        ).scalar_one_or_none()
-        if stage is None:
-            session.add(
-                WorkflowStage(
-                    template_id=template.id,
-                    name=name,
-                    order_index=position,
-                    is_required=is_required,
-                )
-            )
-        else:
-            if stage.name != name:
-                stage.name = name
-            if stage.is_required is not is_required:
-                stage.is_required = is_required
-    session.commit()
-
-    n_templates = (
-        session.execute(select(WorkflowTemplate.id).where(WorkflowTemplate.name == TEMPLATE_NAME))
-        .scalars()
-        .all()
-        .__len__()
-    )
-    n_stages = (
-        session.execute(select(WorkflowStage.id).where(WorkflowStage.template_id == template.id))
-        .scalars()
-        .all()
-        .__len__()
-    )
-    return {"workflow_templates": n_templates, "workflow_stages": n_stages}
+    """Legacy entry point: demo workflow templates are no longer seeded."""
+    return {"workflow_templates": 0, "workflow_stages": 0}
 
 
 def main() -> None:

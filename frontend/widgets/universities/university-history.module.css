@@ -46,3 +46,4 @@
 @keyframes historyShimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 @media (max-width: 768px) { .desktopTable { display: none; } .mobileList { background: var(--rtk-color-surface-subtle); display: flex; flex-direction: column; gap: var(--rtk-space-3); padding: var(--rtk-space-3); } .mobileEvent { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); padding: var(--rtk-space-4); } }
 @media (prefers-reduced-motion: reduce) { .skeleton span { animation: none; } }
+.changesContent { max-height: min(65dvh, 620px); overflow: auto; }

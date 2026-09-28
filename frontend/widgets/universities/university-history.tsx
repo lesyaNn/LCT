@@ -8,7 +8,6 @@ import HistoryAction from '@atomaro/icons/24/communication/HistoryAction';
 import { useMemo, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { isMockDataSourceFor } from '@/shared/lib/data-source';
-import { summarizeAuditEvent } from '@/shared/lib/audit-human';
 import { formatDateTimeRu } from '@/shared/lib/formatters';
 import { historyEventTypeIntent, historyEventTypeLabels } from '@/shared/lib/status-semantics';
 import { getUniversityHistory, getUniversityHistoryFilterOptions, universityHistoryQueryKey, type UniversityHistoryEvent, type UniversityHistoryEventType, type UniversityHistoryFilters } from '@/shared/lib/universities-repository';
@@ -17,11 +16,13 @@ import { FilterToolbar } from '@/shared/ui/rtk/filter-surface';
 import { FilterField } from '@/shared/ui/rtk/filter-field';
 import { DateRangeField } from '@/shared/ui/rtk/date-range-field';
 import { Select } from '@/shared/ui/rtk/form-controls';
+import { Button } from '@/shared/ui/rtk/button';
+import { Modal } from '@/shared/ui/rtk/modal';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { TableShell } from '@/shared/ui/rtk/table-shell';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { TableSkeleton } from '@/shared/ui/skeleton';
-import { AuditDiff } from '@/widgets/audit/audit-diff';
+import { AuditDiff, hasAuditDiff } from '@/widgets/audit/audit-diff';
 import { AttachmentRow } from './workflow-attachments';
 import styles from './university-history.module.css';
 
@@ -41,14 +42,12 @@ function EventType({ type }: { type: UniversityHistoryEventType }) {
 }
 
 function EventDetails({ event }: { event: UniversityHistoryEvent }) {
-  const hasChanges = event.auditEvent
-    ? summarizeAuditEvent(event.auditEvent).changes.length > 0
-    : Boolean((event.oldValues && Object.keys(event.oldValues).length) || (event.newValues && Object.keys(event.newValues).length))
-      && JSON.stringify(event.oldValues ?? {}) !== JSON.stringify(event.newValues ?? {});
+  const [changesOpen, setChangesOpen] = useState(false);
+  const hasChanges = hasAuditDiff(event.auditEvent ?? event);
   return <div className={styles.eventDetails}>
     {event.details && !event.action.includes(event.details) ? <p>{event.details}</p> : null}
     {event.attachment ? <ul className={styles.attachmentList}><AttachmentRow attachment={{ id: event.attachment.id, fileName: event.attachment.fileName, fileType: '', fileSize: '', mimeType: event.attachment.mimeType }} instanceId={event.attachment.instanceId} canDelete={false} onOpen={() => undefined} onDelete={() => undefined} compact /></ul> : null}
-    {hasChanges ? <details className={styles.details}><summary>Показать изменения</summary><AuditDiff event={event.auditEvent ?? event} showTechnical={false} /></details> : null}
+    {hasChanges ? <><Button variant="ghost" size="s" type="button" onClick={() => setChangesOpen(true)}>Показать изменения</Button>{changesOpen ? <Modal title="Изменения" onClose={() => setChangesOpen(false)}><div className={styles.changesContent}><AuditDiff event={event.auditEvent ?? event} showTechnical={false} /></div></Modal> : null}</> : null}
   </div>;
 }
 

@@ -56,9 +56,6 @@ export const DOC_SECTION_DEFINITIONS: Array<{ id: string; title: string; topics:
     { slug: 'admin', title: 'Администратор' },
   ] },
   { id: 'help', title: 'Помощь', topics: [{ slug: 'faq', title: 'Частые вопросы' }] },
-  { id: 'system', title: 'Системному администратору', topics: [
-    { slug: 'operations', title: 'Запуск и обслуживание' },
-  ] },
 ];
 
 const contentRoots = [
@@ -142,7 +139,7 @@ export async function loadDocumentation(): Promise<DocsSnapshot> {
       return [];
     }
   }))).flat();
-  const loadedArticles = await Promise.all(files.map(async ({ root, filePath }) => articleFromSource(root, filePath, await readFile(filePath, 'utf8'))));
+  const loadedArticles = await Promise.all(files.filter(({ filePath }) => !filePath.includes(`${path.sep}system${path.sep}`)).map(async ({ root, filePath }) => articleFromSource(root, filePath, await readFile(filePath, 'utf8'))));
   const articles = Array.from(new Map(loadedArticles.map((article) => [article.id, article])).values())
     .sort((left, right) => left.order - right.order || left.title.localeCompare(right.title, 'ru'));
   const sections = DOC_SECTION_DEFINITIONS.map((definition) => ({

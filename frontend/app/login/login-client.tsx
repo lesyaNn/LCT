@@ -26,14 +26,12 @@ export default function LoginClient({ demoEnabled }: { demoEnabled: boolean }) {
 
   useEffect(() => {
     if (status === 'authenticated') router.replace(returnTo);
-    if (status === 'unauthenticated' && authService.mode() === 'keycloak' && !demoEnabled) void login(returnTo);
+    if (status === 'unauthenticated' && authService.mode() === 'keycloak' && (!demoEnabled || new URLSearchParams(window.location.search).has('openAuth'))) void login(returnTo, demoEnabled ? '__demo__' : undefined);
   }, [demoEnabled, login, returnTo, router, status]);
 
   if (status === 'loading' || status === 'authenticated'
     || (status === 'unauthenticated' && authService.mode() === 'keycloak' && !demoEnabled)) return <AuthLoading />;
   if (status === 'error') return <AuthError message={error ?? 'Не удалось проверить сессию.'} onRetry={retry} />;
 
-  return <AuthRequired message={notice} onLogin={() => void login(returnTo)}
-    onDemoLogin={demoEnabled && authService.mode() === 'keycloak'
-      ? (username) => void login(returnTo, username) : undefined} />;
+  return <AuthRequired message={notice} onLogin={() => void login(returnTo, demoEnabled ? '__demo__' : undefined)} />;
 }

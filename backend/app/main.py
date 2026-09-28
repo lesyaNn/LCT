@@ -29,25 +29,7 @@ log = logging.getLogger("rtk.bootstrap.workflow")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Run startup baseline bootstraps (migrations already applied by entrypoint).
-
-    Ensures the standard workflow template exists on every backend start.
-    Fail-open by design (consistent with the rest of the startup path):
-    a DB failure is logged with traceback and retried on the next
-    start; it never prevents the API process from serving /health.
-    """
-    try:
-        from app.bootstrap.workflow_defaults import ensure_default_workflow_template, ensure_spec_workflow_template
-        from app.db.session import SessionLocal
-
-        db = SessionLocal()
-        try:
-            ensure_default_workflow_template(db)
-            ensure_spec_workflow_template(db)
-        finally:
-            db.close()
-    except Exception:
-        log.exception("[bootstrap] Standard workflow template bootstrap failed")
+    """Start the API without creating visible workflow templates."""
     yield
 
 

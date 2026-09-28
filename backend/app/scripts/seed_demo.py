@@ -93,22 +93,10 @@ from app.models.catalog import (  # noqa: E402
     Vendor,
 )
 from app.models.interactions import Meeting, UniversityProduct, UniversityProgram  # noqa: E402
-from app.models.workflow_instances import WorkflowInstance  # noqa: E402
-from app.models.workflow_templates import WorkflowStage, WorkflowTemplate  # noqa: E402
 
 log = logging.getLogger("rtk.seed_demo")
 
 SYSTEM_SUB = "system-seed-demo"
-
-DEMO_TEMPLATE_NAME = "Демонстрационный маршрут взаимодействия с вузом"
-DEMO_TEMPLATE_DESCRIPTION = "Демонстрационный маршрут для первичного знакомства с CRM"
-DEMO_STAGES = [
-    "Первичный контакт",
-    "Согласование программы",
-    "Подготовка документов",
-    "Согласование договора",
-    "Запуск программы",
-]
 
 # ---------------------------------------------------------------------------
 # Dataset
@@ -507,34 +495,6 @@ def _seed_contracts_licenses(
         _say(dry_run, verbose, f"{'[CREATE]' if created else '[FOUND]'} License: {number}")
 
 
-def _seed_template(session: Session, stats: SeedStats, dry_run: bool, verbose: bool):
-    template, created = _get_or_create(
-        session,
-        stats,
-        "workflow_templates",
-        WorkflowTemplate,
-        {"description": DEMO_TEMPLATE_DESCRIPTION, "is_active": True},
-        name=DEMO_TEMPLATE_NAME,
-    )
-    _say(dry_run, verbose, f"{'[CREATE]' if created else '[FOUND]'} WorkflowTemplate: {DEMO_TEMPLATE_NAME}")
-    for position, stage_name in enumerate(DEMO_STAGES, start=1):
-        _, stage_created = _get_or_create(
-            session,
-            stats,
-            "workflow_stages",
-            WorkflowStage,
-            {"name": stage_name, "is_required": True, "is_active": True},
-            template_id=template.id,
-            order_index=position,
-        )
-        _say(
-            dry_run,
-            verbose,
-            f"{'[CREATE]' if stage_created else '[FOUND]'} WorkflowStage: {position}. {stage_name}",
-        )
-    return template
-
-
 def _seed_meetings(
     session: Session,
     stats: SeedStats,
@@ -578,100 +538,6 @@ def _seed_meetings(
 # ---------------------------------------------------------------------------
 
 
-def _seed_workflow_instances(
-    session: Session,
-    stats: SeedStats,
-    dry_run: bool,
-    verbose: bool,
-    template: WorkflowTemplate,
-    universities: dict[str, University],
-    programs: dict[str, ITProgram],
-    responsibles_by_uni: dict[str, Responsible],
-) -> None:
-    from app.modules.workflow_instances.service import create_instance
-    from app.modules.workflow_transitions.service import ordered_stages, transition_instance
-
-    for uni_name, (prog_name, target_stage) in INSTANCE_PLAN.items():
-        uni = universities[uni_name]
-        existing = session.execute(
-            select(WorkflowInstance).where(
-                WorkflowInstance.university_id == uni.id,
-                WorkflowInstance.template_id == template.id,
-            )
-        ).scalar_one_or_none()
-
-        if existing is None and dry_run:
-            stats.created["workflow_instances"] += 1
-            _say(dry_run, verbose, f"[CREATE] WorkflowInstance: {uni_name} (would create)")
-            _say(dry_run, verbose, f"[STAGE] {uni_name} -> {target_stage} (would transition)")
-            continue
-
-        if existing is None:
-            create_instance(
-                session,
-                university_id=uni.id,
-                template_id=template.id,
-                program_id=programs[prog_name].id,
-                product_id=None,
-                responsible_id=(
-                    responsibles_by_uni[uni_name].id if uni_name in responsibles_by_uni else None
-                ),
-                actor_sub=SYSTEM_SUB,
-            )
-            instance = session.execute(
-                select(WorkflowInstance).where(
-                    WorkflowInstance.university_id == uni.id,
-                    WorkflowInstance.template_id == template.id,
-                )
-            ).scalar_one()
-            stats.created["workflow_instances"] += 1
-            _say(dry_run, verbose, f"[CREATE] WorkflowInstance: {uni_name}")
-        else:
-            instance = existing
-            stats.existing["workflow_instances"] += 1
-            _say(dry_run, verbose, f"[FOUND] WorkflowInstance: {uni_name}")
-
-        # Advance to the target stage step by step (all demo stages are
-        # required, so only adjacent moves are legal). Never move backwards
-        # and never move an instance that already reached (or passed) target.
-        stages = ordered_stages(instance.id, session)
-        by_index = {s.order_index: s for s in stages}
-        target = next((s for s in stages if s.name == target_stage), None)
-        if target is None:
-            _say(dry_run, verbose, f"[WARN] target stage missing: {target_stage}", always=True)
-            continue
-        current = next((s for s in stages if s.id == instance.current_instance_stage_id), None)
-        if current is None:
-            _say(dry_run, verbose, f"[WARN] instance has no current stage: {uni_name}", always=True)
-            continue
-        while current.order_index < target.order_index:
-            nxt = by_index[current.order_index + 1]
-            if dry_run:
-                _say(dry_run, verbose, f"[STAGE] {uni_name} -> {nxt.name} (would transition)")
-                current = nxt
-                continue
-            transition_instance(
-                session,
-                instance.id,
-                nxt.id,
-                f"Demo seed: переход на этап «{nxt.name}»",
-                SYSTEM_SUB,
-            )
-            stats.transitions += 1
-            _say(dry_run, verbose, f"[STAGE] {uni_name} -> {nxt.name}")
-            instance = session.get(WorkflowInstance, instance.id)
-            stages = ordered_stages(instance.id, session)
-            by_index = {s.order_index: s for s in stages}
-            current = next((s for s in stages if s.id == instance.current_instance_stage_id), None)
-        if current.order_index == target.order_index:
-            _say(dry_run, verbose, f"[FOUND] Stage: {uni_name} on «{target_stage}»")
-
-
-# ---------------------------------------------------------------------------
-# Entry points
-# ---------------------------------------------------------------------------
-
-
 def run_seed(session: Session, *, dry_run: bool = False, verbose: bool = False) -> SeedStats:
     """Execute the full idempotent demo seed on an open session.
 
@@ -690,7 +556,6 @@ def run_seed(session: Session, *, dry_run: bool = False, verbose: bool = False) 
     _seed_contracts_licenses(
         session, stats, dry_run, verbose, unis["universities"], catalog["products"]
     )
-    template = _seed_template(session, stats, dry_run, verbose)
 
     responsibles_by_uni = {
         uni_name: unis["responsibles"][email]
@@ -729,10 +594,6 @@ def run_seed(session: Session, *, dry_run: bool = False, verbose: bool = False) 
         always=True,
     )
 
-    _seed_workflow_instances(
-        session, stats, dry_run, verbose, template,
-        unis["universities"], catalog["programs"], responsibles_by_uni,
-    )
     return stats
 
 

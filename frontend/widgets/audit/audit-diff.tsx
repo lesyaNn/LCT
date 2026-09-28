@@ -37,6 +37,10 @@ function toAuditEvent(event: AuditDiffSource): AuditEvent {
   };
 }
 
+export function hasAuditDiff(event: AuditDiffSource): boolean {
+  return summarizeAuditEvent(toAuditEvent(event)).changes.length > 0;
+}
+
 export function AuditDiff({ event, showTechnical = true }: { event: AuditDiffSource; showTechnical?: boolean }) {
   const summary = summarizeAuditEvent(toAuditEvent(event));
   const hasValues = event.oldValues !== undefined || event.newValues !== undefined;

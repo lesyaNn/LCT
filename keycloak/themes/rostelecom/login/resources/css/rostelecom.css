@@ -330,3 +330,13 @@ html.login-pf,
   .pf-v5-c-button.pf-m-primary, #kc-login { min-height: 54px; font-size: 17px; }
   .pf-v5-c-login__main::after { margin-top: 32px; font-size: 12px; }
 }
+
+.rtk-demo-login { margin-top: 12px; }
+.rtk-demo-button { background: #fff; border: 1px solid var(--rtk-purple); border-radius: 12px; color: var(--rtk-purple); cursor: pointer; font-size: 17px; font-weight: 700; min-height: 54px; width: 100%; }
+.rtk-demo-button:hover { background: #f6efff; }
+.rtk-demo-button:focus-visible, .rtk-demo-roles button:focus-visible { outline: 3px solid var(--rtk-purple); outline-offset: 2px; }
+.rtk-demo-roles { border: 1px solid #e8e4ef; border-radius: 12px; margin-top: 12px; padding: 12px; }
+.rtk-demo-roles[hidden] { display: none; }
+.rtk-demo-roles p { color: var(--rtk-muted); font-size: 13px; margin: 0 0 8px; }
+.rtk-demo-roles button { background: #faf9fd; border: 1px solid #e8e4ef; border-radius: 8px; color: var(--rtk-ink); cursor: pointer; display: block; font-size: 14px; margin-top: 6px; min-height: 42px; text-align: left; width: 100%; }
+.rtk-demo-roles button:hover { background: #f6efff; border-color: var(--rtk-purple); }
