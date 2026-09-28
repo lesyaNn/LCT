@@ -70,6 +70,7 @@ class WorkflowCommentRead(BaseModel):
     instance_id: uuid.UUID
     stage_id: uuid.UUID | None = None
     author_keycloak_sub: str
+    author_name: str | None = None
     content: str
     is_internal: bool = True
     created_at: datetime

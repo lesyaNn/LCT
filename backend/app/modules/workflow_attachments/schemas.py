@@ -21,5 +21,6 @@ class AttachmentRead(BaseModel):
     mime_type: str
     file_size: int
     uploaded_by_keycloak_sub: str
+    uploaded_by_name: str | None = None
     created_at: datetime
     updated_at: datetime

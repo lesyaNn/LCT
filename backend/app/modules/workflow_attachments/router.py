@@ -18,6 +18,7 @@ from app.core.security import CurrentUser
 from app.db.session import get_db
 from app.modules.audit.service import get_audit_db
 from app.modules.workflow_attachments import service
+from app.modules.audit.workflow_actor_names import workflow_actor_names
 from app.modules.workflow_attachments.policy import (
     UPLOAD_CHUNK_SIZE_BYTES,
     content_disposition,
@@ -82,8 +83,9 @@ def list_attachments(
     instance = service.get_instance_or_404(db, instance_id)
     service.authorize_scope(user, instance)
     rows, total = service.list_attachments(db, instance.id, page=page, page_size=page_size)
+    names = workflow_actor_names(db, "document", [row.id for row in rows])
     return PaginatedResponse(
-        items=[AttachmentRead.model_validate(r) for r in rows],
+        items=[AttachmentRead.model_validate(r).model_copy(update={"uploaded_by_name": names.get(r.id)}) for r in rows],
         page=page,
         page_size=page_size,
         total=total,

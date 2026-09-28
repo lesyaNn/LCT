@@ -73,8 +73,9 @@
 .stageButton { align-items: start; background: transparent; border: 1px solid transparent; border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-primary); cursor: pointer; display: grid; gap: var(--rtk-space-3); grid-template-columns: 36px minmax(0, 1fr); padding: var(--rtk-space-3); position: relative; text-align: left; width: 100%; z-index: 1; }
 .stageButton:hover { background: var(--rtk-color-surface-hover); }
 .stageButton:focus-visible { border-color: var(--rtk-color-brand); outline: 2px solid var(--rtk-color-brand); outline-offset: 1px; }
-.stageItemSelected .stageButton { background: var(--rtk-color-surface-subtle); border-left: 3px solid var(--rtk-color-brand-secondary); }
+.stageItemSelected .stageButton { background: var(--rtk-color-surface-subtle); border-left: 3px solid var(--rtk-color-border); }
 .stageButtonCurrent { border-left: 3px solid var(--rtk-color-brand-secondary); }
+.stageItemSelected .stageButtonCurrent { background: var(--rtk-color-brand-secondary-soft); border-left-color: var(--rtk-color-brand-secondary); }
 .stageButtonError { border-left: 3px solid var(--atmr-error-on-container); }
 .stageItemMuted .stageButton { color: var(--rtk-color-text-secondary); }
 .stageMarker { align-items: center; background: var(--rtk-color-surface-subtle); border: 1px solid var(--rtk-color-border); border-radius: 50%; color: var(--rtk-color-text-secondary); display: inline-flex; height: 36px; justify-content: center; width: 36px; }
@@ -100,7 +101,12 @@
 .dueSoon { color: var(--atmr-warning-on-container) !important; font-weight: 650; }
 .stageSummary { align-items: center; color: var(--rtk-color-text-tertiary); display: flex; flex-wrap: wrap; font-size: 10px; gap: var(--rtk-space-3); }
 .stageSummary > span { align-items: center; display: inline-flex; gap: 4px; }
+.stageSummary > [data-empty='true'] { opacity: .65; }
 .stageSummary svg { color: var(--rtk-color-text-secondary); }
+.globalResources { composes: surface from '../../shared/ui/rtk/section-surface.module.css'; }
+.globalResources > .historyDisclosure { border: 0; }
+.globalResources > .historyDisclosure > summary { padding: 0; }
+.globalResourcesContent { display: flex; flex-direction: column; gap: var(--rtk-space-4); padding-top: var(--rtk-space-4); }
 .detailPanel { display: flex; flex-direction: column; gap: var(--rtk-space-5); }
 .detailHeader h2 { font-size: 24px; max-width: 500px; overflow-wrap: anywhere; }
 .detail-overdue { border-top: 2px solid var(--atmr-error-on-container); }

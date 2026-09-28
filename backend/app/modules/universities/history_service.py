@@ -4,9 +4,13 @@ from __future__ import annotations
 
 import uuid
 
+from sqlalchemy import select
+
+from app.models.workflow_instances import WorkflowAttachment, WorkflowInstance
 from app.modules.audit.presentation import actor_display_name, summarize_event
 from app.modules.audit.resolver import resolve_names
 from app.modules.audit.service import AuditService
+from app.modules.workflow_attachments.storage import StorageBackend
 
 
 _ENTITIES = frozenset({
@@ -66,8 +70,23 @@ def present_history_event(event, names: dict[str, str], university_name: str | N
     }
 
 
-def university_history(db, university_id: uuid.UUID) -> list[dict]:
+def university_history(db, university_id: uuid.UUID, storage: StorageBackend) -> list[dict]:
     events = AuditService(db).recent_for_university(university_id, limit=100)
     names = resolve_names(db, events)
     university_name = names.get(str(university_id).lower())
-    return [item for event in events if (item := present_history_event(event, names, university_name)) is not None]
+    items = [item for event in events if (item := present_history_event(event, names, university_name)) is not None]
+    attachment_ids = [uuid.UUID(item["attachment"]["attachment_id"]) for item in items if item["attachment"]]
+    if not attachment_ids:
+        return items
+    rows = db.execute(
+        select(WorkflowAttachment, WorkflowInstance.university_id)
+        .join(WorkflowInstance, WorkflowInstance.id == WorkflowAttachment.instance_id)
+        .where(WorkflowAttachment.id.in_(attachment_ids))
+    ).all()
+    persisted = {
+        str(attachment.id): str(attachment.instance_id)
+        for attachment, owner_university_id in rows
+        if owner_university_id == university_id and storage.exists(attachment.storage_key)
+    }
+    return [item for item in items if not item["attachment"] or
+            persisted.get(item["attachment"]["attachment_id"]) == item["attachment"]["instance_id"]]

@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from app.core.permissions import require_permission
 from app.core.security import CurrentUser
 from app.modules.audit.service import get_audit_db
+from app.modules.audit.workflow_actor_names import workflow_actor_names
 from app.modules.workflow_instances import service as instance_service
 from app.modules.workflow_attachments.router import get_storage
 from app.modules.workflow_attachments.storage import StorageBackend
@@ -160,8 +161,9 @@ def list_comments(
     instance = service.get_instance_or_404(db, instance_id)
     instance_service.authorize_scope(user, instance)
     rows, total = service.list_comment_page(db, instance_id, page=page, page_size=page_size)
+    names = workflow_actor_names(db, "workflow_comment", [row.id for row in rows])
     return PaginatedResponse(
-        items=[WorkflowCommentRead.model_validate(r) for r in rows],
+        items=[WorkflowCommentRead.model_validate(r).model_copy(update={"author_name": names.get(r.id)}) for r in rows],
         page=page,
         page_size=page_size,
         total=total,

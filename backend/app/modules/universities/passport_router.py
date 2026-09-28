@@ -24,6 +24,8 @@ from app.modules.universities.passport_service import (
     parse_include,
 )
 from app.modules.universities.history_service import university_history
+from app.modules.workflow_attachments.router import get_storage
+from app.modules.workflow_attachments.storage import StorageBackend
 
 router = APIRouter(prefix="/universities", tags=["universities-passport"])
 
@@ -32,10 +34,11 @@ router = APIRouter(prefix="/universities", tags=["universities-passport"])
 def get_university_history(
     university_id: uuid.UUID,
     db: Session = Depends(get_db),
+    storage: StorageBackend = Depends(get_storage),
     user: CurrentUser = Depends(require_permission("university.read")),
 ) -> list[dict]:
     ensure_university_access(university_id, user)
-    return university_history(db, university_id)
+    return university_history(db, university_id, storage)
 
 
 @router.get(

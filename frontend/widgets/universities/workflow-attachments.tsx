@@ -139,7 +139,7 @@ export function WorkflowAttachments({ instanceId, stageId, attachments, readOnly
   const [error, setError] = useState<string | null>(null);
   const images = useMemo(() => attachments.filter((attachment) => isWorkflowImageAttachment(attachment.mimeType, attachment.fileName) && attachment.previewUrl), [attachments]);
   const handleUploadSuccess = useCallback((record: Parameters<typeof workflowAttachmentFromApi>[0]) => {
-    if (isRealWorkflowMode()) void queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowAttachments(instanceId) });
+    if (isRealWorkflowMode()) void queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowHistory(instanceId) });
     else addWorkflowAttachmentToCache(queryClient, instanceId, stageId, workflowAttachmentFromApi(record, user));
   }, [instanceId, queryClient, stageId, user]);
   const queue = useAttachmentUploadQueue({ instanceId, onSuccess: handleUploadSuccess, onServerError: (normalized: NormalizedApiError) => onNotify?.({ intent: 'error', title: 'Ошибка загрузки', message: normalized.message }) });
@@ -151,7 +151,7 @@ export function WorkflowAttachments({ instanceId, stageId, attachments, readOnly
   const remove = useMutation({
     mutationFn: (attachment: UniversityWorkflowAttachment) => deleteWorkflowAttachment(instanceId, attachment.id),
     onSuccess: (_data, attachment) => {
-      if (isRealWorkflowMode()) void queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowAttachments(instanceId) });
+      if (isRealWorkflowMode()) void queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowHistory(instanceId) });
       else removeWorkflowAttachmentFromCache(queryClient, instanceId, stageId, attachment.id);
       setDeleteCandidate(null);
       setSelectedImage(null);

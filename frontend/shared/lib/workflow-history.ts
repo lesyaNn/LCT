@@ -41,6 +41,22 @@ export async function loadWorkflowHistory(instanceId: string): Promise<{ transit
   return { transitions, comments, attachments, activity };
 }
 
+export function countWorkflowStageResources(source: Awaited<ReturnType<typeof loadWorkflowHistory>>): Map<string, { comments: number; attachments: number }> {
+  const counts = new Map<string, { comments: number; attachments: number }>();
+  const commentStages = new Map(source.comments.map((comment) => [comment.id, comment.stage_id]));
+  const forStage = (stageId: string) => {
+    const count = counts.get(stageId) ?? { comments: 0, attachments: 0 };
+    counts.set(stageId, count);
+    return count;
+  };
+  for (const comment of source.comments) if (comment.stage_id) forStage(comment.stage_id).comments += 1;
+  for (const attachment of source.attachments) {
+    const stageId = attachment.comment_id ? commentStages.get(attachment.comment_id) : attachment.stage_id;
+    if (stageId) forStage(stageId).attachments += 1;
+  }
+  return counts;
+}
+
 export function buildWorkflowHistory(
   source: Awaited<ReturnType<typeof loadWorkflowHistory>>,
   stages: UniversityWorkflowStage[],
@@ -55,17 +71,17 @@ export function buildWorkflowHistory(
   }));
   const comments: WorkflowHistoryEvent[] = source.comments.map((event) => ({
     id: `comment:${event.id}`, stageId: event.stage_id, kind: 'comment', occurredAt: event.created_at,
-    actorId: event.author_keycloak_sub, stageName: stageName(event.stage_id),
+    actorId: event.author_keycloak_sub, actorName: event.author_name ?? undefined, stageName: stageName(event.stage_id),
     title: workflowHistoryPresentation.comment.label, text: event.content,
-    attachments: event.attachments ?? source.attachments.filter((attachment) => attachment.comment_id === event.id),
+    attachments: source.attachments.filter((attachment) => attachment.comment_id === event.id),
   }));
   const attachments: WorkflowHistoryEvent[] = source.attachments.filter((event) => !event.comment_id).map((event) => ({
     id: `attachment:${event.id}`, stageId: event.stage_id, kind: 'attachment', occurredAt: event.created_at,
-    actorId: event.uploaded_by_keycloak_sub, stageName: stageName(event.stage_id),
+    actorId: event.uploaded_by_keycloak_sub, actorName: event.uploaded_by_name ?? undefined, stageName: stageName(event.stage_id),
     title: workflowHistoryPresentation.attachment.label, attachments: [event],
   }));
   const activity: WorkflowHistoryEvent[] = source.activity.map((event) => ({
-    id: `activity:${event.id}`, kind: event.type, occurredAt: event.created_at,
+    id: `activity:${event.id}`, stageId: event.stage_id, kind: event.type, occurredAt: event.created_at,
     actorId: '', actorName: event.actor_name, stageName: event.stage_name,
     title: event.title, attachments: [],
   }));

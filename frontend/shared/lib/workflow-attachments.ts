@@ -102,6 +102,7 @@ export interface WorkflowAttachmentApiRecord {
   mime_type: string;
   file_size: number;
   uploaded_by_keycloak_sub: string;
+  uploaded_by_name?: string | null;
   created_at: string;
   updated_at: string;
 }

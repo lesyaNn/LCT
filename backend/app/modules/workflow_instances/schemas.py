@@ -35,6 +35,7 @@ class WorkflowActivityRead(BaseModel):
     type: Literal["responsible_changed", "deadline_changed"]
     created_at: datetime
     actor_name: str
+    stage_id: uuid.UUID | None = None
     stage_name: str
     title: str
 

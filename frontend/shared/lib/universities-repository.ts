@@ -442,6 +442,8 @@ export interface UniversityWorkflowStage {
   tasks: UniversityWorkflowTask[];
   taskTotal?: number;
   taskCompleted?: number;
+  commentTotal?: number | null;
+  attachmentTotal?: number | null;
   transitions: UniversityWorkflowTransition[];
 }
 
@@ -480,6 +482,7 @@ export interface WorkflowCommentApiRecord {
   instance_id: string;
   stage_id: string | null;
   author_keycloak_sub: string;
+  author_name?: string | null;
   content: string;
   is_internal: boolean;
   created_at: string;
@@ -625,9 +628,9 @@ export async function listWorkflowInstancePage(page: number, pageSize = 100): Pr
 }
 
 export interface WorkflowTaskApiRecord { id: string; instance_id: string; stage_id: string | null; title: string; status: string; responsible_id: string | null; deadline: string | null; completed_at: string | null }
-export interface WorkflowAttachmentApiRecord { id: string; instance_id: string; stage_id: string | null; comment_id?: string | null; original_filename: string; mime_type: string; file_size: number; uploaded_by_keycloak_sub: string; created_at: string; updated_at: string }
+export interface WorkflowAttachmentApiRecord { id: string; instance_id: string; stage_id: string | null; comment_id?: string | null; original_filename: string; mime_type: string; file_size: number; uploaded_by_keycloak_sub: string; uploaded_by_name?: string | null; created_at: string; updated_at: string }
 export interface WorkflowTransitionApiRecord { id: string; instance_id: string; from_stage_id: string | null; to_stage_id: string | null; actor_keycloak_sub: string; comment: string; created_at: string }
-export interface WorkflowActivityApiRecord { id: string; type: 'responsible_changed' | 'deadline_changed'; created_at: string; actor_name: string; stage_name: string; title: string }
+export interface WorkflowActivityApiRecord { id: string; type: 'responsible_changed' | 'deadline_changed'; created_at: string; actor_name: string; stage_id?: string | null; stage_name: string; title: string }
 export interface WorkflowAllowedApiRecord { id: string; name: string; order_index: number }
 
 export async function listWorkflowTasksPage(instanceId: string, page: number): Promise<WorkflowPage<WorkflowTaskApiRecord>> {

@@ -53,6 +53,7 @@ def list_workflow_activity(db: Session, instance_id: uuid.UUID) -> list[Workflow
 
     instance = get_instance_or_404(db, instance_id)
     stage_names = {str(stage.id): stage.name for stage in instance.instance_stages}
+    stage_names.update({str(stage.template_stage_id): stage.name for stage in instance.instance_stages if stage.template_stage_id})
     rows = db.scalars(
         select(AuditEvent)
         .where(AuditEvent.entity_type == "workflow_instance",
@@ -94,16 +95,18 @@ def list_workflow_activity(db: Session, instance_id: uuid.UUID) -> list[Workflow
             kind = "responsible_changed"
             title = f"{responsible_name(old.get('responsible_id'))} → {responsible_name(new.get('responsible_id'))}"
             stage_name = "Весь Workflow"
+            stage_id = None
         elif "due_date" in new and old.get("due_date") != new.get("due_date"):
             kind = "deadline_changed"
             title = f"{date_label(old.get('due_date'))} → {date_label(new.get('due_date'))}"
             stage_name = stage_names.get(str(new.get("stage_id")), "Этап Workflow")
+            stage_id = uuid.UUID(str(new["stage_id"])) if str(new.get("stage_id")) in stage_names else None
         else:
             continue
         events.append(WorkflowActivityRead(
             id=row.id, type=kind, created_at=row.created_at,
             actor_name=("Системное действие" if is_uuid_like(row.user_name) else actor_display_name(row.user_name, row.user_id)),
-            stage_name=stage_name, title=title,
+            stage_id=stage_id, stage_name=stage_name, title=title,
         ))
     return events
 
