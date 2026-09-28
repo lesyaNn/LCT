@@ -6,20 +6,20 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Attachment from '@atomaro/icons/24/action/Attachment';
+import ArrowRight from '@atomaro/icons/24/navigation/ArrowRight';
 import CheckLarge from '@atomaro/icons/24/navigation/CheckLarge';
 import Comments from '@atomaro/icons/24/communication/Comments';
 import ErrorStroke from '@atomaro/icons/24/alert/ErrorStroke';
 import History from '@atomaro/icons/24/communication/History';
 import InformationStroke from '@atomaro/icons/24/alert/InformationStroke';
 import SkipStroke from '@atomaro/icons/24/alert/SkipStroke';
-import Task from '@atomaro/icons/24/communication/Task';
 import TimeStroke from '@atomaro/icons/24/alert/TimeStroke';
 import { useAuth } from '@/shared/auth/AuthProvider';
 import { hasPermission, hasRole } from '@/shared/lib/access-control';
 import type { WorkflowTransitionTarget } from '@/shared/lib/workflow-transition';
 import { formatDateRu, formatDateTimeRu, getRelativeDueDateRu } from '@/shared/lib/formatters';
 import { workflowStageStatusSemantics, type WorkflowStageIcon } from '@/shared/lib/status-semantics';
-import { getApiUniversityWorkflow, getUniversityResponsibles, getUniversityWorkflow, getWorkflowAllowedTransitions, getWorkflowRollbackTargets, isRealWorkflowMode, listWorkflowTasksPage, listWorkflowAttachmentsPage, universityResponsiblesQueryKey, updateWorkflowResponsible, updateWorkflowStageDueDate, workflowQueryKey, type UniversityWorkflow, type UniversityWorkflowAttachment, type UniversityWorkflowStage, type UniversityWorkflowStageStatus, type UniversityWorkflowTask } from '@/shared/lib/universities-repository';
+import { getApiUniversityWorkflow, getUniversityResponsibles, getUniversityWorkflow, getWorkflowAllowedTransitions, getWorkflowRollbackTargets, isRealWorkflowMode, listWorkflowAttachmentsPage, universityResponsiblesQueryKey, updateWorkflowResponsible, updateWorkflowStageDueDate, workflowQueryKey, type UniversityWorkflow, type UniversityWorkflowAttachment, type UniversityWorkflowStage, type UniversityWorkflowStageStatus } from '@/shared/lib/universities-repository';
 import { queryKeys } from '@/shared/lib/query-keys';
 import { workflowAttachmentFromApi } from '@/shared/lib/workflow-attachments';
 import { buildMockWorkflowHistory, buildWorkflowHistory, loadWorkflowHistory, workflowHistoryPresentation, type WorkflowHistoryEvent } from '@/shared/lib/workflow-history';
@@ -96,14 +96,11 @@ function StageAssignee({ stage }: { stage: UniversityWorkflowStage }) {
 }
 
 function StageSummary({ stage }: { stage: UniversityWorkflowStage }) {
-  const completedTasks = stage.taskCompleted ?? stage.tasks.filter((task) => task.completed).length;
-  const totalTasks = stage.taskTotal ?? stage.tasks.length;
   const items = [
     { key: 'comments', icon: Comments, label: 'Комментарии', value: String(stage.comments.length) },
     { key: 'attachments', icon: Attachment, label: 'Вложения', value: String(stage.attachments.length) },
-    { key: 'tasks', icon: Task, label: 'Задачи', value: `${completedTasks}/${totalTasks}` },
   ];
-  if (!stage.comments.length && !stage.attachments.length && !totalTasks) return null;
+  if (!stage.comments.length && !stage.attachments.length) return null;
   return <div className={styles.stageSummary} aria-label="Сводка этапа">{items.map(({ key, icon: Icon, label, value }) => <span key={key}><Icon size={14} fill="currentColor" /><span>{label} {value}</span></span>)}</div>;
 }
 
@@ -159,30 +156,34 @@ type WorkflowResourceState = { loading: boolean; error: boolean; retry: () => vo
 
 const historyIcons = { transition: History, comment: Comments, attachment: Attachment, responsible_changed: History, deadline_changed: History };
 
-function WorkflowHistorySection({ idPrefix, instanceId, events, userId, userName, state }: { idPrefix: string; instanceId: string; events: WorkflowHistoryEvent[]; userId?: string; userName?: string; state?: WorkflowResourceState }) {
-  return <section className={styles.detailSection} aria-labelledby={`${idPrefix}-transition-title`}><div className={styles.detailSectionHeading}><h3 id={`${idPrefix}-transition-title`}><History size={18} fill="currentColor" />История Workflow</h3></div>{state?.loading ? <ListSkeleton items={2} /> : state?.error ? <ErrorState title="Не удалось загрузить историю" headingLevel={3} onRetry={state.retry} /> : events.length ? <ol className={styles.transitionList}>{events.map((event) => {
-    const presentation = workflowHistoryPresentation[event.kind];
-    const Icon = historyIcons[presentation.icon];
-    const actor = event.actorName ?? (event.actorId === userId ? userName : undefined);
-    return <li className={`${styles.historyEvent} ${styles[`history${event.kind}`]}`} key={event.id}><div className={styles.historyHeading}><Icon size={18} fill="currentColor" /><strong>{presentation.label}</strong><time dateTime={event.occurredAt}>{formatDateTimeRu(event.occurredAt)}</time></div><div className={styles.historyContent}><span className={styles.historyStage}>{event.stageName}</span>{event.kind === 'transition' || event.kind === 'responsible_changed' || event.kind === 'deadline_changed' ? <strong>{event.title}</strong> : null}{actor ? <span className={styles.historyActor}>{actor}</span> : null}{event.text ? <p>{event.text}</p> : null}{event.attachments.length ? <ul className={styles.historyFiles}>{event.attachments.map((record) => <AttachmentRow key={record.id} attachment={workflowAttachmentFromApi(record, null)} instanceId={instanceId} canDelete={false} compact onOpen={() => undefined} onDelete={() => undefined} />)}</ul> : null}</div></li>;
-  })}</ol> : <EmptyState title="Событий пока нет" description="История появится после первого действия." headingLevel={3} />}</section>;
+function WorkflowHistorySection({ idPrefix, instanceId, events, stages, userId, userName, state }: { idPrefix: string; instanceId: string; events: WorkflowHistoryEvent[]; stages: UniversityWorkflowStage[]; userId?: string; userName?: string; state?: WorkflowResourceState }) {
+  const names = [...new Set([...stages.map((stage) => stage.name), ...events.map((event) => event.stageName)])];
+  const currentName = stages.find((stage) => stage.status === 'current' || stage.status === 'overdue')?.name;
+  const orderedNames = [...names].sort((left, right) => Number(right === currentName) - Number(left === currentName));
+  return <section className={styles.detailSection} aria-labelledby={`${idPrefix}-transition-title`}><details className={styles.historyDisclosure}><summary id={`${idPrefix}-transition-title`}><History size={18} fill="currentColor" /><strong>История Workflow</strong><span>{events.length} событий</span></summary><div className={styles.historyGroups}>{state?.loading ? <ListSkeleton items={2} /> : state?.error ? <ErrorState title="Не удалось загрузить историю" headingLevel={3} onRetry={state.retry} /> : events.length ? orderedNames.map((name) => {
+    const group = events.filter((event) => event.stageName === name);
+    if (!group.length) return null;
+    const stage = stages.find((item) => item.name === name);
+    return <details className={styles.historyDisclosure} key={name}><summary><strong>{name}</strong><span>{name === currentName ? 'Текущий этап' : stage?.status === 'completed' ? 'Завершённый этап' : 'Этап'} · {group.length} событий</span></summary><ol className={styles.transitionList}>{group.map((event) => {
+      const presentation = workflowHistoryPresentation[event.kind];
+      const Icon = historyIcons[presentation.icon];
+      const actor = event.actorName ?? (event.actorId === userId ? userName : undefined);
+      return <li className={`${styles.historyEvent} ${styles[`history${event.kind}`]}`} key={event.id}><div className={styles.historyHeading}><Icon size={18} fill="currentColor" /><strong>{presentation.label}</strong><time dateTime={event.occurredAt}>{formatDateTimeRu(event.occurredAt)}</time></div><div className={styles.historyContent}>{event.kind === 'transition' || event.kind === 'responsible_changed' || event.kind === 'deadline_changed' ? <strong>{event.title}</strong> : null}{actor ? <span className={styles.historyActor}>{actor}</span> : null}{event.text ? <p>{event.text}</p> : null}{event.attachments.length ? <ul className={styles.historyFiles}>{event.attachments.map((record) => <AttachmentRow key={record.id} attachment={workflowAttachmentFromApi(record, null)} instanceId={instanceId} canDelete={false} compact onOpen={() => undefined} onDelete={() => undefined} />)}</ul> : null}</div></li>;
+    })}</ol></details>;
+  }) : <EmptyState title="Событий пока нет" description="История появится после первого действия." headingLevel={3} />}</div></details></section>;
 }
 
-function WorkflowStageDetails({ stage, stages, workflow, instanceId, universityId, userId, canManage, idPrefix, onTransitionOpen, onTransitionClose, onTransitionSuccess, onNotify, tasksState, attachmentsState, historyState, historyEvents, historyActorName, allowedTargets, rollbackTargets }: { stage: UniversityWorkflowStage; stages: UniversityWorkflowStage[]; workflow: UniversityWorkflow; instanceId: string; universityId?: string | null; userId?: string | null; canManage: boolean; idPrefix: string; onTransitionOpen: () => void; onTransitionClose: () => void; onTransitionSuccess: () => void; onNotify: (notification: WorkflowTransitionNotification) => void; tasksState?: WorkflowResourceState; attachmentsState?: WorkflowResourceState; historyState?: WorkflowResourceState; historyEvents: WorkflowHistoryEvent[]; historyActorName?: string; allowedTargets?: WorkflowTransitionTarget[]; rollbackTargets?: WorkflowTransitionTarget[] }) {
+function WorkflowStageDetails({ stage, stages, workflow, instanceId, universityId, userId, canManage, idPrefix, onTransitionOpen, onTransitionClose, onTransitionSuccess, onNotify, attachmentsState, historyState, historyEvents, historyActorName, allowedTargets, rollbackTargets }: { stage: UniversityWorkflowStage; stages: UniversityWorkflowStage[]; workflow: UniversityWorkflow; instanceId: string; universityId?: string | null; userId?: string | null; canManage: boolean; idPrefix: string; onTransitionOpen: () => void; onTransitionClose: () => void; onTransitionSuccess: () => void; onNotify: (notification: WorkflowTransitionNotification) => void; attachmentsState?: WorkflowResourceState; historyState?: WorkflowResourceState; historyEvents: WorkflowHistoryEvent[]; historyActorName?: string; allowedTargets?: WorkflowTransitionTarget[]; rollbackTargets?: WorkflowTransitionTarget[] }) {
   const semantics = workflowStageStatusSemantics[stage.status];
-  const completedTasks = stage.taskCompleted ?? stage.tasks.filter((task) => task.completed).length;
-  const totalTasks = stage.taskTotal ?? stage.tasks.length;
-  const taskProgress = totalTasks ? Math.round((completedTasks / totalTasks) * 100) : 0;
   const headingId = `${idPrefix}-stage-details-title`;
   return (
     <section className={`${styles.detailPanel} ${styles[`detail-${stage.status}`]}`} aria-labelledby={headingId} id={idPrefix}>
       <div className={styles.detailHeader}><div><h2 id={headingId}>{stage.name}</h2></div><StatusBadge intent={semantics.intent} icon={<StageStatusIcon status={stage.status} />}>{semantics.label}</StatusBadge></div>
       <CompletionSummary stage={stage} />
       <section className={styles.detailSection} aria-labelledby={`${idPrefix}-overview-title`}><div className={styles.detailSectionHeading}><h3 id={`${idPrefix}-overview-title`}><InformationStroke size={18} fill="currentColor" />Основная информация</h3></div><dl className={styles.detailFacts}><div><dt>{stage.status === 'completed' ? 'Дедлайн был' : 'Дедлайн'}</dt><dd className={stage.status === 'overdue' ? styles.overdue : undefined}><WorkflowDeadlineField instanceId={instanceId} stage={stage} canManage={canManage && workflow.currentStage?.id === stage.id && isRealWorkflowMode()} onNotify={onNotify} /></dd></div>{stage.startedAt ? <div><dt>Начат</dt><dd><time dateTime={stage.startedAt}>{formatDateTimeRu(stage.startedAt)}</time></dd></div> : null}{stage.completedAt && stage.status !== 'completed' ? <div><dt>Завершён</dt><dd><time dateTime={stage.completedAt}>{formatDateTimeRu(stage.completedAt)}</time></dd></div> : null}<div><dt>Ответственный Workflow</dt><dd><WorkflowResponsibleField instanceId={instanceId} workflow={workflow} canManage={canManage && workflow.currentStage?.id === stage.id && isRealWorkflowMode()} onNotify={onNotify} /></dd></div></dl></section>
-      <section className={styles.detailSection} aria-labelledby={`${idPrefix}-tasks-title`}><div className={styles.detailSectionHeading}><h3 id={`${idPrefix}-tasks-title`}><Task size={18} fill="currentColor" />Задачи этапа</h3><span className={styles.taskCount}>Выполнено {completedTasks} из {totalTasks}</span></div>{tasksState?.loading ? <ListSkeleton items={3} /> : tasksState?.error ? <ErrorState title="Не удалось загрузить задачи" headingLevel={3} onRetry={tasksState.retry} /> : <><div className={styles.taskProgress} role="progressbar" aria-label={`Задачи этапа: выполнено ${completedTasks} из ${totalTasks}`} aria-valuemin={0} aria-valuemax={totalTasks} aria-valuenow={completedTasks}><span style={{ width: `${taskProgress}%` }} /></div><ul className={styles.taskList}>{stage.tasks.map((task) => <li key={task.id}><label><input type="checkbox" checked={task.completed} disabled readOnly /><span className={task.completed ? styles.taskCompleted : undefined}>{task.label}</span></label></li>)}</ul>{tasksState?.hasMore ? <Button variant="ghost" size="s" type="button" loading={tasksState.loadingMore} onClick={tasksState.loadMore}>Загрузить ещё задачи</Button> : null}</>}</section>
       <WorkflowComments instanceId={instanceId} stageId={stage.templateStageId ?? stage.id} comments={stage.comments} readOnly={stage.status !== 'current' && stage.status !== 'overdue'} onNotify={onNotify} />
       {attachmentsState?.loading ? <ListSkeleton items={2} /> : attachmentsState?.error ? <ErrorState title="Не удалось загрузить вложения" headingLevel={3} onRetry={attachmentsState.retry} /> : stage.attachments.length ? <><WorkflowAttachments instanceId={instanceId} stageId={stage.id} attachments={stage.attachments} uploadEnabled={false} readOnly={stage.status !== 'current' && stage.status !== 'overdue'} onNotify={onNotify} />{attachmentsState?.hasMore ? <Button variant="ghost" size="s" type="button" loading={attachmentsState.loadingMore} onClick={attachmentsState.loadMore}>Загрузить ещё вложения</Button> : null}</> : null}
-      <WorkflowHistorySection idPrefix={idPrefix} instanceId={instanceId} events={historyEvents} userId={userId ?? undefined} userName={historyActorName} state={historyState} />
+      <WorkflowHistorySection idPrefix={idPrefix} instanceId={instanceId} events={historyEvents} stages={stages} userId={userId ?? undefined} userName={historyActorName} state={historyState} />
       <StageActionPanel stage={stage} stages={stages} instanceId={instanceId} universityId={universityId} userId={userId} canManage={canManage} allowedTargets={allowedTargets} rollbackTargets={rollbackTargets} onTransitionOpen={onTransitionOpen} onTransitionClose={onTransitionClose} onTransitionSuccess={onTransitionSuccess} onNotify={onNotify} />
     </section>
   );
@@ -252,12 +253,11 @@ function WorkflowSkeleton({ mode }: { mode: WorkflowViewMode }) {
   return <SkeletonGroup label="Загрузка Workflow">{mode === 'page' ? <><Skeleton variant="text" width="220px" /><Skeleton variant="text" width="min(72%, 520px)" height={36} /><Skeleton height={96} /></> : null}<div className={styles.skeletonLayout}><ListSkeleton items={6} withAvatar /><Skeleton height={520} /></div></SkeletonGroup>;
 }
 
-function WorkflowGlobalResources({ instanceId, tasks, attachments, readOnly }: { instanceId: string; tasks: UniversityWorkflowTask[]; attachments: UniversityWorkflowAttachment[]; readOnly: boolean }) {
-  if (!tasks.length && !attachments.length) return null;
+function WorkflowGlobalResources({ instanceId, attachments, readOnly }: { instanceId: string; attachments: UniversityWorkflowAttachment[]; readOnly: boolean }) {
+  if (!attachments.length) return null;
   return <section className={styles.detailSection} aria-label="Общие материалы Workflow">
     <h2>Общие материалы Workflow</h2>
-    {tasks.length ? <><h3>Задачи без привязки к этапу</h3><ul className={styles.taskList}>{tasks.map((task) => <li key={task.id}><label><input type="checkbox" checked={task.completed} disabled readOnly /><span className={task.completed ? styles.taskCompleted : undefined}>{task.label}</span></label></li>)}</ul></> : null}
-    {attachments.length ? <WorkflowAttachments instanceId={instanceId} stageId="general" attachments={attachments} uploadEnabled={false} readOnly={readOnly} /> : null}
+    <WorkflowAttachments instanceId={instanceId} stageId="general" attachments={attachments} uploadEnabled={false} readOnly={readOnly} />
   </section>;
 }
 
@@ -265,7 +265,6 @@ export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride 
   const { user } = useAuth();
   const realWorkflow = isRealWorkflowMode();
   const query = useQuery({ queryKey: workflowQueryKey(instanceId), queryFn: () => getUniversityWorkflow(instanceId), staleTime: 30_000 });
-  const tasksQuery = useInfiniteQuery({ queryKey: queryKeys.universities.workflowTasks(instanceId), queryFn: ({ pageParam }) => listWorkflowTasksPage(instanceId, pageParam), initialPageParam: 1, getNextPageParam: (last) => last.page * last.page_size < last.total ? last.page + 1 : undefined, enabled: realWorkflow && Boolean(query.data), staleTime: 30_000 });
   const attachmentsQuery = useInfiniteQuery({ queryKey: queryKeys.universities.workflowAttachments(instanceId), queryFn: ({ pageParam }) => listWorkflowAttachmentsPage(instanceId, pageParam), initialPageParam: 1, getNextPageParam: (last) => last.page * last.page_size < last.total ? last.page + 1 : undefined, enabled: realWorkflow && Boolean(query.data), staleTime: 30_000 });
   const historyQuery = useQuery({ queryKey: queryKeys.universities.workflowHistory(instanceId), queryFn: () => loadWorkflowHistory(instanceId), enabled: realWorkflow && Boolean(query.data), staleTime: 30_000 });
   const allowedQuery = useQuery({ queryKey: queryKeys.universities.workflowAllowed(instanceId), queryFn: () => getWorkflowAllowedTransitions(instanceId), enabled: realWorkflow && Boolean(query.data), staleTime: 30_000 });
@@ -282,15 +281,13 @@ export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride 
   }, [notification]);
   const stages = useMemo(() => query.data?.stages.map((stage) => realWorkflow ? {
     ...stage,
-    tasks: (tasksQuery.data?.pages.flatMap((page) => page.items) ?? []).filter((task) => task.stage_id === stage.templateStageId).map((task) => ({ id: task.id, label: task.title, completed: task.status === 'done' })),
     attachments: (attachmentsQuery.data?.pages.flatMap((page) => page.items) ?? []).filter((attachment) => !attachment.comment_id && attachment.stage_id === stage.templateStageId).map((attachment) => workflowAttachmentFromApi(attachment, null)),
-  } : stage).sort((left, right) => left.orderIndex - right.orderIndex) ?? [], [query.data, realWorkflow, tasksQuery.data, attachmentsQuery.data]);
+  } : stage).sort((left, right) => left.orderIndex - right.orderIndex) ?? [], [query.data, realWorkflow, attachmentsQuery.data]);
   const historyEvents = useMemo(() => realWorkflow ? historyQuery.data ? buildWorkflowHistory(historyQuery.data, stages) : [] : buildMockWorkflowHistory(stages), [historyQuery.data, realWorkflow, stages]);
   const selectedStage = useMemo(() => {
     if (!stages.length) return null;
     return stages.find((stage) => stage.id === selectedId) ?? stages.find((stage) => stage.id === query.data?.currentStage?.id) ?? stages[0];
   }, [query.data?.currentStage, selectedId, stages]);
-  const commonTasks = useMemo(() => (tasksQuery.data?.pages.flatMap((page) => page.items) ?? []).filter((task) => !task.stage_id).map((task) => ({ id: task.id, label: task.title, completed: task.status === 'done' })), [tasksQuery.data]);
   const commonAttachments = useMemo(() => (attachmentsQuery.data?.pages.flatMap((page) => page.items) ?? []).filter((attachment) => !attachment.stage_id && !attachment.comment_id).map((attachment) => workflowAttachmentFromApi(attachment, null)), [attachmentsQuery.data]);
   const idPrefix = `workflow-${instanceId.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
   const detailsId = `${idPrefix}-details`;
@@ -306,9 +303,9 @@ export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride 
         <div className={styles.panelHeading}><div><h2 id={`${idPrefix}-stages-title`}>Этапы Workflow</h2></div><span className={styles.totalLabel}>{stages.length} этапов</span></div>
         <ol className={styles.stageList}>{stages.map((stage) => <WorkflowStageItem key={stage.id} stage={stage} selected={stage.id === selectedStage.id} detailsId={detailsId} onSelect={() => setSelectedId(stage.id)} />)}</ol>
       </section>
-      <WorkflowStageDetails key={selectedStage.id} stage={selectedStage} stages={stages} workflow={query.data} instanceId={instanceId} universityId={query.data.universityId} userId={user?.id} canManage={canManage} idPrefix={detailsId} onTransitionOpen={() => setSelectedId(selectedStage.id)} onTransitionClose={() => setSelectedId(null)} onTransitionSuccess={() => setSelectedId(null)} onNotify={setNotification} tasksState={realWorkflow ? { loading: tasksQuery.isPending, error: tasksQuery.isError && !tasksQuery.data, retry: () => void tasksQuery.refetch(), hasMore: tasksQuery.hasNextPage, loadingMore: tasksQuery.isFetchingNextPage, loadMore: () => void tasksQuery.fetchNextPage() } : undefined} attachmentsState={realWorkflow ? { loading: attachmentsQuery.isPending, error: attachmentsQuery.isError && !attachmentsQuery.data, retry: () => void attachmentsQuery.refetch(), hasMore: attachmentsQuery.hasNextPage, loadingMore: attachmentsQuery.isFetchingNextPage, loadMore: () => void attachmentsQuery.fetchNextPage() } : undefined} historyState={realWorkflow ? { loading: historyQuery.isPending, error: historyQuery.isError && !historyQuery.data, retry: () => void historyQuery.refetch() } : undefined} historyEvents={historyEvents} historyActorName={user?.name} allowedTargets={allowedTargets} rollbackTargets={rollbackTargets} />
+      <WorkflowStageDetails key={selectedStage.id} stage={selectedStage} stages={stages} workflow={query.data} instanceId={instanceId} universityId={query.data.universityId} userId={user?.id} canManage={canManage} idPrefix={detailsId} onTransitionOpen={() => setSelectedId(selectedStage.id)} onTransitionClose={() => setSelectedId(null)} onTransitionSuccess={() => setSelectedId(null)} onNotify={setNotification} attachmentsState={realWorkflow ? { loading: attachmentsQuery.isPending, error: attachmentsQuery.isError && !attachmentsQuery.data, retry: () => void attachmentsQuery.refetch(), hasMore: attachmentsQuery.hasNextPage, loadingMore: attachmentsQuery.isFetchingNextPage, loadMore: () => void attachmentsQuery.fetchNextPage() } : undefined} historyState={realWorkflow ? { loading: historyQuery.isPending, error: historyQuery.isError && !historyQuery.data, retry: () => void historyQuery.refetch() } : undefined} historyEvents={historyEvents} historyActorName={user?.name} allowedTargets={allowedTargets} rollbackTargets={rollbackTargets} />
     </div>
-    {realWorkflow ? <WorkflowGlobalResources instanceId={instanceId} tasks={commonTasks} attachments={commonAttachments} readOnly={!canManage || !query.data.currentStage || query.data.currentStage.status === 'completed'} /> : null}
+    {realWorkflow ? <WorkflowGlobalResources instanceId={instanceId} attachments={commonAttachments} readOnly={!canManage || !query.data.currentStage || query.data.currentStage.status === 'completed'} /> : null}
     {notification ? <div className={styles.toastViewport}><Toast intent={notification.intent} title={notification.title} message={notification.message} onClose={() => setNotification(null)} /></div> : null}
   </div>;
 }
@@ -378,10 +375,10 @@ function RealUniversityWorkflow({ id }: { id: string; canAdvance: boolean }) {
   return <div className={styles.programWorkflow}>
     <div className={styles.instancesHeader}>
       <div>
-        <h2>Воркфлоу вуза</h2>
-        <p>{instances.length ? `Всего: ${instances.length}` : 'Процессы появятся после создания первого воркфлоу.'}</p>
+        <h2>Workflow вуза</h2>
+        <p>{instances.length ? `Всего: ${instances.length}` : 'Процессы появятся после создания первого Workflow.'}</p>
       </div>
-      {canCreate ? <Button variant="primary" size="s" type="button" onClick={() => setCreateOpen(true)}>Создать воркфлоу</Button> : null}
+      {canCreate ? <Button variant="primary" size="s" type="button" onClick={() => setCreateOpen(true)}>Создать Workflow</Button> : null}
     </div>
     {instances.length ? (
       <ol className={styles.instanceList}>
@@ -389,20 +386,19 @@ function RealUniversityWorkflow({ id }: { id: string; canAdvance: boolean }) {
           <li key={item.id} className={styles.instanceItem}>
             <Link className={styles.instanceButton} href={`/workflows/${item.id}`}>
               <strong>{item.program_name || 'Без программы'}</strong>
-              <span className={styles.instanceMeta}>
-                {item.product_name ? <span>{item.product_name}</span> : null}
-                <span>{instanceStatusLabel(item.status)}</span>
-                {item.due_date ? <span>Дедлайн: {formatDateRu(item.due_date)}</span> : null}
-                {item.is_overdue ? <span>Просрочен</span> : null}
-              </span>
+              {(() => {
+                const current = item.stages.find((stage) => stage.id === item.current_instance_stage_id || stage.template_stage_id === item.current_stage_id) ?? item.stages.find((stage) => stage.status === 'current');
+                const completed = item.stages.filter((stage) => stage.status === 'completed').length;
+                return <><span className={styles.instanceStage}>{current ? <>Текущий этап: <b>{current.name}</b></> : 'Этап завершён'}</span><span className={styles.instanceMeta}><span>{completed} из {item.stages.length} этапов</span><StatusBadge intent={item.is_overdue ? 'danger' : item.status === 'completed' ? 'success' : 'info'}>{item.is_overdue ? 'Просрочен' : instanceStatusLabel(item.status)}</StatusBadge></span><span className={styles.instanceProgress} role="progressbar" aria-label="Прогресс Workflow" aria-valuemin={0} aria-valuemax={item.stages.length} aria-valuenow={completed}><span style={{ width: `${item.stages.length ? completed / item.stages.length * 100 : 0}%` }} /></span><span className={styles.instanceFacts}>Ответственный: {item.responsible_name || 'Не назначен'}{item.due_date ? ` · Дедлайн: ${formatDateRu(item.due_date)}` : ''}</span><span className={styles.instanceOpen}>Открыть Workflow <ArrowRight size={16} fill="currentColor" /></span></>;
+              })()}
             </Link>
           </li>
         ))}
       </ol>
     ) : (
       <EmptyState
-        title="Воркфлоу ещё не созданы"
-        description="Создайте первый воркфлоу: выберите направление, программу обучения и продукт."
+        title="Workflow ещё не созданы"
+        description="Создайте первый Workflow: выберите направление, программу обучения и продукт."
       />
     )}
     {createOpen ? (

@@ -131,8 +131,8 @@ export function WorkflowCreateModal({ universityId, onClose, onCreated }: {
   const canSubmit = Boolean(activeDirectionId && activeProgramId && activeTemplateId) && !create.isPending;
 
   return (
-    <Modal title="Создание воркфлоу" onClose={onClose} size="m">
-      {bootstrapping ? <SkeletonGroup label="Загрузка данных для создания воркфлоу"><Skeleton height={220} /></SkeletonGroup> : (
+    <Modal title="Создание Workflow" onClose={onClose} size="m">
+      {bootstrapping ? <SkeletonGroup label="Загрузка данных для создания Workflow"><Skeleton height={220} /></SkeletonGroup> : (
         <form
           className={styles.form}
           onSubmit={(event) => {
@@ -203,7 +203,7 @@ export function WorkflowCreateModal({ universityId, onClose, onCreated }: {
           </label>
 
           <label className={styles.field}>
-            <span>Шаблон воркфлоу</span>
+            <span>Шаблон Workflow</span>
             <Select value={activeTemplateId} onChange={(event) => setTemplateId(event.target.value)}>
               <option value="">Выберите шаблон</option>
               {templateOptions.map((template) => (
@@ -213,7 +213,7 @@ export function WorkflowCreateModal({ universityId, onClose, onCreated }: {
               ))}
             </Select>
             {templatesQuery.isError ? <em>Не удалось загрузить шаблоны.</em> : null}
-            {templatesQuery.isSuccess && !templateOptions.length ? <em>Нет активного шаблона воркфлоу.</em> : null}
+            {templatesQuery.isSuccess && !templateOptions.length ? <em>Нет активного шаблона Workflow.</em> : null}
           </label>
 
           {serverError ? <p role="alert" className={styles.error}>{serverError}</p> : null}
@@ -223,7 +223,7 @@ export function WorkflowCreateModal({ universityId, onClose, onCreated }: {
               Отмена
             </Button>
             <Button type="submit" variant="primary" size="s" loading={create.isPending} disabled={!canSubmit}>
-              Создать воркфлоу
+              Создать Workflow
             </Button>
           </div>
         </form>

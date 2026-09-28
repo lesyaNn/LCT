@@ -147,7 +147,7 @@ export async function listUniversityWorkflowInstances(
         `/api/v1/workflow/instances?university_id=${encodeURIComponent(universityId)}&page=1&page_size=100`,
         { signal },
       );
-      if (!result.ok) return fail(result.status, result.body, result.error, 'Не удалось загрузить воркфлоу вуза.');
+      if (!result.ok) return fail(result.status, result.body, result.error, 'Не удалось загрузить Workflow вуза.');
       const first = result.data;
       const pages = Math.ceil(first.total / first.page_size);
       if (pages <= 1) return first.items;
@@ -157,7 +157,7 @@ export async function listUniversityWorkflowInstances(
             `/api/v1/workflow/instances?university_id=${encodeURIComponent(universityId)}&page=${page}&page_size=100`,
             { signal },
           );
-          if (!pageResult.ok) return fail(pageResult.status, pageResult.body, pageResult.error, 'Не удалось загрузить воркфлоу вуза.');
+          if (!pageResult.ok) return fail(pageResult.status, pageResult.body, pageResult.error, 'Не удалось загрузить Workflow вуза.');
           return pageResult.data.items;
         }),
       );
