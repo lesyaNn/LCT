@@ -55,16 +55,6 @@
   outline: none;
 }
 
-.programStatus {
-  align-items: center;
-  border-radius: 999px;
-  display: inline-flex;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
 .tableScroll { overflow-x: auto; }
 .table { composes: table from '../../shared/ui/rtk/data-table.module.css'; min-width: 1030px; table-layout: fixed; }
 .table th { white-space: normal; }
@@ -79,10 +69,9 @@
 .sortButton { composes: sortButton from '../../shared/ui/rtk/data-table.module.css'; }
 .universityLink { color: var(--rtk-color-text-primary); display: block; font-weight: 700; line-height: 1.35; text-decoration: none; }
 .universityLink:hover { color: var(--rtk-color-brand); text-decoration: underline; }
-.programsCell { display: flex; flex-direction: column; gap: 5px; }
-.programsCell > strong { color: var(--rtk-color-text-primary); font-size: 16px; }
-.programStatuses { display: flex; flex-wrap: wrap; gap: 4px; }
-.programStatus { background: var(--rtk-color-surface-subtle); color: var(--rtk-color-text-secondary); padding: 3px 5px; }
+.programCount { color: var(--rtk-color-text-primary); font-size: 16px; }
+.stageCell { display: block; min-width: 0; max-width: 100%; }
+.stageCell > span { align-items: flex-start; max-width: 100%; overflow-wrap: anywhere; white-space: normal; }
 .healthCell { align-items: flex-start; display: flex; flex-direction: column; gap: 5px; }
 .healthCell > strong { color: var(--rtk-color-text-primary); font-size: 16px; }
 .attention { color: var(--rtk-color-danger); display: inline-flex; }

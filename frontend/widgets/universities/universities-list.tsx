@@ -34,7 +34,6 @@ import {
 } from '@/shared/lib/universities-repository';
 import {
   getUniversities,
-  programStatusLabels,
   UNIVERSITY_LIST_CAPABILITIES,
   universityFilterOptions,
   universitiesListQueryKey,
@@ -222,27 +221,12 @@ function formatFullDate(isoDate: string): string {
 
 function StageBadge({ item }: { item: UniversityListItem }) {
   if (item.availability?.stage === false) return <span>—</span>;
-  return <SemanticStatusBadge intent={item.currentStage.tone}>{item.currentStage.name}</SemanticStatusBadge>;
+  return <span className={styles.stageCell}><SemanticStatusBadge intent={item.currentStage.tone}>{item.currentStage.name}</SemanticStatusBadge></span>;
 }
 
 function ProgramsCell({ item }: { item: UniversityListItem }) {
   if (item.availability?.programs === false) return <span>—</span>;
-  const statuses = Object.entries(item.programStatusCounts).filter(([, count]) => count);
-
-  return (
-    <div className={styles.programsCell}>
-      <strong>{item.programsCount}</strong>
-      {statuses.length ? (
-        <div className={styles.programStatuses}>
-          {statuses.slice(0, 3).map(([status, count]) => (
-            <span className={styles.programStatus} key={status} title={programStatusLabels[status as keyof typeof programStatusLabels]}>
-              {programStatusLabels[status as keyof typeof programStatusLabels].slice(0, 3)} {count}
-            </span>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
+  return <strong className={styles.programCount}>{item.programsCount}</strong>;
 }
 
 function AttentionIndicator({ active }: { active: boolean }) {
