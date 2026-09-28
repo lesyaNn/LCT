@@ -30,32 +30,35 @@ export interface DocsSnapshot {
   articles: DocsArticle[];
 }
 
-/** The four top-level sections are the stable content contract for P5 docs. */
+/** Navigation order for the existing Markdown documentation loader. */
 export const DOC_SECTION_DEFINITIONS: Array<{ id: string; title: string; topics: DocsTopicDefinition[] }> = [
-  {
-    id: 'user-guide',
-    title: 'Руководство пользователя',
-    topics: [
-      { slug: 'getting-started', title: 'Начало работы' },
-      { slug: 'universities', title: 'Работа с ВУЗами' },
-      { slug: 'workflow', title: 'Workflow' },
-      { slug: 'documents', title: 'Загрузка документов' },
-      { slug: 'reports', title: 'Отчёты' },
-    ],
-  },
-  {
-    id: 'admin-guide',
-    title: 'Руководство администратора',
-    topics: [
-      { slug: 'users', title: 'Пользователи' },
-      { slug: 'workflow-templates', title: 'Workflow-шаблоны' },
-      { slug: 'catalogs', title: 'Каталоги' },
-      { slug: 'roles', title: 'Роли и права' },
-      { slug: 'import', title: 'Импорт' },
-    ],
-  },
-  { id: 'faq', title: 'FAQ', topics: [] },
-  { id: 'roles', title: 'Роли и права', topics: [] },
+  { id: 'user-guide', title: 'Руководство пользователя', topics: [
+    { slug: 'getting-started', title: 'Начало работы' },
+    { slug: 'overview', title: 'Обзор' },
+    { slug: 'universities', title: 'Вузы' },
+    { slug: 'passport', title: 'Паспорт вуза' },
+    { slug: 'programs-products', title: 'Программы и продукты' },
+    { slug: 'workflow', title: 'Workflow' },
+    { slug: 'comments-files', title: 'Комментарии и файлы' },
+    { slug: 'documents', title: 'Документы и лицензии' },
+    { slug: 'reports', title: 'Отчёты' },
+    { slug: 'history', title: 'История изменений' },
+  ] },
+  { id: 'admin-guide', title: 'Для администратора', topics: [
+    { slug: 'catalogs', title: 'Управление каталогами' },
+    { slug: 'users', title: 'Пользователи и права' },
+    { slug: 'workflow-templates', title: 'Шаблоны Workflow' },
+    { slug: 'import', title: 'Импорт справочников' },
+  ] },
+  { id: 'roles', title: 'Доступ и роли', topics: [
+    { slug: 'user', title: 'Пользователь' },
+    { slug: 'manager', title: 'Руководитель' },
+    { slug: 'admin', title: 'Администратор' },
+  ] },
+  { id: 'help', title: 'Помощь', topics: [{ slug: 'faq', title: 'Частые вопросы' }] },
+  { id: 'system', title: 'Системному администратору', topics: [
+    { slug: 'operations', title: 'Запуск и обслуживание' },
+  ] },
 ];
 
 const contentRoots = [
