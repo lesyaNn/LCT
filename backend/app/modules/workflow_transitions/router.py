@@ -15,13 +15,15 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.permissions import require_permission
 from app.core.security import CurrentUser
 from app.modules.audit.service import get_audit_db
 from app.modules.workflow_instances import service as instance_service
+from app.modules.workflow_attachments.router import get_storage
+from app.modules.workflow_attachments.storage import StorageBackend
 from app.modules.workflow_instances.schemas import AllowedTransitionRead, InstanceDetail
 from app.modules.workflow_transitions import service
 from app.modules.workflow_transitions.schemas import (
@@ -37,6 +39,30 @@ router = APIRouter(prefix="/workflow", tags=["Workflow"])
 
 READ = require_permission("workflow.read")
 WRITE = require_permission("workflow.change_status")
+
+
+@router.post(
+    "/instances/{instance_id}/comments/with-attachments",
+    response_model=WorkflowCommentRead,
+    status_code=201,
+    summary="Create a comment and its attachments atomically",
+)
+def add_comment_with_attachments(
+    instance_id: uuid.UUID,
+    content: str = Form(..., min_length=1, max_length=10000),
+    stage_id: uuid.UUID | None = Form(None),
+    files: list[UploadFile] = File(..., min_length=1, max_length=10),
+    db: Session = Depends(get_audit_db),
+    storage: StorageBackend = Depends(get_storage),
+    user: CurrentUser = Depends(WRITE),
+) -> WorkflowCommentRead:
+    instance = service.get_instance_or_404(db, instance_id)
+    instance_service.authorize_scope(user, instance)
+    comment = service.add_comment_with_files(
+        db, storage, instance_id,
+        WorkflowCommentCreate(content=content, stage_id=stage_id), files, user.id,
+    )
+    return WorkflowCommentRead.model_validate(comment)
 
 
 @router.post(

@@ -113,6 +113,7 @@ def _audit_attachment_event(db: Session, *, action: str, attachment: WorkflowAtt
     snapshot = {
         "audit_object_type": "workflow_attachment",
         "instance_id": str(attachment.instance_id),
+        "comment_id": str(attachment.comment_id) if attachment.comment_id else None,
         "original_filename": attachment.original_filename,
         "file_size": attachment.file_size,
         "mime_type": attachment.mime_type,
@@ -153,6 +154,29 @@ def upload_attachment(
     actor_sub: str,
 ) -> WorkflowAttachment:
     """Stream an upload to storage, then record canonical metadata."""
+    attachment = stage_attachment(
+        db, storage, instance_id=instance_id, filename=filename,
+        content_type=content_type, stream=stream, actor_sub=actor_sub,
+    )
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        try:
+            storage.delete(attachment.storage_key)
+        except StorageError:
+            logger.exception("attachment storage cleanup failed", extra={"key": attachment.storage_key})
+        raise
+    db.refresh(attachment)
+    return attachment
+
+
+def stage_attachment(
+    db: Session, storage: StorageBackend, *, instance_id: uuid.UUID,
+    filename: str | None, content_type: str | None, stream: BinaryIO,
+    actor_sub: str, comment_id: uuid.UUID | None = None,
+) -> WorkflowAttachment:
+    """Store one object and stage its metadata in the caller's transaction."""
     instance = get_instance_or_404(db, instance_id)
     safe_name = sanitize_filename(filename)
     mime = check_file_type(safe_name, content_type)
@@ -165,6 +189,7 @@ def upload_attachment(
         raise BusinessException(ErrorCode.INTERNAL_ERROR) from exc
     attachment = WorkflowAttachment(
         instance_id=instance.id,
+        comment_id=comment_id,
         original_filename=safe_name,
         storage_key=key,
         file_size=size,
@@ -179,7 +204,6 @@ def upload_attachment(
             db, action="CREATE", attachment=attachment,
             university_id=instance.university_id,
         )
-        db.commit()
     except Exception:
         db.rollback()
         try:
@@ -187,7 +211,6 @@ def upload_attachment(
         except StorageError:
             logger.exception("attachment storage cleanup failed", extra={"key": key})
         raise
-    db.refresh(attachment)
     return attachment
 
 

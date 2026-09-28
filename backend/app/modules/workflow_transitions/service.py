@@ -441,6 +441,50 @@ def add_comment(
     return comment
 
 
+def add_comment_with_files(
+    db: Session, storage, instance_id: uuid.UUID, data: WorkflowCommentCreate,
+    files, actor: str,
+) -> WorkflowComment:
+    """Create a comment and its files in one DB transaction; remove objects on failure."""
+    from app.modules.workflow_attachments import service as attachment_service
+    from app.modules.workflow_attachments.storage import StorageError
+
+    instance = get_instance_or_404(db, instance_id)
+    if data.stage_id is not None:
+        stage = db.get(WorkflowStage, data.stage_id)
+        if stage is None or stage.template_id != instance.template_id:
+            raise NotFound("Workflow stage not found")
+    content = (data.content or "").strip()
+    if not content:
+        raise BadTransition("Comment content is required")
+    comment = WorkflowComment(
+        instance_id=instance_id, stage_id=data.stage_id,
+        author_keycloak_sub=actor, content=content, is_internal=True,
+    )
+    keys: list[str] = []
+    try:
+        db.add(comment)
+        db.flush()
+        for file in files:
+            attachment = attachment_service.stage_attachment(
+                db, storage, instance_id=instance_id, filename=file.filename,
+                content_type=file.content_type, stream=file.file, actor_sub=actor,
+                comment_id=comment.id,
+            )
+            keys.append(attachment.storage_key)
+        db.commit()
+    except Exception:
+        db.rollback()
+        for key in keys:
+            try:
+                storage.delete(key)
+            except StorageError:
+                logging.getLogger(__name__).exception("comment attachment cleanup failed", extra={"key": key})
+        raise
+    db.refresh(comment)
+    return comment
+
+
 def edit_comment(
     db: Session,
     comment_id: uuid.UUID,

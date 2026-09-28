@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime
 
 from pydantic import BaseModel, Field
+from app.modules.workflow_attachments.schemas import AttachmentRead
 
 
 class TransitionRequest(BaseModel):
@@ -73,5 +74,6 @@ class WorkflowCommentRead(BaseModel):
     is_internal: bool = True
     created_at: datetime
     updated_at: datetime
+    attachments: list[AttachmentRead] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}

@@ -226,6 +226,7 @@ class WorkflowComment(UUIDPKMixin, TimestampMixin, Base):
     is_internal: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     instance: Mapped["WorkflowInstance"] = relationship(back_populates="comments")
+    attachments: Mapped[list["WorkflowAttachment"]] = relationship(back_populates="comment")
 
 
 class WorkflowAttachment(UUIDPKMixin, TimestampMixin, Base):
@@ -255,6 +256,12 @@ class WorkflowAttachment(UUIDPKMixin, TimestampMixin, Base):
         nullable=True,
         default=None,
     )
+    comment_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("workflow_comments.id", name="fk_workflow_attachments_comment_id_workflow_comments", ondelete="SET NULL"),
+        nullable=True,
+        default=None,
+        index=True,
+    )
     original_filename: Mapped[str] = mapped_column(String(512), nullable=False)
     storage_key: Mapped[str] = mapped_column(String(1024), nullable=False)
     file_size: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -262,6 +269,7 @@ class WorkflowAttachment(UUIDPKMixin, TimestampMixin, Base):
     uploaded_by_keycloak_sub: Mapped[str] = mapped_column(String(256), nullable=False)
 
     instance: Mapped["WorkflowInstance"] = relationship(back_populates="attachments")
+    comment: Mapped["WorkflowComment | None"] = relationship(back_populates="attachments")
 
 
 class WorkflowTask(UUIDPKMixin, TimestampMixin, Base):

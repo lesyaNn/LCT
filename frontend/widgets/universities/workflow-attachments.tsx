@@ -53,7 +53,7 @@ const uploadStatus: Record<WorkflowUploadStatus, { label: string; intent: Semant
   cancelled: { label: 'Отменён', intent: 'neutral' },
 };
 
-function AttachmentTypeIcon({ mimeType, fileName }: { mimeType?: string; fileName: string }) {
+export function AttachmentTypeIcon({ mimeType, fileName }: { mimeType?: string; fileName: string }) {
   const Icon = attachmentIcons[getWorkflowAttachmentCategory(mimeType, fileName)];
   return <Icon size={20} fill="currentColor" />;
 }
@@ -74,7 +74,7 @@ function AttachmentThumbnail({ attachment, onOpen }: { attachment: UniversityWor
   return <button className={styles.thumbnailButton} type="button" aria-label={`Открыть изображение ${attachment.fileName}`} onClick={onOpen}><Image src={attachment.previewUrl} alt="" width={96} height={96} unoptimized /></button>;
 }
 
-function AttachmentRow({ attachment, instanceId, canDelete, onOpen, onDelete }: { attachment: UniversityWorkflowAttachment; instanceId: string; canDelete: boolean; onOpen: () => void; onDelete: (attachment: UniversityWorkflowAttachment) => void }) {
+export function AttachmentRow({ attachment, instanceId, canDelete, onOpen, onDelete }: { attachment: UniversityWorkflowAttachment; instanceId: string; canDelete: boolean; onOpen: () => void; onDelete: (attachment: UniversityWorkflowAttachment) => void }) {
   const [downloadError, setDownloadError] = useState('');
   const [downloading, setDownloading] = useState(false);
   const downloadUrl = attachment.downloadUrl ?? workflowAttachmentDownloadUrl(instanceId, attachment.id);

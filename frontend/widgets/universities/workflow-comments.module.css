@@ -24,6 +24,14 @@
 .editorFooter { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); justify-content: space-between; }
 .counter, .integrationHint { color: var(--rtk-color-text-tertiary); font-size: 11px; }
 .editorActions { display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); }
+.filePicker { align-items: center; color: var(--rtk-color-brand); cursor: pointer; display: inline-flex; gap: var(--rtk-space-2); width: fit-content; }
+.filePicker input { height: 1px; opacity: 0; position: absolute; width: 1px; }
+.filePicker:focus-within { outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
+.selectedFiles, .commentFiles { list-style: none; margin: 0; padding: 0; }
+.selectedFiles { display: flex; flex-direction: column; gap: var(--rtk-space-2); }
+.selectedFiles li { align-items: center; background: var(--rtk-color-surface-subtle); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); display: flex; gap: var(--rtk-space-2); padding: var(--rtk-space-2); }
+.selectedFiles li span { flex: 1; font-size: 12px; min-width: 0; overflow-wrap: anywhere; }
+.commentFiles { margin: var(--rtk-space-2) 0 0 40px; }
 .integrationHint, .validationError { margin: 0; }
 .validationError { color: var(--atmr-error-on-container); font-size: 12px; }
 .empty { color: var(--rtk-color-text-tertiary); font-size: 12px; margin: 0; }

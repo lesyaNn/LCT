@@ -1,5 +1,5 @@
 import { programStatusLabels, type ProgramStatus } from './dashboard-repository';
-import { apiDownload, apiFetch } from './api-client';
+import { apiDownload, apiFetch, apiUploadFormData } from './api-client';
 import { ApiRequestError } from './api-errors';
 import { fromDataSource, isMockDataSource, isMockDataSourceFor } from './data-source';
 import { queryKeys } from './query-keys';
@@ -391,6 +391,7 @@ export interface UniversityWorkflowComment {
   canEdit?: boolean;
   canDelete?: boolean;
   isOptimistic?: boolean;
+  attachments?: UniversityWorkflowAttachment[];
 }
 
 export interface UniversityWorkflowAttachment {
@@ -483,6 +484,7 @@ export interface WorkflowCommentApiRecord {
   is_internal: boolean;
   created_at: string;
   updated_at: string;
+  attachments?: import('./workflow-attachments').WorkflowAttachmentApiRecord[];
   /** Frontend-only marker used while a create mutation is in flight. */
   is_optimistic?: boolean;
 }
@@ -513,8 +515,24 @@ export async function listWorkflowCommentsPage(instanceId: string, page: number)
   return unwrapApiResult(await apiFetch<WorkflowPage<WorkflowCommentApiRecord>>(`/api/v1/workflow/instances/${instanceId}/comments?page=${page}&page_size=100`));
 }
 
-export async function createWorkflowComment(instanceId: string, content: string, stageId?: string): Promise<WorkflowCommentApiRecord> {
+export async function createWorkflowComment(instanceId: string, content: string, stageId?: string, files: File[] = []): Promise<WorkflowCommentApiRecord> {
   if (!isWorkflowApiInstanceId(instanceId)) throw new Error('Добавление комментариев недоступно для этого Workflow-источника.');
+  if (files.length) {
+    if (!isRealWorkflowMode()) throw new WorkflowApiError(0, 'Загрузка файлов доступна только при подключённом backend.');
+    const { validateWorkflowUploadFile } = await import('./workflow-attachments');
+    if (files.length > 10) throw new WorkflowApiError(0, 'Можно прикрепить не более 10 файлов.');
+    for (const file of files) {
+      const validation = validateWorkflowUploadFile(file);
+      if (!validation.valid) throw new WorkflowApiError(0, validation.message);
+    }
+    const body = new FormData();
+    body.append('content', content);
+    if (stageId) body.append('stage_id', stageId);
+    for (const file of files) body.append('files', file, file.name);
+    const result = await apiUploadFormData<WorkflowCommentApiRecord>(`/api/v1/workflow/instances/${instanceId}/comments/with-attachments`, body);
+    if (!result.ok) throw new WorkflowApiError(result.status, 'Не удалось сохранить комментарий с файлами.', result.body, result.error);
+    return result.data;
+  }
   return fromDataSource({
     mock: () => mockCreateWorkflowComment(instanceId, content, stageId),
     real: async () => unwrapApiResult(await apiFetch<WorkflowCommentApiRecord>(`/api/v1/workflow/instances/${instanceId}/comments`, { method: 'POST', body: { content, stage_id: stageId ?? null } })),

@@ -222,6 +222,21 @@ def _stored_files(storage_dir: Path) -> list[str]:
     return sorted(p.name for p in storage_dir.iterdir() if p.is_file())
 
 
+def test_comment_attachment_write_permission(auth_client, db):
+    graph = _seed_universe(db)
+    url = f"/api/v1/workflow/instances/{graph['ia'].id}/comments/with-attachments"
+    payload = {"content": "Разрешённое вложение"}
+    files = [("files", ("note.pdf", b"bytes", "application/pdf"))]
+    assert auth_client.post(url, data=payload, files=files).status_code == 401
+    assert auth_client.post(url, data=payload, files=files, headers=_auth(auth_client, ["user"])).status_code == 403
+    permitted = auth_client.post(
+        url, data=payload, files=files,
+        headers=_auth(auth_client, ["manager"], [str(graph['ua'].id)]),
+    )
+    assert permitted.status_code == 201, permitted.text
+    assert len(permitted.json()["attachments"]) == 1
+
+
 # ============================================================ pure-unit ==
 # These run everywhere (no database): policy, backend contract, S3 seam.
 

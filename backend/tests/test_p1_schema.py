@@ -433,8 +433,8 @@ def test_sql_migration_single_head_chain():
         assert m, f"bad migration filename: {fname}"
         (ups if m.group(2) == "up" else downs).add(m.group(1))
     assert ups == downs, f"unpaired migrations: up^down={ups ^ downs}"
-    assert sorted(ups)[-1] == "000034_report_templates_xls_format"
-    assert len(ups) == 34
+    assert sorted(ups)[-1] == "000035_comment_attachments"
+    assert len(ups) == 35
 
 
 @pytest.mark.skipif(

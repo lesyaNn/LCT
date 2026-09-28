@@ -15,6 +15,7 @@ class AttachmentRead(BaseModel):
 
     id: uuid.UUID
     instance_id: uuid.UUID
+    comment_id: uuid.UUID | None = None
     stage_id: uuid.UUID | None = None
     original_filename: str
     mime_type: str
