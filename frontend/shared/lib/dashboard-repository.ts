@@ -13,6 +13,8 @@ export interface DashboardOverview {
   launchedPrograms: number | null;
   websiteApplications7d: number | null;
   websiteSyncedAt: string | null;
+  lmsStudents: number | null;
+  lmsSyncedAt: string | null;
 }
 
 export type ProgramStatus = 'planned' | 'active' | 'launched' | 'archived';
@@ -80,6 +82,8 @@ const dashboardOverviewMock: DashboardOverview = {
   launchedPrograms: 7,
   websiteApplications7d: 38,
   websiteSyncedAt: '2026-09-24T08:45:00.000Z',
+  lmsStudents: null,
+  lmsSyncedAt: null,
 };
 
 type AnalyticsOverviewDto = {
@@ -110,6 +114,8 @@ function mapDashboardOverview(dto: AnalyticsOverviewDto): DashboardOverview {
     launchedPrograms: dto.kpi.launched_programs,
     websiteApplications7d: null,
     websiteSyncedAt: null,
+    lmsStudents: null,
+    lmsSyncedAt: null,
   };
 }
 

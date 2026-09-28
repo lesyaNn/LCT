@@ -261,9 +261,9 @@ export async function realCreateWorkflowFromExternal(
   };
 }
 
-export async function realGetExternalDashboardMetrics(): Promise<{ mode: 'real' | 'mock' | 'import'; websiteApplications7d: number | null; websiteSyncedAt: string | null }> {
-  const data = unwrap(await apiFetch<{ mode: 'real' | 'mock' | 'import'; website_applications_7d: number | null; website_synced_at: string | null }>('/api/v1/integrations/metrics'), 'Не удалось загрузить показатели интеграций.');
-  return { mode: data.mode, websiteApplications7d: data.website_applications_7d, websiteSyncedAt: data.website_synced_at };
+export async function realGetExternalDashboardMetrics(): Promise<{ mode: 'real' | 'mock' | 'import'; websiteApplications7d: number | null; websiteSyncedAt: string | null; lmsStudents: number | null; lmsSyncedAt: string | null }> {
+  const data = unwrap(await apiFetch<{ mode: 'real' | 'mock' | 'import'; website_applications_7d: number | null; website_synced_at: string | null; lms_students: number | null; lms_synced_at: string | null }>('/api/v1/integrations/metrics'), 'Не удалось загрузить показатели интеграций.');
+  return { mode: data.mode, websiteApplications7d: data.website_applications_7d, websiteSyncedAt: data.website_synced_at, lmsStudents: data.lms_students, lmsSyncedAt: data.lms_synced_at };
 }
 
 export async function realGetUniversityProducts(id: string, queryClient?: QueryClient): Promise<UniversityProductRow[]> {

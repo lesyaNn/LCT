@@ -816,6 +816,8 @@ export function mockGetExternalDashboardMetrics(): ExternalDashboardMetrics {
     mode: 'mock',
     websiteApplications7d: 38,
     websiteSyncedAt: mockExternalSyncAt,
+    lmsStudents: null,
+    lmsSyncedAt: null,
   };
 }
 

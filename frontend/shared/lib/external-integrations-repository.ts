@@ -57,6 +57,8 @@ export interface ExternalDashboardMetrics {
   mode: 'real' | 'mock' | 'import';
   websiteApplications7d: number | null;
   websiteSyncedAt: string | null;
+  lmsStudents: number | null;
+  lmsSyncedAt: string | null;
 }
 
 export const universityExternalDataQueryKey = (id: string, source: ExternalDataSource) =>

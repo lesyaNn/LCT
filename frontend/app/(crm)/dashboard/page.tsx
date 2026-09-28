@@ -4,6 +4,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import Education from '@atomaro/icons/24/culture/Education';
 import Book from '@atomaro/icons/24/culture/Book';
+import Group from '@atomaro/icons/24/business/Group';
 import Time from '@atomaro/icons/24/alert/TimeStroke';
 import DocumentText from '@atomaro/icons/24/document/DocumentText';
 import Checklist from '@atomaro/icons/24/action/Checklist';
@@ -37,6 +38,7 @@ interface KpiDefinition {
   ariaLabel?: string;
   value: (overview: DashboardOverview) => string;
   tooltip?: (overview: DashboardOverview) => string;
+  visible?: (overview: DashboardOverview) => boolean;
 }
 
 const kpiDefinitions: KpiDefinition[] = [
@@ -53,6 +55,15 @@ const kpiDefinitions: KpiDefinition[] = [
     ariaLabel: 'Открыть список ВУЗов с заявками с сайта',
     value: (overview) => formatCount(overview.websiteApplications7d),
     tooltip: (overview) => `Источник: сайт${overview.mode === 'mock' ? ' (тестовые данные)' : overview.mode === 'import' ? ' (данные импорта)' : ''}\nСинхронизировано: ${overview.websiteSyncedAt ? formatDateTimeRu(overview.websiteSyncedAt) : 'недоступно'}`,
+  },
+  {
+    title: 'Обучающиеся',
+    caption: 'по доступным агрегатам',
+    tone: 'brand',
+    icon: Group,
+    value: (overview) => formatCount(overview.lmsStudents),
+    visible: (overview) => overview.lmsStudents !== null,
+    tooltip: (overview) => `Источник: агрегаты LMS и ранее внесённые данные${overview.mode === 'mock' ? ' (тестовые данные)' : ''}\nСинхронизировано: ${overview.lmsSyncedAt ? formatDateTimeRu(overview.lmsSyncedAt) : 'недоступно'}`,
   },
 ];
 
@@ -89,7 +100,7 @@ export default function DashboardPage() {
       <section className={styles.section} aria-labelledby="dashboard-kpi-title" data-testid="dashboard-kpi">
         <div className={styles.sectionHeader}><h2 className={styles.sectionTitle} id="dashboard-kpi-title">Ключевые показатели</h2><div className={styles.refreshStatus} aria-live="polite">{overviewQuery.isFetching ? <span role="status">Обновляем показатели…</span> : null}{overviewQuery.isError ? <BackgroundRefreshNotice onRetry={() => void overviewQuery.refetch()} /> : null}</div></div>
         <div className={styles.grid}>
-          {kpiDefinitions.map((definition) => {
+          {kpiDefinitions.filter((definition) => definition.visible?.(data.overview) ?? true).map((definition) => {
             const card = <KpiCard
                 ariaLabel={definition.ariaLabel}
                 caption={definition.caption}
