@@ -10,12 +10,14 @@ from __future__ import annotations
 import enum
 import logging
 import uuid
+from pathlib import Path
 from collections import defaultdict
 from datetime import date, datetime, timezone
 
 from sqlalchemy import func, select
 
 from app.core.errors import BusinessException
+from app.config import settings
 from app.core.exceptions import NotFound
 from app.schemas.errors import ErrorCode
 from app.models.catalog import Contract, ITDirection, ITProgram, License, Responsible
@@ -414,6 +416,53 @@ def get_documents(db, university_id: uuid.UUID) -> list[DocumentShort]:
     ]
 
 
+def get_documents_page(
+    db, university_id: uuid.UUID, page: int, page_size: int,
+    *, search: str | None = None, document_type: str | None = None,
+    status: str | None = None,
+) -> tuple[list[DocumentShort], int, list[str]]:
+    base = Document.university_id == university_id
+    types = db.scalars(select(Document.document_type).where(base).distinct().order_by(Document.document_type)).all()
+    conditions = [base]
+    if search:
+        from app.modules.catalog.repository import like_pattern
+        pattern = like_pattern(search.strip())
+        conditions.append(Document.title.ilike(pattern, escape="\\") | Document.file_name.ilike(pattern, escape="\\"))
+    if document_type:
+        conditions.append(Document.document_type == document_type)
+    if status:
+        if status == "expired":
+            conditions.extend((Document.expires_at < date.today(), Document.status_raw != "archived"))
+        elif status == "signed":
+            conditions.extend((Document.status_raw == "signed", (Document.expires_at.is_(None) | (Document.expires_at >= date.today()))))
+        elif status == "pending":
+            conditions.extend((Document.status_raw.in_(("draft", "pending")), (Document.expires_at.is_(None) | (Document.expires_at >= date.today()))))
+        else:
+            conditions.append(Document.status_raw == status)
+    total = db.scalar(select(func.count(Document.id)).where(*conditions)) or 0
+    rows = db.scalars(
+        select(Document).where(*conditions)
+        .order_by(Document.created_at.desc(), Document.id.desc())
+        .offset((page - 1) * page_size).limit(page_size)
+    ).all()
+    return [DocumentShort(
+        id=row.id, document_type=row.document_type, title=row.title,
+        file_name=row.file_name, file_size=row.file_size,
+        file_available=bool(document_storage_path(row.file_path)),
+        mime_type=row.mime_type, signed_at=row.signed_at,
+        expires_at=row.expires_at, status=row.status_raw,
+        uploaded_by=row.uploaded_by_keycloak_sub,
+        created_at=_ensure_tz(row.created_at),
+    ) for row in rows], total, list(types)
+
+
+def document_storage_path(file_path: str) -> Path | None:
+    root = Path(settings.storage_root).resolve()
+    stored = Path(file_path)
+    path = (stored if stored.is_absolute() else root / stored).resolve()
+    return path if path.is_relative_to(root) and path.is_file() else None
+
+
 def get_meetings(db, university_id: uuid.UUID) -> list[MeetingShort]:
     rows = (
         db.execute(
@@ -648,6 +697,3 @@ def get_programs_page(
     )
     program_rows = list(db.execute(stmt).all())
     return _assemble_programs(program_rows), int(total)
-
-
-

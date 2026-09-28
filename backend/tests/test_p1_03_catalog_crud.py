@@ -609,6 +609,48 @@ def test_vendor_http_crud(client):
     assert client.delete(f"/api/v1/vendors/{vid}").status_code == 404
 
 
+def test_vendor_contacts_are_editable_and_visible_through_product(client):
+    created = client.post("/api/v1/vendors", json={
+        "name": "Vendor with contact",
+        "contacts": [{"full_name": "Ирина", "email": "irina@example.org", "phone": "+70000000000"}],
+    })
+    assert created.status_code == 201, created.text
+    vendor_id = created.json()["id"]
+    assert len(created.json()["contacts"]) == 1
+    assert created.json()["contacts"][0]["product_id"] is None
+    product = _product(client, vendor_id)
+    assert [contact["email"] for contact in client.get(f"/api/v1/products/{product['id']}").json()["contacts"]] == ["irina@example.org"]
+
+    updated = client.patch(f"/api/v1/vendors/{vendor_id}", json={
+        "contacts": [{"full_name": "Мария", "email": "maria@example.org"}],
+    })
+    assert updated.status_code == 200, updated.text
+    assert [contact["email"] for contact in updated.json()["contacts"]] == ["maria@example.org"]
+    assert [contact["email"] for contact in client.get(f"/api/v1/products/{product['id']}").json()["contacts"]] == ["maria@example.org"]
+
+
+def test_passport_documents_filter_and_authenticated_download(client, db, tmp_path, monkeypatch):
+    from app.models.interactions import Document
+
+    university = _uni(client)
+    monkeypatch.setattr(settings, "storage_root", str(tmp_path))
+    (tmp_path / "jury.txt").write_bytes(b"jury document")
+    db.add_all([
+        Document(university_id=uuid.UUID(university["id"]), document_type="contract", title="Жюри", file_path="jury.txt", file_name="jury.txt", file_size=13, mime_type="text/plain", status_raw="signed", uploaded_by_keycloak_sub="test"),
+        Document(university_id=uuid.UUID(university["id"]), document_type="license", title="Лицензия", file_path="missing.txt", file_name="missing.txt", file_size=10, status_raw="draft", uploaded_by_keycloak_sub="test"),
+    ])
+    db.commit()
+    base = f"/api/v1/universities/{university['id']}/passport/documents"
+    page = client.get(base, params={"search": "Жюри", "document_type": "contract", "status": "signed", "page_size": 1})
+    assert page.status_code == 200, page.text
+    assert page.json()["total"] == 1
+    assert page.json()["types"] == ["contract", "license"]
+    document = page.json()["items"][0]
+    assert document["file_available"] is True
+    assert client.get(f"{base}/{document['id']}/download").content == b"jury document"
+    assert client.get(base, params={"document_type": "license"}).json()["items"][0]["file_available"] is False
+
+
 def test_vendor_duplicate_name_409(client):
     _vendor(client, name="Dup-V")
     assert client.post("/api/v1/vendors", json={"name": "Dup-V"}).status_code == 409

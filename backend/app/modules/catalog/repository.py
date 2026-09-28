@@ -728,6 +728,31 @@ def vendor_contacts(db: Session, vendor_id: uuid.UUID) -> list[VendorContact]:
     ).all())
 
 
+def replace_vendor_contacts(db: Session, vendor_id: uuid.UUID, contacts) -> None:
+    """Replace vendor-level contacts while preserving product-specific rows."""
+    existing = db.scalars(select(VendorContact).where(
+        VendorContact.vendor_id == vendor_id, VendorContact.product_id.is_(None)
+    )).all()
+    by_email = {contact.email.lower(): contact for contact in existing}
+    incoming = {contact.email.strip().lower(): contact for contact in contacts}
+    if len(incoming) != len(contacts):
+        from app.core.exceptions import Conflict
+        raise Conflict("Vendor contact emails must be unique")
+    for email, contact in incoming.items():
+        row = by_email.get(email)
+        if row is None:
+            row = VendorContact(vendor_id=vendor_id, product_id=None, email=email)
+            db.add(row)
+        row.full_name = contact.full_name.strip()
+        row.email = email
+        row.phone = contact.phone or None
+        row.communication_method = contact.communication_method or None
+    for email, row in by_email.items():
+        if email not in incoming:
+            db.delete(row)
+    db.flush()
+
+
 # ------------------------------------------------------------- responsibles
 
 
@@ -949,6 +974,7 @@ def list_contracts(
         stmt.order_by(*_order(Contract, CONTRACT_SORT, sort_by, sort_order))
         .limit(page_size).offset((page - 1) * page_size)
     ).scalars().all()
+
     return list(rows), total
 
 
@@ -1029,7 +1055,7 @@ def get_link(
 # ------------------------------------------------------------------ writes
 
 
-def add_and_flush(db: Session, obj):
+def add_and_flush(db: Session, obj, *, commit: bool = True):
     """Persist a new row. IntegrityError bubbles to the central 409 handler."""
     db.add(obj)
     if "audit_context" in db.info and type(obj) in _AUDIT_FIELDS:
@@ -1037,12 +1063,15 @@ def add_and_flush(db: Session, obj):
         action = (AuditAction.ASSIGN_RESPONSIBLE if isinstance(obj, UniversityResponsible)
                   else AuditAction.CREATE)
         _audit_write(db, obj, action, new=_audit_snapshot(obj))
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     db.refresh(obj)
     return obj
 
 
-def save(db: Session, obj):
+def save(db: Session, obj, *, commit: bool = True):
     """Persist in-place mutations. IntegrityError bubbles to the 409 handler."""
     if "audit_context" in db.info and type(obj) in _AUDIT_FIELDS:
         current = _audit_snapshot(obj)
@@ -1054,7 +1083,10 @@ def save(db: Session, obj):
                 old[name] = history.deleted[0]
         if old != current:
             _audit_write(db, obj, AuditAction.UPDATE, old=old, new=current)
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     db.refresh(obj)
     return obj
 

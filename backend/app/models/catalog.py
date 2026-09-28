@@ -139,19 +139,20 @@ class ITProduct(UUIDPKMixin, TimestampMixin, Base):
 
 
 class VendorContact(UUIDPKMixin, TimestampMixin, Base):
-    """Contact for a particular vendor/product pair, as supplied by the catalog."""
+    """Vendor contact, optionally scoped to a particular product."""
 
     __tablename__ = "vendor_contacts"
     __table_args__ = (
         UniqueConstraint("product_id", "email", name="uq_vendor_contacts_product_email"),
         Index("ix_vendor_contacts_vendor_id", "vendor_id"),
+        Index("uq_vendor_contacts_vendor_email", "vendor_id", "email", unique=True, postgresql_where=text("product_id IS NULL")),
     )
 
     vendor_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("vendors.id", ondelete="RESTRICT"), nullable=False
     )
-    product_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("it_products.id", ondelete="CASCADE"), nullable=False
+    product_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("it_products.id", ondelete="CASCADE"), nullable=True
     )
     full_name: Mapped[str] = mapped_column(String(512), nullable=False)
     phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -159,7 +160,7 @@ class VendorContact(UUIDPKMixin, TimestampMixin, Base):
     communication_method: Mapped[str | None] = mapped_column(String(256), nullable=True)
 
     vendor: Mapped["Vendor"] = relationship(back_populates="contacts")
-    product: Mapped["ITProduct"] = relationship(back_populates="contacts")
+    product: Mapped["ITProduct | None"] = relationship(back_populates="contacts")
 
 
 class ProductDirection(UUIDPKMixin, TimestampMixin, Base):

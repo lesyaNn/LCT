@@ -57,6 +57,7 @@ from app.schemas.catalog import (
     ProductShort,
     ProgramShort,
     VendorShort,
+    VendorContactInput,
 )
 from app.schemas.licenses import LicenseShort
 
@@ -361,7 +362,10 @@ def get_product_detail(db: Session, product_id: uuid.UUID) -> ProductDetail:
     detail.vendor_name = vendor.name if vendor is not None else None
     detail.vendor = VendorShort.model_validate(vendor) if vendor is not None else None
     detail.program_name = program.name if program is not None else None
-    detail.contacts = [VendorContactRead.model_validate(contact) for contact in repo.product_contacts(db, product_id)]
+    contacts = repo.product_contacts(db, product_id)
+    if vendor is not None:
+        contacts.extend(contact for contact in repo.vendor_contacts(db, vendor.id) if contact.product_id is None)
+    detail.contacts = [VendorContactRead.model_validate(contact) for contact in contacts]
     return detail
 
 
@@ -456,24 +460,30 @@ def get_vendor_detail(db: Session, vendor_id: uuid.UUID) -> VendorDetail:
     return detail
 
 
-def create_vendor(db: Session, *, name: str) -> VendorDetail:
-    obj = repo.add_and_flush(db, Vendor(name=name))
+def create_vendor(db: Session, *, name: str, contacts: list[VendorContactInput] | None = None) -> VendorDetail:
+    obj = repo.add_and_flush(db, Vendor(name=name), commit=False)
+    repo.replace_vendor_contacts(db, obj.id, contacts or [])
+    db.commit()
     return get_vendor_detail(db, obj.id)
 
 
-def patch_vendor(db: Session, vendor_id: uuid.UUID, *, name: str | None) -> VendorDetail:
+def patch_vendor(db: Session, vendor_id: uuid.UUID, *, name: str | None, contacts: list[VendorContactInput] | None = None) -> VendorDetail:
     obj = repo.get_vendor(db, vendor_id)
     if obj is None:
         raise NotFound("Vendor not found")
     if name is not None:
         obj.name = name
-    repo.save(db, obj)
+    repo.save(db, obj, commit=False)
+    if contacts is not None:
+        repo.replace_vendor_contacts(db, vendor_id, contacts)
+    db.commit()
     return get_vendor_detail(db, vendor_id)
 
 
 def delete_vendor(db: Session, vendor_id: uuid.UUID) -> None:
     if repo.get_vendor(db, vendor_id) is None:
         raise NotFound("Vendor not found")
+    repo.replace_vendor_contacts(db, vendor_id, [])
     repo.delete_by_id(db, Vendor, vendor_id)
 
 

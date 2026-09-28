@@ -176,12 +176,20 @@ class VendorBase(BaseModel):
     name: str = Field(min_length=1, max_length=512, examples=["РЕД СОФТ"])
 
 
+class VendorContactInput(BaseModel):
+    full_name: str = Field(min_length=1, max_length=512)
+    email: str = Field(min_length=1, max_length=512)
+    phone: str | None = Field(default=None, max_length=64)
+    communication_method: str | None = Field(default=None, max_length=256)
+
+
 class VendorCreate(VendorBase):
-    pass
+    contacts: list[VendorContactInput] = Field(default_factory=list)
 
 
 class VendorUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=512)
+    contacts: list[VendorContactInput] | None = None
 
 
 class VendorList(BaseModel):

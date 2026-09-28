@@ -278,7 +278,7 @@ class VendorRead(BaseModel):
 
 class VendorContactRead(BaseModel):
     id: uuid.UUID
-    product_id: uuid.UUID
+    product_id: uuid.UUID | None
     full_name: str
     phone: str | None = None
     email: str

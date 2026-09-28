@@ -66,6 +66,7 @@ class DocumentShort(BaseModel):
     document_type: str
     title: str
     file_name: str
+    file_available: bool = False
     file_size: int = 0
     mime_type: str = ""
     signed_at: date | None = None
@@ -75,6 +76,14 @@ class DocumentShort(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class PaginatedDocuments(BaseModel):
+    items: list[DocumentShort]
+    total: int
+    page: int
+    page_size: int
+    types: list[str]
 
 
 class MeetingShort(BaseModel):

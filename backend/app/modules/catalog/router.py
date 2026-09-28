@@ -597,7 +597,7 @@ def create_vendor(
     db: Session = Depends(get_audit_db),
     _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
 ) -> VendorDetail:
-    return service.create_vendor(db, name=data.name)
+    return service.create_vendor(db, name=data.name, contacts=data.contacts)
 
 
 @router.get(
@@ -652,7 +652,7 @@ def patch_vendor(
     db: Session = Depends(get_audit_db),
     _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
 ) -> VendorDetail:
-    return service.patch_vendor(db, vendor_id, name=data.name)
+    return service.patch_vendor(db, vendor_id, name=data.name, contacts=data.contacts)
 
 
 @router.delete(
