@@ -124,11 +124,12 @@ export function WorkflowComments({ instanceId, stageId, comments, readOnly = fal
   const queryClient = useQueryClient();
   const apiAvailable = isWorkflowApiInstanceId(instanceId);
   const realWorkflow = isRealWorkflowMode();
+  const commentsQueryKey = realWorkflow ? workflowCommentsQueryKey(instanceId) : [...workflowCommentsQueryKey(instanceId), 'mock'];
   const create = useMutation<WorkflowCommentApiRecord, unknown, { content: string; files: File[] }, CommentMutationContext>({
     mutationFn: ({ content, files }) => createWorkflowComment(instanceId, content, stageId, files),
     onMutate: async ({ content }) => {
       if (realWorkflow) return { tempId: '' };
-      const queryKey = workflowCommentsQueryKey(instanceId);
+      const queryKey = commentsQueryKey;
       await queryClient.cancelQueries({ queryKey });
       const previousComments = queryClient.getQueryData<WorkflowCommentApiRecord[]>(queryKey);
       const randomPart = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -139,7 +140,7 @@ export function WorkflowComments({ instanceId, stageId, comments, readOnly = fal
       return { previousComments, tempId };
     },
     onSuccess: async (serverComment, _content, context) => {
-      const queryKey = workflowCommentsQueryKey(instanceId);
+      const queryKey = commentsQueryKey;
       if (realWorkflow) {
         await Promise.all([queryClient.invalidateQueries({ queryKey }), queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowHistory(instanceId) })]);
         return;
@@ -152,10 +153,10 @@ export function WorkflowComments({ instanceId, stageId, comments, readOnly = fal
     },
     onError: async (cause: unknown, _content, context) => {
       if (realWorkflow) return;
-      queryClient.setQueryData(workflowCommentsQueryKey(instanceId), (current: WorkflowCommentApiRecord[] | undefined) => rollbackComments(current, context?.previousComments, context?.tempId ?? ''));
+      queryClient.setQueryData(commentsQueryKey, (current: WorkflowCommentApiRecord[] | undefined) => rollbackComments(current, context?.previousComments, context?.tempId ?? ''));
     },
   });
-  const apiCommentsQuery = useQuery({ queryKey: workflowCommentsQueryKey(instanceId), queryFn: () => listWorkflowComments(instanceId), enabled: apiAvailable && !realWorkflow, staleTime: 30_000 });
+  const apiCommentsQuery = useQuery({ queryKey: commentsQueryKey, queryFn: () => listWorkflowComments(instanceId), enabled: apiAvailable && !realWorkflow, staleTime: 30_000 });
   const realCommentsQuery = useInfiniteQuery({ queryKey: workflowCommentsQueryKey(instanceId), queryFn: ({ pageParam }) => listWorkflowCommentsPage(instanceId, pageParam), initialPageParam: 1, getNextPageParam: (last) => last.page * last.page_size < last.total ? last.page + 1 : undefined, enabled: apiAvailable && realWorkflow, staleTime: 30_000 });
   const records = useMemo(() => realWorkflow ? realCommentsQuery.data?.pages.flatMap((page) => page.items) : apiCommentsQuery.data, [realWorkflow, realCommentsQuery.data, apiCommentsQuery.data]);
   const apiComments = useMemo<UniversityWorkflowComment[] | null>(() => records?.filter((comment) => comment.stage_id === null || comment.stage_id === stageId).map((comment) => ({ id: comment.id, author: user?.id === comment.author_keycloak_sub ? user.name : isUuidLike(comment.author_keycloak_sub) ? 'Участник Workflow' : comment.author_keycloak_sub, authorId: comment.author_keycloak_sub, authorRole: user?.id === comment.author_keycloak_sub ? user.roleLabel : 'Участник Workflow', isSystem: false, occurredAt: comment.created_at, updatedAt: comment.updated_at, text: comment.content, isOptimistic: comment.is_optimistic, canDelete: true, attachments: comment.attachments?.map((attachment) => workflowAttachmentFromApi(attachment, user)) })) ?? null, [records, stageId, user]);

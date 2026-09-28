@@ -36,7 +36,7 @@ function instance() {
   };
 }
 
-function stubReads(page: Page) {
+async function stubReads(page: Page) {
   const calls = new Map<string, number>();
   const taskRows = [
     { id: 'aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaaa', instance_id: instanceId, stage_id: firstTemplateStage, title: 'Завершённая задача', status: 'done', responsible_id: null, deadline: null, completed_at: now },
@@ -47,7 +47,7 @@ function stubReads(page: Page) {
     record.stages = record.stages.map((stage) => ({ ...stage, tasks_total: taskRows.filter((task) => task.stage_id === stage.template_stage_id).length, tasks_completed: taskRows.filter((task) => task.stage_id === stage.template_stage_id && task.status === 'done').length }));
     return record;
   };
-  void page.route('**/api/v1/**', async (route) => {
+  await page.route('**/api/v1/**', async (route) => {
     const method = route.request().method();
     const url = new URL(route.request().url());
     const path = url.pathname;
@@ -107,7 +107,7 @@ function stubReads(page: Page) {
 
 test('Workflow lists university instances and never commits mock mutations', async ({ page }) => {
   await login(page);
-  const calls = stubReads(page);
+  const calls = await stubReads(page);
   await page.goto(`/universities/${universityId}?tab=workflow`);
   await expect(page.getByRole('heading', { name: 'Workflow вуза' })).toBeVisible();
   const workflowCard = page.getByRole('link', { name: /Программа А/ });
@@ -155,4 +155,46 @@ test('Workflow lists university instances and never commits mock mutations', asy
   await page.getByRole('button', { name: 'Скачать workflow.pdf' }).click();
   expect((await download).suggestedFilename()).toBe('workflow.pdf');
   expect(calls.get('/api/v1/workflow/instances')).toBeGreaterThanOrEqual(1);
+});
+
+test('Workflow stage emphasis remains clear at responsive widths', async ({ page }) => {
+  test.skip(process.env.E2E_MOCK_MODE !== '1', 'Run against a dev server with mock auth and data.');
+  await page.goto('/workflows/university-014');
+  await expect(page.getByRole('heading', { name: 'Этапы Workflow' })).toBeVisible();
+  const current = page.getByTestId('workflow-current-stage');
+  const stages = page.locator('section[aria-labelledby$="-stages-title"] button[aria-controls]');
+  await expect(current).toHaveAttribute('aria-current', 'step');
+  await expect(page.locator('main header').first().getByText('Текущий этап', { exact: true })).toHaveCount(0);
+
+  for (const width of [1440, 768, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    const initial = await page.evaluate(() => {
+      const progress = document.querySelector('[role="progressbar"] > span');
+      const selected = document.querySelector('button[aria-expanded="true"][aria-controls]');
+      const currentButton = document.querySelector('[data-testid="workflow-current-stage"]');
+      if (!progress || !selected || !currentButton) throw new Error('Workflow controls are missing');
+      return {
+        progress: getComputedStyle(progress).backgroundColor,
+        selectedLeft: getComputedStyle(selected).borderLeftColor,
+        selectedTop: getComputedStyle(selected).borderTopColor,
+        currentMarker: getComputedStyle(currentButton.querySelector('span')!).backgroundColor,
+        documentWidth: document.documentElement.scrollWidth,
+        viewportWidth: innerWidth,
+      };
+    });
+    expect(initial.progress).toBe(initial.selectedLeft);
+    expect(initial.currentMarker).toBe(initial.progress.replace('rgb(', 'rgba(').replace(')', ', 0.1)'));
+    expect(initial.selectedTop).toBe('rgba(0, 0, 0, 0)');
+    expect(initial.documentWidth).toBeLessThanOrEqual(initial.viewportWidth + 2);
+    await stages.first().click();
+    await expect(stages.first()).toHaveAttribute('aria-expanded', 'true');
+    await expect(current).toHaveAttribute('aria-current', 'step');
+    const selectedOtherStage = await stages.first().evaluate((button) => ({
+      left: getComputedStyle(button).borderLeftColor,
+      top: getComputedStyle(button).borderTopColor,
+    }));
+    expect(selectedOtherStage.left).toBe(initial.progress);
+    expect(selectedOtherStage.top).toBe('rgba(0, 0, 0, 0)');
+    await current.click();
+  }
 });

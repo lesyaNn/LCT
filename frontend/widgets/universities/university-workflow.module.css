@@ -4,7 +4,7 @@
 .breadcrumbs { align-items: center; color: var(--rtk-color-text-tertiary); display: flex; flex-wrap: wrap; font-size: 12px; gap: var(--rtk-space-2); }
 .breadcrumbs a { color: var(--rtk-color-brand); text-decoration: none; }
 .breadcrumbs a:hover { text-decoration: underline; }
-.headerMain { align-items: start; display: grid; gap: var(--rtk-space-6); grid-template-columns: minmax(0, 1fr) minmax(260px, 360px); }
+.headerMain { display: flex; flex-direction: column; gap: var(--rtk-space-3); }
 .eyebrow { color: var(--rtk-color-brand); display: block; font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
 .programWorkflow { display: flex; flex-direction: column; gap: var(--rtk-space-4); min-width: 0; }
 .programSelector { max-width: 260px; min-width: 0; }
@@ -26,7 +26,7 @@
 .instanceStage { color: var(--rtk-color-text-secondary); font-size: 12px; overflow-wrap: anywhere; }
 .instanceStage b { color: var(--rtk-color-text-primary); }
 .instanceProgress { background: var(--rtk-color-surface-subtle); border-radius: 999px; height: 6px; overflow: hidden; width: 100%; }
-.instanceProgress span { background: var(--rtk-color-brand); display: block; height: 100%; }
+.instanceProgress span { background: var(--rtk-color-brand-secondary); display: block; height: 100%; }
 .instanceFacts { color: var(--rtk-color-text-secondary); font-size: 12px; overflow-wrap: anywhere; }
 .historyDisclosure { border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); min-width: 0; }
 .historyDisclosure summary { align-items: center; cursor: pointer; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); list-style: none; padding: var(--rtk-space-3); }
@@ -47,23 +47,19 @@
 .externalHint { color: var(--rtk-color-text-secondary); font-size: 12px; margin: 0; }
 @media (max-width: 480px) { .programSelector { max-width: none; width: 100%; } }
 .headerMain h1 { font-size: clamp(26px, 3vw, 38px); letter-spacing: -.035em; line-height: 1.12; margin: 0; }
-.headerContext { color: var(--rtk-color-text-secondary); font-size: 14px; margin: var(--rtk-space-3) 0 0; overflow-wrap: anywhere; }
+.headerContext { color: var(--rtk-color-text-secondary); font-size: 14px; margin: 0; overflow-wrap: anywhere; }
 .factValue { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
 .editForm { display: flex; flex-direction: column; gap: var(--rtk-space-4); }
 .editForm label { color: var(--rtk-color-text-secondary); display: flex; flex-direction: column; font-size: 12px; font-weight: 600; gap: var(--rtk-space-2); }
 .editForm p { color: var(--rtk-color-text-secondary); font-size: 12px; margin: 0; }
 .editActions { display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); justify-content: flex-end; }
-.headerCurrent { composes: surface from '../../shared/ui/rtk/section-surface.module.css'; display: flex; flex-direction: column; gap: var(--rtk-space-2); }
-.headerCurrent > span { color: var(--rtk-color-text-tertiary); font-size: 11px; }
-.headerCurrent strong { font-size: 15px; line-height: 1.35; overflow-wrap: anywhere; }
-.headerCurrent > :last-child { align-self: flex-start; }
 .overallProgress { composes: surface from '../../shared/ui/rtk/section-surface.module.css'; }
 .progressLabel { align-items: baseline; display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); justify-content: space-between; }
 .progressLabel span { color: var(--rtk-color-text-secondary); font-size: 12px; }
 .progressLabel strong { font-size: 13px; }
 .progressTrack, .taskProgress { background: var(--rtk-color-surface-subtle); border-radius: 999px; height: 8px; overflow: hidden; }
 .progressTrack { margin-top: var(--rtk-space-3); }
-.progressTrack span, .taskProgress span { background: var(--rtk-color-brand); border-radius: inherit; display: block; height: 100%; transition: width 180ms ease; }
+.progressTrack span, .taskProgress span { background: var(--rtk-color-brand-secondary); border-radius: inherit; display: block; height: 100%; transition: width 180ms ease; }
 .layout { align-items: start; display: grid; gap: var(--rtk-space-5); grid-template-columns: minmax(300px, .9fr) minmax(0, 1.4fr); }
 .stagesPanel, .detailPanel { composes: surface from '../../shared/ui/rtk/section-surface.module.css'; min-width: 0; }
 .detailPanel { animation: workflowDetailsReveal 180ms ease both; }
@@ -77,13 +73,13 @@
 .stageButton { align-items: start; background: transparent; border: 1px solid transparent; border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-primary); cursor: pointer; display: grid; gap: var(--rtk-space-3); grid-template-columns: 36px minmax(0, 1fr); padding: var(--rtk-space-3); position: relative; text-align: left; width: 100%; z-index: 1; }
 .stageButton:hover { background: var(--rtk-color-surface-hover); }
 .stageButton:focus-visible { border-color: var(--rtk-color-brand); outline: 2px solid var(--rtk-color-brand); outline-offset: 1px; }
-.stageItemSelected .stageButton { background: var(--rtk-color-brand-soft); border-color: var(--rtk-color-brand); }
-.stageButtonCurrent { border-left: 3px solid var(--rtk-color-brand); }
+.stageItemSelected .stageButton { background: var(--rtk-color-surface-subtle); border-left: 3px solid var(--rtk-color-brand-secondary); }
+.stageButtonCurrent { border-left: 3px solid var(--rtk-color-brand-secondary); }
 .stageButtonError { border-left: 3px solid var(--atmr-error-on-container); }
 .stageItemMuted .stageButton { color: var(--rtk-color-text-secondary); }
 .stageMarker { align-items: center; background: var(--rtk-color-surface-subtle); border: 1px solid var(--rtk-color-border); border-radius: 50%; color: var(--rtk-color-text-secondary); display: inline-flex; height: 36px; justify-content: center; width: 36px; }
 .status-completed { background: var(--atmr-success-container-soft); border-color: var(--atmr-success-on-container); color: var(--atmr-success-on-container); }
-.status-current { background: var(--atmr-accent-container-default); border-color: var(--rtk-color-brand); color: var(--rtk-color-brand); }
+.status-current { background: var(--rtk-color-brand-secondary-soft); border-color: var(--rtk-color-brand-secondary); color: var(--rtk-color-brand-secondary); }
 .status-overdue { background: var(--atmr-error-container-soft); border-color: var(--atmr-error-on-container); color: var(--atmr-error-on-container); }
 .status-skipped { color: var(--rtk-color-text-tertiary); }
 .stageContent { display: flex; flex-direction: column; gap: var(--rtk-space-2); min-width: 0; }
@@ -107,7 +103,6 @@
 .stageSummary svg { color: var(--rtk-color-text-secondary); }
 .detailPanel { display: flex; flex-direction: column; gap: var(--rtk-space-5); }
 .detailHeader h2 { font-size: 24px; max-width: 500px; overflow-wrap: anywhere; }
-.detail-current { border-top: 2px solid var(--rtk-color-brand); }
 .detail-overdue { border-top: 2px solid var(--atmr-error-on-container); }
 .detailFacts { display: grid; gap: var(--rtk-space-4); grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
 .detailFacts div { display: flex; flex-direction: column; gap: var(--rtk-space-1); min-width: 0; }
@@ -184,7 +179,7 @@
 .skeletonDetails span { height: 84px; }
 @keyframes workflowShimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 @keyframes workflowDetailsReveal { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-@media (max-width: 900px) { .headerMain, .layout, .skeletonLayout { grid-template-columns: 1fr; } .headerCurrent { max-width: 520px; } }
+@media (max-width: 900px) { .layout, .skeletonLayout { grid-template-columns: 1fr; } }
 @media (max-width: 480px) { .stagesPanel, .detailPanel, .overallProgress { padding: var(--rtk-space-4); } .detailFacts { grid-template-columns: 1fr; } .detailHeader { flex-direction: column; } .stageButton { gap: var(--rtk-space-2); grid-template-columns: 36px minmax(0, 1fr); min-height: 52px; padding: var(--rtk-space-2); } .stageMarker { height: 36px; width: 36px; } .stageItem:not(:last-child)::after { left: 18px; top: 44px; } .stageMeta { align-items: flex-start; flex-direction: column; gap: var(--rtk-space-1); } .progressLabel { align-items: flex-start; flex-direction: column; gap: var(--rtk-space-1); } .taskList label { min-height: 44px; } .stageActionButtons { align-items: stretch; flex-direction: column; } .stageActionButtons > button { width: 100%; } .completionSummary time { margin-left: 0; width: 100%; } }
 @media (max-width: 480px) { .toastViewport { left: var(--rtk-space-3); right: var(--rtk-space-3); top: var(--rtk-space-3); } .toastViewport > * { max-width: none; } }
 @media (prefers-reduced-motion: reduce) { .progressTrack span, .taskProgress span, .skeletonStages span, .skeletonDetails span, .skeletonHeader span, .detailPanel { animation: none; transition: none; } }
