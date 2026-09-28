@@ -297,7 +297,7 @@ function Filters({ state, options, catalogsLoading, catalogsUnavailable, searchI
         </Select>
       </label>
       <MultiSelect label="Ответственный" labelPlacement="outside" options={options.responsibles.map((person) => ({ id: person.id, name: person.name, description: person.role }))} values={filters.responsibleIds} onChange={(values) => onPatch({ responsible: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
-      <label className={styles.field} title={!UNIVERSITY_LIST_CAPABILITIES.filters.stage ? 'Backend пока не публикует фильтр по текущему этапу.' : undefined}>
+      <label className={styles.field} title={!UNIVERSITY_LIST_CAPABILITIES.filters.stage ? 'Фильтр по текущему этапу пока недоступен.' : undefined}>
         <span>Текущий этап</span>
         <Select disabled={!UNIVERSITY_LIST_CAPABILITIES.filters.stage} value={filters.workflowStageId} onChange={(event) => onPatch({ stage: event.target.value, page: 1 })}>
           <option value="">Все этапы</option>

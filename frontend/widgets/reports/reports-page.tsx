@@ -1,7 +1,6 @@
 'use client';
 
 import Filter from '@atomaro/icons/24/action/Filter';
-import InformationStroke from '@atomaro/icons/24/alert/InformationStroke';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   keepPreviousData,
@@ -266,9 +265,6 @@ function ReportQueue() {
           <h2 id="report-jobs-heading">Задачи отчётов</h2>
           <p>В очереди и во время формирования статус обновляется примерно каждые 3 секунды.</p>
         </div>
-        <span className={styles.jobsCapability}>
-          <InformationStroke size={16} fill="currentColor" aria-hidden="true" />История задач загружается с сервера.
-        </span>
       </div>
       <ReportJobsPanel
         jobs={jobs}
