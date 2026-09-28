@@ -6,7 +6,8 @@
 .panel { display: flex; flex-direction: column; gap: var(--rtk-space-4); min-width: 0; }
 .actions { display: flex; gap: var(--rtk-space-2); margin-left: auto; }
 .actions > span { display: inline-flex; }
-.agreementSwitch { display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); padding: var(--rtk-space-3) var(--rtk-space-5) 0; }
+.agreementSwitch { display: flex; flex-wrap: wrap; gap: var(--rtk-space-1); padding: var(--rtk-space-3) 0 0; }
+.agreementSwitch button { height: 46px; min-height: 46px; padding-inline: var(--rtk-space-3); white-space: nowrap; }
 .surface { background: var(--rtk-color-surface); min-width: 0; overflow: hidden; }
 .surfaceHeader { border-bottom: 1px solid var(--rtk-color-border); padding: var(--rtk-space-4) var(--rtk-space-5); }
 .surfaceHeader h2 { font-size: 20px; margin: 0; }
@@ -48,6 +49,7 @@
 }
 
 @media (max-width: 600px) {
+  .agreementSwitch button { height: 48px; min-height: 48px; }
   .actions { display: grid; grid-template-columns: 1fr; margin-left: 0; width: 100%; }
   .actions > *, .actions > span, .actions button, .actions a { width: 100%; }
   .actions > span > span:first-child, .rowActions > span > span:first-child { width: 100%; }

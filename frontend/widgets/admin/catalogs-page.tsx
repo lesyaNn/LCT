@@ -217,7 +217,7 @@ export function CatalogsPage() {
     <TabbedSurface tabs={<Tabs items={catalogDefinitions} activeId={type} onChange={(id) => chooseType(id as CatalogType)} label="Каталоги" prefix="catalog-tab" />}>
       <div data-testid="catalog-tabs">
         <section id="catalog-panel" role="tabpanel" aria-labelledby={`catalog-tab-${type}`} className={styles.panel}>
-          {type === 'agreements' ? <div className={styles.agreementSwitch} role="group" aria-label="Тип записи"><Button type="button" variant={agreementKind === 'contracts' ? 'primary' : 'ghost'} size="s" data-testid="catalog-agreements-contracts" aria-pressed={agreementKind === 'contracts'} onClick={() => chooseKind('contracts')}>Договоры</Button><Button type="button" variant={agreementKind === 'licenses' ? 'primary' : 'ghost'} size="s" data-testid="catalog-agreements-licenses" aria-pressed={agreementKind === 'licenses'} onClick={() => chooseKind('licenses')}>Лицензии</Button></div> : null}
+          {type === 'agreements' ? <div className={styles.agreementSwitch} role="group" aria-label="Тип записи"><Button type="button" variant={agreementKind === 'contracts' ? 'primary' : 'secondary'} size="s" data-testid="catalog-agreements-contracts" aria-pressed={agreementKind === 'contracts'} onClick={() => chooseKind('contracts')}>Договоры</Button><Button type="button" variant={agreementKind === 'licenses' ? 'primary' : 'secondary'} size="s" data-testid="catalog-agreements-licenses" aria-pressed={agreementKind === 'licenses'} onClick={() => chooseKind('licenses')}>Лицензии</Button></div> : null}
           <FilterToolbar
             embedded
             label="Фильтры каталога"
