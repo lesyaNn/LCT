@@ -437,6 +437,7 @@ export interface UniversityWorkflowStage {
   completion: 'on_time' | 'late' | null;
   isOptional?: boolean;
   responsible: UniversityResponsible | null;
+  responsibleOverrideId?: string | null;
   comments: UniversityWorkflowComment[];
   attachments: UniversityWorkflowAttachment[];
   tasks: UniversityWorkflowTask[];
@@ -545,6 +546,11 @@ export async function createWorkflowComment(instanceId: string, content: string,
 
 export interface WorkflowInstanceApiStage {
   id: string;
+  responsible_id?: string | null;
+  effective_responsible_id?: string | null;
+  responsible_name?: string | null;
+  responsible_email?: string | null;
+  responsible_phone?: string | null;
   template_stage_id: string | null;
   order_index: number;
   name: string;
@@ -616,6 +622,13 @@ export async function updateWorkflowResponsible(instanceId: string, responsibleI
   });
 }
 
+export async function updateWorkflowStageResponsible(instanceId: string, stageId: string, responsibleId: string | null): Promise<WorkflowInstanceApiRecord> {
+  if (!isWorkflowApiInstanceId(instanceId) || !isWorkflowApiInstanceId(stageId)) throw new WorkflowApiError(0, 'Изменение ответственного недоступно для этого Workflow.');
+  return unwrapApiResult(await apiFetch<WorkflowInstanceApiRecord>(`/api/v1/workflow/instances/${instanceId}/stages/${stageId}/responsible`, {
+    method: 'PATCH', body: { responsible_id: responsibleId },
+  }));
+}
+
 export async function updateWorkflowStageDueDate(instanceId: string, stageId: string, dueDate: string | null): Promise<WorkflowInstanceApiRecord> {
   if (!isWorkflowApiInstanceId(instanceId) || !isWorkflowApiInstanceId(stageId)) throw new WorkflowApiError(0, 'Изменение срока недоступно для этого Workflow.');
   return unwrapApiResult(await apiFetch<WorkflowInstanceApiRecord>(`/api/v1/workflow/instances/${instanceId}/stages/${stageId}/due-date`, {
@@ -630,7 +643,7 @@ export async function listWorkflowInstancePage(page: number, pageSize = 100): Pr
 export interface WorkflowTaskApiRecord { id: string; instance_id: string; stage_id: string | null; title: string; status: string; responsible_id: string | null; deadline: string | null; completed_at: string | null }
 export interface WorkflowAttachmentApiRecord { id: string; instance_id: string; stage_id: string | null; comment_id?: string | null; original_filename: string; mime_type: string; file_size: number; uploaded_by_keycloak_sub: string; uploaded_by_name?: string | null; created_at: string; updated_at: string }
 export interface WorkflowTransitionApiRecord { id: string; instance_id: string; from_stage_id: string | null; to_stage_id: string | null; actor_keycloak_sub: string; comment: string; created_at: string }
-export interface WorkflowActivityApiRecord { id: string; type: 'responsible_changed' | 'deadline_changed'; created_at: string; actor_name: string; stage_id?: string | null; stage_name: string; title: string }
+export interface WorkflowActivityApiRecord { id: string; type: 'responsible_changed' | 'stage_responsible_changed' | 'deadline_changed'; created_at: string; actor_name: string; stage_id?: string | null; stage_name: string; title: string }
 export interface WorkflowAllowedApiRecord { id: string; name: string; order_index: number }
 
 export async function listWorkflowTasksPage(instanceId: string, page: number): Promise<WorkflowPage<WorkflowTaskApiRecord>> {
@@ -880,7 +893,8 @@ export function getApiUniversityWorkflow(instance: WorkflowInstanceApiRecord): U
       completedAt: stage.completed_at,
       completion: stage.completed_at && stage.due_date && stage.completed_at.slice(0, 10) > stage.due_date ? 'late' : stage.completed_at ? 'on_time' : null,
       isOptional: !stage.is_required,
-      responsible: instance.responsible_id && instance.responsible_name ? { id: instance.responsible_id, name: instance.responsible_name, email: instance.responsible_email ?? undefined } : null,
+      responsible: (stage.effective_responsible_id ?? instance.responsible_id) && (stage.responsible_name ?? instance.responsible_name) ? { id: (stage.effective_responsible_id ?? instance.responsible_id)!, name: (stage.responsible_name ?? instance.responsible_name)!, email: stage.responsible_email ?? instance.responsible_email ?? undefined } : null,
+      responsibleOverrideId: stage.responsible_id ?? null,
       comments: [],
       attachments: [],
       tasks: [],

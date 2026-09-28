@@ -1,0 +1,2 @@
+ALTER TABLE instance_stages DROP CONSTRAINT fk_instance_stages_responsible_id_responsibles;
+ALTER TABLE instance_stages DROP COLUMN responsible_id;

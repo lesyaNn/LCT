@@ -752,7 +752,7 @@ def test_report_jobs_migration_down_up_cycle(pg):
         verify.dispose()
 
 
-def test_migration_chain_latest_is_report_jobs():
+def test_migration_chain_has_report_jobs_and_latest_head():
     import importlib.util
 
     spec = importlib.util.spec_from_file_location(
@@ -767,9 +767,9 @@ def test_migration_chain_latest_is_report_jobs():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     versions = [v for v, _, _ in module._discover()]
-    assert versions[-1] == "000037_minimize_education_domain"
+    assert versions[-1] == "000038_instance_stage_responsible"
     assert "000033_product_program" in versions
-    assert len(versions) == 37
+    assert len(versions) == 38
     assert "report_jobs" in module.EXPECTED_TABLES
     assert module.EXPECTED_TABLES[-1] == "report_templates"
 

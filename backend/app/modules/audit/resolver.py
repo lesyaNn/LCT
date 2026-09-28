@@ -64,6 +64,7 @@ _PAYLOAD_KEY_MAP = {
     "vendor_id": "vendor",
     "template_id": "template",
     "responsible_id": "responsible",
+    "stage_responsible_id": "responsible",
     "stage_id": "stage",
     "instance_id": "instance",
 }

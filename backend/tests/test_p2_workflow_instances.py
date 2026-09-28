@@ -129,7 +129,7 @@ def test_migration_000012_pair_discoverable_and_latest():
     assert "000019_import_jobs" in versions
     # P4-06-01 retries: attempts counter for the worker claim loop.
     assert "000020_job_attempts" in versions
-    assert versions[-1] == "000035_comment_attachments"
+    assert versions[-1] == "000038_instance_stage_responsible"
     assert versions.index("000011_workflow_templates") < versions.index("000012_workflow_instances")
     assert versions.index("000012_workflow_instances") < versions.index("000013_instance_stages")
     assert versions.index("000013_instance_stages") < versions.index(
@@ -336,7 +336,7 @@ def test_orm_constraints_and_indexes():
 
 
 def test_orm_instance_stage_columns_fk_constraints_indexes():
-    """P2-01-02 runtime snapshot table mirrors 000013 exactly (pure-unit)."""
+    """Runtime snapshot metadata includes the nullable 000038 assignment."""
     from sqlalchemy import CheckConstraint, UniqueConstraint
 
     from app.models.workflow_instances import InstanceStage  # noqa: F401
@@ -348,6 +348,7 @@ def test_orm_instance_stage_columns_fk_constraints_indexes():
         "id",
         "instance_id",
         "template_stage_id",
+        "responsible_id",
         "order_index",
         "name",
         "description",
@@ -360,12 +361,14 @@ def test_orm_instance_stage_columns_fk_constraints_indexes():
     }
     assert cols["instance_id"].nullable is False
     assert cols["template_stage_id"].nullable is True
+    assert cols["responsible_id"].nullable is True
     assert cols["order_index"].nullable is False
     assert cols["name"].nullable is False
     assert cols["due_date"].nullable is True
     assert cols["completed_at"].nullable is True
     assert _fk_ondelete("instance_stages", "instance_id") == ("workflow_instances", "CASCADE")
     assert _fk_ondelete("instance_stages", "template_stage_id") == ("workflow_stages", "SET NULL")
+    assert _fk_ondelete("instance_stages", "responsible_id") == ("responsibles", "SET NULL")
 
     def names(kind) -> set[str]:
         return {c.name for c in tables["instance_stages"].constraints if isinstance(c, kind)}
@@ -646,7 +649,67 @@ def test_set_instance_responsible_assign_clear_and_unlinked(db):
     with pytest.raises(NotFound):
         instance_service.set_instance_responsible(db, g["instance"].id, other.id, actor_sub="t")
     db.rollback()
-
     with pytest.raises(NotFound):
         instance_service.set_instance_responsible(db, g["instance"].id, uuid.uuid4(), actor_sub="t")
     db.rollback()
+
+
+def test_stage_responsible_override_inheritance_and_clear(db):
+    from app.models.catalog import UniversityResponsible
+    from app.models.workflow_instances import InstanceStage
+    from app.modules.workflow_instances import service as instance_service
+
+    g = _mini_instance(db)
+    other = Responsible(full_name="Сидоров С.С.", email=f"stage-{_tag()}@example.local", role="manager")
+    third = Responsible(full_name="Волков В.В.", email=f"default-{_tag()}@example.local", role="manager")
+    db.add_all([other, third])
+    db.flush()
+    db.add_all([UniversityResponsible(university_id=g["university"].id, responsible_id=person.id)
+                for person in (g["responsible"], other, third)])
+    stages = [InstanceStage(instance_id=g["instance"].id, order_index=index, name=f"Stage {index}")
+              for index in range(1, 4)]
+    db.add_all(stages)
+    db.commit()
+
+    detail = instance_service.get_instance_detail(db, g["instance"].id)
+    assert [stage.responsible_name for stage in detail.stages] == ["Петров П.П."] * 3
+    detail = instance_service.set_instance_stage_responsible(db, g["instance"].id, stages[1].id, other.id)
+    assert [stage.responsible_name for stage in detail.stages] == ["Петров П.П.", "Сидоров С.С.", "Петров П.П."]
+    assert detail.stages[1].responsible_id == other.id
+
+    detail = instance_service.set_instance_responsible(db, g["instance"].id, third.id)
+    assert [stage.responsible_name for stage in detail.stages] == ["Волков В.В.", "Сидоров С.С.", "Волков В.В."]
+    db.expire_all()
+    assert instance_service.get_instance_detail(db, g["instance"].id).stages[1].responsible_id == other.id
+
+    detail = instance_service.set_instance_stage_responsible(db, g["instance"].id, stages[1].id, None)
+    assert [stage.responsible_name for stage in detail.stages] == ["Волков В.В."] * 3
+    assert detail.stages[1].responsible_id is None
+
+
+def test_stage_responsible_rejects_foreign_stage_and_unlinked_person(db):
+    from app.core.exceptions import NotFound
+    from app.models.workflow_instances import InstanceStage
+    from app.modules.workflow_instances import service as instance_service
+
+    first = _mini_instance(db)
+    second = _mini_instance(db)
+    stage = InstanceStage(instance_id=second["instance"].id, order_index=1, name="Other stage")
+    db.add(stage)
+    db.commit()
+    with pytest.raises(NotFound):
+        instance_service.set_instance_stage_responsible(db, first["instance"].id, stage.id, None)
+    with pytest.raises(NotFound):
+        instance_service.set_instance_stage_responsible(db, second["instance"].id, stage.id, first["responsible"].id)
+
+
+def test_responsible_assignment_permission_is_manager_or_admin():
+    from app.core.errors import SecurityError
+    from app.core.permissions import require_permission
+    from app.core.security import CurrentUser
+
+    assign = require_permission("university_responsible.manage")
+    with pytest.raises(SecurityError):
+        assign(CurrentUser(roles={"user"}))
+    assert assign(CurrentUser(roles={"manager"})).roles == {"manager"}
+    assert assign(CurrentUser(roles={"admin"})).roles == {"admin"}

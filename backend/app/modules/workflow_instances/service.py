@@ -64,9 +64,9 @@ def list_workflow_activity(db: Session, instance_id: uuid.UUID) -> list[Workflow
     responsible_ids: set[uuid.UUID] = set()
     for row in rows:
         for value in (row.old_value, row.new_value):
-            if isinstance(value, dict) and value.get("responsible_id"):
+            if isinstance(value, dict) and (value.get("responsible_id") or value.get("stage_responsible_id")):
                 try:
-                    responsible_ids.add(uuid.UUID(str(value["responsible_id"])))
+                    responsible_ids.add(uuid.UUID(str(value.get("responsible_id") or value.get("stage_responsible_id"))))
                 except (ValueError, TypeError):
                     pass
     names = dict(db.execute(select(Responsible.id, Responsible.full_name).where(Responsible.id.in_(responsible_ids))).all()) if responsible_ids else {}
@@ -91,7 +91,12 @@ def list_workflow_activity(db: Session, instance_id: uuid.UUID) -> list[Workflow
     for row in rows:
         old = row.old_value if isinstance(row.old_value, dict) else {}
         new = row.new_value if isinstance(row.new_value, dict) else {}
-        if "responsible_id" in new and old.get("responsible_id") != new.get("responsible_id"):
+        if "stage_responsible_id" in new and old.get("stage_responsible_id") != new.get("stage_responsible_id"):
+            kind = "stage_responsible_changed"
+            stage_id = uuid.UUID(str(new["stage_id"])) if str(new.get("stage_id")) in stage_names else None
+            stage_name = stage_names.get(str(new.get("stage_id")), "Этап Workflow")
+            title = f"{responsible_name(old.get('stage_responsible_id'))} → {responsible_name(new.get('stage_responsible_id'))}"
+        elif "responsible_id" in new and old.get("responsible_id") != new.get("responsible_id"):
             kind = "responsible_changed"
             title = f"{responsible_name(old.get('responsible_id'))} → {responsible_name(new.get('responsible_id'))}"
             stage_name = "Весь Workflow"
@@ -148,11 +153,21 @@ def stage_due_dates(
     return out
 
 
-def _stage_to_read(row: InstanceStage, today: date, counts: tuple[int, int] = (0, 0)) -> InstanceStageRead:
+def _stage_to_read(row: InstanceStage, today: date, counts: tuple[int, int] = (0, 0), default_responsible: tuple[uuid.UUID | None, str | None, str | None, str | None] = (None, None, None, None)) -> InstanceStageRead:
     overdue, days = compute_overdue(row.due_date, row.completed_at, today)
+    responsible = row.responsible
+    effective_id, effective_name, effective_email, effective_phone = (
+        (responsible.id, responsible.full_name, responsible.email, responsible.phone)
+        if responsible is not None else default_responsible
+    )
     return InstanceStageRead(
         id=row.id,
         template_stage_id=row.template_stage_id,
+        responsible_id=row.responsible_id,
+        effective_responsible_id=effective_id,
+        responsible_name=effective_name,
+        responsible_email=effective_email,
+        responsible_phone=effective_phone,
         order_index=row.order_index,
         name=row.name,
         description=row.description,
@@ -181,7 +196,7 @@ def get_instance_detail(
         .outerjoin(ITProduct, ITProduct.id == WorkflowInstance.product_id)
         .outerjoin(Responsible, Responsible.id == WorkflowInstance.responsible_id)
         .options(
-            selectinload(WorkflowInstance.instance_stages),
+            selectinload(WorkflowInstance.instance_stages).selectinload(InstanceStage.responsible),
             selectinload(WorkflowInstance.tasks),
         )
         .where(WorkflowInstance.id == instance_id)
@@ -219,7 +234,7 @@ def _to_detail(instance: WorkflowInstance, university_name: str,
         days_overdue=days,
         created_at=instance.created_at,
         updated_at=instance.updated_at,
-        stages=[_stage_to_read(r, day, task_counts.get(r.template_stage_id, (0, 0))) for r in rows],
+        stages=[_stage_to_read(r, day, task_counts.get(r.template_stage_id, (0, 0)), (instance.responsible_id, responsible_name, responsible_email, responsible_phone)) for r in rows],
         university_name=university_name,
         university_city=university_city,
         program_name=program_name,
@@ -256,7 +271,7 @@ def list_instance_page(db: Session, user, page: int, page_size: int, university_
         .outerjoin(ITProduct, ITProduct.id == WorkflowInstance.product_id)
         .outerjoin(Responsible, Responsible.id == WorkflowInstance.responsible_id)
         .options(
-            selectinload(WorkflowInstance.instance_stages),
+            selectinload(WorkflowInstance.instance_stages).selectinload(InstanceStage.responsible),
             selectinload(WorkflowInstance.tasks),
         )
         .where(WorkflowInstance.id.in_(ids))
@@ -471,7 +486,6 @@ def set_instance_responsible(
         if linked is None:
             raise NotFound("Responsible is not linked to university")
     instance.responsible_id = responsible_id
-    db.commit()
     if "audit_context" in db.info:
         from app.modules.audit.service import AuditService, context_for
 
@@ -484,8 +498,47 @@ def set_instance_responsible(
             old_value={"responsible_id": str(old_responsible_id) if old_responsible_id else None},
             new_value={"responsible_id": str(responsible_id) if responsible_id else None},
         )
-        db.commit()
+    db.commit()
     return get_instance_detail(db, instance.id)
+
+
+def set_instance_stage_responsible(
+    db: Session,
+    instance_id: uuid.UUID,
+    stage_id: uuid.UUID,
+    responsible_id: uuid.UUID | None,
+    actor_sub: str = "",
+) -> InstanceDetail:
+    """Set one runtime stage override; None restores the workflow default."""
+    instance = get_instance_or_404(db, instance_id)
+    stage = db.get(InstanceStage, stage_id)
+    if stage is None or stage.instance_id != instance_id:
+        raise NotFound("Workflow stage not found")
+    if responsible_id is not None:
+        if db.get(Responsible, responsible_id) is None:
+            raise NotFound("Responsible not found")
+        linked = db.scalar(select(UniversityResponsible.id).where(
+            UniversityResponsible.university_id == instance.university_id,
+            UniversityResponsible.responsible_id == responsible_id,
+        ))
+        if linked is None:
+            raise NotFound("Responsible is not linked to university")
+    previous = stage.responsible_id
+    if previous == responsible_id:
+        return get_instance_detail(db, instance_id)
+    stage.responsible_id = responsible_id
+    if "audit_context" in db.info:
+        from app.modules.audit.service import AuditService, context_for
+
+        AuditService(db).log_event(
+            context=context_for(db, actor_sub or "system"),
+            action="UPDATE", entity_type="workflow_instance",
+            entity_id=instance.id, university_id=instance.university_id,
+            old_value={"stage_id": str(stage_id), "stage_name": stage.name, "stage_responsible_id": str(previous) if previous else None},
+            new_value={"stage_id": str(stage_id), "stage_name": stage.name, "stage_responsible_id": str(responsible_id) if responsible_id else None},
+        )
+    db.commit()
+    return get_instance_detail(db, instance_id)
 
 
 def set_instance_stage_due_date(

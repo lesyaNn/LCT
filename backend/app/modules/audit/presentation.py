@@ -83,6 +83,7 @@ FIELD_LABELS: dict[str, str] = {
     "template_id": "Шаблон Workflow",
     "template_name": "Шаблон Workflow",
     "responsible_id": "Ответственный",
+    "stage_responsible_id": "Ответственный этапа",
     "responsible_name": "Ответственный",
     "old_name": "Ответственный",
     "new_name": "Ответственный",
@@ -602,6 +603,19 @@ def _summarize(
         return {"title": f"Запустил Workflow {quote(template)}{where}",
                 "section": "Workflow", "object_name": template,
                 "changes": [], "note": None}
+
+    if entity_key == "workflow_instance" and action == "UPDATE":
+        old_map = old if isinstance(old, dict) else {}
+        new_map = new if isinstance(new, dict) else {}
+        key = "stage_responsible_id" if "stage_responsible_id" in new_map else "responsible_id"
+        if key in new_map:
+            old_name = _resolve_reference(old_map.get(key), None, names, "Не назначен") if old_map.get(key) else "Не назначен"
+            new_name = _resolve_reference(new_map.get(key), None, names, "Не назначен") if new_map.get(key) else "Не назначен"
+            stage_name = new_map.get("stage_name") if key == "stage_responsible_id" else None
+            target = f"этапа {quote(stage_name)}" if isinstance(stage_name, str) and stage_name else "Workflow"
+            return {"title": f"Изменил ответственного {target}: {quote(old_name)} → {quote(new_name)}",
+                    "section": "Workflow", "object_name": stage_name or uni,
+                    "changes": [{"field": key, "label": "Ответственный этапа" if stage_name else "Ответственный Workflow", "old": old_name, "new": new_name}], "note": None}
 
     # ---- comments ----
     if entity_key == "workflow_comment":

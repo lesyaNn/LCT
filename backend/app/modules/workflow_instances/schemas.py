@@ -26,13 +26,17 @@ class InstanceResponsibleUpdate(BaseModel):
     responsible_id: uuid.UUID | None = Field(default=None)
 
 
+class InstanceStageResponsibleUpdate(BaseModel):
+    responsible_id: uuid.UUID | None = Field(default=None)
+
+
 class InstanceStageDueDateUpdate(BaseModel):
     due_date: date | None
 
 
 class WorkflowActivityRead(BaseModel):
     id: uuid.UUID
-    type: Literal["responsible_changed", "deadline_changed"]
+    type: Literal["responsible_changed", "stage_responsible_changed", "deadline_changed"]
     created_at: datetime
     actor_name: str
     stage_id: uuid.UUID | None = None
@@ -45,6 +49,11 @@ class InstanceStageRead(BaseModel):
 
     id: uuid.UUID
     template_stage_id: uuid.UUID | None
+    responsible_id: uuid.UUID | None = None
+    effective_responsible_id: uuid.UUID | None = None
+    responsible_name: str | None = None
+    responsible_email: str | None = None
+    responsible_phone: str | None = None
     order_index: int
     name: str
     description: str | None

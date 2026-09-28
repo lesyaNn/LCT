@@ -28,6 +28,7 @@ from app.modules.workflow_instances.schemas import (
     InstanceCreate,
     InstanceDetail,
     InstanceResponsibleUpdate,
+    InstanceStageResponsibleUpdate,
     InstanceStageDueDateUpdate,
     WorkflowActivityRead,
     WorkflowTaskRead,
@@ -42,6 +43,7 @@ router = APIRouter(prefix="/workflow", tags=["Workflow"])
 
 READ = require_permission("workflow.read")
 WRITE = require_permission("workflow.change_status")
+ASSIGN = require_permission("university_responsible.manage")
 
 
 @router.post(
@@ -137,12 +139,31 @@ def update_workflow_instance_responsible(
     instance_id: uuid.UUID,
     data: InstanceResponsibleUpdate,
     db: Session = Depends(get_audit_db),
-    user: CurrentUser = Depends(WRITE),
+    user: CurrentUser = Depends(ASSIGN),
 ) -> InstanceDetail:
     detail = service.get_instance_detail(db, instance_id)
     service.authorize_scope(user, detail)
     return service.set_instance_responsible(
         db, instance_id, data.responsible_id, actor_sub=user.id
+    )
+
+
+@router.patch(
+    "/instances/{instance_id}/stages/{stage_id}/responsible",
+    response_model=InstanceDetail,
+    summary="Assign or clear a runtime stage responsible override",
+)
+def update_workflow_stage_responsible(
+    instance_id: uuid.UUID,
+    stage_id: uuid.UUID,
+    data: InstanceStageResponsibleUpdate,
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(ASSIGN),
+) -> InstanceDetail:
+    detail = service.get_instance_detail(db, instance_id)
+    service.authorize_scope(user, detail)
+    return service.set_instance_stage_responsible(
+        db, instance_id, stage_id, data.responsible_id, actor_sub=user.id
     )
 
 

@@ -1,7 +1,8 @@
 """P2-01-03/P2-01-02 canonical ORM for the workflow instances pipeline.
 
 Runtime-only description of SQL migrations ``000012_workflow_instances``,
-``000013_instance_stages`` and ``000014_transition_history_restrict`` (which
+``000013_instance_stages``, ``000014_transition_history_restrict`` and
+``000038_instance_stage_responsible`` (which
 are the schema source of truth): types, nullability, FK, constraints and
 indexes mirror the ``*.up.sql`` exactly. Never drives DDL.
 
@@ -366,6 +367,16 @@ class InstanceStage(UUIDPKMixin, TimestampMixin, Base):
         nullable=True,
         default=None,
     )
+    responsible_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(
+            "responsibles.id",
+            name="fk_instance_stages_responsible_id_responsibles",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+        default=None,
+    )
+    responsible: Mapped["Responsible"] = relationship("Responsible", lazy="selectin")
     order_index: Mapped[int] = mapped_column(Integer, nullable=False)
     name: Mapped[str] = mapped_column(String(512), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
