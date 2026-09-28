@@ -488,7 +488,7 @@ export function UniversitiesList() {
     { id: 'programs', accessorFn: (row) => row.programsCount, enableSorting: UNIVERSITY_LIST_CAPABILITIES.sorts.programs, header: 'Программы', cell: ({ row }) => <ProgramsCell item={row.original} /> },
     { id: 'stage', accessorFn: (row) => row.currentStage.name, enableSorting: UNIVERSITY_LIST_CAPABILITIES.sorts.stage, header: 'Текущий этап', cell: ({ row }) => <StageBadge item={row.original} /> },
     { id: 'last_interaction', accessorFn: (row) => row.lastInteractionAt, enableSorting: UNIVERSITY_LIST_CAPABILITIES.sorts.last_interaction, header: 'Последнее взаимодействие', cell: ({ row }) => row.original.availability?.lastInteraction === false ? '—' : <time dateTime={row.original.lastInteractionAt} title={formatFullDate(row.original.lastInteractionAt)}>{formatRelativeTime(row.original.lastInteractionAt)}</time> },
-    { id: 'attention', enableSorting: false, header: 'Attention', cell: ({ row }) => <AttentionIndicator active={row.original.attention} /> },
+    { id: 'attention', enableSorting: false, header: 'Требует внимания', cell: ({ row }) => <AttentionIndicator active={row.original.attention} /> },
   ], []);
 
   // TanStack Table intentionally returns an imperative table instance; React Compiler cannot memoize it safely.

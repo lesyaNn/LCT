@@ -111,6 +111,50 @@ class UniversityRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class UniversityListStage(BaseModel):
+    """Current workflow stage pointer for the universities list.
+
+    ``code`` carries the runtime instance-stage id (opaque pointer for
+    filtering/debugging); the UI displays only ``name`` (human-readable,
+    never a UUID).
+    """
+
+    code: str = Field(examples=["Согласование программы"])
+    name: str = Field(examples=["Согласование программы"])
+
+    model_config = {"from_attributes": True}
+
+
+class UniversityListItem(UniversityRead):
+    """Presentation DTO for GET /universities (list only).
+
+    Extends the flat ``UniversityRead`` with aggregated relations so the
+    "Вузы" table can render without per-row requests. All aggregates are
+    computed batch-side in the repository (constant SELECTs per page,
+    never N+1); missing relations surface as None/0/False and the UI
+    renders "—".
+    Sources (existing bindings only, no new entities):
+    * ``responsible`` — primary (``is_primary``) row of
+      ``university_responsibles``, fallback to the first link alphabetically;
+    * ``programs_count`` / ``program_status_counts`` — GROUP BY over
+      ``university_programs.status``;
+    * ``current_stage`` — current ``InstanceStage.name`` of the latest
+      ``workflow_instances`` row of the university (any status);
+    * ``last_interaction_at`` — GREATEST(max(``meetings.meeting_at``),
+      max(``interaction_notes.created_at``)) — the frozen P4-02-02 FULL rule;
+    * ``attention`` — existing overdue signal reused: an overdue open stage
+      or an overdue open task (P2 canonical ``due_date < today`` rule) on an
+      ACTIVE workflow instance.
+    """
+
+    responsible: ResponsibleShort | None = None
+    programs_count: int = 0
+    program_status_counts: dict[str, int] = Field(default_factory=dict)
+    current_stage: UniversityListStage | None = None
+    last_interaction_at: datetime | None = None
+    attention: bool = False
+
+
 class UniversityDetail(UniversityRead):
     # M:N via university_responsibles (the ONLY university<->responsible
     # binding). Loaded with ONE join query, never per-item.
@@ -411,6 +455,8 @@ __all__ = [
     "ResponsibleShort",
     "ResponsibleUpdate",
     "UniversityDetail",
+    "UniversityListItem",
+    "UniversityListStage",
     "UniversityRead",
     "UniversityResponsibleRead",
     "VendorDetail",
