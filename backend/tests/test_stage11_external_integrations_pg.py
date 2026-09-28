@@ -68,9 +68,9 @@ def test_mock_sync_read_metrics_and_exact_id_dedup(engine):
         assert service.metrics(db)["website_applications_7d"] == 1
         scoped_out = service.metrics(db, CurrentUser(id="outside", roles={"user"}, university_ids=()))
         assert scoped_out["website_applications_7d"] is None
-        assert service.university_data(db, university_id, "lms")["students"] == []
+        assert service.university_data(db, university_id, "lms")["programs"] == []
         assert service.sync_mock(db, university_id, "lms")["processed"] == 1
-        assert service.university_data(db, university_id, "lms")["students"][0]["source"] == "mock_lms"
+        assert service.university_data(db, university_id, "lms")["programs"][0]["source"] == "mock_lms"
         external_id = applications["applications"][0]["id"]
         service.upsert_application(db, {
             "external_id": external_id, "university_id": university_id,
@@ -116,7 +116,7 @@ def test_unavailable_never_falls_back_to_mock(engine):
         with pytest.raises(BusinessException) as err:
             service.sync_mock(db, university_id, "lms")
         assert err.value.code.value == "EXTERNAL_SOURCE_UNAVAILABLE"
-        assert service.university_data(db, university_id, "lms")["students"] == []
+        assert service.university_data(db, university_id, "lms")["programs"] == []
 
 
 def test_website_without_source_state_is_unconfigured(engine):
@@ -173,7 +173,7 @@ def test_http_permissions_unavailable_and_no_fixture_leak(engine):
         assert client.post("/api/v1/integrations/sync", json={"university_id": str(university_id), "source": "website"}).status_code == 200
         assert client.post("/api/v1/integrations/sync", json={"university_id": str(university_id), "source": "lms"}).status_code == 200
         assert client.get(path, params={"source": "website"}).json()["applications"][0]["applications_count"] == 1
-        assert client.get(path, params={"source": "lms"}).json()["students"][0]["source"] == "mock_lms"
+        assert client.get(path, params={"source": "lms"}).json()["programs"][0]["source"] == "mock_lms"
         settings.external_adapter_mode = "disabled"
         unavailable = client.get(path, params={"source": "website"})
         assert unavailable.status_code == 200

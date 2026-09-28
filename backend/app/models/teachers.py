@@ -32,7 +32,7 @@ class Teacher(UUIDPKMixin, TimestampMixin, Base):
         nullable=False,
     )
     full_name: Mapped[str] = mapped_column(String(512), nullable=False)
-    email: Mapped[str] = mapped_column(String(512), unique=True, nullable=False)
+    email: Mapped[str | None] = mapped_column(String(512), unique=True, nullable=True)
     phone: Mapped[str | None] = mapped_column(String(64), nullable=True, default=None)
     position: Mapped[str] = mapped_column(String(256), nullable=False, default="")
 
@@ -135,5 +135,9 @@ class TeacherProgram(UUIDPKMixin, TimestampMixin, Base):
     )
     can_teach: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     assigned_at: Mapped[date] = mapped_column(Date, nullable=False)
+    training_status: Mapped[str] = mapped_column(String(32), nullable=False, default="not_started")
+    qualification_status: Mapped[str] = mapped_column(String(32), nullable=False, default="not_started")
+    last_training_at: Mapped[date | None] = mapped_column(Date, nullable=True)
+    next_qualification_due_at: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     teacher: Mapped["Teacher"] = relationship(back_populates="teacher_programs")

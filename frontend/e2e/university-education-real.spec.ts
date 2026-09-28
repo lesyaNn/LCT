@@ -15,15 +15,13 @@ test('university education sections load on desktop and mobile', async ({ page }
 
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 900 });
-    await page.goto(`/universities/${universityId}?tab=students`);
-    const learners = page.locator('section[aria-label="Обучающиеся"]');
+    await page.goto(`/universities/${universityId}?tab=programs`);
+    const learners = page.locator('section[aria-label="Статистика обучения"]');
     await expect(learners).toBeVisible();
     await expect(learners.getByText('Потоков')).toBeVisible();
-    await expect(learners.getByRole('button', { name: 'Добавить' })).toBeVisible();
-    await page.goto(`/universities/${universityId}?tab=teachers`);
-    const teachers = page.locator('section[aria-label="Преподаватели"]');
+    const teachers = page.locator('section[aria-label="Обучение преподавателей"]');
     await expect(teachers).toBeVisible();
-    await expect(teachers.getByRole('button', { name: 'Добавить преподавателя' })).toBeVisible();
+    await expect(teachers.getByRole('button', { name: 'Назначить преподавателя' })).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);
   }
 });

@@ -1,58 +1,43 @@
-"""University-scoped educator API contracts."""
+"""Minimal university/program teacher training contract."""
 
-from datetime import date, datetime
+from datetime import date
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+TrainingStatus = Literal["not_started", "in_progress", "completed", "needs_review"]
 
 
 class TeacherCreate(BaseModel):
     full_name: str = Field(min_length=1, max_length=512)
-    email: str = Field(min_length=3, max_length=512)
-    phone: str | None = Field(default=None, max_length=64)
-    position: str = Field(default="", max_length=256)
+    program_id: UUID
 
 
 class TeacherUpdate(BaseModel):
-    full_name: str | None = Field(default=None, min_length=1, max_length=512)
-    email: str | None = Field(default=None, min_length=3, max_length=512)
-    phone: str | None = Field(default=None, max_length=64)
-    position: str | None = Field(default=None, max_length=256)
-
-
-class QualificationCreate(BaseModel):
-    qualification_name: str = Field(min_length=1, max_length=512)
-    obtained_at: date
-    expires_at: date | None = None
-    document_ref: str | None = Field(default=None, max_length=1024)
-
-
-class CertificateCreate(BaseModel):
-    certificate_name: str = Field(min_length=1, max_length=512)
-    issued_by: str = Field(default="", max_length=512)
-    issued_at: date
-    expires_at: date | None = None
-    is_mandatory: bool = False
-    program_id: UUID | None = None
-    document_ref: str | None = Field(default=None, max_length=1024)
+    full_name: str = Field(min_length=1, max_length=512)
 
 
 class TeacherProgramCreate(BaseModel):
     program_id: UUID
-    can_teach: bool = True
-    assigned_at: date
+    training_status: TrainingStatus = "not_started"
+    qualification_status: TrainingStatus = "not_started"
+    last_training_at: date | None = None
+    next_qualification_due_at: date | None = None
 
 
-class QualificationRead(QualificationCreate):
-    model_config = ConfigDict(from_attributes=True)
-    id: UUID
-    created_at: datetime
+class TeacherProgramUpdate(BaseModel):
+    training_status: TrainingStatus | None = None
+    qualification_status: TrainingStatus | None = None
+    last_training_at: date | None = None
+    next_qualification_due_at: date | None = None
 
-
-class CertificateRead(CertificateCreate):
-    model_config = ConfigDict(from_attributes=True)
-    id: UUID
-    created_at: datetime
+    @model_validator(mode="after")
+    def statuses_cannot_be_cleared(self):
+        for field in ("training_status", "qualification_status"):
+            if field in self.model_fields_set and getattr(self, field) is None:
+                raise ValueError(f"{field} cannot be null")
+        return self
 
 
 class TeacherProgramRead(TeacherProgramCreate):
@@ -60,12 +45,9 @@ class TeacherProgramRead(TeacherProgramCreate):
     id: UUID
 
 
-class TeacherRead(TeacherCreate):
+class TeacherRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     university_id: UUID
-    created_at: datetime
-    updated_at: datetime
-    qualifications: list[QualificationRead] = Field(default_factory=list)
-    certificates: list[CertificateRead] = Field(default_factory=list)
-    teacher_programs: list[TeacherProgramRead] = Field(default_factory=list)
+    full_name: str
+    teacher_programs: list[TeacherProgramRead]

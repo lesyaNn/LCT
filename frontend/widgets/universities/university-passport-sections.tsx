@@ -28,6 +28,7 @@ import { normalizeApiError } from '@/shared/lib/api-errors';
 import { adminUsersQueryKeys, assignUniversityResponsible, listResponsibleCandidates } from '@/shared/lib/users-repository';
 import { queryKeys } from '@/shared/lib/query-keys';
 import { formatDateRu, formatDateTimeRu } from '@/shared/lib/formatters';
+import { educationKeys, educationStatistics, type ProgramEducationStats } from '@/shared/lib/education-repository';
 import {
   createWorkflowFromExternal,
   getUniversityExternalData,
@@ -96,6 +97,7 @@ function ProgramFilter({ value, onChange }: { value: ProgramStatus | 'all'; onCh
 
 type ProgramViewRow = UniversityProgramRow & {
   externalApplication?: ExternalApplication;
+  education?: ProgramEducationStats;
 };
 
 function ProgramRow({ row }: { row: ProgramViewRow }) {
@@ -105,13 +107,6 @@ function ProgramRow({ row }: { row: ProgramViewRow }) {
 function SyncMeta({ source, syncedAt, mode }: { source: 'LMS' | 'Сайт' | 'Ручные данные'; syncedAt: string | null; mode?: 'real' | 'mock' | 'import' | 'unconfigured' }) {
   if (mode === 'unconfigured') return <StatusBadge intent="neutral">Данные сайта не подключены</StatusBadge>;
   return <div className={styles.integrationMeta}><StatusBadge data-testid={source === 'LMS' ? 'external-badge' : undefined} intent={source === 'Ручные данные' ? 'neutral' : 'brand'}>{source}{mode === 'mock' ? ' · тест' : mode === 'import' ? ' · импорт' : ''}</StatusBadge><Tooltip content={<span>{syncedAt ? formatDateTimeRu(syncedAt) : 'Дата синхронизации недоступна'}</span>}><time data-testid="sync-date" dateTime={syncedAt ?? undefined}>Синхронизировано: {syncedAt ? formatDate(syncedAt) : 'недоступно'}</time></Tooltip></div>;
-}
-
-function demandLabel(score: number | null): string {
-  if (score === null) return 'Нет данных';
-  if (score >= 75) return `Высокий (${score}/100)`;
-  if (score >= 45) return `Средний (${score}/100)`;
-  return `Низкий (${score}/100)`;
 }
 
 function ExternalUnavailableNotice({ source, error, onRetry }: { source: 'LMS' | 'сайта'; error: unknown; onRetry: () => void }) {
@@ -140,6 +135,7 @@ function ProgramsSection({ id }: { id: string }) {
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: universityProgramsQueryKey(id, page, 20, statusFilter), queryFn: ({ signal }) => getUniversityPrograms(id, page, 20, signal, statusFilter), placeholderData: keepPreviousData, staleTime: 30_000 });
   const websiteQuery = useQuery({ queryKey: universityExternalDataQueryKey(id, 'website'), queryFn: () => getUniversityExternalData(id, 'website'), enabled: UNIVERSITY_PASSPORT_CAPABILITIES.externalData, staleTime: 30_000 });
+  const educationQuery = useQuery({ queryKey: educationKeys.stats(id), queryFn: () => educationStatistics(id), staleTime: 30_000 });
   const createMutation = useMutation({
     mutationFn: (externalId: string) => createWorkflowFromExternal({ universityId: id, source: 'website', externalId }),
     onSuccess: async (result) => {
@@ -172,8 +168,9 @@ function ProgramsSection({ id }: { id: string }) {
     const base = query.data?.items ?? [];
     const applications = websiteQuery.data?.applications ?? [];
     const byId = new Map(applications.filter((application) => application.programId).map((application) => [application.programId, application]));
-    return base.map((row) => ({ ...row, externalApplication: byId.get(row.id) }));
-  }, [query.data, websiteQuery.data]);
+    const education = new Map(educationQuery.data?.programs.map((program) => [program.program_id, program]) ?? []);
+    return base.map((row) => ({ ...row, externalApplication: byId.get(row.id), education: education.get(row.id) }));
+  }, [query.data, websiteQuery.data, educationQuery.data]);
   const columns: PassportTableColumn<ProgramViewRow>[] = [
     { id: 'direction', label: 'Направление', sortable: true, sortValue: (row) => row.direction, render: (row) => row.direction },
     { id: 'name', label: 'Программа', sortable: true, sortValue: (row) => row.name, render: (row) => <ProgramRow row={row} /> },
@@ -181,7 +178,10 @@ function ProgramsSection({ id }: { id: string }) {
     { id: 'launchDate', label: 'Дата запуска', sortable: true, sortValue: (row) => row.launchDate, render: (row) => formatDate(row.launchDate) },
     { id: 'responsible', label: 'Ответственный', sortable: true, sortValue: (row) => row.responsible?.name ?? '', render: (row) => row.responsible?.name ?? 'Не назначен' },
     { id: 'applications', label: 'Заявки с сайта', sortable: true, sortValue: (row) => row.externalApplication?.applicationsCount ?? 0, render: (row) => row.externalApplication?.applicationsCount ?? '—' },
-    { id: 'demand', label: 'Спрос', sortable: true, sortValue: (row) => row.externalApplication?.demandScore ?? -1, render: (row) => demandLabel(row.externalApplication?.demandScore ?? null) },
+    { id: 'learners', label: 'Обучающиеся', sortable: true, sortValue: (row) => row.education?.learners_count ?? 0, render: (row) => row.education?.learner_source ? row.education.learners_count : '—' },
+    { id: 'flows', label: 'Потоки', sortable: true, sortValue: (row) => row.education?.flows_count ?? 0, render: (row) => row.education?.learner_source ? row.education.flows_count : '—' },
+    { id: 'lmsSource', label: 'Обучение: источник', render: (row) => row.education?.learner_source === 'mock_lms' ? 'LMS · TEST/DEMO' : row.education?.learner_source === 'lms' ? 'LMS' : row.education?.learner_source === 'manual' ? 'Ранее внесённые данные' : '—' },
+    { id: 'lmsSync', label: 'Обучение: обновлено', render: (row) => row.education?.learner_synced_at ? formatDate(row.education.learner_synced_at) : '—' },
     { id: 'source', label: 'Источник', render: (row) => row.externalApplication ? <StatusBadge intent="brand">{websiteQuery.data?.mode === 'import' ? 'Импорт' : 'Сайт'}</StatusBadge> : <StatusBadge intent="neutral">Ручные данные</StatusBadge> },
     { id: 'sync', label: 'Синхронизация', render: (row) => row.externalApplication ? <time dateTime={row.externalApplication.syncedAt ?? undefined}>{row.externalApplication.syncedAt ? formatDate(row.externalApplication.syncedAt) : '—'}</time> : '—' },
     { id: 'actions', label: 'Workflow', render: (row) => row.externalApplication ? applicationAction(row.externalApplication) : '—' },
@@ -191,7 +191,9 @@ function ProgramsSection({ id }: { id: string }) {
     { label: 'Направление', render: (row) => row.direction },
     { label: 'Статус', render: (row) => <ProgramStatusBadge status={row.status} /> },
     { label: 'Заявки с сайта', render: (row) => row.externalApplication?.applicationsCount ?? '—' },
-    { label: 'Спрос', render: (row) => demandLabel(row.externalApplication?.demandScore ?? null) },
+    { label: 'Обучающиеся', render: (row) => row.education?.learner_source ? row.education.learners_count : '—' },
+    { label: 'Потоки', render: (row) => row.education?.learner_source ? row.education.flows_count : '—' },
+    { label: 'Обучение: источник', render: (row) => row.education?.learner_source === 'mock_lms' ? 'LMS · TEST/DEMO' : row.education?.learner_source === 'lms' ? 'LMS' : row.education?.learner_source === 'manual' ? 'Ранее внесённые данные' : '—' },
     { label: 'Источник', render: (row) => row.externalApplication ? <StatusBadge intent="brand">{websiteQuery.data?.mode === 'import' ? 'Импорт' : 'Сайт'}</StatusBadge> : <StatusBadge intent="neutral">Ручные данные</StatusBadge> },
     { label: 'Синхронизация', render: (row) => row.externalApplication?.syncedAt ? formatDate(row.externalApplication.syncedAt) : '—' },
     { label: 'Workflow', render: (row) => row.externalApplication ? applicationAction(row.externalApplication) : '—' },

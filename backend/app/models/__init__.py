@@ -41,12 +41,12 @@ from app.models.report_job import (  # noqa: F401
     ReportJob,
 )
 from app.models.report_template import ReportTemplate  # noqa: F401
+from app.models.education import ProgramEducationStats  # noqa: F401
 from app.models.interactions import (  # noqa: F401
     Document,
     InteractionNote,
     Meeting,
     MeetingDocument,
-    Student,
     UniversityProduct,
     UniversityProgram,
 )
@@ -76,7 +76,7 @@ __all__ = [
     "Responsible",
     "UniversityResponsible",
     "UniversityProgram",
-    "Student",
+    "ProgramEducationStats",
     "Teacher",
     "TeacherQualification",
     "TeacherCertificate",

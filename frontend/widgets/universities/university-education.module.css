@@ -9,8 +9,5 @@
 .form label { display: grid; gap: 6px; font-size: 14px; }
 .actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .error { color: #bd3030; }
-.teacherDetails { display: grid; gap: 10px; padding: 12px 0; }
-.teacherDetails h3 { margin: 8px 0 0; font-size: 16px; }
-.teacherDetails ul { margin: 0; padding-left: 20px; }
-.teacherActions { display: flex; gap: 8px; flex-wrap: wrap; }
+.meta { margin: 0; color: #617080; font-size: 13px; }
 @media (max-width: 600px) { .section { padding: 16px; } .metric { flex: 1 1 100px; } }

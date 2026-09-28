@@ -40,7 +40,7 @@ import { MetricCardSkeleton, Skeleton, SkeletonGroup } from '@/shared/ui/skeleto
 import { UniversityHistory } from './university-history';
 import { DocumentsSection, LicensesSection, MeetingsSection, ProductsSection, ProgramsSection, ResponsiblesSection } from './university-passport-sections';
 import { UniversityWorkflow } from './university-workflow';
-import { StudentsSection, TeachersSection } from './university-education';
+import { EducationOverview, TeachersSection } from './university-education';
 import styles from './university-passport.module.css';
 
 const mobileLayoutQuery = '(max-width: 768px)';
@@ -57,10 +57,8 @@ function isMobileLayout() {
 
 const tabDefinitions = [
   { id: 'overview', label: 'Обзор' },
-  { id: 'programs', label: 'Программы' },
+  { id: 'programs', label: 'Программы и обучение' },
   { id: 'products', label: 'Продукты' },
-  { id: 'teachers', label: 'Преподаватели' },
-  { id: 'students', label: 'Обучающиеся' },
   { id: 'licenses', label: 'Лицензии' },
   { id: 'documents', label: 'Документы' },
   { id: 'meetings', label: 'Встречи' },
@@ -74,6 +72,7 @@ type PassportTabId = (typeof tabDefinitions)[number]['id'];
 const tabIds = new Set<PassportTabId>(tabDefinitions.map((tab) => tab.id));
 
 function parseTab(value: string | null): PassportTabId {
+  if (value === 'students' || value === 'teachers') return 'programs';
   return value && tabIds.has(value as PassportTabId) ? value as PassportTabId : 'overview';
 }
 
@@ -199,13 +198,9 @@ export function UniversityPassport({ id }: { id: string }) {
   const renderContent = (tab: PassportTabId) => tab === 'overview'
     ? <OverviewContent passport={passport} canAdvance={canAdvance} onTabChange={selectTab} />
     : tab === 'programs'
-      ? <ProgramsSection id={id} />
+      ? <><ProgramsSection id={id} /><EducationOverview id={id} /><TeachersSection id={id} /></>
     : tab === 'products'
       ? <ProductsSection id={id} />
-    : tab === 'teachers'
-      ? <TeachersSection id={id} />
-    : tab === 'students'
-      ? <StudentsSection id={id} />
     : tab === 'licenses'
       ? <LicensesSection id={id} />
     : tab === 'documents'

@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import uuid
 from typing import Literal
-from datetime import date, datetime
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 
 from app.core.permissions import require_permission
@@ -20,7 +20,6 @@ from app.db.session import get_db
 from app.modules.audit.service import get_audit_db
 from app.modules.integrations import service
 from app.modules.workflow_instances.service import require_university_scope
-from app.modules.students.schemas import StudentStatus
 
 router = APIRouter(tags=["External integrations"])
 
@@ -37,20 +36,23 @@ class ExternalWorkflowRequest(BaseModel):
     template_id: uuid.UUID | None = None
 
 
-class LmsLearnerRecord(BaseModel):
-    """CRM-owned JSON contract; not a claim about the customer's LMS API."""
-    external_id: str = Field(min_length=1, max_length=256)
+class LmsProgramStatsRecord(BaseModel):
+    """CRM-owned aggregate contract; no individual learner fields."""
     program_id: uuid.UUID
-    full_name: str = Field(min_length=1, max_length=512)
-    group_name: str | None = Field(default=None, max_length=256)
-    status: StudentStatus = StudentStatus.ACTIVE
-    started_at: date
-    progress: int | None = Field(default=None, ge=0, le=100)
+    learners_count: int = Field(ge=0)
+    flows_count: int = Field(ge=0)
 
 
 class LmsIngestRequest(BaseModel):
     university_id: uuid.UUID
-    learners: list[LmsLearnerRecord] = Field(max_length=1000)
+    programs: list[LmsProgramStatsRecord] = Field(max_length=1000)
+
+    @model_validator(mode="after")
+    def unique_programs(self):
+        ids = [row.program_id for row in self.programs]
+        if len(ids) != len(set(ids)):
+            raise ValueError("program_id must be unique within a batch")
+        return self
 
 
 class WebsiteApplicationRecord(BaseModel):
@@ -84,12 +86,12 @@ def sync_external(req: SyncRequest, db: Session = Depends(get_audit_db),
     return service.sync_mock(db, req.university_id, req.source)
 
 
-@router.post("/integrations/lms/ingest", summary="Ingest CRM-owned LMS JSON contract")
+@router.post("/integrations/lms/ingest", summary="Ingest per-program LMS statistics without learner identities")
 def ingest_lms(req: LmsIngestRequest, db: Session = Depends(get_audit_db),
                user: CurrentUser = Depends(require_permission("university.edit"))) -> dict:
     require_university_scope(user, req.university_id)
     return service.ingest_lms(db, req.university_id,
-                              [item.model_dump(mode="python") for item in req.learners])
+                              [item.model_dump(mode="python") for item in req.programs])
 
 
 @router.post("/integrations/website/ingest", summary="Ingest CRM-owned website JSON contract")

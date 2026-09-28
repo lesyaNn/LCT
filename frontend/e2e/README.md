@@ -127,7 +127,7 @@ E2E_STAGE11_ISOLATED=1 E2E_BASE_URL=http://localhost:23000 E2E_API_URL=http://lo
 ```
 
 The test creates its own catalog/Workflow fixtures, verifies persisted LMS
-students, website aggregate, KPI filter, Workflow repeat, and degraded LMS
+program totals, website aggregate, KPI filter, Workflow repeat, and degraded LMS
 section. It uses the realm's disposable admin fixture unless
 `E2E_STAGE11_ADMIN_USERNAME` / `E2E_STAGE11_ADMIN_PASSWORD` are supplied.
 Afterward, `docker compose -p team26-stage11-e2e -f docker-compose.yml -f

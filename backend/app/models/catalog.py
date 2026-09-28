@@ -30,7 +30,6 @@ if TYPE_CHECKING:  # pragma: no cover
     from app.models.interactions import (
         Document,
         Meeting,
-        Student,
         UniversityProduct,
         UniversityProgram,
     )
@@ -54,7 +53,6 @@ class University(UUIDPKMixin, TimestampMixin, Base):
     )
     licenses: Mapped[list["License"]] = relationship(back_populates="university")
     contracts: Mapped[list["Contract"]] = relationship(back_populates="university")
-    students: Mapped[list["Student"]] = relationship(back_populates="university")
     teachers: Mapped[list["Teacher"]] = relationship(back_populates="university")
     university_programs: Mapped[list["UniversityProgram"]] = relationship(
         back_populates="university", cascade="all, delete-orphan"

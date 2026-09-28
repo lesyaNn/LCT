@@ -1,4 +1,4 @@
-"""University educator records; manager/admin writes reuse university.edit."""
+"""Contextual teacher training API; no global HR catalogue."""
 
 from uuid import UUID
 
@@ -11,12 +11,11 @@ from app.db.session import get_db
 from app.modules.audit.service import get_audit_db
 from app.modules.teachers import service
 from app.modules.teachers.schemas import (
-    CertificateCreate, QualificationCreate, TeacherCreate, TeacherProgramCreate,
-    TeacherRead, TeacherUpdate,
+    TeacherCreate, TeacherProgramCreate, TeacherProgramUpdate, TeacherRead, TeacherUpdate,
 )
 from app.schemas.common import PaginatedResponse
 
-router = APIRouter(tags=["Teachers"])
+router = APIRouter(tags=["Teacher training"])
 READ = require_permission("university.read")
 WRITE = require_permission("university.edit")
 
@@ -37,7 +36,7 @@ def create_teacher(university_id: UUID, data: TeacherCreate,
 
 @router.get("/teachers/{teacher_id}", response_model=TeacherRead)
 def get_teacher(teacher_id: UUID, db: Session = Depends(get_db), user: CurrentUser = Depends(READ)):
-    return service._read(db, teacher_id, user)
+    return service.get_teacher(db, teacher_id, user)
 
 
 @router.patch("/teachers/{teacher_id}", response_model=TeacherRead)
@@ -46,34 +45,13 @@ def update_teacher(teacher_id: UUID, data: TeacherUpdate,
     return service.update_teacher(db, teacher_id, data, user)
 
 
-@router.delete("/teachers/{teacher_id}", status_code=204)
-def delete_teacher(teacher_id: UUID, db: Session = Depends(get_audit_db),
-                   user: CurrentUser = Depends(WRITE)):
-    service.delete_teacher(db, teacher_id, user)
-
-
-@router.post("/teachers/{teacher_id}/qualifications", response_model=TeacherRead)
-def add_qualification(teacher_id: UUID, data: QualificationCreate,
-                      db: Session = Depends(get_audit_db), user: CurrentUser = Depends(WRITE)):
-    return service.add_qualification(db, teacher_id, data, user)
-
-
-@router.post("/teachers/{teacher_id}/certificates", response_model=TeacherRead)
-def add_certificate(teacher_id: UUID, data: CertificateCreate,
-                    db: Session = Depends(get_audit_db), user: CurrentUser = Depends(WRITE)):
-    return service.add_certificate(db, teacher_id, data, user)
-
-
 @router.post("/teachers/{teacher_id}/programs", response_model=TeacherRead)
 def add_program(teacher_id: UUID, data: TeacherProgramCreate,
                 db: Session = Depends(get_audit_db), user: CurrentUser = Depends(WRITE)):
     return service.add_program(db, teacher_id, data, user)
 
 
-@router.delete("/teachers/{teacher_id}/{child_type}/{child_id}", response_model=TeacherRead)
-def remove_child(teacher_id: UUID, child_type: str, child_id: UUID,
-                 db: Session = Depends(get_audit_db), user: CurrentUser = Depends(WRITE)):
-    if child_type not in {"qualifications", "certificates", "programs"}:
-        from app.core.exceptions import NotFound
-        raise NotFound("Teacher record not found")
-    return service.remove_child(db, teacher_id, child_id, child_type, user)
+@router.patch("/teachers/{teacher_id}/programs/{program_id}", response_model=TeacherRead)
+def update_program(teacher_id: UUID, program_id: UUID, data: TeacherProgramUpdate,
+                   db: Session = Depends(get_audit_db), user: CurrentUser = Depends(WRITE)):
+    return service.update_program(db, teacher_id, program_id, data, user)
