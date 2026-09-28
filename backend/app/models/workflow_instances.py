@@ -2,7 +2,7 @@
 
 Runtime-only description of SQL migrations ``000012_workflow_instances``,
 ``000013_instance_stages``, ``000014_transition_history_restrict`` and
-``000038_instance_stage_responsible`` (which
+``000038_instance_stage_responsible`` and ``000039_workflow_instance_archive`` (which
 are the schema source of truth): types, nullability, FK, constraints and
 indexes mirror the ``*.up.sql`` exactly. Never drives DDL.
 
@@ -56,8 +56,8 @@ class WorkflowInstance(UUIDPKMixin, TimestampMixin, Base):
         Index("ix_workflow_instances_template_id", "template_id"),
         Index("ix_workflow_instances_program_id", "program_id"),
         Index("ix_workflow_instances_product_id", "product_id"),
-        Index("uq_workflow_instances_univ_prog_prod", "university_id", "program_id", "product_id", unique=True, postgresql_where=text("program_id IS NOT NULL")),
-        Index("uq_workflow_instances_univ_prog_noprod", "university_id", "program_id", unique=True, postgresql_where=text("program_id IS NOT NULL AND product_id IS NULL")),
+        Index("uq_workflow_instances_univ_prog_prod", "university_id", "program_id", "product_id", unique=True, postgresql_where=text("program_id IS NOT NULL AND status <> 'archived'")),
+        Index("uq_workflow_instances_univ_prog_noprod", "university_id", "program_id", unique=True, postgresql_where=text("program_id IS NOT NULL AND product_id IS NULL AND status <> 'archived'")),
         Index("ix_workflow_instances_current_stage_id", "current_stage_id"),
         Index("ix_workflow_instances_current_instance_stage_id", "current_instance_stage_id"),
         Index("ix_workflow_instances_status", "status"),

@@ -115,6 +115,21 @@ def get_workflow_instance(
     return detail
 
 
+@router.post(
+    "/instances/{instance_id}/archive",
+    response_model=InstanceDetail,
+    summary="Archive an active workflow without deleting its history or files",
+)
+def archive_workflow_instance(
+    instance_id: uuid.UUID,
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(WRITE),
+) -> InstanceDetail:
+    detail = service.get_instance_detail(db, instance_id)
+    service.authorize_scope(user, detail)
+    return service.archive_instance(db, instance_id, actor_sub=user.id)
+
+
 @router.get(
     "/instances/{instance_id}/activity",
     response_model=list[WorkflowActivityRead],
@@ -144,7 +159,8 @@ def update_workflow_instance_responsible(
     detail = service.get_instance_detail(db, instance_id)
     service.authorize_scope(user, detail)
     return service.set_instance_responsible(
-        db, instance_id, data.responsible_id, actor_sub=user.id
+        db, instance_id, data.responsible_id, actor_sub=user.id,
+        replace_stage_overrides=data.replace_stage_overrides,
     )
 
 

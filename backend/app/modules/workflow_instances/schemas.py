@@ -24,6 +24,7 @@ class InstanceCreate(BaseModel):
 
 class InstanceResponsibleUpdate(BaseModel):
     responsible_id: uuid.UUID | None = Field(default=None)
+    replace_stage_overrides: bool = False
 
 
 class InstanceStageResponsibleUpdate(BaseModel):

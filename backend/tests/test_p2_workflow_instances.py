@@ -129,7 +129,7 @@ def test_migration_000012_pair_discoverable_and_latest():
     assert "000019_import_jobs" in versions
     # P4-06-01 retries: attempts counter for the worker claim loop.
     assert "000020_job_attempts" in versions
-    assert versions[-1] == "000038_instance_stage_responsible"
+    assert versions[-1] == "000039_workflow_instance_archive"
     assert versions.index("000011_workflow_templates") < versions.index("000012_workflow_instances")
     assert versions.index("000012_workflow_instances") < versions.index("000013_instance_stages")
     assert versions.index("000013_instance_stages") < versions.index(
@@ -685,6 +685,69 @@ def test_stage_responsible_override_inheritance_and_clear(db):
     detail = instance_service.set_instance_stage_responsible(db, g["instance"].id, stages[1].id, None)
     assert [stage.responsible_name for stage in detail.stages] == ["Волков В.В."] * 3
     assert detail.stages[1].responsible_id is None
+
+
+def test_assign_all_replaces_stage_overrides_in_one_operation(db):
+    from app.models.catalog import UniversityResponsible
+    from app.models.workflow_instances import InstanceStage
+    from app.modules.workflow_instances import service as instance_service
+
+    graph = _mini_instance(db)
+    replacement = Responsible(full_name="Волков В.В.", email=f"all-{_tag()}@example.local", role="manager")
+    db.add(replacement)
+    db.flush()
+    db.add(UniversityResponsible(university_id=graph["university"].id, responsible_id=replacement.id))
+    stages = [InstanceStage(instance_id=graph["instance"].id, order_index=index, name=f"Stage {index}", responsible_id=graph["responsible"].id) for index in range(1, 4)]
+    db.add_all(stages)
+    db.commit()
+
+    detail = instance_service.set_instance_responsible(
+        db, graph["instance"].id, replacement.id, replace_stage_overrides=True
+    )
+    assert detail.responsible_id == replacement.id
+    assert [stage.responsible_id for stage in detail.stages] == [None] * 3
+    assert [stage.effective_responsible_id for stage in detail.stages] == [replacement.id] * 3
+
+
+def test_archive_hides_instance_but_keeps_history_and_stages(db):
+    from app.core.exceptions import BadTransition
+    from app.models.catalog import ITDirection, ITProgram
+    from app.models.workflow_instances import InstanceStage, WorkflowStageTransition
+    from app.modules.workflow_instances import service as instance_service
+    from app.core.security import CurrentUser
+
+    graph = _mini_instance(db)
+    direction = ITDirection(code=f"wf-{_tag()}", name="Test direction")
+    db.add(direction)
+    db.flush()
+    program = ITProgram(direction_id=direction.id, name="Test program", description="")
+    db.add(program)
+    db.flush()
+    graph["instance"].program_id = program.id
+    stage = InstanceStage(instance_id=graph["instance"].id, order_index=1, name="Stage 1")
+    transition = WorkflowStageTransition(instance_id=graph["instance"].id, from_stage_id=None, to_stage_id=graph["stage"].id, actor_keycloak_sub="test")
+    db.add_all([stage, transition])
+    db.commit()
+
+    archived = instance_service.archive_instance(db, graph["instance"].id)
+    assert archived.status == "archived"
+    assert len(archived.stages) == 1
+    assert db.get(WorkflowStageTransition, transition.id) is not None
+    assert instance_service.get_instance_detail(db, graph["instance"].id).status == "archived"
+    assert instance_service.get_instance_by_program(db, graph["university"].id, program.id) is None
+    replacement = WorkflowInstance(
+        university_id=graph["university"].id,
+        template_id=graph["template"].id,
+        program_id=program.id,
+        current_stage_id=graph["stage"].id,
+    )
+    db.add(replacement)
+    db.commit()
+    assert instance_service.get_instance_by_program(db, graph["university"].id, program.id).id == replacement.id
+    items, total = instance_service.list_instance_page(db, CurrentUser(roles={"admin"}), 1, 20)
+    assert total == 1 and items[0].id == replacement.id
+    with pytest.raises(BadTransition):
+        instance_service.set_instance_responsible(db, graph["instance"].id, None)
 
 
 def test_stage_responsible_rejects_foreign_stage_and_unlinked_person(db):

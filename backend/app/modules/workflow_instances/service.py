@@ -250,12 +250,13 @@ def get_instance_by_program(db: Session, university_id: uuid.UUID, program_id: u
     instance_id = db.scalar(select(WorkflowInstance.id).where(
         WorkflowInstance.university_id == university_id,
         WorkflowInstance.program_id == program_id,
+        WorkflowInstance.status != "archived",
     ))
     return get_instance_detail(db, instance_id) if instance_id else None
 
 
 def list_instance_page(db: Session, user, page: int, page_size: int, university_id: uuid.UUID | None = None):
-    stmt = select(WorkflowInstance.id)
+    stmt = select(WorkflowInstance.id).where(WorkflowInstance.status != "archived")
     if university_id is not None:
         stmt = stmt.where(WorkflowInstance.university_id == university_id)
     stmt = apply_university_scope(stmt, WorkflowInstance.university_id, user)
@@ -466,6 +467,7 @@ def set_instance_responsible(
     instance_id: uuid.UUID,
     responsible_id: uuid.UUID | None,
     actor_sub: str = "",
+    replace_stage_overrides: bool = False,
 ) -> InstanceDetail:
     """Assign (or clear) the instance responsible.
 
@@ -473,6 +475,8 @@ def set_instance_responsible(
     (``university_responsibles``) can be assigned; ``None`` clears it.
     """
     instance = get_instance_or_404(db, instance_id)
+    if instance.status == "archived":
+        raise BadTransition("Archived Workflow cannot be changed")
     old_responsible_id = instance.responsible_id
     if responsible_id is not None:
         if db.get(Responsible, responsible_id) is None:
@@ -486,6 +490,22 @@ def set_instance_responsible(
         if linked is None:
             raise NotFound("Responsible is not linked to university")
     instance.responsible_id = responsible_id
+    if replace_stage_overrides:
+        for stage in instance.instance_stages:
+            previous_stage_responsible = stage.responsible_id
+            if previous_stage_responsible is None:
+                continue
+            stage.responsible_id = None
+            if "audit_context" in db.info:
+                from app.modules.audit.service import AuditService, context_for
+
+                AuditService(db).log_event(
+                    context=context_for(db, actor_sub or "system"),
+                    action="UPDATE", entity_type="workflow_instance",
+                    entity_id=instance.id, university_id=instance.university_id,
+                    old_value={"stage_id": str(stage.id), "stage_name": stage.name, "stage_responsible_id": str(previous_stage_responsible)},
+                    new_value={"stage_id": str(stage.id), "stage_name": stage.name, "stage_responsible_id": None},
+                )
     if "audit_context" in db.info:
         from app.modules.audit.service import AuditService, context_for
 
@@ -502,6 +522,27 @@ def set_instance_responsible(
     return get_instance_detail(db, instance.id)
 
 
+def archive_instance(db: Session, instance_id: uuid.UUID, actor_sub: str = "") -> InstanceDetail:
+    """Hide an active workflow while retaining its stages, history, and files."""
+    instance = get_instance_or_404(db, instance_id)
+    if instance.status == "archived":
+        return get_instance_detail(db, instance_id)
+    if instance.status != "active":
+        raise BadTransition("Only an active Workflow can be archived")
+    instance.status = "archived"
+    if "audit_context" in db.info:
+        from app.modules.audit.service import AuditService, context_for
+
+        AuditService(db).log_event(
+            context=context_for(db, actor_sub or "system"),
+            action="UPDATE", entity_type="workflow_instance",
+            entity_id=instance.id, university_id=instance.university_id,
+            old_value={"status": "active"}, new_value={"status": "archived"},
+        )
+    db.commit()
+    return get_instance_detail(db, instance_id)
+
+
 def set_instance_stage_responsible(
     db: Session,
     instance_id: uuid.UUID,
@@ -512,6 +553,8 @@ def set_instance_stage_responsible(
     """Set one runtime stage override; None restores the workflow default."""
     instance = get_instance_or_404(db, instance_id)
     stage = db.get(InstanceStage, stage_id)
+    if instance.status == "archived":
+        raise BadTransition("Archived Workflow cannot be changed")
     if stage is None or stage.instance_id != instance_id:
         raise NotFound("Workflow stage not found")
     if responsible_id is not None:

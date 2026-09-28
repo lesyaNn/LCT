@@ -17,6 +17,7 @@
 .instancesHeader p { color: var(--rtk-color-text-secondary); font-size: 12px; margin: var(--rtk-space-1) 0 0; }
 .instanceList { display: flex; flex-direction: column; gap: var(--rtk-space-2); list-style: none; margin: var(--rtk-space-4) 0 0; padding: 0; }
 .instanceItem { margin: 0; }
+.instanceItemActions { display: flex; justify-content: flex-end; margin-top: calc(var(--rtk-space-3) * -1); padding: 0 var(--rtk-space-2) var(--rtk-space-2); position: relative; }
 .instanceButton { align-items: flex-start; background: transparent; border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); color: inherit; cursor: pointer; display: flex; flex-direction: column; gap: var(--rtk-space-1); padding: var(--rtk-space-3); text-align: left; text-decoration: none; width: 100%; }
 .instanceButton:hover { background: var(--rtk-color-surface-hover); }
 .instanceButton:focus-visible { border-color: var(--rtk-color-brand); outline: 2px solid var(--rtk-color-brand); outline-offset: 1px; }
@@ -48,10 +49,10 @@
 @media (max-width: 480px) { .programSelector { max-width: none; width: 100%; } }
 .headerMain h1 { font-size: clamp(26px, 3vw, 38px); letter-spacing: -.035em; line-height: 1.12; margin: 0; }
 .headerContext { color: var(--rtk-color-text-secondary); font-size: 14px; margin: 0; overflow-wrap: anywhere; }
-.factValue { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.editForm .assignAllOption { align-items: center; flex-direction: row; font-weight: 400; }
+.assignAllOption input { accent-color: var(--rtk-color-brand); height: 16px; width: 16px; }
+.factValue { font-weight: 400; min-width: 0; overflow-wrap: anywhere; }
 .responsibleSource { color: var(--rtk-color-text-tertiary); display: block; font-size: 11px; margin-top: 2px; }
-.workflowDefaultResponsible { border-bottom: 1px solid var(--rtk-color-border); display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); padding: var(--rtk-space-3) var(--rtk-space-4); }
-.workflowDefaultResponsible > span { color: var(--rtk-color-text-secondary); flex-basis: 100%; font-size: 12px; }
 .editForm { display: flex; flex-direction: column; gap: var(--rtk-space-4); }
 .editForm label { color: var(--rtk-color-text-secondary); display: flex; flex-direction: column; font-size: 12px; font-weight: 600; gap: var(--rtk-space-2); }
 .editForm p { color: var(--rtk-color-text-secondary); font-size: 12px; margin: 0; }
@@ -160,6 +161,7 @@
 .transitionList li > .historyHeading { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); }
 .historyHeading svg { color: var(--rtk-color-brand); flex: 0 0 auto; }
 .historyHeading time { margin-left: auto; }
+.historyMetadata { color: var(--rtk-color-text-secondary); font-size: 12px; font-weight: 400; }
 .transitionList li > .historyContent { align-items: stretch; display: flex; flex-direction: column; gap: var(--rtk-space-1); min-width: 0; padding: var(--rtk-space-2) 0 0 var(--rtk-space-4); }
 .historyContent > strong { font-size: 13px; overflow-wrap: anywhere; }
 .historyStage, .historyActor { color: var(--rtk-color-text-tertiary); font-size: 11px; }

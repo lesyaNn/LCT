@@ -4,6 +4,7 @@ import { formatDateRu } from '@/shared/lib/formatters';
 import { isMockDataSourceFor } from '@/shared/lib/data-source';
 import type { WorkflowOverviewItem } from '@/shared/lib/workflow-overview-repository';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
+import { WorkflowArchiveAction } from './workflow-archive-action';
 import styles from './workflow-overview.module.css';
 
 function statusLabel(status: WorkflowOverviewItem['status']) {
@@ -15,7 +16,7 @@ export function WorkflowCard({ item, dragHandle }: { item: WorkflowOverviewItem;
     ? `/universities/${encodeURIComponent(item.universityId)}?tab=workflow&program=${encodeURIComponent(item.programKey)}&workflow=${encodeURIComponent(item.instanceId)}`
     : `/workflows/${encodeURIComponent(item.instanceId)}`;
   return <article className={styles.card}>
-    <div className={styles.cardTop}><Link className={styles.cardTitle} href={href}>{item.universityName}</Link>{dragHandle}</div>
+    <div className={styles.cardTop}><Link className={styles.cardTitle} href={href}>{item.universityName}</Link><div className={styles.cardTopActions}>{dragHandle}<WorkflowArchiveAction instanceId={item.instanceId} universityId={item.universityId} active={item.status !== 'completed'} /></div></div>
     <p className={styles.program}>{item.programName ?? 'Программа не привязана'}</p>
     <p className={styles.stageName}>{item.stage.name}</p>
     <StatusBadge intent={item.status === 'completed' ? 'success' : item.status === 'overdue' ? 'danger' : 'brand'}>{statusLabel(item.status)}</StatusBadge>

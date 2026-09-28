@@ -15,10 +15,10 @@ test('Workflow responsible and current-stage due date persist after reload', asy
   await page.goto(`/workflows/${instanceId}`);
 
   const info = page.locator('section[aria-labelledby$="-overview-title"]');
-  const responsible = info.locator('div').filter({ has: page.getByText('Ответственный Workflow', { exact: true }) }).last();
+  const responsible = info.locator('div').filter({ has: page.getByText('Ответственный этапа', { exact: true }) }).last();
   const deadline = info.locator('div').filter({ has: page.getByText('Дедлайн', { exact: true }) }).last();
   await responsible.getByRole('button', { name: /Назначить|Редактировать/ }).click();
-  const responsibleDialog = page.getByRole('dialog', { name: 'Ответственный Workflow' });
+  const responsibleDialog = page.getByRole('dialog', { name: 'Ответственный этого этапа' });
   const options = responsibleDialog.getByRole('combobox').locator('option');
   const originalResponsible = await responsibleDialog.getByRole('combobox').inputValue();
   await expect(options).not.toHaveCount(1);
@@ -31,14 +31,14 @@ test('Workflow responsible and current-stage due date persist after reload', asy
   await responsibleDialog.getByRole('button', { name: 'Сохранить' }).click();
   await expect(responsibleDialog).toHaveCount(0);
   const history = page.locator('section[aria-labelledby$="-transition-title"]');
-  await expect(history.getByText('Ответственный изменён').first()).toBeAttached();
+  await expect(history.getByText('Ответственный этапа изменён').first()).toBeAttached();
   await page.reload();
-  await expect(responsible.getByRole('button', { name: 'Редактировать ответственного' })).toBeVisible();
-  await responsible.getByRole('button', { name: 'Редактировать ответственного' }).click();
+  await expect(responsible.getByRole('button', { name: 'Редактировать ответственного этапа' })).toBeVisible();
+  await responsible.getByRole('button', { name: 'Редактировать ответственного этапа' }).click();
   await responsibleDialog.getByRole('combobox').selectOption(second!);
   await responsibleDialog.getByRole('button', { name: 'Сохранить' }).click();
   await page.reload();
-  await responsible.getByRole('button', { name: 'Редактировать ответственного' }).click();
+  await responsible.getByRole('button', { name: 'Редактировать ответственного этапа' }).click();
   await expect(responsibleDialog.getByRole('combobox')).toHaveValue(second!);
   await responsibleDialog.getByRole('button', { name: 'Отмена' }).click();
 
@@ -61,7 +61,7 @@ test('Workflow responsible and current-stage due date persist after reload', asy
   await expect(dateDialog.locator('input[type="date"]')).toHaveValue('2030-10-20');
   await dateDialog.locator('input[type="date"]').fill(originalDate);
   await dateDialog.getByRole('button', { name: 'Сохранить' }).click();
-  await responsible.getByRole('button', { name: 'Редактировать ответственного' }).click();
+  await responsible.getByRole('button', { name: 'Редактировать ответственного этапа' }).click();
   await responsibleDialog.getByRole('combobox').selectOption(originalResponsible);
   await responsibleDialog.getByRole('button', { name: 'Сохранить' }).click();
 });

@@ -18,16 +18,20 @@ test('stage assignments and catalog university picker persist on disposable stan
     return response.json() as Promise<{ responsible_id: string | null; stages: Array<{ id: string; responsible_id: string | null; effective_responsible_id: string | null }> }>;
   };
   await page.goto(`/workflows/${instanceId}`);
-  const global = page.getByRole('button', { name: 'Назначить на весь Workflow' });
-  const setGlobal = async (person: typeof people[number]) => {
-    await global.click();
-    const dialog = page.getByRole('dialog', { name: 'Ответственный Workflow' });
-    await dialog.getByRole('combobox').selectOption(person.id);
-    await dialog.getByRole('button', { name: 'Сохранить' }).click();
-    await expect(dialog).toHaveCount(0);
-  };
   const stageButtons = page.locator('section[aria-labelledby$="-stages-title"] ol > li > button');
   await expect(stageButtons).toHaveCount(14);
+  const setGlobal = async (person: typeof people[number]) => {
+    await stageButtons.first().click();
+    const overview = page.locator('section[aria-labelledby$="-overview-title"]');
+    await overview.getByRole('button', { name: 'Редактировать ответственного этапа' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Ответственный этого этапа' });
+    await dialog.getByRole('checkbox', { name: 'Назначить на весь Workflow' }).check();
+    await dialog.getByRole('combobox').selectOption(person.id);
+    await dialog.getByRole('button', { name: 'Сохранить' }).click();
+    const confirmation = dialog.getByRole('button', { name: 'Назначить на весь Workflow' });
+    if (await confirmation.isVisible().catch(() => false)) await confirmation.click();
+    await expect(dialog).toHaveCount(0);
+  };
   await setGlobal(people[0]);
   const stage = async (index: number) => {
     await stageButtons.nth(index - 1).click();
@@ -54,11 +58,11 @@ test('stage assignments and catalog university picker persist on disposable stan
   await setGlobal(people[2]);
   record = await detail();
   expect(record.stages[3].effective_responsible_id).toBe(people[2].id);
-  expect(record.stages[4].effective_responsible_id).toBe(people[1].id);
+  expect(record.stages[4].effective_responsible_id).toBe(people[2].id);
   expect(record.stages[5].effective_responsible_id).toBe(people[2].id);
   await page.reload();
   await stage(5);
-  await expect(page.locator('section[aria-labelledby$="-overview-title"]')).toContainText('Для этого этапа');
+  await expect(page.locator('section[aria-labelledby$="-overview-title"]')).toContainText('Как у всего Workflow');
   const activity = await (await request.get(`${apiBase}/api/v1/workflow/instances/${instanceId}/activity`, { headers })).json() as Array<{ type: string }>;
   expect(activity.some((item) => item.type === 'responsible_changed')).toBeTruthy();
   expect(activity.some((item) => item.type === 'stage_responsible_changed')).toBeTruthy();

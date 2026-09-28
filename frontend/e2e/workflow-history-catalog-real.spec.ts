@@ -76,7 +76,7 @@ test('full Workflow history, comment edit with file, and shared modals', async (
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 900 });
     const info = page.locator('section[aria-labelledby$="-overview-title"]');
-    for (const [field, title] of [['Дедлайн', 'Дедлайн этапа'], ['Ответственный Workflow', 'Ответственный Workflow']] as const) {
+    for (const [field, title] of [['Дедлайн', 'Дедлайн этапа'], ['Ответственный этапа', 'Ответственный этого этапа']] as const) {
       const row = info.locator('div').filter({ has: page.getByText(field, { exact: true }) }).last();
       await row.getByRole('button', { name: /Установить|Редактировать|Назначить/ }).click();
       const dialog = page.getByRole('dialog', { name: title });
@@ -99,10 +99,10 @@ test('full Workflow history, comment edit with file, and shared modals', async (
   await expect(history.getByText(/Дедлайн изменён · Demo Admin/)).toBeAttached();
 
   await overview.getByRole('button', { name: /Назначить ответственного|Редактировать ответственного/ }).click();
-  const responsibleDialog = page.getByRole('dialog', { name: 'Ответственный Workflow' });
-  await responsibleDialog.getByLabel('Ответственный').selectOption({ index: 1 });
+  const responsibleDialog = page.getByRole('dialog', { name: 'Ответственный этого этапа' });
+  await responsibleDialog.getByLabel('Назначение').selectOption({ index: 1 });
   await responsibleDialog.getByRole('button', { name: 'Сохранить' }).click();
-  await expect(history.getByText(/Ответственный изменён · Demo Admin/)).toBeAttached();
+  await expect(history.getByText(/Ответственный этапа изменён · Demo Admin/)).toBeAttached();
 
   await page.getByRole('button', { name: 'Перевести на следующий этап' }).click();
   const transitionDialog = page.getByRole('dialog', { name: 'Перевести на следующий этап' });

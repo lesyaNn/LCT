@@ -39,6 +39,7 @@
 .workflowCards { display: grid; gap: var(--rtk-space-3); grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); margin-top: var(--rtk-space-4); }
 .workflowItem { align-items: flex-start; border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); display: flex; flex-direction: column; gap: var(--rtk-space-3); min-width: 0; padding: var(--rtk-space-4); }
 .workflowItemTop { align-items: flex-start; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); justify-content: space-between; width: 100%; }
+.workflowItemStatus { align-items: center; display: flex; gap: var(--rtk-space-2); }
 .workflowItemTop strong, .workflowProgram { font-size: 15px; overflow-wrap: anywhere; }
 .workflowItem p { color: var(--rtk-color-text-secondary); font-size: 13px; margin: 0; }
 .workflowItem p b { color: var(--rtk-color-text-primary); }

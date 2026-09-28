@@ -45,6 +45,7 @@ import { WorkflowComments } from './workflow-comments';
 import { WorkflowStageTasks } from './workflow-stage-tasks';
 import { AttachmentRow, WorkflowAttachments } from './workflow-attachments';
 import { WorkflowCreateModal } from './workflow-create-modal';
+import { WorkflowArchiveAction } from '@/widgets/workflows/workflow-archive-action';
 import { WorkflowTransitionModal, type WorkflowTransitionNotification } from './workflow-transition-modal';
 import { WorkflowRollbackModal } from './workflow-rollback-modal';
 import styles from './university-workflow.module.css';
@@ -180,7 +181,7 @@ function WorkflowHistorySection({ idPrefix, instanceId, events, stages, userId, 
       const presentation = workflowHistoryPresentation[event.kind];
       const Icon = historyIcons[presentation.icon];
       const actor = event.actorName ?? (event.actorId === userId ? userName : undefined) ?? 'Участник Workflow';
-      return <li className={`${styles.historyEvent} ${styles[`history${event.kind}`]}`} key={event.id}><div className={styles.historyHeading}><Icon size={18} fill="currentColor" /><strong>{presentation.label} · {actor}</strong><time dateTime={event.occurredAt}>{formatDateTimeRu(event.occurredAt)}</time></div><div className={styles.historyContent}>{event.kind === 'transition' || event.kind === 'responsible_changed' || event.kind === 'stage_responsible_changed' || event.kind === 'deadline_changed' ? <strong>{event.title}</strong> : null}{event.text ? <p>{event.text}</p> : null}{event.attachments.length ? <ul className={styles.historyFiles}>{event.attachments.map((record) => <AttachmentRow key={record.id} attachment={workflowAttachmentFromApi(record, null)} instanceId={instanceId} canDelete={false} compact onOpen={() => undefined} onDelete={() => undefined} />)}</ul> : null}</div></li>;
+      return <li className={`${styles.historyEvent} ${styles[`history${event.kind}`]}`} key={event.id}><div className={styles.historyHeading}><Icon size={18} fill="currentColor" /><span className={styles.historyMetadata}>{presentation.label} · {actor}</span><time dateTime={event.occurredAt}>{formatDateTimeRu(event.occurredAt)}</time></div><div className={styles.historyContent}>{event.kind === 'transition' || event.kind === 'responsible_changed' || event.kind === 'stage_responsible_changed' || event.kind === 'deadline_changed' ? <strong>{event.title}</strong> : null}{event.text ? <p>{event.text}</p> : null}{event.attachments.length ? <ul className={styles.historyFiles}>{event.attachments.map((record) => <AttachmentRow key={record.id} attachment={workflowAttachmentFromApi(record, null)} instanceId={instanceId} canDelete={false} compact onOpen={() => undefined} onDelete={() => undefined} />)}</ul> : null}</div></li>;
     })}</ol></details>;
   }) : <EmptyState title="Событий пока нет" description="История появится после первого действия." headingLevel={3} />}</div></details></section>;
 }
@@ -194,40 +195,11 @@ function WorkflowStageDetails({ stage, stages, workflow, instanceId, universityI
       <CompletionSummary stage={stage} />
       <section className={styles.detailSection} aria-labelledby={`${idPrefix}-overview-title`}><div className={styles.detailSectionHeading}><h3 id={`${idPrefix}-overview-title`}><InformationStroke size={18} fill="currentColor" />Основная информация</h3></div><dl className={styles.detailFacts}><div><dt>{stage.status === 'completed' ? 'Дедлайн был' : 'Дедлайн'}</dt><dd className={stage.status === 'overdue' ? styles.overdue : undefined}><WorkflowDeadlineField instanceId={instanceId} stage={stage} canManage={canManage && workflow.currentStage?.id === stage.id && isRealWorkflowMode()} onNotify={onNotify} /></dd></div>{stage.startedAt ? <div><dt>Начат</dt><dd><time dateTime={stage.startedAt}>{formatDateTimeRu(stage.startedAt)}</time></dd></div> : null}{stage.completedAt && stage.status !== 'completed' ? <div><dt>Завершён</dt><dd><time dateTime={stage.completedAt}>{formatDateTimeRu(stage.completedAt)}</time></dd></div> : null}<div><dt>Ответственный этапа</dt><dd><WorkflowStageResponsibleField instanceId={instanceId} workflow={workflow} stage={stage} canManage={canManage && isRealWorkflowMode()} onNotify={onNotify} /></dd></div></dl></section>
       <WorkflowStageTasks stage={stage} instanceId={instanceId} canEdit={canManage && isRealWorkflowMode()} state={tasksState} />
-      <WorkflowComments instanceId={instanceId} stageId={stage.templateStageId ?? stage.id} comments={stage.comments} readOnly={stage.status !== 'current' && stage.status !== 'overdue'} onNotify={onNotify} />
-      {attachmentsState?.loading ? <ListSkeleton items={2} /> : attachmentsState?.error ? <ErrorState title="Не удалось загрузить вложения" headingLevel={3} onRetry={attachmentsState.retry} /> : stage.attachments.length ? <><WorkflowAttachments instanceId={instanceId} stageId={stage.id} attachments={stage.attachments} uploadEnabled={false} readOnly={stage.status !== 'current' && stage.status !== 'overdue'} onNotify={onNotify} />{attachmentsState?.hasMore ? <Button variant="ghost" size="s" type="button" loading={attachmentsState.loadingMore} onClick={attachmentsState.loadMore}>Загрузить ещё вложения</Button> : null}</> : null}
+      <WorkflowComments instanceId={instanceId} stageId={stage.templateStageId ?? stage.id} comments={stage.comments} readOnly={!canManage || (stage.status !== 'current' && stage.status !== 'overdue')} onNotify={onNotify} />
+      {attachmentsState?.loading ? <ListSkeleton items={2} /> : attachmentsState?.error ? <ErrorState title="Не удалось загрузить вложения" headingLevel={3} onRetry={attachmentsState.retry} /> : stage.attachments.length ? <><WorkflowAttachments instanceId={instanceId} stageId={stage.id} attachments={stage.attachments} uploadEnabled={false} readOnly={!canManage || (stage.status !== 'current' && stage.status !== 'overdue')} onNotify={onNotify} />{attachmentsState?.hasMore ? <Button variant="ghost" size="s" type="button" loading={attachmentsState.loadingMore} onClick={attachmentsState.loadMore}>Загрузить ещё вложения</Button> : null}</> : null}
       <WorkflowHistorySection idPrefix={idPrefix} instanceId={instanceId} events={historyEvents} stages={stages} userId={userId ?? undefined} userName={historyActorName} state={historyState} />
       <StageActionPanel stage={stage} stages={stages} instanceId={instanceId} universityId={universityId} userId={userId} canManage={canManage} allowedTargets={allowedTargets} rollbackTargets={rollbackTargets} onTransitionOpen={onTransitionOpen} onTransitionClose={onTransitionClose} onTransitionSuccess={onTransitionSuccess} onNotify={onNotify} />
     </section>
-  );
-}
-
-function WorkflowResponsibleField({ instanceId, workflow, canManage, onNotify }: { instanceId: string; workflow: UniversityWorkflow; canManage: boolean; onNotify: (notification: WorkflowTransitionNotification) => void }) {
-  const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const responsiblesQuery = useQuery({
-    queryKey: universityResponsiblesQueryKey(workflow.universityId),
-    queryFn: () => getUniversityResponsibles(workflow.universityId),
-    staleTime: 30_000,
-    enabled: open,
-  });
-  const options = useMemo(() => responsiblesQuery.data ?? [], [responsiblesQuery.data]);
-  const [value, setValue] = useState(workflow.responsibleId ?? '');
-  const save = useMutation({
-    mutationFn: () => updateWorkflowResponsible(instanceId, value || null),
-    onSuccess: async (record) => {
-      setOpen(false);
-      queryClient.setQueryData(workflowQueryKey(instanceId), getApiUniversityWorkflow(record));
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: workflowQueryKey(instanceId) }),
-        queryClient.invalidateQueries({ queryKey: universityWorkflowInstancesQueryKey(workflow.universityId) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowHistory(instanceId) }),
-      ]);
-    },
-    onError: (cause) => onNotify({ intent: 'error', title: 'Ответственный не сохранён', message: normalizeApiError(cause).message }),
-  });
-  return (
-    <><span className={styles.factValue}>{workflow.responsibleName ?? 'Не назначен'}</span>{canManage ? <Button variant="ghost" size="s" type="button" onClick={() => { setValue(workflow.responsibleId ?? ''); setOpen(true); }}>Назначить на весь Workflow</Button> : null}{open ? <Modal title="Ответственный Workflow" onClose={() => { if (!save.isPending) setOpen(false); }}><div className={styles.editForm}><label>Ответственный<Select value={value} disabled={responsiblesQuery.isPending || save.isPending} onChange={(event) => setValue(event.target.value)}><option value="">Не назначен</option>{options.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>{responsiblesQuery.isError ? <p role="alert">Не удалось загрузить ответственных вуза.</p> : null}{value ? <p className={styles.externalHint}>{[options.find((item) => item.id === value)?.email, options.find((item) => item.id === value)?.phone].filter(Boolean).join(' · ')}</p> : null}<div className={styles.editActions}><Button variant="ghost" size="s" type="button" disabled={save.isPending} onClick={() => setOpen(false)}>Отмена</Button><Button variant="primary" size="s" type="button" loading={save.isPending} disabled={save.isPending || responsiblesQuery.isPending || value === (workflow.responsibleId ?? '') || Boolean(value && !options.some((item) => item.id === value))} onClick={() => save.mutate()}>Сохранить</Button></div></div></Modal> : null}</>
   );
 }
 
@@ -236,6 +208,9 @@ function WorkflowStageResponsibleField({ instanceId, workflow, stage, canManage,
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(stage.responsibleOverrideId ?? '');
+  const [assignAll, setAssignAll] = useState(false);
+  const [confirmReplace, setConfirmReplace] = useState(false);
+  const overriddenStages = workflow.stages.filter((item) => item.responsibleOverrideId).length;
   const responsiblesQuery = useQuery({
     queryKey: universityResponsiblesQueryKey(workflow.universityId),
     queryFn: () => getUniversityResponsibles(workflow.universityId),
@@ -244,28 +219,37 @@ function WorkflowStageResponsibleField({ instanceId, workflow, stage, canManage,
   });
   const options = responsiblesQuery.data ?? [];
   const save = useMutation({
-    mutationFn: () => updateWorkflowStageResponsible(instanceId, stage.id, value || null),
+    mutationFn: () => assignAll
+      ? updateWorkflowResponsible(instanceId, value || null, true)
+      : updateWorkflowStageResponsible(instanceId, stage.id, value || null),
     onSuccess: async (record) => {
       setOpen(false);
+      setConfirmReplace(false);
       queryClient.setQueryData(workflowQueryKey(instanceId), getApiUniversityWorkflow(record));
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: workflowQueryKey(instanceId) }),
+        queryClient.invalidateQueries({ queryKey: universityWorkflowInstancesQueryKey(workflow.universityId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowHistory(instanceId) }),
       ]);
     },
     onError: (cause) => onNotify({ intent: 'error', title: 'Ответственный этапа не сохранён', message: normalizeApiError(cause).message }),
   });
+  const close = () => { if (!save.isPending) { setOpen(false); setConfirmReplace(false); } };
+  const unchanged = assignAll ? value === (workflow.responsibleId ?? '') && !overriddenStages : value === (stage.responsibleOverrideId ?? '');
   return <>
     <span className={styles.factValue}>{stage.responsible?.name ?? 'Не назначен'}</span>
-    {canManage && hasPermission(user, 'university_responsible.manage') ? <IconButton icon={<Edit size={18} fill="currentColor" />} label="Редактировать ответственного этапа" size={18} onClick={() => { setValue(stage.responsibleOverrideId ?? ''); setOpen(true); }} /> : null}
+    {canManage && hasPermission(user, 'university_responsible.manage') ? <Tooltip content="Редактировать ответственного этапа"><IconButton icon={<Edit size={18} fill="currentColor" />} label="Редактировать ответственного этапа" size={18} onClick={() => { setValue(stage.responsibleOverrideId ?? ''); setAssignAll(false); setConfirmReplace(false); setOpen(true); }} /></Tooltip> : null}
     <small className={styles.responsibleSource}>{stage.responsibleOverrideId ? 'Для этого этапа' : 'Как у всего Workflow'}</small>
-    {open ? <Modal title="Ответственный этого этапа" onClose={() => { if (!save.isPending) setOpen(false); }}><div className={styles.editForm}>
-      <label>Назначение<Select value={value} disabled={responsiblesQuery.isPending || save.isPending} onChange={(event) => setValue(event.target.value)}>
-        <option value="">Как у всего Workflow — {workflow.responsibleName ?? 'не назначен'}</option>
-        {options.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-      </Select></label>
-      {responsiblesQuery.isError ? <p role="alert">Не удалось загрузить ответственных вуза.</p> : null}
-      <div className={styles.editActions}><Button variant="ghost" size="s" type="button" disabled={save.isPending} onClick={() => setOpen(false)}>Отмена</Button><Button variant="primary" size="s" type="button" loading={save.isPending} disabled={save.isPending || responsiblesQuery.isPending || value === (stage.responsibleOverrideId ?? '') || Boolean(value && !options.some((item) => item.id === value))} onClick={() => save.mutate()}>Сохранить</Button></div>
+    {open ? <Modal title="Ответственный этого этапа" onClose={close}><div className={styles.editForm}>
+      {confirmReplace ? <><p role="alert">Индивидуальные назначения {overriddenStages} этапов будут заменены выбранным ответственным.</p><div className={styles.editActions}><Button variant="ghost" size="s" type="button" onClick={() => setConfirmReplace(false)}>Назад</Button><Button variant="primary" size="s" type="button" loading={save.isPending} onClick={() => save.mutate()}>Назначить на весь Workflow</Button></div></> : <>
+        <label>Назначение<Select value={value} disabled={responsiblesQuery.isPending || save.isPending} onChange={(event) => setValue(event.target.value)}>
+          <option value="">{assignAll ? 'Не назначен' : `Как у всего Workflow — ${workflow.responsibleName ?? 'не назначен'}`}</option>
+          {options.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+        </Select></label>
+        <label className={styles.assignAllOption}><input type="checkbox" checked={assignAll} disabled={save.isPending} onChange={(event) => { const checked = event.target.checked; setAssignAll(checked); setValue(checked ? stage.responsible?.id ?? '' : stage.responsibleOverrideId ?? ''); }} />Назначить на весь Workflow</label>
+        {responsiblesQuery.isError ? <p role="alert">Не удалось загрузить ответственных вуза.</p> : null}
+        <div className={styles.editActions}><Button variant="ghost" size="s" type="button" disabled={save.isPending} onClick={close}>Отмена</Button><Button variant="primary" size="s" type="button" loading={save.isPending} disabled={save.isPending || responsiblesQuery.isPending || unchanged || Boolean(value && !options.some((item) => item.id === value))} onClick={() => { if (assignAll && overriddenStages) setConfirmReplace(true); else save.mutate(); }}>Сохранить</Button></div>
+      </>}
     </div></Modal> : null}
   </>;
 }
@@ -320,7 +304,7 @@ export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride 
   const historyQuery = useQuery({ queryKey: queryKeys.universities.workflowHistory(instanceId), queryFn: () => loadWorkflowHistory(instanceId), enabled: realWorkflow && Boolean(query.data), staleTime: 30_000 });
   const allowedQuery = useQuery({ queryKey: queryKeys.universities.workflowAllowed(instanceId), queryFn: () => getWorkflowAllowedTransitions(instanceId), enabled: realWorkflow && Boolean(query.data), staleTime: 30_000 });
   const rollbackQuery = useQuery({ queryKey: queryKeys.universities.workflowRollbackTargets(instanceId), queryFn: () => getWorkflowRollbackTargets(instanceId), enabled: realWorkflow && Boolean(query.data), staleTime: 30_000 });
-  const canManage = realWorkflow ? hasPermission(user, 'workflow.change_status') : (canAdvanceOverride ?? (user?.role === 'admin' || user?.role === 'manager'));
+  const canManage = realWorkflow ? hasPermission(user, 'workflow.change_status') && query.data?.status !== 'archived' : (canAdvanceOverride ?? (user?.role === 'admin' || user?.role === 'manager'));
   const allowedTargets = realWorkflow ? allowedQuery.data?.map((item) => ({ id: item.id, orderIndex: item.order_index, name: item.name })) ?? [] : undefined;
   const rollbackTargets = realWorkflow ? rollbackQuery.data?.map((item) => ({ id: item.id, orderIndex: item.order_index, name: item.name })) ?? [] : undefined;
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -357,7 +341,6 @@ export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride 
     <div className={styles.layout}>
       <section className={styles.stagesPanel} aria-labelledby={`${idPrefix}-stages-title`}>
         <div className={styles.panelHeading}><div><h2 id={`${idPrefix}-stages-title`}>Этапы Workflow</h2></div><span className={styles.totalLabel}>{stages.length} этапов</span></div>
-        <div className={styles.workflowDefaultResponsible}><span>Ответственный всего Workflow</span><WorkflowResponsibleField instanceId={instanceId} workflow={query.data} canManage={realWorkflow && hasPermission(user, 'university_responsible.manage')} onNotify={setNotification} /></div>
         <ol className={styles.stageList}>{stages.map((stage) => <WorkflowStageItem key={stage.id} stage={stage} selected={stage.id === selectedStage.id} detailsId={detailsId} onSelect={() => setSelectedId(stage.id)} />)}</ol>
       </section>
       <WorkflowStageDetails key={selectedStage.id} stage={selectedStage} stages={stages} workflow={query.data} instanceId={instanceId} universityId={query.data.universityId} userId={user?.id} canManage={canManage} idPrefix={detailsId} onTransitionOpen={() => setSelectedId(selectedStage.id)} onTransitionClose={() => setSelectedId(null)} onTransitionSuccess={() => setSelectedId(null)} onNotify={setNotification} tasksState={realWorkflow ? { loading: tasksQuery.isPending, error: tasksQuery.isError && !tasksQuery.data, retry: () => void tasksQuery.refetch(), hasMore: tasksQuery.hasNextPage, loadingMore: tasksQuery.isFetchingNextPage, loadMore: () => void tasksQuery.fetchNextPage() } : undefined} attachmentsState={realWorkflow ? { loading: historyQuery.isPending, error: historyQuery.isError && !historyQuery.data, retry: () => void historyQuery.refetch() } : undefined} historyState={realWorkflow ? { loading: historyQuery.isPending, error: historyQuery.isError && !historyQuery.data, retry: () => void historyQuery.refetch() } : undefined} historyEvents={historyEvents} historyActorName={user?.name} allowedTargets={allowedTargets} rollbackTargets={rollbackTargets} />
@@ -449,6 +432,7 @@ function RealUniversityWorkflow({ id }: { id: string; canAdvance: boolean }) {
                 return <><span className={styles.instanceStage}>{current ? <>Текущий этап: <b>{current.name}</b></> : 'Этап завершён'}</span><span className={styles.instanceMeta}><span>{completed} из {item.stages.length} этапов</span><StatusBadge intent={item.is_overdue ? 'danger' : item.status === 'completed' ? 'success' : 'brand'}>{item.is_overdue ? 'Просрочен' : instanceStatusLabel(item.status)}</StatusBadge></span><span className={styles.instanceProgress} role="progressbar" aria-label="Прогресс Workflow" aria-valuemin={0} aria-valuemax={item.stages.length} aria-valuenow={completed}><span style={{ width: `${item.stages.length ? completed / item.stages.length * 100 : 0}%` }} /></span>{item.responsible_name || item.due_date ? <span className={styles.instanceFacts}>{item.responsible_name}{item.responsible_name && item.due_date ? ' · ' : null}{item.due_date ? `Дедлайн: ${formatDateRu(item.due_date)}` : null}</span> : null}</>;
               })()}
             </Link>
+            <div className={styles.instanceItemActions}><WorkflowArchiveAction instanceId={item.id} universityId={id} active={item.status === 'active'} /></div>
           </li>
         ))}
       </ol>

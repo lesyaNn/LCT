@@ -450,6 +450,7 @@ export interface UniversityWorkflowStage {
 
 export interface UniversityWorkflow {
   templateId?: string;
+  status?: string;
   universityId: string;
   universityName: string;
   universityCity: string;
@@ -612,12 +613,17 @@ export async function createProgramWorkflow(universityId: string, programId: str
   }));
 }
 
-export async function updateWorkflowResponsible(instanceId: string, responsibleId: string | null): Promise<WorkflowInstanceApiRecord> {
+export async function archiveWorkflowInstance(instanceId: string): Promise<WorkflowInstanceApiRecord> {
+  if (!isWorkflowApiInstanceId(instanceId)) throw new WorkflowApiError(0, 'Архивация недоступна для этого Workflow.');
+  return unwrapApiResult(await apiFetch<WorkflowInstanceApiRecord>(`/api/v1/workflow/instances/${instanceId}/archive`, { method: 'POST' }));
+}
+
+export async function updateWorkflowResponsible(instanceId: string, responsibleId: string | null, replaceStageOverrides = false): Promise<WorkflowInstanceApiRecord> {
   return fromDataSource({
     domain: 'workflow',
     mock: async () => ({ ...mockGetWorkflowInstance(instanceId), responsible_id: responsibleId }),
     real: async () => unwrapApiResult(await apiFetch<WorkflowInstanceApiRecord>(`/api/v1/workflow/instances/${instanceId}`, {
-      method: 'PATCH', body: { responsible_id: responsibleId },
+      method: 'PATCH', body: { responsible_id: responsibleId, replace_stage_overrides: replaceStageOverrides },
     })),
   });
 }
@@ -906,6 +912,7 @@ export function getApiUniversityWorkflow(instance: WorkflowInstanceApiRecord): U
   const currentStage = stages.find((stage) => stage.id === instance.current_instance_stage_id) ?? null;
   return {
     templateId: instance.template_id,
+    status: instance.status,
     universityId: instance.university_id,
     universityName: instance.university_name ?? 'Workflow',
     universityCity: instance.university_city ?? '',

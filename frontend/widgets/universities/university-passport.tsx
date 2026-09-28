@@ -44,6 +44,7 @@ import { UniversityHistory } from './university-history';
 import { DocumentsSection, LicensesSection, MeetingsSection, ProductsSection, ProgramsSection, ResponsiblesSection } from './university-passport-sections';
 import { UniversityWorkflow } from './university-workflow';
 import { WorkflowCreateModal } from './workflow-create-modal';
+import { WorkflowArchiveAction } from '@/widgets/workflows/workflow-archive-action';
 import { EducationOverview, TeachersSection } from './university-education';
 import styles from './university-passport.module.css';
 
@@ -120,7 +121,7 @@ function LaunchedWorkflowCard({ instance }: { instance: WorkflowInstanceApiRecor
   const total = instance.stages.length;
   const statusLabel = instance.is_overdue ? 'Просрочен' : instance.status === 'completed' ? 'Завершён' : instance.status === 'active' ? 'В работе' : instance.status;
   return <article className={styles.workflowItem}>
-    <div className={styles.workflowItemTop}><strong>{instance.program_name || 'Без программы'}</strong><SemanticStatusBadge intent={instance.is_overdue ? 'danger' : instance.status === 'completed' ? 'success' : 'brand'}>{statusLabel}</SemanticStatusBadge></div>
+    <div className={styles.workflowItemTop}><strong>{instance.program_name || 'Без программы'}</strong><div className={styles.workflowItemStatus}><SemanticStatusBadge intent={instance.is_overdue ? 'danger' : instance.status === 'completed' ? 'success' : 'brand'}>{statusLabel}</SemanticStatusBadge><WorkflowArchiveAction instanceId={instance.id} universityId={instance.university_id} active={instance.status === 'active'} /></div></div>
     <p>{current ? <>Текущий этап: <b>{current.name}</b></> : instance.status === 'completed' ? 'Все этапы завершены' : 'Этап не назначен'}</p>
     <div className={styles.workflowProgress}><div className={styles.progressLabel}><span>Прогресс</span><strong>{completed} из {total} этапов</strong></div><div className={styles.progressTrack} role="progressbar" aria-label={`Пройдено ${completed} из ${total} этапов`} aria-valuemin={0} aria-valuemax={total} aria-valuenow={completed}><span style={{ width: `${total ? completed / total * 100 : 0}%` }} /></div></div>
     <Link className={styles.workflowLink} href={`/workflows/${instance.id}`}>Открыть Workflow <ArrowRight size={16} fill="currentColor" /></Link>
