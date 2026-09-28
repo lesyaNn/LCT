@@ -43,6 +43,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.workflow_templates import WorkflowStage, WorkflowTemplate
+from app.db.seed_workflow import STAGES_14, TEMPLATE_NAME as SPEC_TEMPLATE_NAME
 
 log = logging.getLogger("rtk.bootstrap.workflow")
 
@@ -71,6 +72,29 @@ def _find_template(db: Session) -> WorkflowTemplate | None:
     return db.execute(
         select(WorkflowTemplate).where(WorkflowTemplate.name == TEMPLATE_NAME)
     ).scalar_one_or_none()
+
+
+def ensure_spec_workflow_template(db: Session) -> dict:
+    """Create the 14-stage ТЗ route once; preserve all existing user edits."""
+    existing = db.scalar(select(WorkflowTemplate.id).where(WorkflowTemplate.name == SPEC_TEMPLATE_NAME))
+    if existing is not None:
+        return {"status": "ready", "template_id": existing, "stages": 14}
+    try:
+        template = WorkflowTemplate(name=SPEC_TEMPLATE_NAME, is_active=True)
+        db.add(template)
+        db.flush()
+        for position, (name, required) in enumerate(STAGES_14, start=1):
+            db.add(WorkflowStage(template_id=template.id, name=name,
+                                 order_index=position, is_required=required,
+                                 is_active=True, sla_days=None))
+        db.commit()
+        return {"status": "created", "template_id": template.id, "stages": 14}
+    except IntegrityError:
+        db.rollback()
+        existing = db.scalar(select(WorkflowTemplate.id).where(WorkflowTemplate.name == SPEC_TEMPLATE_NAME))
+        if existing is None:
+            raise
+        return {"status": "ready", "template_id": existing, "stages": 14}
 
 
 def _ordered_stages(db: Session, template_id) -> list[WorkflowStage]:

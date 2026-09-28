@@ -37,12 +37,13 @@ async def lifespan(app: FastAPI):
     start; it never prevents the API process from serving /health.
     """
     try:
-        from app.bootstrap.workflow_defaults import ensure_default_workflow_template
+        from app.bootstrap.workflow_defaults import ensure_default_workflow_template, ensure_spec_workflow_template
         from app.db.session import SessionLocal
 
         db = SessionLocal()
         try:
             ensure_default_workflow_template(db)
+            ensure_spec_workflow_template(db)
         finally:
             db.close()
     except Exception:

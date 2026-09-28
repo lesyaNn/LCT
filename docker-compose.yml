@@ -114,6 +114,7 @@ services:
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
       STORAGE_ROOT: /app/storage
       UPLOAD_ALLOWED_EXTENSIONS: ${UPLOAD_ALLOWED_EXTENSIONS:-pdf,png,jpg,jpeg,doc,docx,xls,xlsx,zip,gz,gzip,rar}
+      EXTERNAL_ADAPTER_MODE: ${EXTERNAL_ADAPTER_MODE:-disabled}
       REPORTS_ROOT: /app/reports
       # Dev-2 analytics boundary: Dev-1 filter adapter (non-empty filters
       # in /analytics/* stop returning 503 FILTER_PROVIDER_NOT_CONFIGURED).
