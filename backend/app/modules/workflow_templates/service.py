@@ -44,12 +44,16 @@ from .schemas import StageRead, TemplateDetail, TemplateRead
 
 # ---------------------------------------------------------------- templates
 
+_HISTORY_ONLY_TEMPLATE_NAME = "Архивный маршрут взаимодействия с вузом"
+
 
 def list_template_page(db: Session, *, page: int, page_size: int) -> tuple[list[TemplateRead], int]:
-    total = db.execute(select(func.count()).select_from(WorkflowTemplate)).scalar() or 0
+    visible = WorkflowTemplate.name != _HISTORY_ONLY_TEMPLATE_NAME
+    total = db.execute(select(func.count()).select_from(WorkflowTemplate).where(visible)).scalar() or 0
     rows = (
         db.execute(
             select(WorkflowTemplate)
+            .where(visible)
             .order_by(WorkflowTemplate.created_at.asc(), WorkflowTemplate.id.asc())
             .limit(page_size)
             .offset((page - 1) * page_size)

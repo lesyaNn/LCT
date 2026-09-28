@@ -1,29 +1,7 @@
-"""P2-01-04 seed: the legacy 14-stage university-interaction route.
+"""Legacy workflow seed entry point. It no longer creates templates.
 
-* Source of the stage names/order: ``README.md`` ("Текущий workflow
-  взаимодействия с вузом (14 шагов)") — the only stage list fixed in the
-  repository. Names are quoted verbatim (trailing punctuation dropped).
-* Runs strictly AFTER ``scripts/migrate.py up`` (``migrate -> seed``);
-  never creates schema, only rows in ``000011`` tables.
-* Idempotent: the template is get-or-created by its UNIQUE name, stages by
-  ``(template_id, order_index)``; re-runs update drifted names in place and
-  never duplicate. ``run 1 -> 1 template / 14 stages``,
-  ``run 2 -> still 1 template / 14 stages``.
-* Stage 5 is explicitly optional in the ТЗ ("Опционально: ...") and is
-  seeded with ``is_required=False``; every other stage is required.
-* No deadlines are invented: the ТЗ fixes no durations, so ``sla_days``
-  stays NULL for all 14 stages.
-* Name disambiguation: this legacy 14-stage template intentionally uses a
-  SUFFIXED name (``... (14 этапов)``) so it never collides with the
-  production 5-stage baseline ``"Стандартный маршрут взаимодействия
-  с вузом"`` created at every backend start by
-  ``app.bootstrap.workflow_defaults.ensure_default_workflow_template``.
-  The two templates are independent rows (different UNIQUE names) and
-  neither seed nor bootstrap ever rewrites the other.
-
-Usage::
-
-    DATABASE_URL=postgresql+psycopg://... python -m app.db.seed_workflow
+The 14-stage template name and stage list remain for integrations and
+reference data; running this module does not write workflow templates.
 """
 
 import logging

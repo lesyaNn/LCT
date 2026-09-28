@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.permissions import require_role
@@ -105,16 +105,16 @@ def patch_template(
 
 @router.delete(
     "/templates/{template_id}",
-    status_code=status.HTTP_200_OK,
-    response_class=Response,
+    response_model=dict[str, str],
     summary="Delete an unused workflow template",
 )
 def delete_template(
     template_id: uuid.UUID,
     db: Session = Depends(get_audit_db),
     _user: CurrentUser = Depends(ADMIN),
-) -> None:
+) -> dict[str, str]:
     service.delete_template(db, template_id)
+    return {"status": "deleted"}
 
 
 # ------------------------------------------------------------------- stages

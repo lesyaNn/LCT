@@ -2,6 +2,8 @@
 :root {
   --rtk-purple: #7700ff;
   --rtk-purple-hover: #6510d8;
+  --rtk-brand-orange: #FF4F12;
+  --rtk-color-brand-secondary: var(--rtk-brand-orange);
   --rtk-ink: #24232f;
   --rtk-muted: #646474;
   --rtk-field: #faf9fd;
@@ -332,8 +334,8 @@ html.login-pf,
 }
 
 .rtk-demo-login { margin-top: 12px; }
-.rtk-demo-button { background: #fff; border: 1px solid var(--rtk-purple); border-radius: 12px; color: var(--rtk-purple); cursor: pointer; font-size: 17px; font-weight: 700; min-height: 54px; width: 100%; }
-.rtk-demo-button:hover { background: #f6efff; }
+.rtk-demo-button { background: var(--rtk-color-brand-secondary); border: 0; border-radius: 12px; color: #fff; cursor: pointer; font-size: 17px; font-weight: 700; min-height: 54px; width: 100%; }
+.rtk-demo-button:hover { background: color-mix(in srgb, var(--rtk-color-brand-secondary) 85%, black); }
 .rtk-demo-button:focus-visible, .rtk-demo-roles button:focus-visible { outline: 3px solid var(--rtk-purple); outline-offset: 2px; }
 .rtk-demo-roles { border: 1px solid #e8e4ef; border-radius: 12px; margin-top: 12px; padding: 12px; }
 .rtk-demo-roles[hidden] { display: none; }

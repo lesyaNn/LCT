@@ -292,6 +292,14 @@ def test_template_crud_happy_path(client):
     assert patched.json()["description"] == "d1"  # partial update preserves the rest
 
 
+def test_template_delete_returns_json_and_removes_unused_template(client):
+    created = _template(client)
+    response = client.delete(f"/api/v1/workflow/templates/{created['id']}")
+    assert response.status_code == 200, response.text
+    assert response.json() == {"status": "deleted"}
+    assert client.get(f"/api/v1/workflow/templates/{created['id']}").status_code == 404
+
+
 def test_template_patch_exclude_unset_and_explicit_null(client):
     created = _template(client, description="keep me")
     tid = created["id"]

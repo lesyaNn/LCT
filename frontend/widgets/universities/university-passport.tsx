@@ -42,7 +42,7 @@ import { DocumentsSection, LicensesSection, MeetingsSection, ProductsSection, Pr
 import { UniversityWorkflow } from './university-workflow';
 import { WorkflowCreateModal } from './workflow-create-modal';
 import { PassportWorkflowCard } from './passport-workflow-card';
-import { EducationOverview, TeachersSection } from './university-education';
+import { TeachersSection } from './university-education';
 import styles from './university-passport.module.css';
 
 const mobileLayoutQuery = '(max-width: 768px)';
@@ -59,7 +59,7 @@ function isMobileLayout() {
 
 const tabDefinitions = [
   { id: 'overview', label: 'Обзор' },
-  { id: 'programs', label: 'Программы и обучение' },
+  { id: 'programs', label: 'Программы' },
   { id: 'products', label: 'Продукты' },
   { id: 'licenses', label: 'Лицензии' },
   { id: 'documents', label: 'Документы' },
@@ -193,7 +193,7 @@ export function UniversityPassport({ id }: { id: string }) {
   const renderContent = (tab: PassportTabId) => tab === 'overview'
     ? <OverviewContent passport={passport} onTabChange={selectTab} />
     : tab === 'programs'
-      ? <><ProgramsSection id={id} /><EducationOverview id={id} /><TeachersSection id={id} /></>
+      ? <><ProgramsSection id={id} /><TeachersSection id={id} /></>
     : tab === 'products'
       ? <ProductsSection id={id} />
     : tab === 'licenses'

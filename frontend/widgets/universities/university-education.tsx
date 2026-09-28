@@ -7,7 +7,7 @@ import { hasPermission } from '@/shared/lib/access-control';
 import { normalizeApiError } from '@/shared/lib/api-errors';
 import {
   addTeacherProgram, createTeacher, educationKeys, educationStatistics,
-  integrationCapabilities, listTeachers, syncDemoLms, updateTeacher,
+  listTeachers, updateTeacher,
   updateTeacherProgram, type TeacherProgram, type TeacherRecord,
   type TrainingStatus, type UniversityEducationStats,
 } from '@/shared/lib/education-repository';
@@ -24,37 +24,6 @@ const statusLabels: Record<TrainingStatus, string> = {
   not_started: 'Не начато', in_progress: 'В процессе',
   completed: 'Выполнено', needs_review: 'Нужна проверка',
 };
-
-function Metric({ label, value }: { label: string; value: number | string }) {
-  return <div className={styles.metric}><strong>{value}</strong><span>{label}</span></div>;
-}
-
-export function EducationOverview({ id }: { id: string }) {
-  const { user } = useAuth();
-  const queryClient = useQueryClient();
-  const stats = useQuery({ queryKey: educationKeys.stats(id), queryFn: () => educationStatistics(id), staleTime: 30_000 });
-  const capabilities = useQuery({ queryKey: ['integrations', 'capabilities'], queryFn: integrationCapabilities, staleTime: 60_000 });
-  const [error, setError] = useState('');
-  const sync = useMutation({
-    mutationFn: () => syncDemoLms(id),
-    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: educationKeys.family(id) }); setError(''); },
-    onError: (cause) => setError(normalizeApiError(cause).message),
-  });
-  return <section className={styles.section} aria-label="Статистика обучения">
-    <div className={styles.header}><div><h2>Статистика обучения</h2><p>Показатели по программам из LMS и сайта</p></div>
-      {hasPermission(user, 'university.edit') && capabilities.data?.demo_lms_enabled
-        ? <Button variant="ghost" size="s" type="button" loading={sync.isPending} onClick={() => sync.mutate()}>Обновить из TEST/DEMO LMS</Button> : null}
-    </div>
-    {error ? <p className={styles.error} role="alert">{error}</p> : null}
-    {stats.isPending ? <PassportTableSkeleton /> : stats.isError || !stats.data
-      ? <RouteErrorState compact onRetry={() => void stats.refetch()} />
-      : <><div className={styles.metrics}>
-        <Metric label="Обучающихся" value={stats.data.programs.some((program) => program.learner_source) ? stats.data.learners_count : '—'} />
-        <Metric label="Заявок" value={stats.data.programs.some((program) => program.applications_synced_at) ? stats.data.applications_count : '—'} />
-        <Metric label="Потоков" value={stats.data.programs.some((program) => program.learner_source) ? stats.data.flows_count : '—'} />
-      </div><p className={styles.meta}>Источник и дата обновления указаны для каждой программы ниже. Персональные данные обучающихся в CRM не хранятся.</p></>}
-  </section>;
-}
 
 type TeacherAction = { kind: 'create' } | { kind: 'name'; teacher: TeacherRecord } |
   { kind: 'add-program'; teacher: TeacherRecord } |

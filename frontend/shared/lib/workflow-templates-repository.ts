@@ -185,7 +185,7 @@ async function updateRealWorkflowTemplate(templateId: string, input: UpdateWorkf
 }
 
 async function deleteRealWorkflowTemplate(templateId: string): Promise<void> {
-  const result = await apiFetch<undefined>(`/api/v1/workflow/templates/${encodeURIComponent(templateId)}`, { method: 'DELETE' });
+  const result = await apiFetch<{ status: string }>(`/api/v1/workflow/templates/${encodeURIComponent(templateId)}`, { method: 'DELETE' });
   if (!result.ok) return fail(result.status, result.body, result.error, 'Не удалось удалить шаблон Workflow.');
 }
 

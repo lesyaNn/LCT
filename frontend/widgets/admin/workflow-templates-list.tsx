@@ -7,12 +7,15 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AddLarge from '@atomaro/icons/24/action/AddLarge';
 import ArrowRight from '@atomaro/icons/24/navigation/ArrowRight';
+import Trash from '@atomaro/icons/24/action/Trash';
 import { useQuery } from '@tanstack/react-query';
 import { useCreateWorkflowTemplate, useDeleteWorkflowTemplate, useUpdateWorkflowTemplate } from '@/shared/lib/workflow-template-mutations';
 import { normalizeApiError, type NormalizedApiError } from '@/shared/lib/api-errors';
 import { isMockDataSourceFor } from '@/shared/lib/data-source';
 import { listWorkflowTemplates, workflowTemplateListQueryKey, type CreateWorkflowTemplateInput } from '@/shared/lib/workflow-templates-repository';
 import { Button } from '@/shared/ui/rtk/button';
+import { IconButton } from '@/shared/ui/rtk/icon-button';
+import { Tooltip } from '@/shared/ui/rtk/tooltip';
 import { EmptyState } from '@/shared/ui/empty-state';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { ListSkeleton } from '@/shared/ui/skeleton';
@@ -77,7 +80,7 @@ export function WorkflowTemplatesList() {
         <div className={styles.headerActions}>
           {!demoMode && template.isActive ? <Button type="button" variant="ghost" size="s" disabled={updateTemplate.isPending} onClick={() => { setRetireError(null); setRetireCandidate({ id: template.id, name: template.name }); }}>Отключить</Button> : null}
           {!demoMode && !template.isActive ? <Button type="button" variant="ghost" size="s" disabled={updateTemplate.isPending} onClick={() => void updateTemplate.mutateAsync({ templateId: template.id, patch: { isActive: true } }).catch((cause) => setNotification(normalizeApiError(cause)))}>Активировать</Button> : null}
-          {!demoMode ? <Button type="button" variant="ghost" size="s" disabled={deleteTemplate.isPending} onClick={() => { setDeleteError(null); setDeleteCandidate({ id: template.id, name: template.name }); }}>Удалить</Button> : null}
+          {!demoMode ? <Tooltip content="Удалить"><IconButton icon={<Trash size={18} fill="currentColor" />} label={`Удалить шаблон «${template.name}»`} size={18} intent="danger" disabled={deleteTemplate.isPending} onClick={() => { setDeleteError(null); setDeleteCandidate({ id: template.id, name: template.name }); }} /></Tooltip> : null}
           <Link className={styles.editLink} href={`/admin/workflow/templates/${template.id}/edit`}>Редактировать<ArrowRight size={18} fill="currentColor" /></Link>
         </div>
       </li>)}</ul> : <EmptyState title="Шаблонов пока нет" description="Создайте первый шаблон и добавьте в него этапы." headingLevel={3} primaryAction={{ label: 'Новый шаблон', onClick: () => setCreateOpen(true) }} />}

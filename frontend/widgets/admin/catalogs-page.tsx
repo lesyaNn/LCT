@@ -1,5 +1,6 @@
 'use client';
 
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Edit from '@atomaro/icons/24/editor/Edit';
@@ -149,13 +150,15 @@ function ContactList({ contacts }: { contacts?: CatalogContact[] }) {
 }
 
 export function CatalogsPage() {
+  const searchParams = useSearchParams();
+  const openedFromPassport = searchParams.get('type') === 'agreements' && searchParams.get('kind') === 'contracts';
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [type, setType] = useState<CatalogType>('universities');
+  const [type, setType] = useState<CatalogType>(openedFromPassport ? 'agreements' : 'universities');
   // The combined tab renders one of two real resources at a time.
   const [agreementKind, setAgreementKind] = useState<AgreementKind>('contracts');
   const [search, setSearch] = useState('');
-  const [universityId, setUniversityId] = useState('');
+  const [universityId, setUniversityId] = useState(openedFromPassport ? searchParams.get('universityId') ?? '' : '');
   const [agreementStatus, setAgreementStatus] = useState<AgreementStatus | ''>('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
