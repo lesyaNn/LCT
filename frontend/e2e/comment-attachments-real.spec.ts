@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('comment attachments upload once, persist after reload and download', async ({ page }) => {
+test('comment and Workflow attachments upload, persist after reload and download', async ({ page }) => {
   const instanceId = process.env.E2E_WORKFLOW_INSTANCE_ID;
   const mockAuth = process.env.E2E_MOCK_AUTH === '1';
   test.skip(!instanceId || (!mockAuth && (!process.env.E2E_ADMIN_USERNAME || !process.env.E2E_ADMIN_PASSWORD)),
@@ -72,4 +72,15 @@ test('comment attachments upload once, persist after reload and download', async
   await comments.getByRole('button', { name: 'Отправить' }).click();
   await expect(comments.getByRole('textbox', { name: 'Добавить комментарий' })).toHaveValue(failed);
   await expect(comments.getByText('retry.pdf', { exact: false })).toBeVisible();
+
+  const workflowFile = `${marker}-workflow.pdf`;
+  await page.getByRole('region', { name: 'Общие материалы Workflow' }).getByLabel('Выбрать файлы для загрузки').setInputFiles({
+    name: workflowFile, mimeType: 'application/pdf', buffer: Buffer.from('workflow'),
+  });
+  await expect(page.getByRole('button', { name: `Скачать ${workflowFile}` })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('button', { name: `Скачать ${workflowFile}` })).toBeVisible();
+  const workflowDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: `Скачать ${workflowFile}` }).click();
+  expect((await workflowDownload).suggestedFilename()).toBe(workflowFile);
 });
