@@ -257,7 +257,8 @@ def create_job(
             new_value={"audit_object_type": "import" if job_type == "xlsx_import" else "report",
                        "format": format, "columns": columns, "status": "queued",
                        "job_type": job_type,
-                       "university_count": len(effective_university_ids)},
+                       "university_count": (len(effective_university_ids)
+                                            if effective_university_ids is not None else None)},
         )
     db.commit()
     db.refresh(job)

@@ -28,7 +28,7 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, inspect, select
+from sqlalchemy import create_engine, inspect, select, text
 from sqlalchemy.orm import Session, sessionmaker
 
 import app.models  # noqa: F401 (register ReportJob metadata)
@@ -42,6 +42,7 @@ from app.modules.analytics.report_request import ReportRequest
 from app.modules.analytics.reports_router import router as reports_router
 from app.modules.analytics.report_service import create_report_job
 from app.modules.analytics.report_worker import generate_report_task
+from app.modules.audit.service import AuditContext
 from app.schemas.common import ReportFormat
 
 TEST_URL = os.getenv("TEST_DATABASE_URL", "sqlite://")
@@ -118,6 +119,17 @@ def _client(user: CurrentUser | None) -> TestClient:
     if user is not None:
         app.dependency_overrides[get_current_user] = lambda: user
     return TestClient(app, raise_server_exceptions=False)
+
+
+def test_global_admin_report_creation_with_audit_context(pg):
+    engine, _ = pg
+    with Session(engine) as db:
+        db.info["audit_context"] = AuditContext(user_id="admin-1", user_name="Admin", role="admin")
+        queued = create_report_job(db, ReportRequest(format="xlsx"), _admin())
+        job = jobs.get_job(db, queued.job_id)
+        assert queued.status == "queued"
+        assert job is not None
+        assert job.effective_university_ids is None
 
 
 def _session(eng) -> Session:
@@ -269,12 +281,17 @@ def test_xlsx_file_contains_linked_business_fields(pg):
     path = tmp / "linked-business-report.xlsx"
     path.write_bytes(client.get(f"/reports/{job_id}/download").content)
     row = next(load_workbook(path, read_only=True)["Отчёт"].iter_rows(min_row=7, max_row=7, values_only=True))
-    assert row[:4] == ("Альфа", "Вендор Р", "ПО Репортёр", "C-REPORT-1")
-    assert (row[4].date(), row[5].date()) == (date(2026, 2, 10), date(2027, 2, 10))
-    assert row[6:] == ("accepted", "Менеджер Альфа", "Комментарий Альфы")
+    assert row[:3] == ("Альфа", "Вендор Р", "C-REPORT-1")
+    assert (row[3].date(), row[4].date()) == (date(2026, 2, 10), date(2027, 2, 10))
+    assert row[5:] == ("accepted", "Менеджер Альфа", "Комментарий Альфы")
 
 
 def test_pdf_e2e_ready_download(pg):
+    from app.modules.analytics.pdf import PDFFontUnavailableError, ensure_pdf_fonts
+    try:
+        ensure_pdf_fonts()
+    except PDFFontUnavailableError:
+        pytest.skip("DejaVu fonts are not installed in the local test runtime")
     client = _client(_admin())
     resp = client.post("/reports", json={"format": "pdf", "columns": ["university"]})
     assert resp.status_code == 202, resp.text
@@ -549,7 +566,7 @@ def test_cleanup_expired_report_jobs(pg):
     with _session(eng) as s:
         fresh_id = create_report_job(s, ReportRequest(format="json"), _admin()).job_id
         stale_queued_id = create_report_job(
-            s, ReportRequest(format="json"), _admin()
+            s, ReportRequest(format="json", columns=["university"]), _admin()
         ).job_id
         for jid, exp in ((ready_id, past), (stale_queued_id, past)):
             job = jobs.get_job(s, jid)
@@ -657,7 +674,8 @@ def test_parallel_submit_does_not_wait_for_generation(pg, monkeypatch):
     assert statuses == [202] * 10  # every submit accepted immediately
     assert max(latencies) < 2.5, latencies  # nobody waited for the 3s worker
     ids = [b["job_id"] for b in bodies]
-    assert len(set(ids)) == 10
+    # Identical in-flight requests from one actor share one persisted job.
+    assert len(set(ids)) == 1
     with _session(eng) as s:
         for job_id in ids:
             job = jobs.get_job(s, job_id)
@@ -677,6 +695,16 @@ def test_report_jobs_migration_down_up_cycle(pg):
     env = dict(os.environ)
     env["DATABASE_URL"] = os.environ["TEST_DATABASE_URL"]
     eng, _ = pg
+    # Later domain migrations include an intentionally irreversible removal
+    # of Student data. Test the report migration chain in isolation.
+    with eng.begin() as connection:
+        connection.execute(text("DROP SCHEMA public CASCADE"))
+        connection.execute(text("CREATE SCHEMA public"))
+    setup = subprocess.run(
+        ["python", "scripts/migrate.py", "up", "--to", "000020_job_attempts"],
+        cwd=backend_dir, env=env, capture_output=True, text=True,
+    )
+    assert setup.returncode == 0, setup.stdout + setup.stderr
     down = subprocess.run(
         ["python", "scripts/migrate.py", "down", "--to", "000017_tasks_priority", "--yes"],
         cwd=backend_dir,
@@ -739,9 +767,9 @@ def test_migration_chain_latest_is_report_jobs():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     versions = [v for v, _, _ in module._discover()]
-    assert versions[-1] == "000034_report_templates_xls_format"
+    assert versions[-1] == "000037_minimize_education_domain"
     assert "000033_product_program" in versions
-    assert len(versions) == 34
+    assert len(versions) == 37
     assert "report_jobs" in module.EXPECTED_TABLES
     assert module.EXPECTED_TABLES[-1] == "report_templates"
 
