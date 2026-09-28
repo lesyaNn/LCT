@@ -9,14 +9,12 @@
 .agreementSwitch { display: flex; flex-wrap: wrap; gap: var(--rtk-space-1); padding: var(--rtk-space-3) 0 0; }
 .agreementSwitch button { height: 46px; min-height: 46px; padding-inline: var(--rtk-space-3); white-space: nowrap; }
 .surface { background: var(--rtk-color-surface); min-width: 0; overflow: hidden; }
-.surfaceHeader { border-bottom: 1px solid var(--rtk-color-border); padding: var(--rtk-space-4) var(--rtk-space-5); }
+.surfaceHeader { padding: var(--rtk-space-4) var(--rtk-space-5); }
 .surfaceHeader h2 { font-size: 20px; margin: 0; }
 .surfaceHeader p { color: var(--rtk-color-text-tertiary); font-size: 12px; margin: var(--rtk-space-1) 0 0; }
 .desktopTable { overflow-x: auto; }
 .desktopTable table { border-collapse: collapse; min-width: 760px; width: 100%; }
 .compactTable table { min-width: 420px; }
-.desktopTable th { background: var(--rtk-color-surface-subtle); color: var(--rtk-color-text-tertiary); font-size: 11px; letter-spacing: .04em; padding: var(--rtk-space-3) var(--rtk-space-4); text-align: left; text-transform: uppercase; white-space: nowrap; }
-.desktopTable td { border-top: 1px solid var(--rtk-color-border); font-size: 13px; padding: var(--rtk-space-3) var(--rtk-space-4); vertical-align: middle; }
 .nameButton { background: transparent; border: 0; color: inherit; cursor: pointer; font: inherit; font-weight: 700; padding: 0; text-align: left; }
 .nameButton:not(:disabled):hover { color: var(--rtk-color-brand); text-decoration: underline; }
 .nameButton:disabled { cursor: default; }

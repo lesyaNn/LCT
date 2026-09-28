@@ -9,14 +9,11 @@
 .pageHeader h1 { font-size: clamp(26px, 4vw, 36px); letter-spacing: -.035em; line-height: 1.12; margin: 0; overflow-wrap: anywhere; }
 .description { color: var(--rtk-color-text-secondary); margin: var(--rtk-space-2) 0 0; max-width: 720px; }
 .surface { background: var(--rtk-color-surface); min-width: 0; overflow: hidden; }
-.surfaceHeader { align-items: center; border-bottom: 1px solid var(--rtk-color-border); display: flex; justify-content: space-between; min-height: 70px; padding: var(--rtk-space-4) var(--rtk-space-5); }
+.surfaceHeader { align-items: center; display: flex; justify-content: space-between; min-height: 70px; padding: var(--rtk-space-4) var(--rtk-space-5); }
 .surfaceHeader h2 { font-size: 19px; margin: 0; }
 .surfaceHeader p { color: var(--rtk-color-text-tertiary); font-size: 12px; margin: var(--rtk-space-1) 0 0; }
 .desktopTable { overflow-x: auto; }
 .desktopTable table { border-collapse: collapse; min-width: 900px; width: 100%; }
-.desktopTable th { background: var(--rtk-color-surface-subtle); color: var(--rtk-color-text-tertiary); font-size: 11px; font-weight: 700; letter-spacing: .04em; padding: var(--rtk-space-3) var(--rtk-space-4); text-align: left; text-transform: uppercase; white-space: nowrap; }
-.desktopTable td { border-top: 1px solid var(--rtk-color-border); font-size: 13px; padding: var(--rtk-space-3) var(--rtk-space-4); vertical-align: middle; }
-.desktopTable tbody tr:hover { background: color-mix(in srgb, var(--rtk-color-brand-soft) 28%, var(--rtk-color-surface)); }
 .userButton { background: transparent; border: 0; color: var(--rtk-color-text-primary); cursor: pointer; font: inherit; font-weight: 700; padding: 0; text-align: left; }
 .userButton:hover { color: var(--rtk-color-brand); text-decoration: underline; }
 .userButton small, .muted { color: var(--rtk-color-text-tertiary); display: block; font-size: 11px; font-weight: 400; margin-top: 2px; }

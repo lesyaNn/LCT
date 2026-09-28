@@ -39,10 +39,10 @@ test('passport starts a real Workflow and admin lists share responsive toolbar l
       await expect(page.getByRole('heading', { name: heading })).toBeVisible();
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);
       if (path === '/admin/users') {
-        if (width > 900) await expect(page.getByRole('region', { name: 'Фильтры пользователей' }).getByRole('button', { name: 'Добавить пользователя' })).toBeVisible();
+        if (width > 900) await expect(page.getByRole('region', { name: 'Фильтры пользователей' }).getByRole('button', { name: 'Создать приглашение' })).toBeVisible();
         else {
           await page.getByRole('button', { name: /^Фильтры/ }).click();
-          await expect(page.getByRole('dialog', { name: 'Фильтры' }).getByRole('button', { name: 'Добавить пользователя' })).toBeVisible();
+          await expect(page.getByRole('dialog', { name: 'Фильтры' }).getByRole('button', { name: 'Создать приглашение' })).toBeVisible();
           await page.getByRole('dialog', { name: 'Фильтры' }).getByRole('button', { name: 'Закрыть' }).click();
         }
         await page.getByRole('button', { name: 'Настроить' }).first().click();

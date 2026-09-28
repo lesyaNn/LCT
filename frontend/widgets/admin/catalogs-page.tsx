@@ -43,6 +43,7 @@ import { Drawer } from '@/shared/ui/rtk/drawer';
 import { IconButton } from '@/shared/ui/rtk/icon-button';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { TableShell } from '@/shared/ui/rtk/table-shell';
+import tableStyles from '@/shared/ui/rtk/data-table.module.css';
 import { Toast, type ToastIntent } from '@/shared/ui/rtk/toast';
 import { Tooltip } from '@/shared/ui/rtk/tooltip';
 import { TableSkeleton } from '@/shared/ui/skeleton';
@@ -136,7 +137,7 @@ function CatalogTable({ type, kind, items, canWrite, busyId, universityNames, on
   const busy = (item: CatalogItem) => busyId === item.id;
   const actions = (item: CatalogItem) => <div className={styles.rowActions}>{hasContacts(item) ? <Button type="button" variant="ghost" size="s" onClick={() => onContacts(item)}>Контакты</Button> : null}<CatalogActions item={item} canWrite={canWrite} busy={busy(item)} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} /></div>;
   return <TableShell ariaLabel={`Каталог «${catalogDefinition(type).label}»`}>
-    <div className={headers.length > 2 ? styles.desktopTable : `${styles.desktopTable} ${styles.compactTable}`}><table><thead><tr>{headers.map((header) => <th key={header}>{header}</th>)}<th>Действия</th></tr></thead><tbody>{items.map((item) => <tr data-testid={`catalog-row-${item.id}`} key={item.id}><td><button className={styles.nameButton} type="button" disabled={!canWrite} onClick={() => onEdit(item)}>{item.name}</button></td>{secondaryFields(item, universityNames).map((field) => <td key={field.label}>{field.value}</td>)}<td>{actions(item)}</td></tr>)}</tbody></table></div>
+    <div className={headers.length > 2 ? styles.desktopTable : `${styles.desktopTable} ${styles.compactTable}`}><table className={tableStyles.table}><thead><tr>{headers.map((header) => <th key={header}>{header}</th>)}<th>Действия</th></tr></thead><tbody>{items.map((item) => <tr data-testid={`catalog-row-${item.id}`} key={item.id}><td><button className={styles.nameButton} type="button" disabled={!canWrite} onClick={() => onEdit(item)}>{item.name}</button></td>{secondaryFields(item, universityNames).map((field) => <td key={field.label}>{field.value}</td>)}<td>{actions(item)}</td></tr>)}</tbody></table></div>
     <div className={styles.mobileList}>{items.map((item) => <article className={styles.catalogCard} key={item.id}><div className={styles.cardTop}><strong>{item.name}</strong></div><dl>{secondaryFields(item, universityNames).map((field) => <div key={field.label}><dt>{field.label}</dt><dd>{field.value}</dd></div>)}</dl>{hasContacts(item) ? <Button type="button" variant="ghost" size="s" onClick={() => onContacts(item)}>Контакты</Button> : null}<CatalogActions item={item} canWrite={canWrite} busy={busy(item)} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} /></article>)}</div>
   </TableShell>;
 }

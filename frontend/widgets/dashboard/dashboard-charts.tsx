@@ -209,9 +209,9 @@ function AnalyticsGrid({ data }: { data: DashboardAnalytics }) {
       <ChartCard title="Динамика запусков" description="Фактические и планируемые запуски за последние 12 месяцев." exportSlug="dynamics" exportTestId="chart-export-dynamics" canExport={hasLaunches}>
         {hasLaunches ? <LaunchDynamicsChart data={data.launchDynamics} /> : <EmptyChart />}
       </ChartCard>
-      <ChartCard title="Приоритетные задачи" description="Пять элементов, требующих первоочередного внимания." exportSlug="attention" exportTestId="chart-export-attention" canExport={data.attentionItems.length > 0}>
+      <div className={styles.attentionWide}><ChartCard title="Приоритетные задачи" description="Элементы, требующие первоочередного внимания." exportSlug="attention" exportTestId="chart-export-attention" canExport={false}>
         {data.attentionItems.length ? <AttentionList data={data.attentionItems} /> : <EmptyChart />}
-      </ChartCard>
+      </ChartCard></div>
     </div>
   );
 }
