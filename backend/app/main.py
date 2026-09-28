@@ -9,6 +9,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 
+from contextlib import asynccontextmanager
+
 from app.api.router import v1
 from app.config import settings
 from app.core.errors import register_error_handlers
@@ -20,6 +22,34 @@ from app.core.middleware import (
 )
 from app.schemas.errors import ERROR_MESSAGES, ErrorCode
 
+import logging
+
+log = logging.getLogger("rtk.bootstrap.workflow")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Run startup baseline bootstraps (migrations already applied by entrypoint).
+
+    Ensures the standard workflow template exists on every backend start.
+    Fail-open by design (consistent with the rest of the startup path):
+    a DB failure is logged with traceback and retried on the next
+    start; it never prevents the API process from serving /health.
+    """
+    try:
+        from app.bootstrap.workflow_defaults import ensure_default_workflow_template
+        from app.db.session import SessionLocal
+
+        db = SessionLocal()
+        try:
+            ensure_default_workflow_template(db)
+        finally:
+            db.close()
+    except Exception:
+        log.exception("[bootstrap] Standard workflow template bootstrap failed")
+    yield
+
+
 app = FastAPI(
     title="CRM ИТ-Школа Ростелеком API",
     description="API для управления взаимодействием с ВУЗами",
@@ -27,6 +57,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
+    lifespan=lifespan,
     openapi_tags=[
         {"name": "Auth", "description": "Аутентификация через Keycloak"},
         {"name": "Universities", "description": "Каталог ВУЗов и паспорта"},

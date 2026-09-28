@@ -260,6 +260,166 @@ def list_universities(
     return list(rows), int(total)
 
 
+def university_list_presentation(
+    db: Session,
+    university_ids: Sequence[uuid.UUID],
+    *,
+    today: date | None = None,
+) -> dict[uuid.UUID, dict]:
+    """Batched presentation aggregates for one universities page (no N+1).
+
+    Returns ``{university_id: {responsible, programs_count,
+    program_status_counts, current_stage, last_interaction_at, attention}}``.
+    Every relation is loaded with one GROUP BY / filtered SELECT over the
+    whole page (constant ~8 SELECTs, never per-row). Missing relations yield
+    None/0/False. Reuses the frozen business rules: primary responsible from
+    ``university_responsibles.is_primary``; last interaction as
+    GREATEST(max meetings, max notes) (P4-02-02 FULL); attention as the
+    existing P2 overdue signal (overdue open stage or overdue open task on
+    an ACTIVE instance, ``due < today`` canonical rule).
+    """
+    from app.models.interactions import InteractionNote, Meeting, UniversityProgram
+    from app.models.workflow_instances import InstanceStage, WorkflowInstance, WorkflowTask
+
+    result: dict[uuid.UUID, dict] = {
+        uid: {
+            "responsible": None,
+            "programs_count": 0,
+            "program_status_counts": {},
+            "current_stage": None,
+            "last_interaction_at": None,
+            "attention": False,
+        }
+        for uid in university_ids
+    }
+    if not university_ids:
+        return result
+    day = today if today is not None else date.today()
+
+    # 1. Primary responsible: is_primary first, then alphabetical (ONE query).
+    resp_rows = db.execute(
+        select(
+            UniversityResponsible.university_id,
+            Responsible,
+            UniversityResponsible.is_primary,
+        )
+        .join(Responsible, Responsible.id == UniversityResponsible.responsible_id)
+        .where(UniversityResponsible.university_id.in_(list(university_ids)))
+        .order_by(
+            UniversityResponsible.university_id,
+            UniversityResponsible.is_primary.desc(),
+            Responsible.full_name.asc(),
+        )
+    ).all()
+    seen_resp: set[uuid.UUID] = set()
+    for uni_id, resp, primary in resp_rows:
+        if uni_id not in seen_resp and uni_id in result:
+            result[uni_id]["responsible"] = (resp, bool(primary))
+            seen_resp.add(uni_id)
+
+    # 2. Programs GROUP BY status (ONE query).
+    for uni_id, status, count in db.execute(
+        select(
+            UniversityProgram.university_id,
+            UniversityProgram.status,
+            func.count(UniversityProgram.id),
+        )
+        .where(UniversityProgram.university_id.in_(list(university_ids)))
+        .group_by(UniversityProgram.university_id, UniversityProgram.status)
+    ).all():
+        if uni_id in result:
+            result[uni_id]["program_status_counts"][status] = int(count)
+            result[uni_id]["programs_count"] += int(count)
+
+    # 3-4. Latest workflow instance per university + its current stage name.
+    inst_rows = db.execute(
+        select(
+            WorkflowInstance.university_id,
+            WorkflowInstance.id,
+            WorkflowInstance.current_instance_stage_id,
+        )
+        .where(WorkflowInstance.university_id.in_(list(university_ids)))
+        .order_by(WorkflowInstance.updated_at.desc(), WorkflowInstance.id.asc())
+    ).all()
+    latest: dict[uuid.UUID, tuple] = {}
+    for uni_id, inst_id, stage_id in inst_rows:
+        if uni_id not in latest:
+            latest[uni_id] = (inst_id, stage_id)
+    stage_ids = [sid for _, sid in latest.values() if sid is not None]
+    stage_names: dict = {}
+    if stage_ids:
+        stage_names = {
+            sid: name
+            for sid, name in db.execute(
+                select(InstanceStage.id, InstanceStage.name).where(
+                    InstanceStage.id.in_(stage_ids)
+                )
+            ).all()
+        }
+    for uni_id, (inst_id, stage_id) in latest.items():
+        name = stage_names.get(stage_id)
+        if uni_id in result and name:
+            result[uni_id]["current_stage"] = {"code": str(stage_id), "name": name}
+
+    # 5-6. Last interaction = GREATEST(max meetings, max notes) (TWO queries).
+    last: dict[uuid.UUID, object] = {}
+    for uni_id, moment in db.execute(
+        select(Meeting.university_id, func.max(Meeting.meeting_at))
+        .where(Meeting.university_id.in_(list(university_ids)))
+        .group_by(Meeting.university_id)
+    ).all():
+        if moment is not None:
+            last[uni_id] = moment
+    for uni_id, moment in db.execute(
+        select(InteractionNote.university_id, func.max(InteractionNote.created_at))
+        .where(InteractionNote.university_id.in_(list(university_ids)))
+        .group_by(InteractionNote.university_id)
+    ).all():
+        if moment is not None and (uni_id not in last or moment > last[uni_id]):
+            last[uni_id] = moment
+    for uni_id, moment in last.items():
+        if uni_id in result:
+            result[uni_id]["last_interaction_at"] = moment
+
+    # 7-8. Attention = overdue open stage OR overdue open task (P2 rule).
+    overdue_unis: set[uuid.UUID] = set()
+    for (uni_id,) in db.execute(
+        select(WorkflowInstance.university_id)
+        .join(
+            InstanceStage,
+            InstanceStage.instance_id == WorkflowInstance.id,
+        )
+        .where(
+            WorkflowInstance.university_id.in_(list(university_ids)),
+            WorkflowInstance.status == "active",
+            InstanceStage.completed_at.is_(None),
+            InstanceStage.status.notin_(["completed", "skipped"]),
+            InstanceStage.due_date.is_not(None),
+            InstanceStage.due_date < day,
+        )
+        .group_by(WorkflowInstance.university_id)
+    ).all():
+        overdue_unis.add(uni_id)
+    for (uni_id,) in db.execute(
+        select(WorkflowInstance.university_id)
+        .join(WorkflowTask, WorkflowTask.instance_id == WorkflowInstance.id)
+        .where(
+            WorkflowInstance.university_id.in_(list(university_ids)),
+            WorkflowInstance.status == "active",
+            WorkflowTask.status == "open",
+            WorkflowTask.deadline.is_not(None),
+            WorkflowTask.deadline < day,
+        )
+        .group_by(WorkflowInstance.university_id)
+    ).all():
+        overdue_unis.add(uni_id)
+    for uni_id in overdue_unis:
+        if uni_id in result:
+            result[uni_id]["attention"] = True
+
+    return result
+
+
 def get_university(db: Session, university_id: uuid.UUID) -> University | None:
     return db.get(University, university_id)
 

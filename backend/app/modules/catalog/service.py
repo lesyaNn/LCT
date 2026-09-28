@@ -44,6 +44,8 @@ from app.modules.catalog.schemas import (
     ResponsibleRead,
     ResponsibleShort,
     UniversityDetail,
+    UniversityListItem,
+    UniversityListStage,
     UniversityRead,
     UniversityResponsibleRead,
     VendorDetail,
@@ -77,7 +79,7 @@ def list_university_page(
     health_status: str | None = None,
     external_source: str | None = None,
 ):
-    """List universities (plain, no health score)."""
+    """List universities with presentation aggregates (batched, no N+1)."""
     rows, total = repo.list_universities(
         db,
         page=page,
@@ -92,7 +94,27 @@ def list_university_page(
         user=user,
         external_source=external_source,
     )
-    return [UniversityRead.model_validate(r) for r in rows], total
+    presentation = repo.university_list_presentation(
+        db, [r.id for r in rows], today=unified_today
+    )
+    items = []
+    for r in rows:
+        item = UniversityListItem.model_validate(r)
+        agg = presentation.get(r.id, {})
+        resp = agg.get("responsible")
+        if resp is not None:
+            obj, is_primary = resp
+            item.responsible = ResponsibleShort.model_validate(obj)
+            item.responsible.is_primary = is_primary
+        item.programs_count = agg.get("programs_count", 0)
+        item.program_status_counts = agg.get("program_status_counts", {})
+        stage = agg.get("current_stage")
+        if stage is not None:
+            item.current_stage = UniversityListStage.model_validate(stage)
+        item.last_interaction_at = agg.get("last_interaction_at")
+        item.attention = bool(agg.get("attention", False))
+        items.append(item)
+    return items, total
 
 
 def get_university_detail(

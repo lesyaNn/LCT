@@ -46,6 +46,12 @@ type ApiUniversity = {
   city: string | null;
   created_at: string;
   updated_at: string;
+  responsible: { id: string; full_name: string; email: string; phone: string | null; role: string; is_primary: boolean } | null;
+  programs_count: number;
+  program_status_counts: Partial<Record<ProgramStatus, number>>;
+  current_stage: { code: string; name: string } | null;
+  last_interaction_at: string | null;
+  attention: boolean;
 };
 type ApiProgram = { id: string; name: string; direction_name: string; status: ProgramStatus; launch_date: string | null; responsible_name: string | null };
 type ApiLicense = { id: string; license_number: string; product_name: string; vendor_name: string; signed_at: string; expires_at: string; status: string; transfer_status: string; contract_number: string | null };
@@ -126,6 +132,15 @@ export function serializeUniversityListQuery(params: UniversityListQuery): URLSe
   return search;
 }
 
+function mapUniversityStage(item: ApiUniversity): UniversityListItem['currentStage'] {
+  if (!item.current_stage) return { id: 'unavailable', name: '—', tone: 'neutral' };
+  return {
+    id: item.current_stage.code || 'stage',
+    name: item.current_stage.name,
+    tone: item.attention ? 'warning' : 'brand',
+  };
+}
+
 export async function realGetUniversities(params: UniversityListQuery, signal?: AbortSignal): Promise<PaginatedResult<UniversityListItem>> {
   const search = serializeUniversityListQuery(params);
   const page = unwrap(
@@ -133,23 +148,31 @@ export async function realGetUniversities(params: UniversityListQuery, signal?: 
     'Не удалось загрузить список ВУЗов.',
   );
   return {
-    items: page.items.map((item) => ({
-      id: item.id,
-      name: item.name,
-      city: item.city ?? '—',
-      responsible: null,
-      programsCount: 0,
-      programStatusCounts: {},
-      currentStage: { id: 'unavailable', name: '—', tone: 'neutral' },
-      lastInteractionAt: item.updated_at || item.created_at,
-      attention: false,
-      availability: {
-        responsible: false,
-        programs: false,
-        stage: false,
-        lastInteraction: false,
-      },
-    })),
+    items: page.items.map((item) => {
+      const hasResponsible = item.responsible != null;
+      const hasPrograms = (item.programs_count ?? 0) > 0;
+      const hasStage = item.current_stage != null;
+      const hasInteraction = item.last_interaction_at != null;
+      return {
+        id: item.id,
+        name: item.name,
+        city: item.city ?? '—',
+        responsible: item.responsible
+          ? { id: item.responsible.id, name: item.responsible.full_name, email: item.responsible.email, role: item.responsible.role }
+          : null,
+        programsCount: item.programs_count ?? 0,
+        programStatusCounts: item.program_status_counts ?? {},
+        currentStage: mapUniversityStage(item),
+        lastInteractionAt: item.last_interaction_at ?? item.updated_at ?? item.created_at,
+        attention: item.attention === true,
+        availability: {
+          responsible: hasResponsible,
+          programs: hasPrograms,
+          stage: hasStage,
+          lastInteraction: hasInteraction,
+        },
+      };
+    }),
     page: page.page,
     pageSize: page.page_size,
     total: page.total,

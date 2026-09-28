@@ -44,7 +44,7 @@ from app.modules.catalog.schemas import (
     ResponsibleRead,
     ResponsibleUpdate,
     UniversityDetail,
-    UniversityRead,
+    UniversityListItem,
     UniversityResponsibleRead,
     UniversityProgramAttach,
     UniversityProgramRead,
@@ -112,7 +112,7 @@ def create_university(
 
 @router.get(
     "/universities",
-    response_model=PaginatedResponse[UniversityRead],
+    response_model=PaginatedResponse[UniversityListItem],
     tags=["Universities"],
     summary="List universities (paginated, search, filters, sorting)",
 )
@@ -135,7 +135,7 @@ def list_universities(
     unified: UnifiedFilter = Depends(get_unified_filter),
     db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(READ),
-) -> PaginatedResponse[UniversityRead]:
+) -> PaginatedResponse[UniversityListItem]:
     _ = region  # deprecated no-op, kept for backward compatibility (P1-11-03)
     items, total = service.list_university_page(
         db,

@@ -1,4 +1,4 @@
-"""P2-01-04 seed: the standard 14-stage university-interaction route.
+"""P2-01-04 seed: the legacy 14-stage university-interaction route.
 
 * Source of the stage names/order: ``README.md`` ("Текущий workflow
   взаимодействия с вузом (14 шагов)") — the only stage list fixed in the
@@ -13,6 +13,13 @@
   seeded with ``is_required=False``; every other stage is required.
 * No deadlines are invented: the ТЗ fixes no durations, so ``sla_days``
   stays NULL for all 14 stages.
+* Name disambiguation: this legacy 14-stage template intentionally uses a
+  SUFFIXED name (``... (14 этапов)``) so it never collides with the
+  production 5-stage baseline ``"Стандартный маршрут взаимодействия
+  с вузом"`` created at every backend start by
+  ``app.bootstrap.workflow_defaults.ensure_default_workflow_template``.
+  The two templates are independent rows (different UNIQUE names) and
+  neither seed nor bootstrap ever rewrites the other.
 
 Usage::
 
@@ -31,7 +38,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models.workflow_templates import WorkflowStage, WorkflowTemplate
 
-TEMPLATE_NAME = "Стандартный маршрут взаимодействия с вузом"
+TEMPLATE_NAME = "Стандартный маршрут взаимодействия с вузом (14 этапов)"
 TEMPLATE_DESCRIPTION = None
 LEGACY_TEMPLATE_DESCRIPTION = "Канонический маршрут из 14 этапов (README: текущий workflow взаимодействия с вузом)"
 
