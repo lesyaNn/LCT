@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import AddLarge from '@atomaro/icons/24/action/AddLarge';
 import ArrowRight from '@atomaro/icons/24/navigation/ArrowRight';
 import { useQuery } from '@tanstack/react-query';
-import { useCreateWorkflowTemplate, useUpdateWorkflowTemplate } from '@/shared/lib/workflow-template-mutations';
+import { useCreateWorkflowTemplate, useDeleteWorkflowTemplate, useUpdateWorkflowTemplate } from '@/shared/lib/workflow-template-mutations';
 import { normalizeApiError, type NormalizedApiError } from '@/shared/lib/api-errors';
 import { isMockDataSourceFor } from '@/shared/lib/data-source';
 import { listWorkflowTemplates, workflowTemplateListQueryKey, type CreateWorkflowTemplateInput } from '@/shared/lib/workflow-templates-repository';
@@ -28,11 +28,14 @@ export function WorkflowTemplatesList() {
   const query = useQuery({ queryKey: workflowTemplateListQueryKey(), queryFn: ({ signal }) => listWorkflowTemplates(1, 100, signal), staleTime: 30_000 });
   const createTemplate = useCreateWorkflowTemplate();
   const updateTemplate = useUpdateWorkflowTemplate();
+  const deleteTemplate = useDeleteWorkflowTemplate();
   const [createOpen, setCreateOpen] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
   const [notification, setNotification] = useState<NormalizedApiError | null>(null);
   const [retireCandidate, setRetireCandidate] = useState<{ id: string; name: string } | null>(null);
   const [retireError, setRetireError] = useState<string | null>(null);
+  const [deleteCandidate, setDeleteCandidate] = useState<{ id: string; name: string } | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const retire = async () => {
     if (!retireCandidate) return;
@@ -50,6 +53,17 @@ export function WorkflowTemplatesList() {
     router.push(`/admin/workflow/templates/${template.id}/edit`);
   };
 
+  const remove = async () => {
+    if (!deleteCandidate) return;
+    try {
+      await deleteTemplate.mutateAsync(deleteCandidate.id);
+      setDeleteCandidate(null);
+      setDeleteError(null);
+    } catch (cause) {
+      setDeleteError(normalizeApiError(cause).message);
+    }
+  };
+
   if (query.isError && !query.data) return <RouteErrorState onRetry={() => void query.refetch()} />;
   const visibleTemplates = query.data?.items.filter((template) => showInactive || template.isActive) ?? [];
   const inactiveCount = query.data?.items.filter((template) => !template.isActive).length ?? 0;
@@ -63,12 +77,14 @@ export function WorkflowTemplatesList() {
         <div className={styles.headerActions}>
           {!demoMode && template.isActive ? <Button type="button" variant="ghost" size="s" disabled={updateTemplate.isPending} onClick={() => { setRetireError(null); setRetireCandidate({ id: template.id, name: template.name }); }}>Отключить</Button> : null}
           {!demoMode && !template.isActive ? <Button type="button" variant="ghost" size="s" disabled={updateTemplate.isPending} onClick={() => void updateTemplate.mutateAsync({ templateId: template.id, patch: { isActive: true } }).catch((cause) => setNotification(normalizeApiError(cause)))}>Активировать</Button> : null}
+          {!demoMode ? <Button type="button" variant="ghost" size="s" disabled={deleteTemplate.isPending} onClick={() => { setDeleteError(null); setDeleteCandidate({ id: template.id, name: template.name }); }}>Удалить</Button> : null}
           <Link className={styles.editLink} href={`/admin/workflow/templates/${template.id}/edit`}>Редактировать<ArrowRight size={18} fill="currentColor" /></Link>
         </div>
       </li>)}</ul> : <EmptyState title="Шаблонов пока нет" description="Создайте первый шаблон и добавьте в него этапы." headingLevel={3} primaryAction={{ label: 'Новый шаблон', onClick: () => setCreateOpen(true) }} />}
     </section>
     {createOpen ? <CreateTemplateModal pending={createTemplate.isPending} onClose={() => { if (!createTemplate.isPending) setCreateOpen(false); }} onSubmit={create} onError={(error) => setNotification(error)} /> : null}
     {retireCandidate ? <Modal title="Отключить шаблон Workflow?" onClose={() => { if (!updateTemplate.isPending) setRetireCandidate(null); }}><div className={styles.confirmation}><p><strong>{retireCandidate.name}</strong> больше не будет доступен для новых Workflow.</p><p>Существующие Workflow сохранят свои этапы и историю. Шаблон можно активировать снова.</p>{retireError ? <FormErrorBanner>{retireError}</FormErrorBanner> : null}<div className={styles.modalActions}><Button type="button" variant="ghost" size="m" disabled={updateTemplate.isPending} onClick={() => setRetireCandidate(null)}>Отмена</Button><Button type="button" variant="danger" size="m" loading={updateTemplate.isPending} disabled={updateTemplate.isPending} onClick={() => void retire()}>Отключить</Button></div></div></Modal> : null}
+    {deleteCandidate ? <Modal title="Удалить шаблон Workflow?" onClose={() => { if (!deleteTemplate.isPending) setDeleteCandidate(null); }}><div className={styles.confirmation}><p>Шаблон «{deleteCandidate.name}» и его этапы будут удалены без возможности восстановления.</p><p>Если по нему уже запущены Workflow, удаление будет запрещено. Такой шаблон можно отключить.</p>{deleteError ? <FormErrorBanner>{deleteError}</FormErrorBanner> : null}<div className={styles.modalActions}><Button type="button" variant="ghost" size="m" disabled={deleteTemplate.isPending} onClick={() => setDeleteCandidate(null)}>Отмена</Button><Button type="button" variant="danger" size="m" loading={deleteTemplate.isPending} disabled={deleteTemplate.isPending} onClick={() => void remove()}>Удалить шаблон</Button></div></div></Modal> : null}
     {notification ? <div className={styles.toastViewport}><Toast intent="error" title="Не удалось сохранить шаблон" message={notification.message} onClose={() => setNotification(null)} /></div> : null}
   </div>;
 }

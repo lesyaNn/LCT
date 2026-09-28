@@ -32,10 +32,12 @@ from __future__ import annotations
 import uuid
 
 from sqlalchemy import func, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.exceptions import Conflict, NotFound
 from app.models.workflow_templates import WorkflowStage, WorkflowTemplate
+from app.models.workflow_instances import WorkflowInstance
 
 from .schemas import StageRead, TemplateDetail, TemplateRead
 
@@ -129,6 +131,32 @@ def patch_template(
         )
     db.commit()
     return get_template_detail(db, template_id)
+
+
+def delete_template(db: Session, template_id: uuid.UUID) -> None:
+    """Delete an unused template. Existing workflow history must stay intact."""
+    obj = db.execute(
+        select(WorkflowTemplate).where(WorkflowTemplate.id == template_id).with_for_update()
+    ).scalar_one_or_none()
+    if obj is None:
+        raise NotFound("Workflow template not found")
+    if db.scalar(select(WorkflowInstance.id).where(WorkflowInstance.template_id == template_id).limit(1)):
+        raise Conflict("Шаблон используется в Workflow. Отключите его, чтобы сохранить историю процессов.")
+    if "audit_context" in db.info:
+        from app.modules.audit.service import AuditAction, AuditService, context_for
+
+        AuditService(db).log_event(
+            context=context_for(db), action=AuditAction.ADMIN_CONFIG,
+            entity_type="config", entity_id=obj.id,
+            old_value={"audit_object_type": "workflow_template", "name": obj.name,
+                       "is_active": obj.is_active},
+        )
+    db.delete(obj)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise Conflict("Шаблон используется в Workflow. Отключите его, чтобы сохранить историю процессов.") from exc
 
 
 # ------------------------------------------------------------------- stages

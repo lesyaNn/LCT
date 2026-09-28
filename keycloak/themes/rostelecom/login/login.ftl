@@ -35,7 +35,6 @@
                     <input type="hidden" id="id-hidden-input" name="credentialId" <#if auth.selectedCredential?has_content>value="${auth.selectedCredential}"</#if>/>
                     <@buttons.loginButton />
                 </form>
-                <#if (login.username!'') == '__demo__'>
                   <div class="rtk-demo-login">
                     <button id="rtk-demo-toggle" class="rtk-demo-button" type="button" aria-expanded="false" aria-controls="rtk-demo-roles">Демо-вход</button>
                     <div id="rtk-demo-roles" class="rtk-demo-roles" hidden>
@@ -45,7 +44,6 @@
                       <button type="button" data-demo-role="user">Пользователь</button>
                     </div>
                   </div>
-                </#if>
             </#if>
             </div>
         </div>

@@ -184,6 +184,11 @@ async function updateRealWorkflowTemplate(templateId: string, input: UpdateWorkf
   return templateFromApi(result.data);
 }
 
+async function deleteRealWorkflowTemplate(templateId: string): Promise<void> {
+  const result = await apiFetch<undefined>(`/api/v1/workflow/templates/${encodeURIComponent(templateId)}`, { method: 'DELETE' });
+  if (!result.ok) return fail(result.status, result.body, result.error, 'Не удалось удалить шаблон Workflow.');
+}
+
 async function addRealWorkflowStage(templateId: string, input: CreateWorkflowStageInput): Promise<WorkflowTemplateStage> {
   const result = await apiFetch<WorkflowTemplateStageApiRecord>(`/api/v1/workflow/templates/${encodeURIComponent(templateId)}/stages`, {
     method: 'POST',
@@ -237,6 +242,11 @@ export async function createWorkflowTemplate(input: CreateWorkflowTemplateInput)
 export async function updateWorkflowTemplate(templateId: string, input: UpdateWorkflowTemplateInput): Promise<WorkflowTemplate> {
   if (isMockDataSourceFor('workflow')) throw new WorkflowTemplateApiError(0, undefined, 'Изменение статуса шаблона недоступно в деморежиме.');
   return updateRealWorkflowTemplate(templateId, input);
+}
+
+export async function deleteWorkflowTemplate(templateId: string): Promise<void> {
+  if (isMockDataSourceFor('workflow')) throw new WorkflowTemplateApiError(0, undefined, 'Удаление шаблона недоступно в демонстрационном режиме.');
+  return deleteRealWorkflowTemplate(templateId);
 }
 
 export async function addWorkflowStage(templateId: string, input: CreateWorkflowStageInput): Promise<WorkflowTemplateStage> {

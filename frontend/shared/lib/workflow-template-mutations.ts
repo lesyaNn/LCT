@@ -5,6 +5,7 @@ import { getWorkflowStageOrderMoves, insertWorkflowStage, moveWorkflowStage, nor
 import {
   addWorkflowStage,
   createWorkflowTemplate,
+  deleteWorkflowTemplate,
   updateWorkflowTemplate,
   updateWorkflowStage,
   workflowTemplateDetailQueryKey,
@@ -34,6 +35,17 @@ export function useUpdateWorkflowTemplate() {
     mutationFn: ({ templateId, patch }: { templateId: string; patch: UpdateWorkflowTemplateInput }) => updateWorkflowTemplate(templateId, patch),
     onSuccess: async (template) => {
       queryClient.setQueryData(workflowTemplateDetailQueryKey(template.id), template);
+      await queryClient.invalidateQueries({ queryKey: workflowTemplateListsQueryKey });
+    },
+  });
+}
+
+export function useDeleteWorkflowTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteWorkflowTemplate,
+    onSuccess: async (_data, templateId) => {
+      queryClient.removeQueries({ queryKey: workflowTemplateDetailQueryKey(templateId) });
       await queryClient.invalidateQueries({ queryKey: workflowTemplateListsQueryKey });
     },
   });

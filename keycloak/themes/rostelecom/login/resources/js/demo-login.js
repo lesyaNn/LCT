@@ -1,6 +1,8 @@
-const toggle = document.getElementById('rtk-demo-toggle');
-const roles = document.getElementById('rtk-demo-roles');
-if (toggle && roles) {
+document.addEventListener('DOMContentLoaded', () => {
+  const toggle = document.getElementById('rtk-demo-toggle');
+  const roles = document.getElementById('rtk-demo-roles');
+  if (!toggle || !roles) return;
+
   toggle.addEventListener('click', () => {
     roles.hidden = !roles.hidden;
     toggle.setAttribute('aria-expanded', String(!roles.hidden));
@@ -15,4 +17,4 @@ if (toggle && roles) {
       password?.focus();
     });
   });
-}
+});
