@@ -25,6 +25,10 @@ class InstanceResponsibleUpdate(BaseModel):
     responsible_id: uuid.UUID | None = Field(default=None)
 
 
+class InstanceStageDueDateUpdate(BaseModel):
+    due_date: date | None
+
+
 class InstanceStageRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -613,12 +613,19 @@ export async function updateWorkflowResponsible(instanceId: string, responsibleI
   });
 }
 
+export async function updateWorkflowStageDueDate(instanceId: string, stageId: string, dueDate: string | null): Promise<WorkflowInstanceApiRecord> {
+  if (!isWorkflowApiInstanceId(instanceId) || !isWorkflowApiInstanceId(stageId)) throw new WorkflowApiError(0, 'Изменение срока недоступно для этого Workflow.');
+  return unwrapApiResult(await apiFetch<WorkflowInstanceApiRecord>(`/api/v1/workflow/instances/${instanceId}/stages/${stageId}/due-date`, {
+    method: 'PATCH', body: { due_date: dueDate },
+  }));
+}
+
 export async function listWorkflowInstancePage(page: number, pageSize = 100): Promise<WorkflowPage<WorkflowInstanceApiRecord>> {
   return unwrapApiResult(await apiFetch<WorkflowPage<WorkflowInstanceApiRecord>>(`/api/v1/workflow/instances?page=${page}&page_size=${pageSize}`));
 }
 
 export interface WorkflowTaskApiRecord { id: string; instance_id: string; stage_id: string | null; title: string; status: string; responsible_id: string | null; deadline: string | null; completed_at: string | null }
-export interface WorkflowAttachmentApiRecord { id: string; instance_id: string; stage_id: string | null; original_filename: string; mime_type: string; file_size: number; uploaded_by_keycloak_sub: string; created_at: string; updated_at: string }
+export interface WorkflowAttachmentApiRecord { id: string; instance_id: string; stage_id: string | null; comment_id?: string | null; original_filename: string; mime_type: string; file_size: number; uploaded_by_keycloak_sub: string; created_at: string; updated_at: string }
 export interface WorkflowTransitionApiRecord { id: string; instance_id: string; from_stage_id: string | null; to_stage_id: string | null; actor_keycloak_sub: string; comment: string; created_at: string }
 export interface WorkflowAllowedApiRecord { id: string; name: string; order_index: number }
 
@@ -857,7 +864,7 @@ export function getApiUniversityWorkflow(instance: WorkflowInstanceApiRecord): U
       completedAt: stage.completed_at,
       completion: stage.completed_at && stage.due_date && stage.completed_at.slice(0, 10) > stage.due_date ? 'late' : stage.completed_at ? 'on_time' : null,
       isOptional: !stage.is_required,
-      responsible: null,
+      responsible: instance.responsible_id && instance.responsible_name ? { id: instance.responsible_id, name: instance.responsible_name, email: instance.responsible_email ?? undefined } : null,
       comments: [],
       attachments: [],
       tasks: [],

@@ -26,6 +26,7 @@ test('comment and Workflow attachments upload, persist after reload and download
   const comments = page.locator('section[aria-labelledby$="-comments-title"]').first();
   const picker = comments.locator('input[type="file"]');
   await expect(picker).toBeAttached();
+  await expect(page.locator('section[aria-labelledby$="-attachments-title"] input[type="file"]')).toHaveCount(0);
   const marker = `comment-file-${Date.now()}`;
   await comments.getByRole('textbox', { name: 'Добавить комментарий' }).fill(marker);
   await picker.setInputFiles({ name: 'invalid.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('bad') });
@@ -36,6 +37,8 @@ test('comment and Workflow attachments upload, persist after reload and download
     { name: `${marker}-2.pdf`, mimeType: 'application/pdf', buffer: Buffer.from('second') },
   ]);
   await expect(comments.getByText(`${marker}-1.pdf`)).toBeVisible();
+  await expect(comments.getByText('Загрузил:')).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Общие материалы Workflow' }).getByText(`${marker}-1.pdf`)).toHaveCount(0);
   let uploads = 0;
   let uploadAuthorization = '';
   let uploadContentType = '';
@@ -72,15 +75,4 @@ test('comment and Workflow attachments upload, persist after reload and download
   await comments.getByRole('button', { name: 'Отправить' }).click();
   await expect(comments.getByRole('textbox', { name: 'Добавить комментарий' })).toHaveValue(failed);
   await expect(comments.getByText('retry.pdf', { exact: false })).toBeVisible();
-
-  const workflowFile = `${marker}-workflow.pdf`;
-  await page.getByRole('region', { name: 'Общие материалы Workflow' }).getByLabel('Выбрать файлы для загрузки').setInputFiles({
-    name: workflowFile, mimeType: 'application/pdf', buffer: Buffer.from('workflow'),
-  });
-  await expect(page.getByRole('button', { name: `Скачать ${workflowFile}` })).toBeVisible();
-  await page.reload();
-  await expect(page.getByRole('button', { name: `Скачать ${workflowFile}` })).toBeVisible();
-  const workflowDownload = page.waitForEvent('download');
-  await page.getByRole('button', { name: `Скачать ${workflowFile}` }).click();
-  expect((await workflowDownload).suggestedFilename()).toBe(workflowFile);
 });

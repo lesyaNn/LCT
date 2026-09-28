@@ -76,6 +76,13 @@ def test_comment_files_persist_and_download(setup):
     downloaded = client.get(f"{base}/attachments/{attachment_id}/download")
     assert downloaded.status_code == 200
     assert downloaded.content == b"first"
+    settings.auth_dev_bypass = False
+    forbidden_upload = client.post(
+        f"{base}/comments/with-attachments",
+        data={"content": "Без доступа"},
+        files=[("files", ("denied.pdf", b"denied", "application/pdf"))],
+    )
+    assert forbidden_upload.status_code == 401
 
 
 def test_failed_second_file_rolls_back_comment_and_first_file(setup, monkeypatch):

@@ -148,7 +148,7 @@ export function workflowAttachmentFromApi(record: WorkflowAttachmentApiRecord, u
     fileSize: '',
     mimeType: record.mime_type,
     fileSizeBytes: record.file_size,
-    uploadedBy: user ? { id: user.id, name: user.name, role: user.roleLabel } : { id: record.uploaded_by_keycloak_sub, name: record.uploaded_by_keycloak_sub },
+    uploadedBy: user && user.id === record.uploaded_by_keycloak_sub ? { id: user.id, name: user.name, role: user.roleLabel } : { id: record.uploaded_by_keycloak_sub, name: '' },
     uploadedAt: record.created_at,
     downloadUrl,
     previewUrl: isWorkflowImageAttachment(record.mime_type, record.original_filename) ? downloadUrl : undefined,

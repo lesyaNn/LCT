@@ -28,6 +28,7 @@ from app.modules.workflow_instances.schemas import (
     InstanceCreate,
     InstanceDetail,
     InstanceResponsibleUpdate,
+    InstanceStageDueDateUpdate,
     WorkflowTaskRead,
     AllowedTransitionRead,
 )
@@ -124,6 +125,25 @@ def update_workflow_instance_responsible(
     service.authorize_scope(user, detail)
     return service.set_instance_responsible(
         db, instance_id, data.responsible_id, actor_sub=user.id
+    )
+
+
+@router.patch(
+    "/instances/{instance_id}/stages/{stage_id}/due-date",
+    response_model=InstanceDetail,
+    summary="Set the due date of the current runtime stage",
+)
+def update_workflow_stage_due_date(
+    instance_id: uuid.UUID,
+    stage_id: uuid.UUID,
+    data: InstanceStageDueDateUpdate,
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(WRITE),
+) -> InstanceDetail:
+    detail = service.get_instance_detail(db, instance_id)
+    service.authorize_scope(user, detail)
+    return service.set_instance_stage_due_date(
+        db, instance_id, stage_id, data.due_date, actor_sub=user.id
     )
 
 

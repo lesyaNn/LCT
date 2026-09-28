@@ -29,7 +29,7 @@ from datetime import date, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.exceptions import NotFound
+from app.core.exceptions import BadTransition, NotFound
 from app.core.policies import apply_university_scope, ensure_university_access
 from app.models.catalog import ITProduct, ITProgram, Responsible, University, UniversityResponsible
 from app.models.external import ExternalApplication
@@ -367,3 +367,39 @@ def set_instance_responsible(
         )
         db.commit()
     return get_instance_detail(db, instance.id)
+
+
+def set_instance_stage_due_date(
+    db: Session,
+    instance_id: uuid.UUID,
+    stage_id: uuid.UUID,
+    due_date: date | None,
+    actor_sub: str = "",
+) -> InstanceDetail:
+    """Edit only the current runtime stage, then refresh the overall deadline."""
+    instance = get_instance_or_404(db, instance_id)
+    stage = db.get(InstanceStage, stage_id)
+    if stage is None or stage.instance_id != instance_id:
+        raise NotFound("Workflow stage not found")
+    if instance.status != "active" or instance.current_instance_stage_id != stage_id:
+        raise BadTransition("Only the current stage deadline can be changed")
+    previous = stage.due_date
+    if previous == due_date:
+        return get_instance_detail(db, instance_id)
+    stage.due_date = due_date
+    ordered = sorted(instance.instance_stages, key=lambda row: row.order_index)
+    instance.due_date = next((row.due_date for row in reversed(ordered) if row.due_date is not None), None)
+    if "audit_context" in db.info:
+        from app.modules.audit.service import AuditService, context_for
+
+        AuditService(db).log_event(
+            context=context_for(db, actor_sub or "system"),
+            action="UPDATE",
+            entity_type="workflow_instance",
+            entity_id=instance.id,
+            university_id=instance.university_id,
+            old_value={"stage_id": str(stage_id), "due_date": previous.isoformat() if previous else None},
+            new_value={"stage_id": str(stage_id), "due_date": due_date.isoformat() if due_date else None},
+        )
+    db.commit()
+    return get_instance_detail(db, instance_id)

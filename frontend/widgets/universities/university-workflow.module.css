@@ -27,7 +27,11 @@
 @media (max-width: 480px) { .programSelector { max-width: none; width: 100%; } }
 .headerMain h1 { font-size: clamp(26px, 3vw, 38px); letter-spacing: -.035em; line-height: 1.12; margin: 0; }
 .headerContext { color: var(--rtk-color-text-secondary); font-size: 14px; margin: var(--rtk-space-3) 0 0; overflow-wrap: anywhere; }
-.responsibleRow { align-items: flex-end; display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); margin-top: var(--rtk-space-3); }
+.factValue { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.editForm { display: flex; flex-direction: column; gap: var(--rtk-space-4); }
+.editForm label { color: var(--rtk-color-text-secondary); display: flex; flex-direction: column; font-size: 12px; font-weight: 600; gap: var(--rtk-space-2); }
+.editForm p { color: var(--rtk-color-text-secondary); font-size: 12px; margin: 0; }
+.editActions { display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); justify-content: flex-end; }
 .headerCurrent { composes: surface from '../../shared/ui/rtk/section-surface.module.css'; display: flex; flex-direction: column; gap: var(--rtk-space-2); }
 .headerCurrent > span { color: var(--rtk-color-text-tertiary); font-size: 11px; }
 .headerCurrent strong { font-size: 15px; line-height: 1.35; overflow-wrap: anywhere; }
