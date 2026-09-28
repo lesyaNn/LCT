@@ -39,7 +39,13 @@ function DocsNavigation({ sections, activeArticleId, query, onQueryChange, onNav
     {normalizedQuery ? <div className={styles.searchResults} aria-label="Результаты поиска">{results.length ? results.map((article) => <Link className={styles.searchResult} href={article.href} key={article.id} onClick={onNavigate}><strong>{article.title}</strong><span>{searchFragment(article, normalizedQuery)}</span></Link>) : <EmptyState icon={<Search size={18} fill="currentColor" />} title="Ничего не найдено" description="Попробуйте изменить поисковый запрос." headingLevel={3} />}</div> : null}
     <nav className={styles.docsNav} aria-label="Навигация по документации">
       <Link className={`${styles.homeLink} ${!activeArticleId ? styles.activeArticle : ''}`} href="/docs" onClick={onNavigate}>Справочный центр</Link>
-      {sections.filter((section) => section.articles.length).map((section) => <section className={styles.navSection} key={section.id}><h2>{section.title}</h2><ul>{section.articles.map((article) => <li key={article.id}><Link className={activeArticleId === article.id ? styles.activeArticle : undefined} href={article.href} onClick={onNavigate} aria-current={activeArticleId === article.id ? 'page' : undefined}>{article.title}</Link></li>)}</ul></section>)}
+      {sections.filter((section) => section.articles.length).map((section) => {
+        const active = section.articles.some((article) => article.id === activeArticleId);
+        return <details className={styles.navSection} key={`${section.id}-${activeArticleId ?? 'home'}`} open={active || (!activeArticleId && section.id === 'user-guide')}>
+          <summary>{section.title}</summary>
+          <ul>{section.articles.map((article) => <li key={article.id}><Link className={activeArticleId === article.id ? styles.activeArticle : undefined} href={article.href} onClick={onNavigate} aria-current={activeArticleId === article.id ? 'page' : undefined}>{article.title}</Link></li>)}</ul>
+        </details>;
+      })}
     </nav>
   </>;
 }
