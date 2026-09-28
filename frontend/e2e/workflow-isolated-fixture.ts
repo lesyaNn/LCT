@@ -23,7 +23,7 @@ export async function loginForWorkflowE2E(page: Page): Promise<string> {
   return authorization;
 }
 
-export async function createIsolatedWorkflow(request: APIRequestContext, authorization: string): Promise<string> {
+export async function createIsolatedWorkflow(request: APIRequestContext, authorization: string, templateNameIncludes?: string): Promise<string> {
   requireIsolatedWorkflowStand();
   const headers = { authorization };
   const get = async (path: string) => {
@@ -37,8 +37,8 @@ export async function createIsolatedWorkflow(request: APIRequestContext, authori
     return response.json() as Promise<Record<string, unknown>>;
   };
   const direction = (await get('/directions?page=1&page_size=1')).items as Array<{ id: string }>;
-  const templates = (await get('/workflow/templates?page=1&page_size=100')).items as Array<{ id: string; is_active: boolean }>;
-  const template = templates.find((item) => item.is_active);
+  const templates = (await get('/workflow/templates?page=1&page_size=100')).items as Array<{ id: string; name: string; is_active: boolean }>;
+  const template = templates.find((item) => item.is_active && (!templateNameIncludes || item.name.includes(templateNameIncludes)));
   expect(direction[0]?.id).toBeTruthy();
   expect(template?.id).toBeTruthy();
   const program = await post('/programs', { direction_id: direction[0].id, name: `Workflow E2E ${crypto.randomUUID()}` });

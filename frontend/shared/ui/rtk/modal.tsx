@@ -29,7 +29,7 @@ export function Modal({ title, children, onClose, labelledBy, initialFocusRef, s
         return;
       }
       if (event.key !== 'Tab' || !dialog) return;
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'));
+      const focusable = Array.from((dialog.parentElement ?? dialog).querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'));
       if (!focusable.length) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
