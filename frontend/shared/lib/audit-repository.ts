@@ -2,6 +2,7 @@ import { apiFetch } from './api-client';
 import { ApiRequestError } from './api-errors';
 import { fromDataSource } from './data-source';
 import { queryKeys } from './query-keys';
+import { isUuidLike } from './audit-human';
 import type { SemanticIntent } from './status-semantics';
 import { mockGetAuditEvents } from '@/shared/mocks/api-adapter';
 
@@ -20,6 +21,11 @@ export interface AuditEvent {
   requestId?: string;
   ip?: string;
   userAgent?: string;
+  /** Server-side human presentation (new API). Null when the backend predates it. */
+  presentation?: unknown | null;
+  /** Resolved display names (new API). Fall back to ids when absent. */
+  universityName?: string;
+  entityName?: string;
 }
 
 export interface AuditFilters {
@@ -29,6 +35,8 @@ export interface AuditFilters {
   universityIds: string[];
   actions: string[];
   entityTypes: string[];
+  sections: string[];
+  search: string;
 }
 
 export interface AuditListQuery {
@@ -69,6 +77,8 @@ export const EMPTY_AUDIT_FILTERS: AuditFilters = {
   universityIds: [],
   actions: [],
   entityTypes: [],
+  sections: [],
+  search: '',
 };
 
 export const AUDIT_PAGE_SIZES = [20, 50, 100] as const;
@@ -186,6 +196,14 @@ function adaptAuditEvent(raw: unknown, index: number): AuditEvent {
   const entityId = stringValue(item.entity_id ?? item.entityId) ?? 'unknown';
   const universityId = stringValue(item.university_id ?? item.universityId);
   const action = stringValue(item.action) ?? 'UNKNOWN';
+  // Defence-in-depth: raw UUIDs must never become display names. The API
+  // resolves names server-side; when it cannot, the UI shows the section
+  // or an explicit fallback — never the id.
+  const universityNameRaw = stringValue(item.university_name ?? item.universityName);
+  const universityName = universityNameRaw && !isUuidLike(universityNameRaw) ? universityNameRaw : '—';
+  const entityNameRaw = stringValue(item.entity_name ?? item.entityName);
+  const entityName = entityNameRaw && !isUuidLike(entityNameRaw) ? entityNameRaw : undefined;
+  const presentation = isRecord(item.presentation) || Array.isArray(item.presentation) ? (item.presentation as unknown) : (item.presentation ?? null);
   return {
     id: stringValue(item.id) ?? `audit-${index}`,
     occurredAt: stringValue(item.timestamp ?? item.created_at ?? item.occurredAt ?? item.createdAt) ?? '',
@@ -196,13 +214,16 @@ function adaptAuditEvent(raw: unknown, index: number): AuditEvent {
     },
     role: stringValue(item.role ?? item.user_role ?? item.userRole),
     action,
-    entity: { id: entityId, type: entityType, label: `${getAuditEntityLabel(entityType)} · ${entityId}` },
-    university: { id: universityId ?? '', name: stringValue(item.university_name ?? item.universityName) ?? universityId ?? '—' },
+    entity: { id: entityId, type: entityType, label: entityName ?? getAuditEntityLabel(entityType) },
+    university: { id: universityId ?? '', name: universityName },
     oldValues: parseJsonValue(item.old_value ?? item.before_data ?? item.beforeData ?? item.old_values ?? item.oldValues),
     newValues: parseJsonValue(item.new_value ?? item.after_data ?? item.afterData ?? item.new_values ?? item.newValues),
     requestId: stringValue(item.request_id ?? item.requestId),
     ip: stringValue(item.ip_address ?? item.ip),
     userAgent: stringValue(item.user_agent ?? item.userAgent),
+    presentation: presentation ?? null,
+    universityName,
+    entityName,
   };
 }
 
@@ -210,6 +231,7 @@ function queryPath(query: AuditListQuery): string {
   const params = new URLSearchParams();
   if (query.filters.dateFrom) params.set('date_from', query.filters.dateFrom);
   if (query.filters.dateTo) params.set('date_to', query.filters.dateTo);
+  if (query.filters.search.trim()) params.set('search', query.filters.search.trim());
   for (const [key, values] of [
     ['user_id', query.filters.userIds], ['university_id', query.filters.universityIds],
     ['action', query.filters.actions], ['entity_type', query.filters.entityTypes],

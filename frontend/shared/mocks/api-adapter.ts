@@ -330,6 +330,7 @@ function prependAuditEvent(event: AuditEvent): void {
 export function mockGetAuditEvents(query: AuditListQuery): AuditListResult {
   const auditEvents = [...readSession<AuditEvent[]>('audit-events', []), ...seededAuditEvents];
   const { filters } = query;
+  const search = filters.search.trim().toLocaleLowerCase('ru-RU');
   const filtered = auditEvents.filter((event) => {
     const date = event.occurredAt.slice(0, 10);
     if (filters.dateFrom && date < filters.dateFrom) return false;
@@ -338,6 +339,11 @@ export function mockGetAuditEvents(query: AuditListQuery): AuditListResult {
     if (filters.universityIds.length && !filters.universityIds.includes(event.university.id)) return false;
     if (filters.actions.length && !filters.actions.includes(event.action)) return false;
     if (filters.entityTypes.length && !filters.entityTypes.includes(event.entity.type)) return false;
+    if (search) {
+      const haystack = [event.user.name, event.university.name, event.entity.label, event.action, event.entity.type]
+        .join(' ').toLocaleLowerCase('ru-RU');
+      if (!haystack.includes(search)) return false;
+    }
     return true;
   });
   const start = (query.page - 1) * query.pageSize;

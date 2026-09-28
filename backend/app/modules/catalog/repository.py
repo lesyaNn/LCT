@@ -68,6 +68,41 @@ def _audit_snapshot(obj):
     return {name: getattr(obj, name) for name in _AUDIT_FIELDS[type(obj)]}
 
 
+def _snapshot_display_names(db: Session, snapshot: dict | None) -> dict | None:
+    """Add human-readable ``*_name`` siblings next to raw FK ids.
+
+    Best-effort: any lookup failure leaves the snapshot untouched so the
+    business write never breaks because of audit enrichment.
+    """
+    if not snapshot:
+        return snapshot
+    enriched = dict(snapshot)
+    try:
+        direction_id = snapshot.get("direction_id")
+        if direction_id is not None and "direction_name" not in enriched:
+            direction = db.get(ITDirection, direction_id)
+            if direction is not None:
+                enriched["direction_name"] = direction.name
+        vendor_id = snapshot.get("vendor_id")
+        if vendor_id is not None and "vendor_name" not in enriched:
+            vendor = db.get(Vendor, vendor_id)
+            if vendor is not None:
+                enriched["vendor_name"] = vendor.name
+        responsible_id = snapshot.get("responsible_id")
+        if responsible_id is not None and "responsible_name" not in enriched:
+            responsible = db.get(Responsible, responsible_id)
+            if responsible is not None:
+                enriched["responsible_name"] = responsible.full_name
+        university_id = snapshot.get("university_id")
+        if university_id is not None and "university_name" not in enriched:
+            university = db.get(University, university_id)
+            if university is not None:
+                enriched["university_name"] = university.name
+    except Exception:
+        return snapshot
+    return enriched
+
+
 def _audit_write(db: Session, obj, action: AuditAction, *, old=None, new=None):
     if "audit_context" not in db.info or type(obj) not in _AUDIT_FIELDS:
         return
@@ -80,7 +115,8 @@ def _audit_write(db: Session, obj, action: AuditAction, *, old=None, new=None):
     AuditService(db).log_event(
         context=context_for(db), action=action, entity_type=entity_type,
         entity_id=obj.id, university_id=university_id,
-        old_value=old, new_value=new,
+        old_value=_snapshot_display_names(db, old),
+        new_value=_snapshot_display_names(db, new),
     )
 
 # ------------------------------------------------------------- like escape

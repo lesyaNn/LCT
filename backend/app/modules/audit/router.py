@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import func, select
+from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import SecurityError
@@ -16,6 +16,12 @@ from app.core.security import CurrentUser
 from app.db.session import get_db
 from app.modules.audit.models import AuditEvent
 from app.models.catalog import University
+from app.modules.audit.presentation import actor_display_name, summarize_event
+from app.modules.audit.resolver import (
+    entity_display_name,
+    fallback_name,
+    resolve_names,
+)
 from app.modules.audit.service import AuditAction, AuditEntityType
 from app.schemas.common import PaginatedResponse
 from app.schemas.errors import ErrorCode, ErrorResponse
@@ -55,9 +61,48 @@ class AuditEventRead(BaseModel):
     request_id: uuid.UUID | None
     ip: str | None
     user_agent: str | None
+    # Human-readable enrichment (additive; old clients ignore it).
+    university_name: str | None = None
+    entity_name: str | None = None
+    presentation: dict | None = None
 
     @classmethod
     def from_event(cls, event: AuditEvent) -> "AuditEventRead":
+        return cls.from_event_enriched(event, None, None, None)
+
+    @classmethod
+    def from_event_enriched(
+        cls,
+        event: AuditEvent,
+        names: dict[str, str] | None,
+        university_name: str | None = None,
+        entity_name: str | None = None,
+    ) -> "AuditEventRead":
+        names = names or {}
+        resolved_uni = university_name
+        if resolved_uni is None and event.university_id is not None:
+            resolved_uni = names.get(str(event.university_id).lower())
+        if resolved_uni is None and str(event.entity_type or "").lower() == "university":
+            # The university row may be physically deleted already; the
+            # historic snapshot (old/new `name`) is then the only source.
+            # Never fall back to the raw UUID here.
+            resolved_uni = entity_display_name(
+                event.entity_type, event.entity_id, event.old_value,
+                event.new_value, names,
+            )
+        resolved_entity = entity_name or entity_display_name(
+            event.entity_type, event.entity_id, event.old_value,
+            event.new_value, names,
+        )
+        presentation = summarize_event(
+            event.action, event.entity_type, event.old_value,
+            event.new_value, names, resolved_uni,
+        )
+        # The actor line never leaks Keycloak sub: presentation consumers
+        # use user_name; raw user_id stays available for filtering only.
+        presentation["actor_name"] = actor_display_name(
+            event.user_name, event.user_id)
+        presentation["actor_role"] = event.role
         return cls(
             id=event.id, timestamp=event.created_at, user_id=event.user_id,
             user_name=event.user_name, role=event.role, action=event.action,
@@ -65,6 +110,8 @@ class AuditEventRead(BaseModel):
             university_id=event.university_id, old_value=public_audit_value(event.old_value),
             new_value=public_audit_value(event.new_value), request_id=event.request_id,
             ip=event.ip_address, user_agent=event.user_agent,
+            university_name=resolved_uni, entity_name=resolved_entity,
+            presentation=presentation,
         )
 
 
@@ -113,6 +160,7 @@ def list_events(
     university_id: list[uuid.UUID] | None = Query(default=None),
     action: list[AuditAction] | None = Query(default=None),
     entity_type: list[AuditEntityType] | None = Query(default=None),
+    search: str | None = Query(default=None, max_length=200),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -124,6 +172,18 @@ def list_events(
     if university_id and not scope.is_all and any(not scope.allows(uid) for uid in university_id):
         raise SecurityError(ErrorCode.FORBIDDEN)
     stmt = apply_university_scope(select(AuditEvent), AuditEvent.university_id, user)
+    if search and search.strip():
+        term = f"%{search.strip()}%"
+        stmt = stmt.outerjoin(
+            University, University.id == AuditEvent.university_id
+        ).where(or_(
+            AuditEvent.user_name.ilike(term),
+            University.name.ilike(term),
+            # Object names live inside old/new JSON snapshots; matching
+            # their text form keeps search to a single statement.
+            cast(AuditEvent.old_value, String).ilike(term),
+            cast(AuditEvent.new_value, String).ilike(term),
+        ))
     if date_from:
         stmt = stmt.where(AuditEvent.created_at >= datetime.combine(date_from, time.min, timezone.utc))
     if date_to:
@@ -141,7 +201,23 @@ def list_events(
         stmt.order_by(AuditEvent.created_at.desc(), AuditEvent.id.desc())
         .limit(page_size).offset((page - 1) * page_size)
     ).scalars().all()
+    # Batch name resolution: a constant number of queries no matter the
+    # page size (never one query per row).
+    names = resolve_names(db, list(rows))
+    items = []
+    for event in rows:
+        uni_name = None
+        if event.university_id is not None:
+            uni_name = names.get(str(event.university_id).lower())
+        entity_name = entity_display_name(
+            event.entity_type, event.entity_id, event.old_value,
+            event.new_value, names,
+        )
+        if entity_name is None:
+            entity_name = fallback_name(
+                event.entity_type, deleted=str(event.action).upper() == "DELETE")
+        items.append(AuditEventRead.from_event_enriched(event, names, uni_name, entity_name))
     return PaginatedResponse(
-        items=[AuditEventRead.from_event(event) for event in rows],
+        items=items,
         total=total, page=page, page_size=page_size,
     )

@@ -113,7 +113,8 @@ def sync_mock(db: Session, university_id: uuid.UUID, source: str) -> dict:
         AuditService(db).log_event(
             context=context_for(db), action="IMPORT", entity_type="external_sync",
             entity_id=state.id, university_id=university_id,
-            new_value={"source": source, "processed": len(payloads), "unresolved": unresolved},
+            new_value={"audit_object_type": "external_sync",
+                       "source": source, "processed": len(payloads), "unresolved": unresolved},
         )
     db.commit()
     return {"source": source, "mode": "mock", "synced_at": now, "processed": len(payloads), "unresolved": unresolved}

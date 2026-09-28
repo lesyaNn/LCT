@@ -51,10 +51,22 @@ def _snapshot(meeting: Meeting) -> dict:
 
 def _audit(db: Session, meeting: Meeting, action: AuditAction, *, old=None, new=None) -> None:
     if "audit_context" in db.info:
+        old_value = dict(old) if isinstance(old, dict) else old
+        new_value = dict(new) if isinstance(new, dict) else new
+        try:
+            university = db.get(University, meeting.university_id)
+            uni_name = university.name if university is not None else None
+        except Exception:
+            uni_name = None
+        for snapshot in (old_value, new_value):
+            if isinstance(snapshot, dict):
+                snapshot.setdefault("audit_object_type", "meeting")
+                if uni_name and "university_name" not in snapshot:
+                    snapshot["university_name"] = uni_name
         AuditService(db).log_event(
             context=context_for(db), action=action, entity_type="meeting",
             entity_id=meeting.id, university_id=meeting.university_id,
-            old_value=old, new_value=new,
+            old_value=old_value, new_value=new_value,
         )
 
 

@@ -2,5 +2,5 @@ import { PageIntro } from '@/shared/ui/page-intro';
 import { AuditPage } from '@/widgets/audit/audit-page';
 
 export default function AuditRoute() {
-  return <><PageIntro title="Аудит действий" description="Полный журнал действий пользователей и изменений в системе." /><AuditPage /></>;
+  return <><PageIntro title="История изменений" description="Здесь отображаются действия пользователей и изменения данных в системе." /><AuditPage /></>;
 }

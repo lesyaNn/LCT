@@ -313,7 +313,10 @@ def create_instance(
             entity_id=instance.id,
             university_id=university.id,
             new_value={
+                "audit_object_type": "workflow_instance",
                 "template_id": str(template.id),
+                "template_name": template.name,
+                "university_name": university.name,
                 "program_id": str(program_id) if program_id else None,
                 "product_id": str(product_id) if product_id else None,
                 "stages": len(snapshots),

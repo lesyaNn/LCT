@@ -203,14 +203,19 @@ def transition_instance(
             comment=text,
         )
     )
+    def _stage_ref(stage) -> str | None:
+        return str(stage.template_stage_id) if stage.template_stage_id is not None else None
+
     AuditService(db).enqueue_event(
         context=context_for(db, actor),
         action=AuditAction.WORKFLOW_TRANSITION,
         entity_type="workflow_instance",
         entity_id=instance.id,
         university_id=instance.university_id,
-        old_value={"stage_id": current.template_stage_id, "stage_name": current.name},
-        new_value={"stage_id": target.template_stage_id, "stage_name": target.name, "comment": text},
+        old_value={"audit_object_type": "workflow_transition",
+                   "stage_id": _stage_ref(current), "stage_name": current.name},
+        new_value={"audit_object_type": "workflow_transition",
+                   "stage_id": _stage_ref(target), "stage_name": target.name, "comment": text},
     )
     db.commit()
     return get_instance_or_404(db, instance.id)
@@ -426,6 +431,9 @@ def add_comment(
         stage_id=data.stage_id,
         author_keycloak_sub=actor,
         content=content,
+        # Explicit model default: the audit before_flush snapshot reads the
+        # attribute before flush-time defaults fire, so None would leak in.
+        is_internal=True,
     )
     db.add(comment)
     db.commit()
