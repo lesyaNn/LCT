@@ -2,7 +2,6 @@ import { apiFetch, apiUploadFormData } from './api-client';
 import type { QueryClient } from '@tanstack/react-query';
 import { queryKeys } from './query-keys';
 import { ApiRequestError } from './api-errors';
-import { getExpirationStatus } from './formatters';
 import type { ImportExecuteResponse, ImportRunOptions } from './import-repository';
 import type { AgreementCatalogItem, AgreementKind, AgreementStatus, CatalogContact, ContractStatusRaw, TransferStatus, CatalogInput, CatalogItem, CatalogListQuery, CatalogListResult, CatalogReferenceData, CatalogType, ResponsibleCatalogItem } from './catalogs-repository';
 import type {

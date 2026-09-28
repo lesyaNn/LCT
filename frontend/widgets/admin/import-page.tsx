@@ -19,7 +19,6 @@ import {
   uploadImportFile,
   waitForImportJob,
   type ImportJob,
-  type ImportSheet,
   type ImportSheetPreview,
   type ImportSummary,
   type ImportUploadResponse,

@@ -3,8 +3,6 @@
 import Link from 'next/link';
 import { useId, useRef, type ReactNode } from 'react';
 import {
-  Bar,
-  BarChart,
   CartesianGrid,
   Cell,
   Line,
