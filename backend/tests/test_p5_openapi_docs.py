@@ -47,7 +47,7 @@ def test_all_operations_have_summary_and_tags():
 
 def test_protected_operations_reference_bearer_auth():
     spec = _spec()
-    protected = ["/api/v1/import/preview", "/api/v1/import/execute",
+    protected = ["/api/v1/import/sheets/preview", "/api/v1/import/execute",
                  "/api/v1/auth/me"]
     for path in protected:
         ops = spec["paths"][path]
@@ -57,8 +57,8 @@ def test_protected_operations_reference_bearer_auth():
 
 def test_error_responses_documented():
     spec = _spec()
-    preview = spec["paths"]["/api/v1/import/preview"]["post"]["responses"]
-    assert {"200", "400", "401", "422"} <= set(preview), preview
+    preview = spec["paths"]["/api/v1/import/sheets/preview"]["post"]["responses"]
+    assert {"200", "401", "403", "404", "422"} <= set(preview), preview
     assert "ErrorResponse" in spec["components"]["schemas"], (
         sorted(spec["components"]["schemas"])
     )

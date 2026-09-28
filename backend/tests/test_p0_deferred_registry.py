@@ -144,6 +144,8 @@ def test_mounted_routers_are_only_the_production_contract():
         "/api/v1/products",
         "/api/v1/vendors",
         "/api/v1/responsibles",
+        "/api/v1/contracts",  # Catalogs CRUD: contracts + licences (hard delete, 409 on reference).
+        "/api/v1/licenses",
         "/api/v1/workflow",
         "/api/v1/analytics",
         "/api/v1/reports",
