@@ -5,12 +5,7 @@ import { formatDateTimeRu } from '@/shared/lib/formatters';
 
 export type ChartExportFormat = 'png' | 'pdf';
 
-const EXPORT_WIDTH = 960;
 const EXPORT_PIXEL_RATIO = 2;
-
-function nextPaint(): Promise<void> {
-  return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-}
 
 function resolveColor(value: string): string {
   const probe = document.createElement('span');
@@ -25,10 +20,9 @@ function resolveColor(value: string): string {
 
 function safeFilenameSlug(value: string): string {
   const slug = value
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLocaleLowerCase('en-US')
-    .replace(/[^a-z0-9]+/g, '-')
+    .normalize('NFC')
+    .toLocaleLowerCase('ru-RU')
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 80);
   return slug || 'chart';
@@ -67,26 +61,29 @@ function resolveSvgPaints(target: HTMLElement): () => void {
 
 async function renderChartComposition(target: HTMLElement): Promise<string> {
   await document.fonts?.ready;
-
-  const parent = target.parentNode;
-  if (!parent) throw new Error('Область графика не найдена.');
-
-  const nextSibling = target.nextSibling;
-  const originalStyle = target.style.cssText;
-  const originalExporting = target.dataset.chartExporting;
   const targetRect = target.getBoundingClientRect();
-  const placeholder = target.cloneNode(true) as HTMLElement;
-  placeholder.setAttribute('aria-hidden', 'true');
-  placeholder.setAttribute('inert', '');
-  placeholder.style.width = `${targetRect.width}px`;
-  placeholder.style.height = `${targetRect.height}px`;
-  placeholder.style.pointerEvents = 'none';
-  parent.insertBefore(placeholder, target);
+  if (!targetRect.width || !targetRect.height) throw new Error('Область графика не видна.');
+  // Capture the rendered SVG without moving the live React/Recharts tree.
+  // Moving it changes ResponsiveContainer's measured width and can blank the chart.
+  const clone = target.cloneNode(true) as HTMLElement;
+  clone.setAttribute('aria-hidden', 'true');
+  clone.dataset.chartExporting = 'true';
+  clone.style.width = `${targetRect.width}px`;
+  clone.style.height = `${targetRect.height}px`;
+  clone.style.flex = 'none';
 
   const rootStyles = getComputedStyle(document.documentElement);
   const surface = resolveColor(rootStyles.getPropertyValue('--rtk-color-surface').trim() || 'white');
   const textSecondary = resolveColor(rootStyles.getPropertyValue('--rtk-color-text-secondary').trim() || 'black');
   const border = resolveColor(rootStyles.getPropertyValue('--rtk-color-border').trim() || 'transparent');
+  const host = document.createElement('div');
+  Object.assign(host.style, {
+    left: '-100000px',
+    position: 'fixed',
+    top: '0',
+    width: `${targetRect.width}px`,
+    zIndex: '-1',
+  });
   const wrapper = document.createElement('div');
   wrapper.setAttribute('aria-hidden', 'true');
   Object.assign(wrapper.style, {
@@ -94,11 +91,7 @@ async function renderChartComposition(target: HTMLElement): Promise<string> {
     boxSizing: 'border-box',
     color: getComputedStyle(document.body).color,
     fontFamily: getComputedStyle(document.body).fontFamily,
-    left: '-100000px',
-    position: 'fixed',
-    top: '0',
-    width: `${EXPORT_WIDTH}px`,
-    zIndex: '-1',
+    width: `${targetRect.width}px`,
   });
 
   const footer = document.createElement('footer');
@@ -113,37 +106,23 @@ async function renderChartComposition(target: HTMLElement): Promise<string> {
     textAlign: 'right',
   });
 
-  document.body.append(wrapper);
-  wrapper.append(target, footer);
-  target.dataset.chartExporting = 'true';
-  Object.assign(target.style, {
-    boxSizing: 'border-box',
-    flex: 'none',
-    margin: '0',
-    maxWidth: 'none',
-    width: `${EXPORT_WIDTH}px`,
-  });
+  document.body.append(host);
+  host.append(wrapper);
+  wrapper.append(clone, footer);
 
   let restoreSvgPaints: (() => void) | undefined;
   try {
-    restoreSvgPaints = resolveSvgPaints(target);
-    await nextPaint();
+    restoreSvgPaints = resolveSvgPaints(clone);
     return await toPng(wrapper, {
       backgroundColor: surface,
       cacheBust: true,
       filter: (node) => !(node instanceof HTMLElement && node.hasAttribute('data-chart-export-ui')),
-      pixelRatio: EXPORT_PIXEL_RATIO,
-      width: EXPORT_WIDTH,
+      pixelRatio: Math.max(EXPORT_PIXEL_RATIO, Math.ceil(1200 / targetRect.width)),
+      width: targetRect.width,
     });
   } finally {
     restoreSvgPaints?.();
-    if (nextSibling && nextSibling.parentNode === parent) parent.insertBefore(target, nextSibling);
-    else parent.appendChild(target);
-    target.style.cssText = originalStyle;
-    if (originalExporting === undefined) delete target.dataset.chartExporting;
-    else target.dataset.chartExporting = originalExporting;
-    placeholder.remove();
-    wrapper.remove();
+    host.remove();
   }
 }
 

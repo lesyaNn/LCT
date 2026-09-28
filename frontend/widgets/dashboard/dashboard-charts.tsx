@@ -52,9 +52,10 @@ interface ChartCardProps {
   children: ReactNode;
   exportSlug: string;
   exportTestId: string;
+  canExport: boolean;
 }
 
-function ChartCard({ title, description, children, exportSlug, exportTestId }: ChartCardProps) {
+function ChartCard({ title, description, children, exportSlug, exportTestId, canExport }: ChartCardProps) {
   const headingId = useId();
   const cardRef = useRef<HTMLElement>(null);
 
@@ -65,7 +66,7 @@ function ChartCard({ title, description, children, exportSlug, exportTestId }: C
           <h3 className={styles.cardTitle} id={headingId}>{title}</h3>
           {description ? <p className={styles.cardDescription}>{description}</p> : null}
         </div>
-        <ChartExportMenu filenameSlug={exportSlug} targetRef={cardRef} testId={exportTestId} />
+        {canExport ? <ChartExportMenu filenameSlug={exportSlug} targetRef={cardRef} testId={exportTestId} /> : null}
       </header>
       <div className={styles.cardBody}>{children}</div>
     </article>
@@ -141,7 +142,6 @@ function ProgramStatusChart({ data }: { data: DashboardAnalytics['programStatuse
           </li>
         ))}
       </ul>
-      <p className={styles.chartNote}>Фильтрация по статусу станет доступна после появления страницы программ.</p>
     </div>
   );
 }
@@ -151,10 +151,10 @@ function LaunchDynamicsChart({ data }: { data: DashboardAnalytics['launchDynamic
     <div className={styles.chartStack}>
       <div className={styles.chartCanvas} role="img" aria-label="Динамика фактических и планируемых запусков программ за 12 месяцев">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: -12 }}>
+          <LineChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: 0 }}>
             <CartesianGrid stroke="var(--rtk-color-border)" strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="monthLabel" tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-            <YAxis allowDecimals={false} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} width={28} />
+            <XAxis dataKey="monthLabel" tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} interval={1} minTickGap={12} tickMargin={8} />
+            <YAxis allowDecimals={false} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} width={36} />
             <Tooltip content={LaunchTooltip} cursor={{ stroke: 'var(--rtk-color-border-strong)' }} />
             <Line type="monotone" dataKey="actual" name="Фактические запуски" stroke="var(--rtk-color-brand)" strokeWidth={3} dot={{ r: 3, fill: 'var(--rtk-color-brand)' }} activeDot={{ r: 5 }} isAnimationActive={false} />
             <Line type="monotone" dataKey="planned" name="Планируемые запуски" stroke="var(--rtk-color-success)" strokeWidth={2} strokeDasharray="6 4" dot={false} isAnimationActive={false} />
@@ -199,15 +199,17 @@ export function DashboardAnalytics({ data }: { data: DashboardAnalytics }) {
 }
 
 function AnalyticsGrid({ data }: { data: DashboardAnalytics }) {
+  const programStatuses = data.programStatuses.filter((item) => item.count > 0);
+  const hasLaunches = data.launchDynamics.some((item) => item.actual > 0 || item.planned > 0);
   return (
     <div className={styles.grid}>
-      <ChartCard title="Программы по статусам" description="Текущее распределение программ в реестре." exportSlug="programs" exportTestId="chart-export-programs">
-        {data.programStatuses.length ? <ProgramStatusChart data={data.programStatuses} /> : <EmptyChart />}
+      <ChartCard title="Программы по статусам" description="Текущее распределение программ в реестре." exportSlug="programs" exportTestId="chart-export-programs" canExport={programStatuses.length > 0}>
+        {programStatuses.length ? <ProgramStatusChart data={programStatuses} /> : <EmptyChart />}
       </ChartCard>
-      <ChartCard title="Динамика запусков" description="Фактические и планируемые запуски за последние 12 месяцев." exportSlug="dynamics" exportTestId="chart-export-dynamics">
-        {data.launchDynamics.length ? <LaunchDynamicsChart data={data.launchDynamics} /> : <EmptyChart />}
+      <ChartCard title="Динамика запусков" description="Фактические и планируемые запуски за последние 12 месяцев." exportSlug="dynamics" exportTestId="chart-export-dynamics" canExport={hasLaunches}>
+        {hasLaunches ? <LaunchDynamicsChart data={data.launchDynamics} /> : <EmptyChart />}
       </ChartCard>
-      <ChartCard title="Приоритетные задачи" description="Пять элементов, требующих первоочередного внимания." exportSlug="attention" exportTestId="chart-export-attention">
+      <ChartCard title="Приоритетные задачи" description="Пять элементов, требующих первоочередного внимания." exportSlug="attention" exportTestId="chart-export-attention" canExport={data.attentionItems.length > 0}>
         {data.attentionItems.length ? <AttentionList data={data.attentionItems} /> : <EmptyChart />}
       </ChartCard>
     </div>
@@ -215,5 +217,5 @@ function AnalyticsGrid({ data }: { data: DashboardAnalytics }) {
 }
 
 function EmptyChart() {
-  return <EmptyState title="Нет данных для отображения" description="Данные появятся после обновления источника." headingLevel={3} />;
+  return <EmptyState title="Нет данных для выбранных условий" headingLevel={3} />;
 }

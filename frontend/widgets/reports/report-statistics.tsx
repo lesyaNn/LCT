@@ -39,7 +39,6 @@ function ChartCard({ title, description, exportSlug, exportTestId, children }: C
           <h4 id={headingId}>{title}</h4>
           <p>{description}</p>
         </div>
-        {/* PNG + PDF of exactly what is on screen. */}
         <ChartExportMenu filenameSlug={exportSlug} targetRef={cardRef} testId={exportTestId} />
       </header>
       <div className={styles.statCardBody}>{children}</div>
@@ -76,23 +75,18 @@ function BucketTooltip({ active, payload, unit }: BucketTooltipProps) {
  * silently dropped.
  */
 function StatBarChart({ slice }: { slice: ReportStatSlice }) {
-  if (!slice.buckets.length) {
-    return <p className={styles.statEmpty}>Нет данных для построения графика.</p>;
-  }
+  if (!slice.buckets.length) return <EmptyState title="Нет данных для выбранных условий" headingLevel={3} />;
   const unitWord = slice.unit === 'universities' ? 'вузов' : 'строк';
-  const data = slice.buckets.map((bucket) => ({
-    label: bucket.label.length > 28 ? `${bucket.label.slice(0, 27)}…` : bucket.label,
-    count: bucket.count,
-  }));
+  const data = slice.buckets;
   return (
     <>
-      <div className={styles.statChart} role="img" aria-label={`${slice.title}. Всего: ${formatCount(slice.total)} ${unitWord}.`}>
+      <div className={styles.statChart} style={{ height: Math.max(220, data.length * 44 + 32) }} role="img" aria-label={`${slice.title}. Всего: ${formatCount(slice.total)} ${unitWord}.`}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
             <CartesianGrid stroke="var(--rtk-color-border)" strokeDasharray="3 3" horizontal={false} />
             <XAxis type="number" allowDecimals={false} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} />
-            <YAxis type="category" dataKey="label" width={150} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} interval={0} />
-            <Tooltip content={<BucketTooltip unit={slice.unit} />} cursor={{ fill: 'var(--rtk-color-surface-hover)' }} />
+            <YAxis type="category" dataKey="label" width={160} tickFormatter={(value: string) => value.length > 22 ? `${value.slice(0, 21)}…` : value} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} interval={0} />
+            <Tooltip content={<BucketTooltip unit={slice.unit} />} cursor={{ fill: 'var(--rtk-color-surface-hover)' }} position={{ x: 8, y: 8 }} />
             <Bar dataKey="count" fill="var(--rtk-color-brand)" radius={[0, 4, 4, 0]} isAnimationActive={false} />
           </BarChart>
         </ResponsiveContainer>
@@ -131,7 +125,7 @@ export function ReportStatisticsPanel({ statistics, pending, error, dirty, onRet
   if (pending && !statistics) return <p className={styles.statEmpty}>Считаем статистику…</p>;
   if (!statistics) return null;
   if (!statistics.slices.length || statistics.slices.every((slice) => !slice.buckets.length)) {
-    return <EmptyState title="Нет данных для построения графиков" description="В выбранной период взаимодействий не было или срез пуст." headingLevel={3} />;
+    return <EmptyState title="Нет данных для выбранных условий" headingLevel={3} />;
   }
 
   return (
