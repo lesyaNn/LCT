@@ -121,7 +121,7 @@ export const UNIVERSITY_LIST_CAPABILITIES = isMockDataSourceFor('universities')
 
 export const UNIVERSITY_PASSPORT_CAPABILITIES = isMockDataSourceFor('passport')
   ? { programStatusFilter: true, documentFilters: true, externalData: true, mutations: true }
-  : { programStatusFilter: true, documentFilters: false, externalData: true, mutations: false };
+  : { programStatusFilter: true, documentFilters: true, externalData: true, mutations: false };
 // External LMS/website methods share the same Mock ↔ Real repository boundary.
 export {
   createWorkflowFromExternal,
@@ -1166,6 +1166,7 @@ export interface UniversityDocumentRow {
   type: string;
   name: string;
   fileName: string;
+  hasFile: boolean;
   fileSize: string;
   signedAt: string | null;
   expiresAt: string | null;
@@ -1217,6 +1218,7 @@ export interface UniversityResponsibleContact {
 
 export const universityLicensesQueryKey = queryKeys.universities.licenses;
 export const universityDocumentsQueryKey = queryKeys.universities.documents;
+export const universityDocumentsPageQueryKey = (id: string, page: number, search: string, type: string, status: string) => [...universityDocumentsQueryKey(id), page, search, type, status] as const;
 export const universityMeetingsQueryKey = queryKeys.universities.meetings;
 export const universityResponsiblesQueryKey = queryKeys.universities.responsibles;
 
@@ -1263,6 +1265,7 @@ async function getMockUniversityDocuments(id: string): Promise<UniversityDocumen
     type,
     name,
     fileName,
+    hasFile: false,
     fileSize,
     signedAt: status === 'signed' ? `2026-0${((index + numericId) % 8) + 1}-12` : null,
     expiresAt: index === 3 ? '2026-08-15' : index === 1 ? '2026-11-30' : null,
@@ -1273,8 +1276,17 @@ async function getMockUniversityDocuments(id: string): Promise<UniversityDocumen
   }));
 }
 
-export async function getUniversityDocuments(id: string, queryClient?: QueryClient): Promise<UniversityDocumentRow[]> {
-  return fromDataSource({ domain: 'passport', mock: () => getMockUniversityDocuments(id), real: () => realGetUniversityDocuments(id, queryClient) });
+export async function getUniversityDocuments(id: string, page = 1, pageSize = 20, search = '', type = 'all', status = 'all', signal?: AbortSignal): Promise<PaginatedResult<UniversityDocumentRow> & { types: string[] }> {
+  return fromDataSource({ domain: 'passport', signal, mock: async () => {
+    const all = await getMockUniversityDocuments(id);
+    const types = [...new Set(all.map((row) => row.type))];
+    const filtered = all.filter((row) => (type === 'all' || row.type === type) && (status === 'all' || row.status === status) && (!search || `${row.name} ${row.fileName}`.toLocaleLowerCase('ru-RU').includes(search.toLocaleLowerCase('ru-RU'))));
+    return { items: filtered.slice((page - 1) * pageSize, page * pageSize), total: filtered.length, page, pageSize, types };
+  }, real: () => realGetUniversityDocuments(id, page, pageSize, search, type, status, signal) });
+}
+
+export async function downloadUniversityDocument(universityId: string, documentId: string): Promise<Blob> {
+  return unwrapApiResult(await apiDownload(`/api/v1/universities/${encodeURIComponent(universityId)}/passport/documents/${encodeURIComponent(documentId)}/download`));
 }
 
 /** Typed frontend adapter for the future university meetings endpoint. */

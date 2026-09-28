@@ -1,7 +1,6 @@
 'use client';
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import { useMemo, useState, useSyncExternalStore } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Checklist from '@atomaro/icons/24/action/Checklist';
@@ -27,7 +26,6 @@ import {
   type UniversityPassport,
   type UniversityPassportEvent,
   type UniversityPassportEventType,
-  type WorkflowInstanceApiRecord,
 } from '@/shared/lib/universities-repository';
 import { listUniversityWorkflowInstances, universityWorkflowInstancesQueryKey } from '@/shared/lib/workflow-creation-repository';
 import { Button } from '@/shared/ui/rtk/button';
@@ -35,7 +33,6 @@ import { Tabs } from '@/shared/ui/rtk/tabs';
 import { TabbedSurface } from '@/shared/ui/rtk/tabbed-surface';
 import { EmptyState } from '@/shared/ui/empty-state';
 import { MetricCard } from '@/shared/ui/rtk/metric-card';
-import { StatusBadge as SemanticStatusBadge } from '@/shared/ui/rtk/status-badge';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { NotFoundState } from '@/shared/ui/not-found-state';
 import { ForbiddenState } from '@/shared/ui/access-state';
@@ -44,7 +41,7 @@ import { UniversityHistory } from './university-history';
 import { DocumentsSection, LicensesSection, MeetingsSection, ProductsSection, ProgramsSection, ResponsiblesSection } from './university-passport-sections';
 import { UniversityWorkflow } from './university-workflow';
 import { WorkflowCreateModal } from './workflow-create-modal';
-import { WorkflowArchiveAction } from '@/widgets/workflows/workflow-archive-action';
+import { PassportWorkflowCard } from './passport-workflow-card';
 import { EducationOverview, TeachersSection } from './university-education';
 import styles from './university-passport.module.css';
 
@@ -114,20 +111,6 @@ function OverviewMetrics({ passport }: { passport: UniversityPassport }) {
   );
 }
 
-function LaunchedWorkflowCard({ instance }: { instance: WorkflowInstanceApiRecord }) {
-  const current = instance.stages.find((stage) => stage.id === instance.current_instance_stage_id || stage.template_stage_id === instance.current_stage_id)
-    ?? instance.stages.find((stage) => stage.status === 'current');
-  const completed = instance.stages.filter((stage) => stage.status === 'completed').length;
-  const total = instance.stages.length;
-  const statusLabel = instance.is_overdue ? 'Просрочен' : instance.status === 'completed' ? 'Завершён' : instance.status === 'active' ? 'В работе' : instance.status;
-  return <article className={styles.workflowItem}>
-    <div className={styles.workflowItemTop}><strong>{instance.program_name || 'Без программы'}</strong><div className={styles.workflowItemStatus}><SemanticStatusBadge intent={instance.is_overdue ? 'danger' : instance.status === 'completed' ? 'success' : 'brand'}>{statusLabel}</SemanticStatusBadge><WorkflowArchiveAction instanceId={instance.id} universityId={instance.university_id} active={instance.status === 'active'} /></div></div>
-    <p>{current ? <>Текущий этап: <b>{current.name}</b></> : instance.status === 'completed' ? 'Все этапы завершены' : 'Этап не назначен'}</p>
-    <div className={styles.workflowProgress}><div className={styles.progressLabel}><span>Прогресс</span><strong>{completed} из {total} этапов</strong></div><div className={styles.progressTrack} role="progressbar" aria-label={`Пройдено ${completed} из ${total} этапов`} aria-valuemin={0} aria-valuemax={total} aria-valuenow={completed}><span style={{ width: `${total ? completed / total * 100 : 0}%` }} /></div></div>
-    <Link className={styles.workflowLink} href={`/workflows/${instance.id}`}>Открыть Workflow <ArrowRight size={16} fill="currentColor" /></Link>
-  </article>;
-}
-
 function WorkflowOverview({ passport }: { passport: UniversityPassport }) {
   const { user } = useAuth();
   const [launchProgramId, setLaunchProgramId] = useState<string | null>(null);
@@ -143,12 +126,8 @@ function WorkflowOverview({ passport }: { passport: UniversityPassport }) {
     {realWorkflow && (instancesQuery.isPending || programsQuery.isPending) ? <Skeleton height={136} />
       : realWorkflow && (instancesQuery.isError || programsQuery.isError) ? <RouteErrorState compact onRetry={() => { void instancesQuery.refetch(); void programsQuery.refetch(); }} />
         : <div className={styles.workflowCards}>
-          {instances.map((instance) => <LaunchedWorkflowCard key={instance.id} instance={instance} />)}
-          {(unstartedPrograms.length ? unstartedPrograms : instances.length ? [] : [{ id: '', name: 'Workflow' }]).map((program) => <article className={styles.workflowItem} key={program.id || 'empty'}>
-            {program.id ? <strong className={styles.workflowProgram}>{program.name}</strong> : null}
-            <SemanticStatusBadge intent="neutral">Workflow не запущен</SemanticStatusBadge>
-            {canCreate ? <Button variant="primary" size="s" type="button" onClick={() => setLaunchProgramId(program.id)}>Запустить Workflow</Button> : null}
-          </article>)}
+          {instances.map((instance) => <PassportWorkflowCard key={instance.id} instance={instance} />)}
+          {(unstartedPrograms.length ? unstartedPrograms : instances.length ? [] : [{ id: '', name: 'Workflow' }]).map((program) => <PassportWorkflowCard key={program.id || 'empty'} programName={program.name} onLaunch={canCreate ? () => setLaunchProgramId(program.id) : undefined} />)}
         </div>}
     {launchProgramId !== null ? <WorkflowCreateModal universityId={passport.id} initialProgramId={launchProgramId || undefined} onClose={() => setLaunchProgramId(null)} onCreated={() => setLaunchProgramId(null)} /> : null}
   </section>;

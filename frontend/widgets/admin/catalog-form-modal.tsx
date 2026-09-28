@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId, useMemo, useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
@@ -29,7 +29,7 @@ const schemas = {
   products: z.object({ name: required(512, 'Укажите название продукта.'), vendorId: required(64, 'Выберите вендора.'), programId: z.string().max(64), version: z.string().max(128, 'Максимум 128 символов.') }),
   directions: z.object({ name: required(512, 'Укажите название направления.'), code: required(64, 'Укажите код направления.') }),
   programs: z.object({ name: required(512, 'Укажите название программы.'), directionId: required(64, 'Выберите направление.'), description: z.string().max(4000, 'Максимум 4000 символов.') }),
-  vendors: z.object({ name: required(512, 'Укажите название вендора.') }),
+  vendors: z.object({ name: required(512, 'Укажите название вендора.'), vendorContacts: z.array(z.object({ fullName: required(512, 'Укажите контактное лицо.'), email: required(512, 'Укажите email.'), phone: z.string().max(64), communicationMethod: z.string().max(256) })) }),
   responsibles: z.object({ name: required(512, 'Укажите ФИО.'), email: required(512, 'Укажите email.'), phone: z.string().max(64, 'Максимум 64 символа.'), role: z.string().max(256, 'Максимум 256 символов.'), universityIds: z.array(z.string()) }),
   contracts: z.object({
     universityId: required(64, 'Выберите ВУЗ.'),
@@ -70,6 +70,7 @@ type CatalogFormValues = {
   phone: string;
   role: string;
   universityIds: string[];
+  vendorContacts: Array<{ fullName: string; email: string; phone: string; communicationMethod: string }>;
   universityId: string;
   contractNumber: string;
   licenseNumber: string;
@@ -95,6 +96,7 @@ const allFieldsSchema = z.object({
   phone: z.string(),
   role: z.string(),
   universityIds: z.array(z.string()),
+  vendorContacts: z.array(z.object({ fullName: z.string(), email: z.string(), phone: z.string(), communicationMethod: z.string() })),
   universityId: z.string(),
   contractNumber: z.string(),
   licenseNumber: z.string(),
@@ -136,6 +138,7 @@ function valuesFor(type: CatalogType, item?: CatalogItem | null): CatalogFormVal
     phone: item?.type === 'responsibles' ? item.phone : '',
     role: item?.type === 'responsibles' ? item.role : '',
     universityIds: item?.type === 'responsibles' ? [...item.universityIds] : [],
+    vendorContacts: item?.type === 'vendors' ? (item.contacts ?? []).filter((contact) => !contact.productId).map((contact) => ({ fullName: contact.fullName, email: contact.email, phone: contact.phone, communicationMethod: contact.communicationMethod })) : [],
     universityId: item?.type === 'agreements' ? item.universityId : '',
     contractNumber: item?.type === 'agreements' && item.kind === 'contracts' ? item.contractNumber : '',
     licenseNumber: item?.type === 'agreements' && item.kind === 'licenses' ? item.licenseNumber : '',
@@ -154,7 +157,7 @@ function inputFor(type: CatalogType, kind: AgreementKind, values: CatalogFormVal
   if (type === 'products') return { type, name: values.name.trim(), vendorId: values.vendorId, programId: values.programId, version: values.version.trim() };
   if (type === 'directions') return { type, name: values.name.trim(), code: values.code.trim() };
   if (type === 'programs') return { type, name: values.name.trim(), directionId: values.directionId, description: values.description.trim() };
-  if (type === 'vendors') return { type, name: values.name.trim() };
+  if (type === 'vendors') return { type, name: values.name.trim(), contacts: values.vendorContacts.map((contact) => ({ fullName: contact.fullName.trim(), email: contact.email.trim(), phone: contact.phone.trim(), communicationMethod: contact.communicationMethod.trim() })) };
   if (type === 'agreements' && kind === 'contracts') {
     return {
       type, kind, universityId: values.universityId, contractNumber: values.contractNumber.trim(), productId: values.productId,
@@ -227,7 +230,7 @@ export function CatalogFormModal({ type, kind, item, references, pending, onClos
   // Only responsibles need the detail round-trip: GET /responsibles omits the
   // university links, while the agreement list already carries every form
   // field. Fetching it anyway would reset the form and discard user input.
-  const needsDetail = type === 'responsibles';
+  const needsDetail = type === 'responsibles' || type === 'vendors';
   const detailQuery = useQuery({
     queryKey: catalogQueryKeys.detail(type, item?.id ?? 'new'),
     queryFn: ({ signal }) => getCatalogItem(type, item!.id, signal, kind),
@@ -241,6 +244,7 @@ export function CatalogFormModal({ type, kind, item, references, pending, onClos
     reValidateMode: 'onChange',
     defaultValues: valuesFor(type, item),
   });
+  const { fields: vendorContactFields, append: addVendorContact, remove: removeVendorContact } = useFieldArray({ control, name: 'vendorContacts' });
 
   useEffect(() => { reset(valuesFor(type, effectiveItem)); }, [effectiveItem, reset, type]);
 
@@ -278,6 +282,7 @@ export function CatalogFormModal({ type, kind, item, references, pending, onClos
     {detailQuery.isError ? <FormErrorBanner>Не удалось загрузить полные данные записи. Закройте форму и попробуйте снова.</FormErrorBanner> : null}
     {type === 'agreements' ? null : <FormField label={type === 'responsibles' ? 'ФИО' : 'Название'} htmlFor={nameField.id} required error={nameField.error} errorId={nameField.errorId}><Input id={nameField.id} autoFocus maxLength={512} disabled={pending || detailLoading} aria-invalid={Boolean(nameField.error)} aria-describedby={nameField.error ? nameField.errorId : undefined} {...register('name')} /></FormField>}
     {type === 'universities' ? (() => { const meta = field('city'); return <FormField label="Город" htmlFor={meta.id} error={meta.error} errorId={meta.errorId} hint="Город указывается отдельно от региона."><Input id={meta.id} maxLength={256} disabled={pending} aria-invalid={Boolean(meta.error)} aria-describedby={meta.error ? meta.errorId : undefined} {...register('city')} /></FormField>; })() : null}
+    {type === 'vendors' ? <div className={styles.vendorContacts}><strong>Контакты вендора</strong>{vendorContactFields.map((contact, index) => <div className={styles.vendorContact} key={contact.id}><div className={styles.formGrid}><FormField label="Контактное лицо" htmlFor={`${id}-contact-name-${index}`} required error={errors.vendorContacts?.[index]?.fullName?.message} errorId={`${id}-contact-name-${index}-error`}><Input id={`${id}-contact-name-${index}`} maxLength={512} disabled={pending || detailLoading} {...register(`vendorContacts.${index}.fullName`)} /></FormField><FormField label="Email" htmlFor={`${id}-contact-email-${index}`} required error={errors.vendorContacts?.[index]?.email?.message} errorId={`${id}-contact-email-${index}-error`}><Input id={`${id}-contact-email-${index}`} type="email" maxLength={512} disabled={pending || detailLoading} {...register(`vendorContacts.${index}.email`)} /></FormField></div><div className={styles.formGrid}><FormField label="Телефон" htmlFor={`${id}-contact-phone-${index}`} errorId={`${id}-contact-phone-${index}-error`}><Input id={`${id}-contact-phone-${index}`} maxLength={64} disabled={pending || detailLoading} {...register(`vendorContacts.${index}.phone`)} /></FormField><FormField label="Способ связи" htmlFor={`${id}-contact-method-${index}`} errorId={`${id}-contact-method-${index}-error`}><Input id={`${id}-contact-method-${index}`} maxLength={256} disabled={pending || detailLoading} {...register(`vendorContacts.${index}.communicationMethod`)} /></FormField></div><Button type="button" variant="ghost" size="s" disabled={pending || detailLoading} onClick={() => removeVendorContact(index)}>Убрать контакт</Button></div>)}<Button type="button" variant="secondary" size="s" disabled={pending || detailLoading} onClick={() => addVendorContact({ fullName: '', email: '', phone: '', communicationMethod: '' })}>Добавить контакт</Button></div> : null}
     {type === 'products' ? <div className={styles.formGrid}>{(() => { const meta = field('vendorId'); return <FormField label="Вендор" htmlFor={meta.id} required error={meta.error} errorId={meta.errorId}><Select id={meta.id} disabled={pending} aria-invalid={Boolean(meta.error)} aria-describedby={meta.error ? meta.errorId : undefined} {...register('vendorId')}><option value="">Выберите вендора</option>{references.vendors.map((vendor) => <option value={vendor.id} key={vendor.id}>{vendor.name}</option>)}</Select></FormField>; })()}{(() => { const meta = field('programId'); return <FormField label="ИТ-программа" htmlFor={meta.id} error={meta.error} errorId={meta.errorId} hint="Программа определяет направление продукта."><Select id={meta.id} disabled={pending} aria-invalid={Boolean(meta.error)} aria-describedby={meta.error ? meta.errorId : undefined} {...register('programId')}><option value="">Без программы</option>{references.programs.map((program) => <option value={program.id} key={program.id}>{program.name}</option>)}</Select></FormField>; })()}{(() => { const meta = field('version'); return <FormField label="Версия" htmlFor={meta.id} error={meta.error} errorId={meta.errorId}><Input id={meta.id} maxLength={128} disabled={pending} aria-invalid={Boolean(meta.error)} aria-describedby={meta.error ? meta.errorId : undefined} {...register('version')} /></FormField>; })()}</div> : null}
     {type === 'directions' ? (() => { const meta = field('code'); return <FormField label="Код" htmlFor={meta.id} required error={meta.error} errorId={meta.errorId}><Input id={meta.id} maxLength={64} disabled={pending} aria-invalid={Boolean(meta.error)} aria-describedby={meta.error ? meta.errorId : undefined} {...register('code')} /></FormField>; })() : null}
     {type === 'programs' ? <>{(() => { const meta = field('directionId'); return <FormField label="Направление" htmlFor={meta.id} required error={meta.error} errorId={meta.errorId}><Select id={meta.id} disabled={pending} aria-invalid={Boolean(meta.error)} aria-describedby={meta.error ? meta.errorId : undefined} {...register('directionId')}><option value="">Выберите направление</option>{references.directions.map((direction) => <option value={direction.id} key={direction.id}>{direction.description ? `${direction.name} (${direction.description})` : direction.name}</option>)}</Select></FormField>; })()}{(() => { const meta = field('description'); return <FormField label="Описание" htmlFor={meta.id} error={meta.error} errorId={meta.errorId}><TextArea id={meta.id} rows={3} maxLength={4000} disabled={pending} aria-invalid={Boolean(meta.error)} aria-describedby={meta.error ? meta.errorId : undefined} {...register('description')} /></FormField>; })()}</> : null}

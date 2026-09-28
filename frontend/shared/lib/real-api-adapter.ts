@@ -57,7 +57,7 @@ type ApiUniversity = {
 type ApiProgram = { id: string; name: string; direction_name: string; status: ProgramStatus; launch_date: string | null; responsible_name: string | null };
 type ApiLicense = { id: string; license_number: string; product_name: string; vendor_name: string; signed_at: string; expires_at: string; status: string; transfer_status: string; contract_number: string | null };
 type ApiProduct = { id: string; name: string; version: string; vendor_name: string; status: string; license: ApiLicense | null };
-type ApiDocument = { id: string; document_type: string; title: string; file_name: string; file_size: number; signed_at: string | null; expires_at: string | null; status: string; uploaded_by: string; created_at: string };
+type ApiDocument = { id: string; document_type: string; title: string; file_name: string; file_available?: boolean; file_size: number; signed_at: string | null; expires_at: string | null; status: string; uploaded_by: string; created_at: string };
 type ApiMeeting = { id: string; meeting_type: string; subject: string; participants: string[]; outcome: string | null; next_action: string | null; next_action_due: string | null; meeting_at: string; created_by: string };
 type ApiMeetingRead = Omit<ApiMeeting, 'participants' | 'created_by'> & { participants: unknown[]; created_by_keycloak_sub: string };
 type ApiResponsible = { id: string; full_name: string; email: string; phone: string | null; role: string; is_primary?: boolean };
@@ -296,20 +296,25 @@ export async function realGetUniversityLicenses(id: string, queryClient?: QueryC
   }));
 }
 
-export async function realGetUniversityDocuments(id: string, queryClient?: QueryClient): Promise<UniversityDocumentRow[]> {
-  const data = (await passportBundle(id, queryClient)).documents;
-  return data.map((item) => ({
+export async function realGetUniversityDocuments(id: string, page: number, pageSize: number, search: string, documentType: string, status: string, signal?: AbortSignal): Promise<{ items: UniversityDocumentRow[]; total: number; page: number; pageSize: number; types: string[] }> {
+  const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+  if (search.trim()) params.set('search', search.trim());
+  if (documentType !== 'all') params.set('document_type', documentType);
+  if (status !== 'all') params.set('status', status);
+  const data = unwrap(await apiFetch<ApiPage<ApiDocument> & { types: string[] }>(`/api/v1/universities/${encodeURIComponent(id)}/passport/documents?${params}`, { signal }), 'Не удалось загрузить документы ВУЗа.');
+  return { items: data.items.map((item) => ({
     id: item.id,
     type: item.document_type,
     name: item.title,
     fileName: item.file_name,
+    hasFile: Boolean(item.file_available),
     fileSize: item.file_size ? `${Math.max(1, Math.round(item.file_size / 1024))} КБ` : '0 КБ',
     signedAt: item.signed_at,
     expiresAt: item.expires_at,
-    status: item.status === 'signed' ? 'signed' : item.status === 'archived' ? 'archived' : 'pending',
+    status: item.status === 'archived' ? 'archived' : item.expires_at && item.expires_at < new Date().toISOString().slice(0, 10) ? 'expired' : item.status === 'signed' ? 'signed' : 'pending',
     uploadedBy: item.uploaded_by,
     uploadedAt: item.created_at,
-  }));
+  })), total: data.total, page: data.page, pageSize: data.page_size, types: data.types };
 }
 
 export async function realGetUniversityMeetings(id: string, page = 1, pageSize = 20, signal?: AbortSignal): Promise<PaginatedResult<UniversityMeetingRow>> {
@@ -559,6 +564,7 @@ function catalogContacts(value: unknown): CatalogContact[] | undefined {
     if (!isRecord(entry)) return [];
     return [{
       id: stringValue(entry.id),
+      productId: entry.product_id ? stringValue(entry.product_id) : null,
       fullName: stringValue(entry.full_name),
       email: stringValue(entry.email),
       phone: stringValue(entry.phone),
@@ -777,7 +783,7 @@ function catalogWriteBody(input: CatalogInput): Record<string, unknown> {
   if (input.type === 'products') return { name: input.name, vendor_id: input.vendorId, program_id: input.programId || null, version: input.version };
   if (input.type === 'directions') return { name: input.name, code: input.code };
   if (input.type === 'programs') return { name: input.name, direction_id: input.directionId, description: input.description };
-  if (input.type === 'vendors') return { name: input.name };
+  if (input.type === 'vendors') return { name: input.name, contacts: input.contacts.map((contact) => ({ full_name: contact.fullName, email: contact.email, phone: contact.phone || null, communication_method: contact.communicationMethod || null })) };
   if (input.type === 'agreements' && input.kind === 'contracts') {
     return {
       university_id: input.universityId,

@@ -936,7 +936,7 @@ function catalogItemFromInput(input: CatalogInput, current?: CatalogItem): Catal
   if (input.type === 'products') return { ...base, type: input.type, name: input.name, vendorId: input.vendorId, vendorName: catalogGroup('vendors').get(input.vendorId)?.name ?? '—', programId: input.programId, programName: catalogGroup('programs').get(input.programId)?.name ?? '', version: input.version };
   if (input.type === 'directions') return { ...base, type: input.type, name: input.name, code: input.code };
   if (input.type === 'programs') return { ...base, type: input.type, name: input.name, directionId: input.directionId, directionName: catalogGroup('directions').get(input.directionId)?.name ?? '', description: input.description };
-  if (input.type === 'vendors') return { ...base, type: input.type, name: input.name };
+  if (input.type === 'vendors') return { ...base, type: input.type, name: input.name, contacts: input.contacts.map((contact, index) => ({ ...contact, id: `${base.id}-contact-${index}`, productId: null })) };
   if (input.type === 'agreements' && input.kind === 'contracts') {
     const product = catalogGroup('products').get(input.productId);
     return {

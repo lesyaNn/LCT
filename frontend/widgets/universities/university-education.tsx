@@ -123,11 +123,11 @@ export function TeachersSection({ id }: { id: string }) {
     { id: 'training', label: 'Обучение', render: (row) => row.teacher_programs.map((link) => <div key={link.id}><StatusBadge intent={link.training_status === 'completed' ? 'success' : 'neutral'}>{statusLabels[link.training_status]}</StatusBadge></div>) },
     { id: 'qualification', label: 'Квалификация', render: (row) => row.teacher_programs.map((link) => <div key={link.id}><StatusBadge intent={link.qualification_status === 'completed' ? 'success' : 'neutral'}>{statusLabels[link.qualification_status]}</StatusBadge></div>) },
     { id: 'due', label: 'Следующее повышение', render: (row) => row.teacher_programs.map((link) => <div key={link.id}>{link.next_qualification_due_at ? formatDateRu(link.next_qualification_due_at) : '—'}</div>) },
-    { id: 'actions', label: 'Действия', render: (row) => canEdit ? <div className={styles.actions}>
+    ...(canEdit ? [{ id: 'actions', label: 'Действия', render: (row: TeacherRecord) => <div className={styles.actions}>
       <Button variant="ghost" size="s" type="button" onClick={() => setAction({ kind: 'name', teacher: row })}>ФИО</Button>
       {row.teacher_programs.map((link) => <Button key={link.id} variant="ghost" size="s" type="button" onClick={() => setAction({ kind: 'program', teacher: row, program: link })}>Статус: {names.get(link.program_id) ?? 'программа'}</Button>)}
       <Button variant="ghost" size="s" type="button" onClick={() => setAction({ kind: 'add-program', teacher: row })}>Добавить программу</Button>
-    </div> : null },
+    </div> }] : []),
   ];
   const mobileFields: PassportMobileField<TeacherRecord>[] = columns.map((column) => ({ label: column.label, render: column.render }));
   return <section className={styles.section} aria-label="Обучение преподавателей">

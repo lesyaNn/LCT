@@ -134,17 +134,18 @@ function CatalogActions({ item, canWrite, busy, onEdit, onDelete }: { item: Cata
 
 function CatalogTable({ type, kind, items, canWrite, busyId, universityNames, onEdit, onDelete, onContacts }: { type: CatalogType; kind: AgreementKind; items: CatalogItem[]; canWrite: boolean; busyId?: string; universityNames: ReadonlyMap<string, string>; onEdit: (item: CatalogItem) => void; onDelete: (item: CatalogItem) => void; onContacts: (item: CatalogItem) => void }) {
   const headers = tableHeaders(type, kind);
+  const showActions = canWrite || type === 'vendors' || type === 'products';
   const busy = (item: CatalogItem) => busyId === item.id;
-  const actions = (item: CatalogItem) => <div className={styles.rowActions}>{hasContacts(item) ? <Button type="button" variant="ghost" size="s" onClick={() => onContacts(item)}>Контакты</Button> : null}<CatalogActions item={item} canWrite={canWrite} busy={busy(item)} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} /></div>;
+  const actions = (item: CatalogItem) => <div className={styles.rowActions}>{hasContacts(item) ? <Button type="button" variant="ghost" size="s" onClick={() => onContacts(item)}>Контакты</Button> : null}{canWrite ? <CatalogActions item={item} canWrite={canWrite} busy={busy(item)} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} /> : null}</div>;
   return <TableShell ariaLabel={`Каталог «${catalogDefinition(type).label}»`}>
-    <div className={headers.length > 2 ? styles.desktopTable : `${styles.desktopTable} ${styles.compactTable}`}><table className={tableStyles.table}><thead><tr>{headers.map((header) => <th key={header}>{header}</th>)}<th>Действия</th></tr></thead><tbody>{items.map((item) => <tr data-testid={`catalog-row-${item.id}`} key={item.id}><td><button className={styles.nameButton} type="button" disabled={!canWrite} onClick={() => onEdit(item)}>{item.name}</button></td>{secondaryFields(item, universityNames).map((field) => <td key={field.label}>{field.value}</td>)}<td>{actions(item)}</td></tr>)}</tbody></table></div>
-    <div className={styles.mobileList}>{items.map((item) => <article className={styles.catalogCard} key={item.id}><div className={styles.cardTop}><strong>{item.name}</strong></div><dl>{secondaryFields(item, universityNames).map((field) => <div key={field.label}><dt>{field.label}</dt><dd>{field.value}</dd></div>)}</dl>{hasContacts(item) ? <Button type="button" variant="ghost" size="s" onClick={() => onContacts(item)}>Контакты</Button> : null}<CatalogActions item={item} canWrite={canWrite} busy={busy(item)} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} /></article>)}</div>
+    <div className={headers.length > 2 ? styles.desktopTable : `${styles.desktopTable} ${styles.compactTable}`}><table className={tableStyles.table}><thead><tr>{headers.map((header) => <th key={header}>{header}</th>)}{showActions ? <th>Действия</th> : null}</tr></thead><tbody>{items.map((item) => <tr data-testid={`catalog-row-${item.id}`} key={item.id}><td><button className={styles.nameButton} type="button" disabled={!canWrite} onClick={() => onEdit(item)}>{item.name}</button></td>{secondaryFields(item, universityNames).map((field) => <td key={field.label}>{field.value}</td>)}{showActions ? <td>{actions(item)}</td> : null}</tr>)}</tbody></table></div>
+    <div className={styles.mobileList}>{items.map((item) => <article className={styles.catalogCard} key={item.id}><div className={styles.cardTop}><strong>{item.name}</strong></div><dl>{secondaryFields(item, universityNames).map((field) => <div key={field.label}><dt>{field.label}</dt><dd>{field.value}</dd></div>)}</dl>{showActions ? actions(item) : null}</article>)}</div>
   </TableShell>;
 }
 
 function ContactList({ contacts }: { contacts?: CatalogContact[] }) {
   if (!contacts?.length) return <p>Контакты не указаны.</p>;
-  return <>{contacts.map((contact) => <dl key={contact.id}><dt><strong>{contact.fullName}</strong></dt><dd>{contact.email} · {contact.phone || 'телефон не указан'} · {contact.communicationMethod || 'способ связи не указан'}</dd></dl>)}</>;
+  return <>{contacts.map((contact) => <dl key={contact.id}><dt><strong>{contact.fullName}</strong></dt><dd>{contact.productId ? 'Контакт продукта' : 'Контакт вендора'} · {contact.email} · {contact.phone || 'телефон не указан'} · {contact.communicationMethod || 'способ связи не указан'}</dd></dl>)}</>;
 }
 
 export function CatalogsPage() {

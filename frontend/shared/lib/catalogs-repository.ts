@@ -42,6 +42,7 @@ interface CatalogItemBase {
 
 export interface CatalogContact {
   id: string;
+  productId?: string | null;
   fullName: string;
   email: string;
   phone: string;
@@ -145,7 +146,7 @@ export type CatalogInput =
   | { type: 'products'; name: string; vendorId: string; programId: string; version: string }
   | { type: 'directions'; name: string; code: string }
   | { type: 'programs'; name: string; directionId: string; description: string }
-  | { type: 'vendors'; name: string }
+  | { type: 'vendors'; name: string; contacts: Array<Pick<CatalogContact, 'fullName' | 'email' | 'phone' | 'communicationMethod'>> }
   | { type: 'responsibles'; name: string; email: string; phone: string; role: string; universityIds: string[] }
   | {
       type: 'agreements';

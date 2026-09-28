@@ -2,7 +2,6 @@
 
 import type { ComponentType } from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Attachment from '@atomaro/icons/24/action/Attachment';
@@ -45,7 +44,7 @@ import { WorkflowComments } from './workflow-comments';
 import { WorkflowStageTasks } from './workflow-stage-tasks';
 import { AttachmentRow, WorkflowAttachments } from './workflow-attachments';
 import { WorkflowCreateModal } from './workflow-create-modal';
-import { WorkflowArchiveAction } from '@/widgets/workflows/workflow-archive-action';
+import { PassportWorkflowCard } from './passport-workflow-card';
 import { WorkflowTransitionModal, type WorkflowTransitionNotification } from './workflow-transition-modal';
 import { WorkflowRollbackModal } from './workflow-rollback-modal';
 import styles from './university-workflow.module.css';
@@ -350,12 +349,6 @@ export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride 
   </div>;
 }
 
-function instanceStatusLabel(status: string): string {
-  if (status === 'completed') return 'Завершён';
-  if (status === 'active') return 'В работе';
-  return status || '—';
-}
-
 function MockUniversityWorkflow({ id, canAdvance }: { id: string; canAdvance: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -406,11 +399,14 @@ function RealUniversityWorkflow({ id }: { id: string; canAdvance: boolean }) {
     staleTime: 30_000,
   });
   const [createOpen, setCreateOpen] = useState(false);
+  const [launchProgramId, setLaunchProgramId] = useState<string | null>(null);
+  const programsQuery = useQuery({ queryKey: workflowProgramsQueryKey(id), queryFn: ({ signal }) => getWorkflowSelectorPrograms(id, signal), staleTime: 30_000 });
   const instances = instancesQuery.data ?? [];
+  const unstartedPrograms = (programsQuery.data ?? []).filter((program) => !instances.some((instance) => instance.program_id === program.id));
   const canCreate = hasPermission(user, 'workflow.change_status') && hasRole(user, 'admin');
 
-  if (instancesQuery.isPending) return <WorkflowSkeleton mode="embedded" />;
-  if (!instancesQuery.data) return <RouteErrorState compact onRetry={() => void instancesQuery.refetch()} />;
+  if (instancesQuery.isPending || programsQuery.isPending) return <WorkflowSkeleton mode="embedded" />;
+  if (!instancesQuery.data || !programsQuery.data) return <RouteErrorState compact onRetry={() => { void instancesQuery.refetch(); void programsQuery.refetch(); }} />;
 
   return <div className={styles.programWorkflow}>
     <div className={styles.instancesHeader}>
@@ -420,34 +416,15 @@ function RealUniversityWorkflow({ id }: { id: string; canAdvance: boolean }) {
       </div>
       {canCreate ? <Button variant="primary" size="s" type="button" onClick={() => setCreateOpen(true)}>Создать Workflow</Button> : null}
     </div>
-    {instances.length ? (
-      <ol className={styles.instanceList}>
-        {instances.map((item) => (
-          <li key={item.id} className={styles.instanceItem}>
-            <Link className={styles.instanceButton} href={`/workflows/${item.id}`} onKeyDown={(event) => { if (event.key === ' ') { event.preventDefault(); event.currentTarget.click(); } }}>
-              <strong>{item.program_name || 'Без программы'}</strong>
-              {(() => {
-                const current = item.stages.find((stage) => stage.id === item.current_instance_stage_id || stage.template_stage_id === item.current_stage_id) ?? item.stages.find((stage) => stage.status === 'current');
-                const completed = item.stages.filter((stage) => stage.status === 'completed').length;
-                return <><span className={styles.instanceStage}>{current ? <>Текущий этап: <b>{current.name}</b></> : 'Этап завершён'}</span><span className={styles.instanceMeta}><span>{completed} из {item.stages.length} этапов</span><StatusBadge intent={item.is_overdue ? 'danger' : item.status === 'completed' ? 'success' : 'brand'}>{item.is_overdue ? 'Просрочен' : instanceStatusLabel(item.status)}</StatusBadge></span><span className={styles.instanceProgress} role="progressbar" aria-label="Прогресс Workflow" aria-valuemin={0} aria-valuemax={item.stages.length} aria-valuenow={completed}><span style={{ width: `${item.stages.length ? completed / item.stages.length * 100 : 0}%` }} /></span>{item.responsible_name || item.due_date ? <span className={styles.instanceFacts}>{item.responsible_name}{item.responsible_name && item.due_date ? ' · ' : null}{item.due_date ? `Дедлайн: ${formatDateRu(item.due_date)}` : null}</span> : null}</>;
-              })()}
-            </Link>
-            <div className={styles.instanceItemActions}><WorkflowArchiveAction instanceId={item.id} universityId={id} active={item.status === 'active'} /></div>
-          </li>
-        ))}
-      </ol>
-    ) : (
-      <EmptyState
-        title="Workflow ещё не созданы"
-        description="Создайте первый Workflow: выберите направление, программу обучения и продукт."
-      />
-    )}
-    {createOpen ? (
+    <div className={styles.passportWorkflowCards}>{instances.map((item) => <PassportWorkflowCard key={item.id} instance={item} />)}{unstartedPrograms.map((program) => <PassportWorkflowCard key={program.id} programName={program.name} onLaunch={canCreate ? () => setLaunchProgramId(program.id) : undefined} />)}{!instances.length && !unstartedPrograms.length ? <EmptyState title="Workflow ещё не созданы" description="Процессы появятся после создания первого Workflow." /> : null}</div>
+    {createOpen || launchProgramId !== null ? (
       <WorkflowCreateModal
         universityId={id}
-        onClose={() => setCreateOpen(false)}
+        initialProgramId={launchProgramId || undefined}
+        onClose={() => { setCreateOpen(false); setLaunchProgramId(null); }}
         onCreated={(record) => {
           setCreateOpen(false);
+          setLaunchProgramId(null);
           router.push(`/workflows/${record.id}`);
         }}
       />
