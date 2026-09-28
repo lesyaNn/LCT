@@ -4,8 +4,6 @@
 .pageHeader > div > p:last-child { display: none; }
 .pageHeader p:last-child { color: var(--rtk-color-text-secondary); margin: var(--rtk-space-2) 0 0; }
 .panel { display: flex; flex-direction: column; gap: var(--rtk-space-4); min-width: 0; }
-.search { display: flex; flex: 1 1 320px; flex-direction: column; gap: var(--rtk-space-1); max-width: 480px; min-width: 220px; }
-.search > span { color: var(--rtk-color-text-secondary); font-size: 11px; font-weight: 650; }
 .actions { display: flex; gap: var(--rtk-space-2); margin-left: auto; }
 .actions > span { display: inline-flex; }
 .agreementSwitch { display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); padding: var(--rtk-space-3) var(--rtk-space-5) 0; }
@@ -50,7 +48,6 @@
 }
 
 @media (max-width: 600px) {
-  .search { flex: none; max-width: none; min-width: 0; width: 100%; }
   .actions { display: grid; grid-template-columns: 1fr; margin-left: 0; width: 100%; }
   .actions > *, .actions > span, .actions button, .actions a { width: 100%; }
   .actions > span > span:first-child, .rowActions > span > span:first-child { width: 100%; }

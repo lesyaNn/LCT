@@ -27,6 +27,7 @@ import { getUniversityExternalData, universityExternalDataQueryKey } from '@/sha
 import { normalizeApiError } from '@/shared/lib/api-errors';
 import { listUniversityWorkflowInstances, universityWorkflowInstancesQueryKey } from '@/shared/lib/workflow-creation-repository';
 import { Select } from '@/shared/ui/rtk/form-controls';
+import { FilterField } from '@/shared/ui/rtk/filter-field';
 import { Avatar } from '@/shared/ui/rtk/avatar';
 import { Button } from '@/shared/ui/rtk/button';
 import { EmptyState } from '@/shared/ui/empty-state';
@@ -339,7 +340,7 @@ function MockUniversityWorkflow({ id, canAdvance }: { id: string; canAdvance: bo
   if (programsQuery.isPending || externalQuery.isPending) return <WorkflowSkeleton mode="embedded" />;
   if (!programsQuery.data) return <RouteErrorState compact onRetry={() => void programsQuery.refetch()} />;
   return <div className={styles.programWorkflow}>
-    {programs.length > 1 ? <label className={styles.programSelector}><span>Программа</span><Select value={selected?.key ?? ''} onChange={(event) => selectProgram(event.target.value)}>{programs.map((program) => <option key={program.key} value={program.key}>{program.name}</option>)}</Select></label> : selected ? <p className={styles.programName}>Программа: <strong>{selected.name}</strong></p> : null}
+    {programs.length > 1 ? <FilterField className={styles.programSelector} label="Программа"><Select value={selected?.key ?? ''} onChange={(event) => selectProgram(event.target.value)}>{programs.map((program) => <option key={program.key} value={program.key}>{program.name}</option>)}</Select></FilterField> : selected ? <p className={styles.programName}>Программа: <strong>{selected.name}</strong></p> : null}
     {mockInstanceId ? <WorkflowView key={mockInstanceId} instanceId={mockInstanceId} mode="embedded" canAdvance={canAdvance} /> : <EmptyState title="Workflow ещё не создан" description="Демонстрационные данные Workflow для выбранной программы отсутствуют." />}
     {externalQuery.isError ? <p className={styles.externalHint}>Связь с заявками сайта сейчас недоступна; показаны программы ВУЗа.</p> : null}
   </div>;

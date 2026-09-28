@@ -321,6 +321,7 @@ export async function realGetUniversityResponsibles(id: string, queryClient?: Qu
 }
 
 export async function realGetUniversityHistory(id: string, filters: UniversityHistoryFilters): Promise<UniversityHistoryEvent[]> {
+  void filters;
   const data = await passport(id, 'audit');
   const defaultUser: UniversityResponsible = data.responsibles[0]
     ? { id: data.responsibles[0].id, name: data.responsibles[0].full_name, email: data.responsibles[0].email, role: data.responsibles[0].role }
@@ -333,15 +334,7 @@ export async function realGetUniversityHistory(id: string, filters: UniversityHi
     action: item.title,
     details: item.description ?? item.title,
     entity: { id: item.id, label: item.title },
-  })).filter((event) => {
-    const date = event.occurredAt.slice(0, 10);
-    if (filters.type !== 'all' && event.type !== filters.type) return false;
-    if (filters.dateFrom && date < filters.dateFrom) return false;
-    if (filters.dateTo && date > filters.dateTo) return false;
-    if (filters.userId && event.user.id !== filters.userId) return false;
-    if (filters.entityId && event.entity.id !== filters.entityId) return false;
-    return true;
-  });
+  }));
 }
 
 // --------------------------------------------------------------------- import

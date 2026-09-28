@@ -7,11 +7,15 @@ import Edit from '@atomaro/icons/24/editor/Edit';
 import HistoryAction from '@atomaro/icons/24/communication/HistoryAction';
 import { useMemo, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { isMockDataSourceFor } from '@/shared/lib/data-source';
 import { formatDateTimeRu } from '@/shared/lib/formatters';
 import { historyEventTypeIntent, historyEventTypeLabels } from '@/shared/lib/status-semantics';
 import { getUniversityHistory, getUniversityHistoryFilterOptions, universityHistoryQueryKey, type UniversityHistoryEvent, type UniversityHistoryEventType, type UniversityHistoryFilters } from '@/shared/lib/universities-repository';
-import { Button } from '@/shared/ui/rtk/button';
 import { EmptyState } from '@/shared/ui/empty-state';
+import { FilterToolbar } from '@/shared/ui/rtk/filter-surface';
+import { FilterField } from '@/shared/ui/rtk/filter-field';
+import { DateRangeField } from '@/shared/ui/rtk/date-range-field';
+import { Select } from '@/shared/ui/rtk/form-controls';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { TableShell } from '@/shared/ui/rtk/table-shell';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
@@ -39,7 +43,18 @@ function EventDetails({ event }: { event: UniversityHistoryEvent }) {
 }
 
 function HistoryFilters({ filters, options, onChange, onReset }: { filters: UniversityHistoryFilters; options: ReturnType<typeof getUniversityHistoryFilterOptions>; onChange: (patch: Partial<UniversityHistoryFilters>) => void; onReset: () => void }) {
-  return <div className={styles.filters} aria-label="Фильтры истории"><label><span>Тип события</span><select value={filters.type} onChange={(event) => onChange({ type: event.target.value as UniversityHistoryFilters['type'] })}>{eventTypes.map((type) => <option value={type} key={type}>{eventTypeOptions[type]}</option>)}</select></label><label><span>С даты</span><input type="date" value={filters.dateFrom} onChange={(event) => onChange({ dateFrom: event.target.value })} /></label><label><span>По дату</span><input type="date" value={filters.dateTo} onChange={(event) => onChange({ dateTo: event.target.value })} /></label><label><span>Пользователь</span><select value={filters.userId} onChange={(event) => onChange({ userId: event.target.value })}><option value="">Все пользователи</option>{options.users.map((user) => <option value={user.id} key={user.id}>{user.name}</option>)}</select></label><label><span>Сущность</span><select value={filters.entityId} onChange={(event) => onChange({ entityId: event.target.value })}><option value="">Все сущности</option>{options.entities.map((entity) => <option value={entity.id} key={entity.id}>{entity.label}</option>)}</select></label><Button variant="ghost" size="s" type="button" onClick={onReset}>Сбросить</Button></div>;
+  const activeFilters = [
+    ...(filters.type !== 'all' ? [{ id: 'type', label: `Тип события: ${eventTypeOptions[filters.type]}`, onRemove: () => onChange({ type: 'all' }) }] : []),
+    ...(filters.dateFrom || filters.dateTo ? [{ id: 'period', label: `Период: ${filters.dateFrom || '…'} — ${filters.dateTo || '…'}`, onRemove: () => onChange({ dateFrom: '', dateTo: '' }) }] : []),
+    ...(filters.userId ? [{ id: 'user', label: `Пользователь: ${options.users.find((user) => user.id === filters.userId)?.name ?? filters.userId}`, onRemove: () => onChange({ userId: '' }) }] : []),
+    ...(filters.entityId ? [{ id: 'entity', label: `Сущность: ${options.entities.find((entity) => entity.id === filters.entityId)?.label ?? filters.entityId}`, onRemove: () => onChange({ entityId: '' }) }] : []),
+  ];
+  return <FilterToolbar embedded label="Фильтры истории" activeFilters={activeFilters} mobileCount={activeFilters.length} controls={() => <>
+    <FilterField label="Тип события"><Select value={filters.type} onChange={(event) => onChange({ type: event.target.value as UniversityHistoryFilters['type'] })}>{eventTypes.map((type) => <option value={type} key={type}>{eventTypeOptions[type]}</option>)}</Select></FilterField>
+    <FilterField label="Пользователь"><Select value={filters.userId} onChange={(event) => onChange({ userId: event.target.value })}><option value="">Все пользователи</option>{options.users.map((user) => <option value={user.id} key={user.id}>{user.name}</option>)}</Select></FilterField>
+    <FilterField label="Сущность"><Select value={filters.entityId} onChange={(event) => onChange({ entityId: event.target.value })}><option value="">Все сущности</option>{options.entities.map((entity) => <option value={entity.id} key={entity.id}>{entity.label}</option>)}</Select></FilterField>
+    <DateRangeField from={filters.dateFrom} to={filters.dateTo} onFromChange={(dateFrom) => onChange({ dateFrom })} onToChange={(dateTo) => onChange({ dateTo })} onRangeChange={(dateFrom, dateTo) => onChange({ dateFrom, dateTo })} />
+  </>} onReset={onReset} resetDisabled={!activeFilters.length} />;
 }
 
 function HistoryTable({ events }: { events: UniversityHistoryEvent[] }) {
@@ -47,6 +62,7 @@ function HistoryTable({ events }: { events: UniversityHistoryEvent[] }) {
 }
 
 export function UniversityHistory({ id }: { id: string }) {
+  const filterSupported = isMockDataSourceFor('passport');
   const [filters, setFilters] = useState<UniversityHistoryFilters>({ type: 'all', dateFrom: '', dateTo: '', userId: '', entityId: '' });
   const options = useMemo(() => getUniversityHistoryFilterOptions(id), [id]);
   const query = useQuery({ queryKey: universityHistoryQueryKey(id, filters), queryFn: () => getUniversityHistory(id, filters), placeholderData: keepPreviousData, staleTime: 30_000 });
@@ -58,5 +74,5 @@ export function UniversityHistory({ id }: { id: string }) {
   });
   const resetFilters = () => setFilters({ type: 'all', dateFrom: '', dateTo: '', userId: '', entityId: '' });
 
-  return <div className={styles.page}><HistoryFilters filters={filters} options={options} onChange={onChange} onReset={resetFilters} />{query.isPending ? <TableSkeleton rows={6} columns={5} label="Загрузка истории университета" /> : !query.data ? <RouteErrorState compact onRetry={() => void query.refetch()} /> : query.data.length ? <HistoryTable events={query.data} /> : <EmptyState icon={<HistoryAction size={22} fill="currentColor" />} title={filtered ? 'По заданным фильтрам события не найдены' : 'Событий пока нет'} description={filtered ? 'Измените условия поиска или сбросьте фильтры.' : 'История появится после первого события.'} primaryAction={filtered ? { label: 'Сбросить фильтры', onClick: resetFilters, variant: 'secondary' } : undefined} />}</div>;
+  return <div className={styles.page}>{filterSupported ? <HistoryFilters filters={filters} options={options} onChange={onChange} onReset={resetFilters} /> : <p className={styles.capabilityNote}>Показаны последние события. Фильтры полной истории в текущем API недоступны.</p>}{query.isPending ? <TableSkeleton rows={6} columns={5} label="Загрузка истории университета" /> : !query.data ? <RouteErrorState compact onRetry={() => void query.refetch()} /> : query.data.length ? <HistoryTable events={query.data} /> : <EmptyState icon={<HistoryAction size={22} fill="currentColor" />} title={filtered ? 'По заданным фильтрам события не найдены' : 'Событий пока нет'} description={filtered ? 'Измените условия поиска или сбросьте фильтры.' : 'История появится после первого события.'} primaryAction={filtered ? { label: 'Сбросить фильтры', onClick: resetFilters, variant: 'secondary' } : undefined} />}</div>;
 }

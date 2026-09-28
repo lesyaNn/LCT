@@ -1,5 +1,5 @@
 .page { display: flex; flex-direction: column; gap: var(--rtk-space-5); min-width: 0; }
-.reportsLayout { align-items: start; display: grid; gap: var(--rtk-space-5); grid-template-columns: minmax(480px, .88fr) minmax(0, 1.35fr); min-width: 0; }
+.reportsLayout { align-items: start; display: grid; gap: var(--rtk-space-5); grid-template-columns: minmax(0, 1fr); min-width: 0; }
 .formSurface, .jobsSurface { background: var(--rtk-color-surface-elevated); border: 0; border-radius: var(--rtk-radius-medium); box-shadow: var(--rtk-shadow-elevation-1); min-width: 0; padding: clamp(var(--rtk-space-4), 2vw, var(--rtk-space-6)); }
 .formSurface { display: flex; flex-direction: column; gap: var(--rtk-space-5); }
 .sectionHeading { align-items: flex-start; display: flex; gap: var(--rtk-space-3); justify-content: space-between; }

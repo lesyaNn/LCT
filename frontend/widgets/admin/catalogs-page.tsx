@@ -35,7 +35,7 @@ import { FilterToolbar } from '@/shared/ui/rtk/filter-surface';
 import { Tabs } from '@/shared/ui/rtk/tabs';
 import { TabbedSurface } from '@/shared/ui/rtk/tabbed-surface';
 import { EmptyState } from '@/shared/ui/empty-state';
-import { Input } from '@/shared/ui/rtk/form-controls';
+import { SearchField } from '@/shared/ui/rtk/filter-field';
 import { Modal } from '@/shared/ui/rtk/modal';
 import { Drawer } from '@/shared/ui/rtk/drawer';
 import { IconButton } from '@/shared/ui/rtk/icon-button';
@@ -214,7 +214,8 @@ export function CatalogsPage() {
             embedded
             label="Фильтры каталога"
             activeFilters={search ? [{ id: 'search', label: `Поиск: ${search}`, onRemove: () => { setSearch(''); setPage(1); } }] : []}
-            controls={() => <><label className={styles.search}><span>Поиск</span><Input type="search" value={search} placeholder={definition.searchPlaceholder} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /></label><div className={styles.actions}>{canWrite ? addButton : <Tooltip content="На текущем этапе каталоги подключены только для чтения.">{addButton}</Tooltip>}<ButtonLink href="/admin/import" variant="orange">Импорт</ButtonLink></div></>}
+            controls={() => <SearchField label="Поиск" value={search} placeholder={definition.searchPlaceholder} onChange={(value) => { setSearch(value); setPage(1); }} />}
+            actions={<div className={styles.actions}>{canWrite ? addButton : <Tooltip content="На текущем этапе каталоги подключены только для чтения.">{addButton}</Tooltip>}<ButtonLink href={`/admin/import?type=${type}`} variant="orange">Импорт</ButtonLink></div>}
             onReset={() => { setSearch(''); setPage(1); }}
             resetDisabled={!search}
           />
