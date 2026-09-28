@@ -1,4 +1,6 @@
 import { apiFetch, apiUploadFormData } from './api-client';
+import type { AuditEvent } from './audit-repository';
+import { isUuidLike, summarizeAuditEvent } from './audit-human';
 import type { QueryClient } from '@tanstack/react-query';
 import { queryKeys } from './query-keys';
 import { ApiRequestError } from './api-errors';
@@ -344,19 +346,53 @@ export async function realGetUniversityResponsibles(id: string, queryClient?: Qu
 
 export async function realGetUniversityHistory(id: string, filters: UniversityHistoryFilters): Promise<UniversityHistoryEvent[]> {
   void filters;
-  const data = await passport(id, 'audit');
-  const defaultUser: UniversityResponsible = data.responsibles[0]
-    ? { id: data.responsibles[0].id, name: data.responsibles[0].full_name, email: data.responsibles[0].email, role: data.responsibles[0].role }
-    : { id: 'system', name: 'Система' };
-  return data.last_interactions.map((item): UniversityHistoryEvent => ({
-    id: item.id,
-    occurredAt: item.created_at,
-    type: item.type === 'workflow_transition' ? 'workflow' : item.type === 'meeting' || item.type === 'document' || item.type === 'note' ? item.type : 'audit',
-    user: { ...defaultUser, name: item.author || defaultUser.name },
-    action: item.title,
-    details: item.description ?? item.title,
-    entity: { id: item.id, label: item.title },
-  }));
+  type HistoryDto = {
+    id: string; timestamp: string; user_name: string; role: string; action: string;
+    entity_type: string; entity_id: string; title: string; section: string;
+    object_name: string | null; changes: Array<{ field: string; label: string; old: string; new: string }>;
+    note: string | null;
+    attachment: { instance_id: string; attachment_id: string; file_name: string; mime_type: string | null } | null;
+  };
+  const [data, audit] = await Promise.all([
+    passport(id),
+    apiFetch<HistoryDto[]>(`/api/v1/universities/${encodeURIComponent(id)}/history`).then((result) => unwrap(result, 'Не удалось загрузить историю ВУЗа.')),
+  ]);
+  const fromAudit = audit.flatMap((item): UniversityHistoryEvent[] => {
+    const event: AuditEvent = {
+      id: item.id, occurredAt: item.timestamp,
+      user: { id: item.user_name, name: item.user_name }, role: item.role,
+      action: item.action,
+      entity: { id: item.entity_id, type: item.entity_type, label: item.object_name ?? item.section },
+      university: { id, name: data.university.name },
+      presentation: { title: item.title, section: item.section, object_name: item.object_name, changes: item.changes, note: item.note, actor_name: item.user_name, actor_role: item.role },
+    };
+    const summary = summarizeAuditEvent(event);
+    if (summary.title === 'Изменение данных' || !event.occurredAt) return [];
+    const type = event.entity.type.toLowerCase();
+    const attachment = item.attachment && isUuidLike(item.attachment.instance_id) && isUuidLike(item.attachment.attachment_id)
+      ? { instanceId: item.attachment.instance_id, id: item.attachment.attachment_id, fileName: item.attachment.file_name, mimeType: item.attachment.mime_type ?? undefined }
+      : undefined;
+    return [{
+      id: event.id, occurredAt: event.occurredAt,
+      type: type === 'document' ? 'document' : type === 'meeting' ? 'meeting' : type === 'workflow_comment' || type.startsWith('workflow_') || event.action.toUpperCase() === 'WORKFLOW_TRANSITION' ? 'workflow' : 'audit',
+      user: { id: event.user.id, name: summary.actorName },
+      action: summary.title, details: summary.objectName ?? summary.note ?? '',
+      entity: { id: event.entity.id, label: summary.objectName ?? summary.section },
+      auditEvent: event, attachment,
+    }];
+  });
+  const auditedEntities = new Set(fromAudit.map((event) => event.entity.id));
+  const interactions: UniversityHistoryEvent[] = data.last_interactions
+    .filter((item) => (item.type === 'note' || item.type === 'meeting') && !auditedEntities.has(item.id) && Boolean(item.description?.trim() || item.title?.trim()))
+    .map((item) => ({
+      id: `interaction-${item.id}`, occurredAt: item.created_at,
+      type: item.type as 'note' | 'meeting',
+      user: { id: item.author || 'unknown', name: item.author || 'Пользователь (имя недоступно)' },
+      action: item.type === 'note' ? 'Оставил заметку' : `Провёл встречу «${item.title}»`,
+      details: item.description ?? item.title,
+      entity: { id: item.id, label: item.title },
+    }));
+  return [...fromAudit, ...interactions].sort((left, right) => right.occurredAt.localeCompare(left.occurredAt));
 }
 
 // --------------------------------------------------------------------- import

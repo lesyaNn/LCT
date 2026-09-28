@@ -386,7 +386,7 @@ def test_unknown_types_never_technical():
         "SOMETHING_NEW", "my_custom_thing",
         {"weird_field": "x"}, {"weird_field": "y", "some_id": str(uuid.uuid4())},
         {}, None)
-    assert summary["title"] == "Системное изменение"
+    assert summary["title"] == "Изменение данных"
     assert_human(summary["title"], summary["section"])
 
 
@@ -418,10 +418,10 @@ def test_secret_keys_dropped_from_changes():
 
 def test_actor_display_name_fallbacks():
     assert actor_display_name("Demo Admin") == "Demo Admin"
-    assert actor_display_name("") == "Системное действие"
-    assert actor_display_name(None) == "Системное действие"
-    assert actor_display_name("system") == "Системное действие"
-    assert actor_display_name("  ") == "Системное действие"
+    assert actor_display_name("") == "Пользователь (имя недоступно)"
+    assert actor_display_name(None) == "Пользователь (имя недоступно)"
+    assert actor_display_name("system") == "Система"
+    assert actor_display_name("  ") == "Пользователь (имя недоступно)"
 
 
 def test_format_value_primitives():

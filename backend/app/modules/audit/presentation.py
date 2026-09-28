@@ -8,7 +8,7 @@ Constraints honoured:
 * never invents data — when a name cannot be resolved it uses an explicit
   fallback label, never a raw UUID;
 * never leaks secrets — secret-shaped keys are dropped from changes;
-* never raises — any unexpected payload degrades to «Системное изменение».
+* never raises — any unexpected payload degrades to «Изменение данных».
 """
 
 from __future__ import annotations
@@ -395,7 +395,9 @@ def actor_display_name(user_name: Any, user_id: Any = None) -> str:
     name = (str(user_name).strip() if user_name else "")
     if name and name.lower() not in ("system", "unknown"):
         return name
-    return "Системное действие"
+    if str(user_id or "").strip().lower() == "system" or name.lower() == "system":
+        return "Система"
+    return "Пользователь (имя недоступно)"
 
 
 def _payload_name(payload: Any, *keys: str) -> str | None:
@@ -449,8 +451,8 @@ def summarize_event(
                           old, new, names, university_name)
     except Exception:
         return {
-            "title": "Системное изменение",
-            "section": "Система",
+            "title": "Изменение данных",
+            "section": "Данные",
             "object_name": None,
             "changes": [],
             "note": None,
@@ -745,7 +747,7 @@ def _summarize(
                 "section": "Система", "object_name": None, "changes": [], "note": None}
 
     # ---- total fallback: never technical ----
-    return {"title": "Системное изменение", "section": "Система",
+    return {"title": "Изменение данных", "section": SECTION_LABELS.get(entity_key, "Данные"),
             "object_name": None,
             "changes": _change_rows(old, new, names) if isinstance(old, dict) or isinstance(new, dict) else [],
             "note": None}

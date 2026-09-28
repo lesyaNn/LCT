@@ -70,10 +70,10 @@ describe('audit-human: action/entity/role labels', () => {
 
   it('actor fallback is human, never system/uuid', () => {
     assert.equal(auditActorName(baseEvent()), 'Demo Admin');
-    assert.equal(auditActorName(baseEvent({ user: { id: 'x', name: 'system' } })), 'Системное действие');
-    assert.equal(auditActorName(baseEvent({ user: { id: 'x', name: '' } })), 'Системное действие');
-    assert.equal(auditActorName(baseEvent({ user: { id: '585d5f6e-58f4-4072-a2c5-17e3e8a61117', name: '585d5f6e-58f4-4072-a2c5-17e3e8a61117' } })), 'Системное действие');
-    assert.equal(auditActorName(baseEvent({ user: { id: 'keycloak-sub', name: 'keycloak-sub' } })), 'Системное действие');
+    assert.equal(auditActorName(baseEvent({ user: { id: 'x', name: 'system' } })), 'Система');
+    assert.equal(auditActorName(baseEvent({ user: { id: 'x', name: '' } })), 'Пользователь (имя недоступно)');
+    assert.equal(auditActorName(baseEvent({ user: { id: '585d5f6e-58f4-4072-a2c5-17e3e8a61117', name: '585d5f6e-58f4-4072-a2c5-17e3e8a61117' } })), 'Пользователь (имя недоступно)');
+    assert.equal(auditActorName(baseEvent({ user: { id: 'keycloak-sub', name: 'keycloak-sub' } })), 'Пользователь (имя недоступно)');
   });
 
   it('isUuidLike detects UUID-shaped strings', () => {
@@ -271,8 +271,21 @@ describe('audit-human: summarize', () => {
       oldValues: { weird_field: 'x' },
       newValues: { weird_field: 'y' },
     }));
-    assert.equal(summary.title, 'Системное изменение');
+    assert.equal(summary.title, 'Изменение данных');
     assertHuman(summary.title, summary.section);
+  });
+
+  it('workflow attachment upload uses the canonical payload and keeps the actor', () => {
+    const summary = summarizeAuditEvent(baseEvent({
+      action: 'CREATE',
+      entity: { id: 'file-1', type: 'document', label: '' },
+      user: { id: 'author-1', name: 'Анна Морозова' },
+      newValues: { audit_object_type: 'workflow_attachment', instance_id: 'instance-1', original_filename: 'Договор.pdf', file_size: 2048 },
+      presentation: { title: 'Системное изменение', section: 'Система', actor_name: 'Системное действие' },
+    }));
+    assert.equal(summary.title, 'Загрузил файл «Договор.pdf»');
+    assert.equal(summary.actorName, 'Анна Морозова');
+    assert.equal(summary.section, 'Файлы');
   });
 
   it('deleted entity uses fallback, not UUID', () => {

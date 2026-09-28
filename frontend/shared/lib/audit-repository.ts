@@ -263,12 +263,19 @@ async function getRealAuditEvents(query: AuditListQuery): Promise<AuditListResul
   };
 }
 
-export async function getAuditFilterOptions(): Promise<AuditFilterOptions> {
+async function getRealAuditFilterOptions(): Promise<AuditFilterOptions> {
   const result = await apiFetch<unknown>('/api/v1/audit/filter-options');
   if (!result.ok) throw new ApiRequestError(result.status, result.body, 'Не удалось загрузить фильтры аудита.', result.error);
   const raw = isRecord(result.data) ? result.data : {};
   const options = (value: unknown): Array<{ id: string; name: string }> => Array.isArray(value) ? value.flatMap((item) => isRecord(item) && stringValue(item.id) ? [{ id: stringValue(item.id)!, name: stringValue(item.name) ?? stringValue(item.id)! }] : []) : [];
   return { users: options(raw.users), universities: options(raw.universities), actions: Array.isArray(raw.actions) ? raw.actions.filter((value): value is string => typeof value === 'string') : [], entityTypes: Array.isArray(raw.entity_types) ? raw.entity_types.filter((value): value is string => typeof value === 'string') : [] };
+}
+
+export async function getAuditFilterOptions(): Promise<AuditFilterOptions> {
+  return fromDataSource({
+    mock: () => mockGetAuditEvents({ filters: EMPTY_AUDIT_FILTERS, page: 1, pageSize: AUDIT_PAGE_SIZES[0] }).filterOptions,
+    real: getRealAuditFilterOptions,
+  });
 }
 
 export async function getAuditEvents(query: AuditListQuery): Promise<AuditListResult> {

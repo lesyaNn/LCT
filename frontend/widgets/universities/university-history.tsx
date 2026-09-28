@@ -8,6 +8,7 @@ import HistoryAction from '@atomaro/icons/24/communication/HistoryAction';
 import { useMemo, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { isMockDataSourceFor } from '@/shared/lib/data-source';
+import { summarizeAuditEvent } from '@/shared/lib/audit-human';
 import { formatDateTimeRu } from '@/shared/lib/formatters';
 import { historyEventTypeIntent, historyEventTypeLabels } from '@/shared/lib/status-semantics';
 import { getUniversityHistory, getUniversityHistoryFilterOptions, universityHistoryQueryKey, type UniversityHistoryEvent, type UniversityHistoryEventType, type UniversityHistoryFilters } from '@/shared/lib/universities-repository';
@@ -21,6 +22,7 @@ import { TableShell } from '@/shared/ui/rtk/table-shell';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { TableSkeleton } from '@/shared/ui/skeleton';
 import { AuditDiff } from '@/widgets/audit/audit-diff';
+import { AttachmentRow } from './workflow-attachments';
 import styles from './university-history.module.css';
 
 const eventTypes: Array<UniversityHistoryEventType | 'all'> = ['all', 'workflow', 'document', 'meeting', 'note', 'audit'];
@@ -39,7 +41,12 @@ function EventType({ type }: { type: UniversityHistoryEventType }) {
 }
 
 function EventDetails({ event }: { event: UniversityHistoryEvent }) {
-  return <details className={styles.details}><summary>{event.details}</summary>{event.type === 'audit' ? <AuditDiff event={event} showTechnical={false} /> : <p>{event.details}</p>}</details>;
+  const hasChanges = event.auditEvent ? summarizeAuditEvent(event.auditEvent).changes.length > 0 : Boolean(event.oldValues || event.newValues);
+  return <div className={styles.eventDetails}>
+    {event.details && !event.action.includes(event.details) ? <p>{event.details}</p> : null}
+    {event.attachment ? <ul className={styles.attachmentList}><AttachmentRow attachment={{ id: event.attachment.id, fileName: event.attachment.fileName, fileType: '', fileSize: '', mimeType: event.attachment.mimeType }} instanceId={event.attachment.instanceId} canDelete={false} onOpen={() => undefined} onDelete={() => undefined} compact /></ul> : null}
+    {hasChanges ? <details className={styles.details}><summary>Показать изменения</summary><AuditDiff event={event.auditEvent ?? event} showTechnical={false} /></details> : null}
+  </div>;
 }
 
 function HistoryFilters({ filters, options, onChange, onReset }: { filters: UniversityHistoryFilters; options: ReturnType<typeof getUniversityHistoryFilterOptions>; onChange: (patch: Partial<UniversityHistoryFilters>) => void; onReset: () => void }) {

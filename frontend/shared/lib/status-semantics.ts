@@ -18,6 +18,6 @@ export const workflowStageStatusSemantics: Record<UniversityWorkflowStageStatus,
   skipped: { label: 'Пропущен', intent: 'neutral', icon: 'skip', muted: true, titleDecoration: 'strike', emphasis: 'default' },
   overdue: { label: 'Просрочен', intent: 'danger', icon: 'error', muted: false, titleDecoration: 'none', emphasis: 'error' },
 };
-export const historyEventTypeLabels: Record<UniversityHistoryEventType, string> = { workflow: 'Workflow', document: 'Документ', meeting: 'Встреча', note: 'Заметка', audit: 'Аудит' };
+export const historyEventTypeLabels: Record<UniversityHistoryEventType, string> = { workflow: 'Workflow', document: 'Файл', meeting: 'Встреча', note: 'Заметка', audit: 'Изменение' };
 export const historyEventTypeIntent: Record<UniversityHistoryEventType, SemanticIntent> = { workflow: 'brand', document: 'neutral', meeting: 'brand', note: 'neutral', audit: 'warning' };
 export const attentionSeverityIntent: Record<AttentionItem['severity'], SemanticIntent> = { red: 'danger', orange: 'warning', yellow: 'warning' };

@@ -18,6 +18,9 @@
 .details summary { color: var(--rtk-color-text-primary); cursor: pointer; line-height: 1.4; }
 .details summary::marker { color: var(--rtk-color-brand); }
 .details > p { color: var(--rtk-color-text-secondary); font-size: 12px; margin: var(--rtk-space-2) 0 0; }
+.eventDetails { min-width: 0; overflow-wrap: anywhere; }
+.eventDetails > p { color: var(--rtk-color-text-secondary); font-size: 12px; line-height: 1.45; margin: 0; }
+.attachmentList { list-style: none; margin: var(--rtk-space-2) 0 0; padding: 0; }
 .auditDetails { background: var(--rtk-color-surface-subtle); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); margin-top: var(--rtk-space-2); overflow: auto; padding: var(--rtk-space-2); }
 .auditDetails table { border-collapse: collapse; font-size: 11px; min-width: 280px; width: 100%; }
 .auditDetails th,

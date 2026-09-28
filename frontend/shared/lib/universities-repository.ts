@@ -909,6 +909,8 @@ export interface UniversityHistoryEvent {
   newValues?: Record<string, string | number | null>;
   ip?: string;
   userAgent?: string;
+  auditEvent?: import('./audit-repository').AuditEvent;
+  attachment?: { instanceId: string; id: string; fileName: string; mimeType?: string };
 }
 
 export interface UniversityHistoryFilters {
@@ -937,12 +939,10 @@ const historyEvents = (id: string, university: UniversityListItem): UniversityHi
     ...(assignment && assigned ? [{ id: `${id}-responsible-assignment-${assignment.assignedAt}`, occurredAt: assignment.assignedAt, type: 'audit' as const, user: anna, action: 'Изменён ответственный', details: assignment.reason ? `Новый ответственный: ${assigned.name}. Причина: ${assignment.reason}` : `Новый ответственный: ${assigned.name}.`, entity: { id: `${id}-responsible`, label: 'Ответственный ВУЗа' }, oldValues: { responsible: university.responsible?.name ?? null }, newValues: { responsible: assigned.name }, ip: 'mock', userAgent: 'CRM demo' }] : []),
     { id: `${id}-history-1`, occurredAt: '2026-09-20T11:30:00+03:00', type: 'meeting', user: anna, action: 'Проведена встреча', details: 'Рабочая встреча с координатором программы', entity: { id: `${id}-meeting-1`, label: 'Встреча с координатором' } },
     { id: `${id}-history-2`, occurredAt: '2026-09-19T15:20:00+03:00', type: 'audit', user: boris, action: 'Изменён срок этапа', details: `${currentStageName} → новый срок 30 сент. 2026 г.`, entity: { id: `${id}-workflow-stage-11`, label: currentStageName }, oldValues: { deadline: '2026-09-18', status: 'attention' }, newValues: { deadline: '2026-09-30', status: 'current' }, ip: '10.24.18.42', userAgent: 'Chrome 128 · macOS' },
-    { id: `${id}-history-3`, occurredAt: '2026-09-18T16:10:00+03:00', type: 'document', user: boris, action: 'Подписан документ', details: 'Договор на обучение · contract-2026.pdf', entity: { id: `${id}-document-1`, label: 'Договор на обучение' } },
     { id: `${id}-history-4`, occurredAt: '2026-09-17T10:05:00+03:00', type: 'workflow', user: anna, action: 'Этап завершён', details: 'Подготовка преподавателей → Подготовка инфраструктуры', entity: { id: `${id}-workflow-stage-7`, label: 'Подготовка инфраструктуры' } },
     { id: `${id}-history-5`, occurredAt: '2026-09-16T13:45:00+03:00', type: 'note', user: { id: 'responsible-elena', name: 'Елена Смирнова' }, action: 'Добавлена заметка', details: 'Нужно подтвердить готовность аудитории к пилоту.', entity: { id: `${id}-note-1`, label: 'Подготовка к пилоту' } },
     { id: `${id}-history-6`, occurredAt: '2026-09-15T09:30:00+03:00', type: 'audit', user: anna, action: 'Изменён ответственный', details: 'Ответственный обновлён в карточке Workflow', entity: { id: `${id}-workflow-stage-10`, label: 'Пилотный запуск' }, oldValues: { responsible: 'Борис Петров' }, newValues: { responsible: anna.name }, ip: '10.24.18.42', userAgent: 'Chrome 128 · macOS' },
     { id: `${id}-history-7`, occurredAt: '2026-09-12T15:00:00+03:00', type: 'meeting', user: { id: 'responsible-elena', name: 'Елена Смирнова' }, action: 'Зафиксированы договорённости', details: 'Согласовали план ближайших запусков', entity: { id: `${id}-meeting-2`, label: 'План ближайших запусков' } },
-    { id: `${id}-history-8`, occurredAt: '2026-09-11T12:20:00+03:00', type: 'document', user: anna, action: 'Загружен документ', details: 'Приложение к договору · appendix-programs.docx', entity: { id: `${id}-document-2`, label: 'Приложение к договору' } },
     { id: `${id}-history-9`, occurredAt: '2026-09-09T17:10:00+03:00', type: 'workflow', user: boris, action: 'Этап изменён', details: `Текущий этап: ${currentStageName}`, entity: { id: `${id}-workflow-stage-11`, label: currentStageName } },
     { id: `${id}-history-10`, occurredAt: '2026-09-06T14:35:00+03:00', type: 'note', user: anna, action: 'Добавлена заметка', details: 'Обновили план подготовки преподавателей.', entity: { id: `${id}-note-2`, label: 'План подготовки преподавателей' } },
   ];

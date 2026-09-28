@@ -23,8 +23,19 @@ from app.modules.universities.passport_service import (
     get_programs_page,
     parse_include,
 )
+from app.modules.universities.history_service import university_history
 
 router = APIRouter(prefix="/universities", tags=["universities-passport"])
+
+
+@router.get("/{university_id}/history", summary="Human-readable history of one university")
+def get_university_history(
+    university_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_permission("university.read")),
+) -> list[dict]:
+    ensure_university_access(university_id, user)
+    return university_history(db, university_id)
 
 
 @router.get(
@@ -62,4 +73,3 @@ def get_university_passport_programs(
     ensure_university_access(university_id, user)
     items, total = get_programs_page(db, university_id, page, page_size, status=status)
     return PaginatedPrograms(items=items, page=page, page_size=page_size, total=total)
-

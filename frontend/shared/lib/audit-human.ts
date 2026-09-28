@@ -199,12 +199,13 @@ export function getAuditRoleLabel(role?: string): string {
 export function auditActorName(event: Pick<AuditEvent, 'user'>): string {
   const id = event.user.id.trim();
   const name = event.user.name.trim();
-  if (!name) return 'Системное действие';
+  if (id.toLowerCase() === 'system' || name.toLowerCase() === 'system') return 'Система';
+  if (!name) return 'Пользователь (имя недоступно)';
   const lowered = name.toLocaleLowerCase('ru-RU');
-  if (lowered === 'system' || lowered === 'unknown') return 'Системное действие';
+  if (lowered === 'unknown') return 'Пользователь (имя недоступно)';
   // Keycloak sub or any UUID-like string is never a display name.
-  if (isUuidLike(name)) return 'Системное действие';
-  if (id && name === id) return 'Системное действие';
+  if (isUuidLike(name)) return 'Пользователь (имя недоступно)';
+  if (id && name === id) return 'Пользователь (имя недоступно)';
   return name;
 }
 
@@ -355,13 +356,19 @@ export function summarizeAuditEvent(event: AuditEvent): AuditSummary {
     return summarize(event);
   } catch {
     return {
-      title: 'Системное изменение', section: 'Система', objectName: null,
+      title: 'Изменение данных', section: getAuditEntityLabel(event.entity.type), objectName: event.entity.label || null,
       changes: [], note: null, actorName: auditActorName(event), actorRole: event.role ?? null,
     };
   }
 }
 
 function summarize(event: AuditEvent): AuditSummary {
+  const attachmentPayload = asObject(event.newValues) ?? asObject(event.oldValues);
+  if (attachmentPayload?.audit_object_type === 'workflow_attachment' || event.entity.type.toLowerCase() === 'workflow_attachment') {
+    const filename = payloadName(attachmentPayload, 'original_filename') ?? 'Файл (название недоступно)';
+    const title = event.action.toUpperCase() === 'DELETE' ? `Удалил файл ${quote(filename)}` : event.action.toUpperCase() === 'CREATE' ? `Загрузил файл ${quote(filename)}` : `Изменил файл ${quote(filename)}`;
+    return { title, section: 'Файлы', objectName: filename, changes: changeRows(asObject(event.oldValues), asObject(event.newValues), new Set(['original_filename'])), note: null, actorName: auditActorName(event), actorRole: event.role ?? null };
+  }
   // Серверный presentation — первичен (уже с резолвом имён).
   const presentationRaw = event.presentation;
   if (presentationRaw && typeof presentationRaw === 'object' && !Array.isArray(presentationRaw)) {
@@ -385,7 +392,7 @@ function summarize(event: AuditEvent): AuditSummary {
         objectName: typeof presentation.object_name === 'string' ? presentation.object_name : null,
         changes,
         note: typeof presentation.note === 'string' ? presentation.note : null,
-        actorName: typeof presentation.actor_name === 'string' && presentation.actor_name ? presentation.actor_name : auditActorName(event),
+        actorName: typeof presentation.actor_name === 'string' && presentation.actor_name && presentation.actor_name !== 'Системное действие' ? presentation.actor_name : auditActorName(event),
         actorRole: typeof presentation.actor_role === 'string' ? presentation.actor_role : (event.role ?? null),
       };
     }
@@ -517,7 +524,7 @@ function summarize(event: AuditEvent): AuditSummary {
 
   if (['CREATE', 'UPDATE', 'DELETE'].includes(action)) {
     const label = ENTITY_LABELS[entity];
-    if (!label) return { ...base, title: 'Системное изменение', section: 'Система', objectName: null, changes: changeRows(oldObj, newObj), note: null };
+    if (!label) return { ...base, title: 'Изменение данных', section: getAuditEntityLabel(entity), objectName: event.entity.label || null, changes: changeRows(oldObj, newObj), note: null };
     const objName = payloadName(newObj, 'name', 'full_name', 'subject', 'original_filename', 'file_name') ?? payloadName(oldObj, 'name', 'full_name', 'subject', 'original_filename', 'file_name') ?? (entity === 'university' ? uni : null);
     const sectionMap: Record<string, string> = {
       university: 'ВУЗы', direction: 'Направления', program: 'Программы', vendor: 'Производители',
@@ -538,5 +545,5 @@ function summarize(event: AuditEvent): AuditSummary {
     return { ...base, title, section: sectionMap[entity] ?? 'Система', objectName: objName, changes: changeRows(oldObj, newObj, skip), note: null };
   }
 
-  return { ...base, title: 'Системное изменение', section: 'Система', objectName: null, changes: changeRows(oldObj, newObj), note: null };
+  return { ...base, title: 'Изменение данных', section: getAuditEntityLabel(entity), objectName: event.entity.label || null, changes: changeRows(oldObj, newObj), note: null };
 }
