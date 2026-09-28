@@ -31,9 +31,8 @@ services:
       options: { max-size: "10m", max-file: "3" }
 
   keydb:
-    # Drop-in замена Redis: тот же RESP-протокол, тот же redis-py клиент.
-    # Multithreaded форк Redis — выше пропускная на analytics/rate-limit.
-    image: eqalpha/keydb:alpine
+    # ARM64-compatible Redis; keep the service name for existing KEYDB_URL values.
+    image: redis:7-alpine
     restart: unless-stopped
     networks: [rtk-net]
     expose:
@@ -41,7 +40,7 @@ services:
     volumes:
       - keydbdata:/data
     healthcheck:
-      test: ["CMD-SHELL", "keydb-cli ping | grep -q PONG"]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
