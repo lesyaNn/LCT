@@ -1,4 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
+  const demoAccounts = {
+    admin: { username: 'admin', password: 'admin123' },
+    manager: { username: 'manager', password: 'manager123' },
+    user: { username: 'user', password: 'user123' },
+  };
   const toggle = document.getElementById('rtk-demo-toggle');
   const roles = document.getElementById('rtk-demo-roles');
   if (!toggle || !roles) return;
@@ -9,12 +14,17 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   roles.querySelectorAll('[data-demo-role]').forEach((button) => {
     button.addEventListener('click', () => {
+      const account = demoAccounts[button.dataset.demoRole];
       const username = document.getElementById('username');
       const password = document.getElementById('password');
-      if (username) username.value = button.dataset.demoRole;
+      if (!account || !username || !password) return;
+      username.value = account.username;
+      password.value = account.password;
+      username.dispatchEvent(new Event('input', { bubbles: true }));
+      password.dispatchEvent(new Event('input', { bubbles: true }));
       roles.hidden = true;
       toggle.setAttribute('aria-expanded', 'false');
-      password?.focus();
+      document.getElementById('kc-login')?.focus();
     });
   });
 });
