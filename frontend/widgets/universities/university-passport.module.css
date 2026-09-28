@@ -19,11 +19,8 @@
 .meter-green { background: var(--rtk-color-success); }
 .meter-yellow { background: var(--rtk-color-warning); }
 .meter-red { background: var(--rtk-color-danger); }
-.textAction { align-items: center; background: transparent; border: 0; color: var(--rtk-color-brand); cursor: pointer; display: inline-flex; font-size: 12px; font-weight: 700; gap: var(--rtk-space-1); padding: 0; }
-.textAction:hover { color: var(--rtk-color-brand-hover); text-decoration: underline; }
 .headerActions { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); }
-.headerActions button,
-.workflowAction button { align-items: center; display: inline-flex; gap: var(--rtk-space-2); }
+.headerActions button { align-items: center; display: inline-flex; gap: var(--rtk-space-2); }
 .desktopTabs { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-bottom: 0; border-radius: var(--rtk-radius-medium) var(--rtk-radius-medium) 0 0; padding: 0 var(--rtk-space-2); position: sticky; top: var(--topbar-height); z-index: 10; }
 .tabList { display: flex; gap: var(--rtk-space-1); max-width: 100%; overflow-x: auto; padding-inline: var(--rtk-space-1); scrollbar-width: thin; }
 .tab,
@@ -39,24 +36,20 @@
 .metricsGrid { display: grid; gap: var(--rtk-space-4); grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .workflowCard,
 .timelineCard { composes: surface from '../../shared/ui/rtk/section-surface.module.css'; }
-.workflowLayout { display: grid; gap: var(--rtk-space-5); grid-template-columns: minmax(180px, 1fr) minmax(280px, 1.4fr); margin-top: var(--rtk-space-5); }
-.workflowStage { display: flex; flex-direction: column; gap: var(--rtk-space-2); }
-.workflowStage > :last-child { align-self: flex-start; }
-.workflowStage strong { font-size: 20px; letter-spacing: -.02em; }
-.workflowDetails { display: grid; gap: var(--rtk-space-4); grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.workflowDetails > div { display: flex; flex-direction: column; gap: var(--rtk-space-2); }
-.detailLabel { color: var(--rtk-color-text-tertiary); font-size: 11px; }
-.workflowDetails strong { align-items: center; display: flex; font-size: 13px; gap: var(--rtk-space-2); }
-.overdue { color: var(--rtk-color-danger); }
-.detailWarning { color: var(--rtk-color-danger); font-size: 11px; }
-.responsibleValue { overflow-wrap: anywhere; }
-.workflowProgress { grid-column: 1 / -1; }
+.workflowCards { display: grid; gap: var(--rtk-space-3); grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); margin-top: var(--rtk-space-4); }
+.workflowItem { align-items: flex-start; border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); display: flex; flex-direction: column; gap: var(--rtk-space-3); min-width: 0; padding: var(--rtk-space-4); }
+.workflowItemTop { align-items: flex-start; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); justify-content: space-between; width: 100%; }
+.workflowItemTop strong, .workflowProgram { font-size: 15px; overflow-wrap: anywhere; }
+.workflowItem p { color: var(--rtk-color-text-secondary); font-size: 13px; margin: 0; }
+.workflowItem p b { color: var(--rtk-color-text-primary); }
+.workflowItem > button, .workflowLink { margin-top: auto; }
+.workflowLink { align-items: center; color: var(--rtk-color-brand); display: inline-flex; font-size: 13px; font-weight: 700; gap: var(--rtk-space-2); text-decoration: none; }
+.workflowLink:hover { text-decoration: underline; }
+.workflowProgress { width: 100%; }
 .progressLabel { align-items: baseline; color: var(--rtk-color-text-secondary); display: flex; font-size: 12px; gap: var(--rtk-space-2); justify-content: space-between; }
 .progressLabel strong { color: var(--rtk-color-text-primary); }
 .progressTrack { background: var(--rtk-color-surface-subtle); border-radius: 999px; height: 8px; margin-top: var(--rtk-space-2); overflow: hidden; }
 .progressTrack span { background: var(--rtk-color-brand); border-radius: inherit; display: block; height: 100%; transition: width 180ms ease; }
-.workflowAction { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); grid-column: 1 / -1; }
-.workflowAction > span { color: var(--rtk-color-text-tertiary); font-size: 12px; }
 .timeline { list-style: none; margin: var(--rtk-space-5) 0 0; padding: 0; }
 .timelineItem { display: flex; gap: var(--rtk-space-3); min-height: 62px; position: relative; }
 .timelineItem:not(:last-child)::before { background: var(--rtk-color-border); content: ''; left: 15px; position: absolute; top: 32px; bottom: -4px; width: 1px; }
@@ -105,22 +98,15 @@
   .accordionPanel { border-top: 1px solid var(--rtk-color-border); padding: var(--rtk-space-4); }
   .accordionPanel .overviewContent { gap: var(--rtk-space-4); }
   .accordionPanel .sectionHeading { align-items: flex-start; flex-direction: column; }
-  .accordionPanel .sectionHeading .textAction { align-self: flex-start; }
   .metricsGrid,
   .skeletonMetrics { grid-template-columns: 1fr; }
-  .workflowLayout { grid-template-columns: 1fr; }
-  .workflowProgress,
-  .workflowAction { grid-column: auto; }
-  .textAction { min-height: 44px; }
 }
 
 @media (max-width: 480px) {
   .workflowCard,
   .timelineCard { padding: var(--rtk-space-4); }
-  .workflowDetails { grid-template-columns: 1fr; }
   .progressLabel { align-items: flex-start; flex-direction: column; }
   .headerActions button { flex: 1; justify-content: center; }
-  .workflowAction > button { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

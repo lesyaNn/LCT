@@ -1,4 +1,5 @@
 .page { display: flex; flex-direction: column; gap: var(--rtk-space-5); min-width: 0; }
+.panel { display: flex; flex-direction: column; gap: var(--rtk-space-4); min-width: 0; }
 .localBreadcrumbs { display: none; }
 .localBreadcrumbs a { text-decoration: none; }
 .localBreadcrumbs a:hover { color: var(--rtk-color-brand); text-decoration: underline; }
@@ -7,9 +8,7 @@
 .eyebrow { color: var(--rtk-color-brand); font-size: 12px; font-weight: 700; letter-spacing: .08em; margin: 0 0 var(--rtk-space-1); text-transform: uppercase; }
 .pageHeader h1 { font-size: clamp(26px, 4vw, 36px); letter-spacing: -.035em; line-height: 1.12; margin: 0; overflow-wrap: anywhere; }
 .description { color: var(--rtk-color-text-secondary); margin: var(--rtk-space-2) 0 0; max-width: 720px; }
-.filter { display: flex; flex-direction: column; gap: var(--rtk-space-1); min-width: 190px; }
-.filter > span { color: var(--rtk-color-text-secondary); font-size: 11px; font-weight: 650; }
-.surface { background: var(--rtk-color-surface); border-radius: var(--rtk-radius-medium); box-shadow: var(--rtk-shadow-elevation-2); min-width: 0; overflow: hidden; }
+.surface { background: var(--rtk-color-surface); min-width: 0; overflow: hidden; }
 .surfaceHeader { align-items: center; border-bottom: 1px solid var(--rtk-color-border); display: flex; justify-content: space-between; min-height: 70px; padding: var(--rtk-space-4) var(--rtk-space-5); }
 .surfaceHeader h2 { font-size: 19px; margin: 0; }
 .surfaceHeader p { color: var(--rtk-color-text-tertiary); font-size: 12px; margin: var(--rtk-space-1) 0 0; }
@@ -59,14 +58,12 @@
 .toastViewport { bottom: var(--rtk-space-5); display: flex; justify-content: flex-end; pointer-events: none; position: fixed; right: var(--rtk-space-5); z-index: 70; }
 
 @media (max-width: 900px) {
-  .filter, .search { flex: 1 1 220px; min-width: 0; }
   .desktopTable { display: none; }
   .mobileList { display: block; }
 }
 
 @media (max-width: 600px) {
   .pageHeader { align-items: stretch; flex-direction: column; }
-  .pageHeader > button { width: 100%; }
   .surfaceHeader { align-items: flex-start; padding: var(--rtk-space-4); }
   .pagination { align-items: stretch; flex-wrap: wrap; padding: var(--rtk-space-3); }
   .pagination span { flex-basis: 100%; }

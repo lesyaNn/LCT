@@ -29,14 +29,15 @@ import { Modal } from '@/shared/ui/rtk/modal';
 import { Skeleton, SkeletonGroup } from '@/shared/ui/skeleton';
 import styles from './workflow-transition-modal.module.css';
 
-export function WorkflowCreateModal({ universityId, onClose, onCreated }: {
+export function WorkflowCreateModal({ universityId, initialProgramId, onClose, onCreated }: {
   universityId: string;
+  initialProgramId?: string;
   onClose: () => void;
   onCreated: (record: WorkflowInstanceApiRecord) => void;
 }) {
   const queryClient = useQueryClient();
-  const [directionId, setDirectionId] = useState('');
-  const [programId, setProgramId] = useState('');
+  const [directionId, setDirectionId] = useState<string | null>(null);
+  const [programId, setProgramId] = useState(initialProgramId ?? '');
   const [productId, setProductId] = useState('');
   const [templateId, setTemplateId] = useState('');
   const [serverError, setServerError] = useState<string | null>(null);
@@ -56,7 +57,9 @@ export function WorkflowCreateModal({ universityId, onClose, onCreated }: {
   const directionOptions = useMemo(() => directionsQuery.data ?? [], [directionsQuery.data]);
 
   // Каскад без эффектов: выбранное значение действительно, только пока оно есть в опциях.
-  const activeDirectionId = directionOptions.some((direction) => direction.id === directionId) ? directionId : '';
+  const initialDirectionName = universityProgramsQuery.data?.find((program) => program.id === initialProgramId)?.direction;
+  const selectedDirectionId = directionId ?? directionOptions.find((direction) => direction.name === initialDirectionName)?.id ?? '';
+  const activeDirectionId = directionOptions.some((direction) => direction.id === selectedDirectionId) ? selectedDirectionId : '';
 
   const catalogProgramsQuery = useQuery({
     queryKey: wizardProgramsQueryKey(activeDirectionId),

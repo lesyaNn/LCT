@@ -1,10 +1,10 @@
 'use client';
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useMemo, useSyncExternalStore } from 'react';
+import Link from 'next/link';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Checklist from '@atomaro/icons/24/action/Checklist';
-import TimeStroke from '@atomaro/icons/24/alert/TimeStroke';
 import StatisticsBoard from '@atomaro/icons/24/business/StatisticsBoard';
 import Calendar from '@atomaro/icons/24/communication/Calendar';
 import HistoryAction from '@atomaro/icons/24/communication/HistoryAction';
@@ -14,19 +14,22 @@ import Education from '@atomaro/icons/24/culture/Education';
 import Edit from '@atomaro/icons/24/editor/Edit';
 import ArrowRight from '@atomaro/icons/24/navigation/ArrowRight';
 import { useAuth } from '@/shared/auth/AuthProvider';
-import { hasPermission } from '@/shared/lib/access-control';
-import { formatDateRu, formatDateTimeRu } from '@/shared/lib/formatters';
+import { hasPermission, hasRole } from '@/shared/lib/access-control';
+import { formatDateTimeRu } from '@/shared/lib/formatters';
 import { normalizeApiError } from '@/shared/lib/api-errors';
-import { workflowStatusIntent } from '@/shared/lib/status-semantics';
 import {
+  getWorkflowSelectorPrograms,
   getUniversityPassport,
+  isRealWorkflowMode,
   universityPassportQueryKey,
   UNIVERSITY_PASSPORT_CAPABILITIES,
+  workflowProgramsQueryKey,
   type UniversityPassport,
   type UniversityPassportEvent,
   type UniversityPassportEventType,
+  type WorkflowInstanceApiRecord,
 } from '@/shared/lib/universities-repository';
-import { Avatar } from '@/shared/ui/rtk/avatar';
+import { listUniversityWorkflowInstances, universityWorkflowInstancesQueryKey } from '@/shared/lib/workflow-creation-repository';
 import { Button } from '@/shared/ui/rtk/button';
 import { Tabs } from '@/shared/ui/rtk/tabs';
 import { TabbedSurface } from '@/shared/ui/rtk/tabbed-surface';
@@ -40,6 +43,7 @@ import { MetricCardSkeleton, Skeleton, SkeletonGroup } from '@/shared/ui/skeleto
 import { UniversityHistory } from './university-history';
 import { DocumentsSection, LicensesSection, MeetingsSection, ProductsSection, ProgramsSection, ResponsiblesSection } from './university-passport-sections';
 import { UniversityWorkflow } from './university-workflow';
+import { WorkflowCreateModal } from './workflow-create-modal';
 import { EducationOverview, TeachersSection } from './university-education';
 import styles from './university-passport.module.css';
 
@@ -76,10 +80,6 @@ function parseTab(value: string | null): PassportTabId {
   return value && tabIds.has(value as PassportTabId) ? value as PassportTabId : 'overview';
 }
 
-function getInitials(name: string): string {
-  return name.split(/\s+/).map((part) => part[0]).filter(Boolean).slice(0, 2).join('').toLocaleUpperCase('ru-RU');
-}
-
 function PassportHeader({ passport, onTabChange }: { passport: UniversityPassport; onTabChange: (tab: PassportTabId) => void }) {
   return (
     <header className={styles.header}>
@@ -113,29 +113,44 @@ function OverviewMetrics({ passport }: { passport: UniversityPassport }) {
   );
 }
 
-function WorkflowOverview({ passport, canAdvance, onTabChange }: { passport: UniversityPassport; canAdvance: boolean; onTabChange: (tab: PassportTabId) => void }) {
-  const { workflow } = passport;
-  const progress = Math.round((workflow.completedSteps / workflow.totalSteps) * 100);
-  const overdue = workflow.overdue;
-  const statusLabel = workflow.status === 'completed' ? 'Завершён' : workflow.status === 'attention' ? 'Требует внимания' : 'В работе';
+function LaunchedWorkflowCard({ instance }: { instance: WorkflowInstanceApiRecord }) {
+  const current = instance.stages.find((stage) => stage.id === instance.current_instance_stage_id || stage.template_stage_id === instance.current_stage_id)
+    ?? instance.stages.find((stage) => stage.status === 'current');
+  const completed = instance.stages.filter((stage) => stage.status === 'completed').length;
+  const total = instance.stages.length;
+  const statusLabel = instance.is_overdue ? 'Просрочен' : instance.status === 'completed' ? 'Завершён' : instance.status === 'active' ? 'В работе' : instance.status;
+  return <article className={styles.workflowItem}>
+    <div className={styles.workflowItemTop}><strong>{instance.program_name || 'Без программы'}</strong><SemanticStatusBadge intent={instance.is_overdue ? 'danger' : instance.status === 'completed' ? 'success' : 'brand'}>{statusLabel}</SemanticStatusBadge></div>
+    <p>{current ? <>Текущий этап: <b>{current.name}</b></> : instance.status === 'completed' ? 'Все этапы завершены' : 'Этап не назначен'}</p>
+    <div className={styles.workflowProgress}><div className={styles.progressLabel}><span>Прогресс</span><strong>{completed} из {total} этапов</strong></div><div className={styles.progressTrack} role="progressbar" aria-label={`Пройдено ${completed} из ${total} этапов`} aria-valuemin={0} aria-valuemax={total} aria-valuenow={completed}><span style={{ width: `${total ? completed / total * 100 : 0}%` }} /></div></div>
+    <Link className={styles.workflowLink} href={`/workflows/${instance.id}`}>Открыть Workflow <ArrowRight size={16} fill="currentColor" /></Link>
+  </article>;
+}
 
-  return (
-    <section className={styles.workflowCard} aria-labelledby="passport-workflow-title">
-      <div className={styles.sectionHeading}><h2 id="passport-workflow-title">Текущий этап Workflow</h2><button className={styles.textAction} type="button" onClick={() => onTabChange('workflow')}>Открыть Workflow <ArrowRight size={14} fill="currentColor" /></button></div>
-      <div className={styles.workflowLayout}>
-        <div className={styles.workflowStage}><span className={styles.overline}>Текущий этап</span><strong>{workflow.currentStage.name}</strong><SemanticStatusBadge intent={workflowStatusIntent[workflow.status]}>{statusLabel}</SemanticStatusBadge></div>
-        <div className={styles.workflowDetails}>
-          <div><span className={styles.detailLabel}>Дедлайн</span><strong className={overdue ? styles.overdue : undefined}><TimeStroke size={16} fill="currentColor" />{formatDateRu(workflow.deadline)}</strong>{overdue ? <span className={styles.detailWarning}>Срок просрочен</span> : null}</div>
-          <div><span className={styles.detailLabel}>Ответственный</span><strong className={styles.responsibleValue}>{workflow.responsible ? <><Avatar initials={getInitials(workflow.responsible.name)} size="s" />{workflow.responsible.name}</> : 'Не назначен'}</strong></div>
-        </div>
-        <div className={styles.workflowProgress}>
-          <div className={styles.progressLabel}><span>Прогресс</span><strong>{workflow.completedSteps} из {workflow.totalSteps} этапов</strong></div>
-          <div className={styles.progressTrack} role="progressbar" aria-label={`Пройдено ${workflow.completedSteps} из ${workflow.totalSteps} этапов`} aria-valuemin={0} aria-valuemax={workflow.totalSteps} aria-valuenow={workflow.completedSteps}><span style={{ width: `${progress}%` }} /></div>
-        </div>
-        {canAdvance && workflow.nextStage ? <div className={styles.workflowAction}><Button variant="secondary" size="s" type="button" onClick={() => onTabChange('workflow')}>Открыть переход <ArrowRight size={16} fill="currentColor" /></Button><span>Следующий этап: {workflow.nextStage.name}</span></div> : null}
-      </div>
-    </section>
-  );
+function WorkflowOverview({ passport }: { passport: UniversityPassport }) {
+  const { user } = useAuth();
+  const [launchProgramId, setLaunchProgramId] = useState<string | null>(null);
+  const realWorkflow = isRealWorkflowMode();
+  const canCreate = realWorkflow && hasPermission(user, 'workflow.change_status') && hasRole(user, 'admin');
+  const instancesQuery = useQuery({ queryKey: universityWorkflowInstancesQueryKey(passport.id), queryFn: ({ signal }) => listUniversityWorkflowInstances(passport.id, signal), enabled: realWorkflow, staleTime: 30_000 });
+  const programsQuery = useQuery({ queryKey: workflowProgramsQueryKey(passport.id), queryFn: ({ signal }) => getWorkflowSelectorPrograms(passport.id, signal), enabled: realWorkflow, staleTime: 30_000 });
+  const instances = instancesQuery.data ?? [];
+  const unstartedPrograms = (programsQuery.data ?? []).filter((program) => !instances.some((instance) => instance.program_id === program.id));
+
+  return <section className={styles.workflowCard} aria-labelledby="passport-workflow-title">
+    <div className={styles.sectionHeading}><h2 id="passport-workflow-title">Workflow</h2></div>
+    {realWorkflow && (instancesQuery.isPending || programsQuery.isPending) ? <Skeleton height={136} />
+      : realWorkflow && (instancesQuery.isError || programsQuery.isError) ? <RouteErrorState compact onRetry={() => { void instancesQuery.refetch(); void programsQuery.refetch(); }} />
+        : <div className={styles.workflowCards}>
+          {instances.map((instance) => <LaunchedWorkflowCard key={instance.id} instance={instance} />)}
+          {(unstartedPrograms.length ? unstartedPrograms : instances.length ? [] : [{ id: '', name: 'Workflow' }]).map((program) => <article className={styles.workflowItem} key={program.id || 'empty'}>
+            {program.id ? <strong className={styles.workflowProgram}>{program.name}</strong> : null}
+            <SemanticStatusBadge intent="neutral">Workflow не запущен</SemanticStatusBadge>
+            {canCreate ? <Button variant="primary" size="s" type="button" onClick={() => setLaunchProgramId(program.id)}>Запустить Workflow</Button> : null}
+          </article>)}
+        </div>}
+    {launchProgramId !== null ? <WorkflowCreateModal universityId={passport.id} initialProgramId={launchProgramId || undefined} onClose={() => setLaunchProgramId(null)} onCreated={() => setLaunchProgramId(null)} /> : null}
+  </section>;
 }
 
 function EventIcon({ type }: { type: UniversityPassportEventType }) {
@@ -158,8 +173,8 @@ function RecentInteractions({ events, onTabChange }: { events: UniversityPasspor
   );
 }
 
-function OverviewContent({ passport, canAdvance, onTabChange }: { passport: UniversityPassport; canAdvance: boolean; onTabChange: (tab: PassportTabId) => void }) {
-  return <div className={styles.overviewContent}><OverviewMetrics passport={passport} /><WorkflowOverview passport={passport} canAdvance={canAdvance} onTabChange={onTabChange} /><RecentInteractions events={passport.timeline} onTabChange={onTabChange} /></div>;
+function OverviewContent({ passport, onTabChange }: { passport: UniversityPassport; onTabChange: (tab: PassportTabId) => void }) {
+  return <div className={styles.overviewContent}><OverviewMetrics passport={passport} /><WorkflowOverview passport={passport} /><RecentInteractions events={passport.timeline} onTabChange={onTabChange} /></div>;
 }
 
 function PlaceholderContent({ tab }: { tab: (typeof tabDefinitions)[number] }) {
@@ -196,7 +211,7 @@ export function UniversityPassport({ id }: { id: string }) {
 
   const passport = query.data;
   const renderContent = (tab: PassportTabId) => tab === 'overview'
-    ? <OverviewContent passport={passport} canAdvance={canAdvance} onTabChange={selectTab} />
+    ? <OverviewContent passport={passport} onTabChange={selectTab} />
     : tab === 'programs'
       ? <><ProgramsSection id={id} /><EducationOverview id={id} /><TeachersSection id={id} /></>
     : tab === 'products'
