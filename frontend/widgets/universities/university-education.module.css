@@ -1,0 +1,16 @@
+.section { display: grid; gap: 20px; padding: 24px; }
+.header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.header h2 { margin: 0; font-size: 20px; }
+.metrics { display: flex; gap: 12px; flex-wrap: wrap; }
+.metric { min-width: 140px; padding: 12px 16px; border: 1px solid var(--border, #dce1e7); border-radius: 12px; }
+.metric strong { display: block; font-size: 24px; }
+.metric span { color: #617080; font-size: 13px; }
+.form { display: grid; gap: 14px; }
+.form label { display: grid; gap: 6px; font-size: 14px; }
+.actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.error { color: #bd3030; }
+.teacherDetails { display: grid; gap: 10px; padding: 12px 0; }
+.teacherDetails h3 { margin: 8px 0 0; font-size: 16px; }
+.teacherDetails ul { margin: 0; padding-left: 20px; }
+.teacherActions { display: flex; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 600px) { .section { padding: 16px; } .metric { flex: 1 1 100px; } }

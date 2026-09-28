@@ -38,8 +38,9 @@ import { NotFoundState } from '@/shared/ui/not-found-state';
 import { ForbiddenState } from '@/shared/ui/access-state';
 import { MetricCardSkeleton, Skeleton, SkeletonGroup } from '@/shared/ui/skeleton';
 import { UniversityHistory } from './university-history';
-import { DocumentsSection, LicensesSection, MeetingsSection, ResponsiblesSection } from './university-passport-sections';
+import { DocumentsSection, LicensesSection, MeetingsSection, ProductsSection, ProgramsSection, ResponsiblesSection } from './university-passport-sections';
 import { UniversityWorkflow } from './university-workflow';
+import { StudentsSection, TeachersSection } from './university-education';
 import styles from './university-passport.module.css';
 
 const mobileLayoutQuery = '(max-width: 768px)';
@@ -56,6 +57,10 @@ function isMobileLayout() {
 
 const tabDefinitions = [
   { id: 'overview', label: 'Обзор' },
+  { id: 'programs', label: 'Программы' },
+  { id: 'products', label: 'Продукты' },
+  { id: 'teachers', label: 'Преподаватели' },
+  { id: 'students', label: 'Обучающиеся' },
   { id: 'licenses', label: 'Лицензии' },
   { id: 'documents', label: 'Документы' },
   { id: 'meetings', label: 'Встречи' },
@@ -193,6 +198,14 @@ export function UniversityPassport({ id }: { id: string }) {
   const passport = query.data;
   const renderContent = (tab: PassportTabId) => tab === 'overview'
     ? <OverviewContent passport={passport} canAdvance={canAdvance} onTabChange={selectTab} />
+    : tab === 'programs'
+      ? <ProgramsSection id={id} />
+    : tab === 'products'
+      ? <ProductsSection id={id} />
+    : tab === 'teachers'
+      ? <TeachersSection id={id} />
+    : tab === 'students'
+      ? <StudentsSection id={id} />
     : tab === 'licenses'
       ? <LicensesSection id={id} />
     : tab === 'documents'
