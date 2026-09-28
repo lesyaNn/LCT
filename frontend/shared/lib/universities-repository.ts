@@ -633,6 +633,15 @@ export interface WorkflowAllowedApiRecord { id: string; name: string; order_inde
 export async function listWorkflowTasksPage(instanceId: string, page: number): Promise<WorkflowPage<WorkflowTaskApiRecord>> {
   return unwrapApiResult(await apiFetch<WorkflowPage<WorkflowTaskApiRecord>>(`/api/v1/workflow/instances/${instanceId}/tasks?page=${page}&page_size=100`));
 }
+export async function createWorkflowTask(instanceId: string, stageId: string, title: string): Promise<WorkflowTaskApiRecord> {
+  return unwrapApiResult(await apiFetch<WorkflowTaskApiRecord>(`/api/v1/workflow/instances/${instanceId}/tasks`, { method: 'POST', body: { stage_id: stageId, title } }));
+}
+export async function updateWorkflowTask(instanceId: string, taskId: string, patch: { title?: string; status?: 'open' | 'done' }): Promise<WorkflowTaskApiRecord> {
+  return unwrapApiResult(await apiFetch<WorkflowTaskApiRecord>(`/api/v1/workflow/instances/${instanceId}/tasks/${taskId}`, { method: 'PATCH', body: patch }));
+}
+export async function deleteWorkflowTask(instanceId: string, taskId: string): Promise<void> {
+  unwrapApiResult(await apiFetch<void>(`/api/v1/workflow/instances/${instanceId}/tasks/${taskId}`, { method: 'DELETE' }));
+}
 export async function listWorkflowAttachmentsPage(instanceId: string, page: number): Promise<WorkflowPage<WorkflowAttachmentApiRecord>> {
   return unwrapApiResult(await apiFetch<WorkflowPage<WorkflowAttachmentApiRecord>>(`/api/v1/workflow/instances/${instanceId}/attachments?page=${page}&page_size=100`));
 }

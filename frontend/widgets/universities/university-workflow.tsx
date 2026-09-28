@@ -14,12 +14,13 @@ import History from '@atomaro/icons/24/communication/History';
 import InformationStroke from '@atomaro/icons/24/alert/InformationStroke';
 import SkipStroke from '@atomaro/icons/24/alert/SkipStroke';
 import TimeStroke from '@atomaro/icons/24/alert/TimeStroke';
+import Task from '@atomaro/icons/24/communication/Task';
 import { useAuth } from '@/shared/auth/AuthProvider';
 import { hasPermission, hasRole } from '@/shared/lib/access-control';
 import type { WorkflowTransitionTarget } from '@/shared/lib/workflow-transition';
 import { formatDateRu, formatDateTimeRu, getRelativeDueDateRu } from '@/shared/lib/formatters';
 import { workflowStageStatusSemantics, type WorkflowStageIcon } from '@/shared/lib/status-semantics';
-import { getApiUniversityWorkflow, getUniversityResponsibles, getUniversityWorkflow, getWorkflowAllowedTransitions, getWorkflowRollbackTargets, isRealWorkflowMode, listWorkflowAttachmentsPage, universityResponsiblesQueryKey, updateWorkflowResponsible, updateWorkflowStageDueDate, workflowQueryKey, type UniversityWorkflow, type UniversityWorkflowAttachment, type UniversityWorkflowStage, type UniversityWorkflowStageStatus } from '@/shared/lib/universities-repository';
+import { getApiUniversityWorkflow, getUniversityResponsibles, getUniversityWorkflow, getWorkflowAllowedTransitions, getWorkflowRollbackTargets, isRealWorkflowMode, listWorkflowTasksPage, listWorkflowAttachmentsPage, universityResponsiblesQueryKey, updateWorkflowResponsible, updateWorkflowStageDueDate, workflowQueryKey, type UniversityWorkflow, type UniversityWorkflowAttachment, type UniversityWorkflowStage, type UniversityWorkflowStageStatus, type UniversityWorkflowTask } from '@/shared/lib/universities-repository';
 import { queryKeys } from '@/shared/lib/query-keys';
 import { workflowAttachmentFromApi } from '@/shared/lib/workflow-attachments';
 import { buildMockWorkflowHistory, buildWorkflowHistory, loadWorkflowHistory, workflowHistoryPresentation, type WorkflowHistoryEvent } from '@/shared/lib/workflow-history';
@@ -40,6 +41,7 @@ import { ListSkeleton, Skeleton, SkeletonGroup } from '@/shared/ui/skeleton';
 import { Toast } from '@/shared/ui/rtk/toast';
 import { Modal } from '@/shared/ui/rtk/modal';
 import { WorkflowComments } from './workflow-comments';
+import { WorkflowStageTasks } from './workflow-stage-tasks';
 import { AttachmentRow, WorkflowAttachments } from './workflow-attachments';
 import { WorkflowCreateModal } from './workflow-create-modal';
 import { WorkflowTransitionModal, type WorkflowTransitionNotification } from './workflow-transition-modal';
@@ -96,11 +98,14 @@ function StageAssignee({ stage }: { stage: UniversityWorkflowStage }) {
 }
 
 function StageSummary({ stage }: { stage: UniversityWorkflowStage }) {
+  const totalTasks = stage.taskTotal ?? stage.tasks.length;
+  const completedTasks = stage.taskCompleted ?? stage.tasks.filter((task) => task.completed).length;
   const items = [
     { key: 'comments', icon: Comments, label: 'Комментарии', value: String(stage.comments.length) },
     { key: 'attachments', icon: Attachment, label: 'Вложения', value: String(stage.attachments.length) },
+    ...(totalTasks ? [{ key: 'tasks', icon: Task, label: 'Задачи', value: `${completedTasks}/${totalTasks}` }] : []),
   ];
-  if (!stage.comments.length && !stage.attachments.length) return null;
+  if (!stage.comments.length && !stage.attachments.length && !totalTasks) return null;
   return <div className={styles.stageSummary} aria-label="Сводка этапа">{items.map(({ key, icon: Icon, label, value }) => <span key={key}><Icon size={14} fill="currentColor" /><span>{label} {value}</span></span>)}</div>;
 }
 
@@ -157,14 +162,20 @@ type WorkflowResourceState = { loading: boolean; error: boolean; retry: () => vo
 const historyIcons = { transition: History, comment: Comments, attachment: Attachment, responsible_changed: History, deadline_changed: History };
 
 function WorkflowHistorySection({ idPrefix, instanceId, events, stages, userId, userName, state }: { idPrefix: string; instanceId: string; events: WorkflowHistoryEvent[]; stages: UniversityWorkflowStage[]; userId?: string; userName?: string; state?: WorkflowResourceState }) {
-  const names = [...new Set([...stages.map((stage) => stage.name), ...events.map((event) => event.stageName)])];
-  const currentName = stages.find((stage) => stage.status === 'current' || stage.status === 'overdue')?.name;
-  const orderedNames = [...names].sort((left, right) => Number(right === currentName) - Number(left === currentName));
-  return <section className={styles.detailSection} aria-labelledby={`${idPrefix}-transition-title`}><details className={styles.historyDisclosure}><summary id={`${idPrefix}-transition-title`}><History size={18} fill="currentColor" /><strong>История Workflow</strong><span>{events.length} событий</span></summary><div className={styles.historyGroups}>{state?.loading ? <ListSkeleton items={2} /> : state?.error ? <ErrorState title="Не удалось загрузить историю" headingLevel={3} onRetry={state.retry} /> : events.length ? orderedNames.map((name) => {
-    const group = events.filter((event) => event.stageName === name);
-    if (!group.length) return null;
-    const stage = stages.find((item) => item.name === name);
-    return <details className={styles.historyDisclosure} key={name}><summary><strong>{name}</strong><span>{name === currentName ? 'Текущий этап' : stage?.status === 'completed' ? 'Завершённый этап' : 'Этап'} · {group.length} событий</span></summary><ol className={styles.transitionList}>{group.map((event) => {
+  const currentStage = stages.find((stage) => stage.status === 'current' || stage.status === 'overdue');
+  const groups = new Map<string, { name: string; stage?: UniversityWorkflowStage; events: WorkflowHistoryEvent[] }>();
+  for (const stage of stages) groups.set(stage.id, { name: stage.name, stage, events: [] });
+  for (const event of events) {
+    const stage = event.stageId ? stages.find((candidate) => candidate.templateStageId === event.stageId || candidate.id === event.stageId) : undefined;
+    const key = stage?.id ?? `unassigned:${event.stageName}`;
+    const group = groups.get(key) ?? { name: event.stageName, events: [] };
+    group.events.push(event);
+    groups.set(key, group);
+  }
+  const orderedGroups = [...groups.entries()].filter(([, group]) => group.events.length).sort((left, right) => Number(right[1].stage?.id === currentStage?.id) - Number(left[1].stage?.id === currentStage?.id));
+  return <section className={styles.detailSection} aria-labelledby={`${idPrefix}-transition-title`}><details className={styles.historyDisclosure}><summary id={`${idPrefix}-transition-title`}><History size={18} fill="currentColor" /><strong>История Workflow</strong><span>{events.length} событий</span></summary><div className={styles.historyGroups}>{state?.loading ? <ListSkeleton items={2} /> : state?.error ? <ErrorState title="Не удалось загрузить историю" headingLevel={3} onRetry={state.retry} /> : events.length ? orderedGroups.map(([key, group]) => {
+    const { name, stage } = group;
+    return <details className={styles.historyDisclosure} key={key}><summary><strong>{name}</strong><span>{stage?.id === currentStage?.id ? 'Текущий этап' : stage?.status === 'completed' ? 'Завершённый этап' : 'Этап'} · {group.events.length} событий</span></summary><ol className={styles.transitionList}>{group.events.map((event) => {
       const presentation = workflowHistoryPresentation[event.kind];
       const Icon = historyIcons[presentation.icon];
       const actor = event.actorName ?? (event.actorId === userId ? userName : undefined);
@@ -173,7 +184,7 @@ function WorkflowHistorySection({ idPrefix, instanceId, events, stages, userId, 
   }) : <EmptyState title="Событий пока нет" description="История появится после первого действия." headingLevel={3} />}</div></details></section>;
 }
 
-function WorkflowStageDetails({ stage, stages, workflow, instanceId, universityId, userId, canManage, idPrefix, onTransitionOpen, onTransitionClose, onTransitionSuccess, onNotify, attachmentsState, historyState, historyEvents, historyActorName, allowedTargets, rollbackTargets }: { stage: UniversityWorkflowStage; stages: UniversityWorkflowStage[]; workflow: UniversityWorkflow; instanceId: string; universityId?: string | null; userId?: string | null; canManage: boolean; idPrefix: string; onTransitionOpen: () => void; onTransitionClose: () => void; onTransitionSuccess: () => void; onNotify: (notification: WorkflowTransitionNotification) => void; attachmentsState?: WorkflowResourceState; historyState?: WorkflowResourceState; historyEvents: WorkflowHistoryEvent[]; historyActorName?: string; allowedTargets?: WorkflowTransitionTarget[]; rollbackTargets?: WorkflowTransitionTarget[] }) {
+function WorkflowStageDetails({ stage, stages, workflow, instanceId, universityId, userId, canManage, idPrefix, onTransitionOpen, onTransitionClose, onTransitionSuccess, onNotify, tasksState, attachmentsState, historyState, historyEvents, historyActorName, allowedTargets, rollbackTargets }: { stage: UniversityWorkflowStage; stages: UniversityWorkflowStage[]; workflow: UniversityWorkflow; instanceId: string; universityId?: string | null; userId?: string | null; canManage: boolean; idPrefix: string; onTransitionOpen: () => void; onTransitionClose: () => void; onTransitionSuccess: () => void; onNotify: (notification: WorkflowTransitionNotification) => void; tasksState?: WorkflowResourceState; attachmentsState?: WorkflowResourceState; historyState?: WorkflowResourceState; historyEvents: WorkflowHistoryEvent[]; historyActorName?: string; allowedTargets?: WorkflowTransitionTarget[]; rollbackTargets?: WorkflowTransitionTarget[] }) {
   const semantics = workflowStageStatusSemantics[stage.status];
   const headingId = `${idPrefix}-stage-details-title`;
   return (
@@ -181,6 +192,7 @@ function WorkflowStageDetails({ stage, stages, workflow, instanceId, universityI
       <div className={styles.detailHeader}><div><h2 id={headingId}>{stage.name}</h2></div><StatusBadge intent={semantics.intent} icon={<StageStatusIcon status={stage.status} />}>{semantics.label}</StatusBadge></div>
       <CompletionSummary stage={stage} />
       <section className={styles.detailSection} aria-labelledby={`${idPrefix}-overview-title`}><div className={styles.detailSectionHeading}><h3 id={`${idPrefix}-overview-title`}><InformationStroke size={18} fill="currentColor" />Основная информация</h3></div><dl className={styles.detailFacts}><div><dt>{stage.status === 'completed' ? 'Дедлайн был' : 'Дедлайн'}</dt><dd className={stage.status === 'overdue' ? styles.overdue : undefined}><WorkflowDeadlineField instanceId={instanceId} stage={stage} canManage={canManage && workflow.currentStage?.id === stage.id && isRealWorkflowMode()} onNotify={onNotify} /></dd></div>{stage.startedAt ? <div><dt>Начат</dt><dd><time dateTime={stage.startedAt}>{formatDateTimeRu(stage.startedAt)}</time></dd></div> : null}{stage.completedAt && stage.status !== 'completed' ? <div><dt>Завершён</dt><dd><time dateTime={stage.completedAt}>{formatDateTimeRu(stage.completedAt)}</time></dd></div> : null}<div><dt>Ответственный Workflow</dt><dd><WorkflowResponsibleField instanceId={instanceId} workflow={workflow} canManage={canManage && workflow.currentStage?.id === stage.id && isRealWorkflowMode()} onNotify={onNotify} /></dd></div></dl></section>
+      <WorkflowStageTasks stage={stage} instanceId={instanceId} canEdit={canManage && isRealWorkflowMode()} state={tasksState} />
       <WorkflowComments instanceId={instanceId} stageId={stage.templateStageId ?? stage.id} comments={stage.comments} readOnly={stage.status !== 'current' && stage.status !== 'overdue'} onNotify={onNotify} />
       {attachmentsState?.loading ? <ListSkeleton items={2} /> : attachmentsState?.error ? <ErrorState title="Не удалось загрузить вложения" headingLevel={3} onRetry={attachmentsState.retry} /> : stage.attachments.length ? <><WorkflowAttachments instanceId={instanceId} stageId={stage.id} attachments={stage.attachments} uploadEnabled={false} readOnly={stage.status !== 'current' && stage.status !== 'overdue'} onNotify={onNotify} />{attachmentsState?.hasMore ? <Button variant="ghost" size="s" type="button" loading={attachmentsState.loadingMore} onClick={attachmentsState.loadMore}>Загрузить ещё вложения</Button> : null}</> : null}
       <WorkflowHistorySection idPrefix={idPrefix} instanceId={instanceId} events={historyEvents} stages={stages} userId={userId ?? undefined} userName={historyActorName} state={historyState} />
@@ -253,11 +265,12 @@ function WorkflowSkeleton({ mode }: { mode: WorkflowViewMode }) {
   return <SkeletonGroup label="Загрузка Workflow">{mode === 'page' ? <><Skeleton variant="text" width="220px" /><Skeleton variant="text" width="min(72%, 520px)" height={36} /><Skeleton height={96} /></> : null}<div className={styles.skeletonLayout}><ListSkeleton items={6} withAvatar /><Skeleton height={520} /></div></SkeletonGroup>;
 }
 
-function WorkflowGlobalResources({ instanceId, attachments, readOnly }: { instanceId: string; attachments: UniversityWorkflowAttachment[]; readOnly: boolean }) {
-  if (!attachments.length) return null;
+function WorkflowGlobalResources({ instanceId, tasks, attachments, readOnly }: { instanceId: string; tasks: UniversityWorkflowTask[]; attachments: UniversityWorkflowAttachment[]; readOnly: boolean }) {
+  if (!tasks.length && !attachments.length) return null;
   return <section className={styles.detailSection} aria-label="Общие материалы Workflow">
     <h2>Общие материалы Workflow</h2>
-    <WorkflowAttachments instanceId={instanceId} stageId="general" attachments={attachments} uploadEnabled={false} readOnly={readOnly} />
+    {tasks.length ? <><h3>Задачи без привязки к этапу</h3><ul className={styles.taskList}>{tasks.map((task) => <li key={task.id}><input type="checkbox" checked={task.completed} disabled readOnly /><span className={task.completed ? styles.taskCompleted : undefined}>{task.label}</span></li>)}</ul></> : null}
+    {attachments.length ? <WorkflowAttachments instanceId={instanceId} stageId="general" attachments={attachments} uploadEnabled={false} readOnly={readOnly} /> : null}
   </section>;
 }
 
@@ -265,6 +278,7 @@ export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride 
   const { user } = useAuth();
   const realWorkflow = isRealWorkflowMode();
   const query = useQuery({ queryKey: workflowQueryKey(instanceId), queryFn: () => getUniversityWorkflow(instanceId), staleTime: 30_000 });
+  const tasksQuery = useInfiniteQuery({ queryKey: queryKeys.universities.workflowTasks(instanceId), queryFn: ({ pageParam }) => listWorkflowTasksPage(instanceId, pageParam), initialPageParam: 1, getNextPageParam: (last) => last.page * last.page_size < last.total ? last.page + 1 : undefined, enabled: realWorkflow && Boolean(query.data), staleTime: 30_000 });
   const attachmentsQuery = useInfiniteQuery({ queryKey: queryKeys.universities.workflowAttachments(instanceId), queryFn: ({ pageParam }) => listWorkflowAttachmentsPage(instanceId, pageParam), initialPageParam: 1, getNextPageParam: (last) => last.page * last.page_size < last.total ? last.page + 1 : undefined, enabled: realWorkflow && Boolean(query.data), staleTime: 30_000 });
   const historyQuery = useQuery({ queryKey: queryKeys.universities.workflowHistory(instanceId), queryFn: () => loadWorkflowHistory(instanceId), enabled: realWorkflow && Boolean(query.data), staleTime: 30_000 });
   const allowedQuery = useQuery({ queryKey: queryKeys.universities.workflowAllowed(instanceId), queryFn: () => getWorkflowAllowedTransitions(instanceId), enabled: realWorkflow && Boolean(query.data), staleTime: 30_000 });
@@ -281,13 +295,15 @@ export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride 
   }, [notification]);
   const stages = useMemo(() => query.data?.stages.map((stage) => realWorkflow ? {
     ...stage,
+    tasks: (tasksQuery.data?.pages.flatMap((page) => page.items) ?? []).filter((task) => task.stage_id === stage.templateStageId).map((task) => ({ id: task.id, label: task.title, completed: task.status === 'done' })),
     attachments: (attachmentsQuery.data?.pages.flatMap((page) => page.items) ?? []).filter((attachment) => !attachment.comment_id && attachment.stage_id === stage.templateStageId).map((attachment) => workflowAttachmentFromApi(attachment, null)),
-  } : stage).sort((left, right) => left.orderIndex - right.orderIndex) ?? [], [query.data, realWorkflow, attachmentsQuery.data]);
+  } : stage).sort((left, right) => left.orderIndex - right.orderIndex) ?? [], [query.data, realWorkflow, tasksQuery.data, attachmentsQuery.data]);
   const historyEvents = useMemo(() => realWorkflow ? historyQuery.data ? buildWorkflowHistory(historyQuery.data, stages) : [] : buildMockWorkflowHistory(stages), [historyQuery.data, realWorkflow, stages]);
   const selectedStage = useMemo(() => {
     if (!stages.length) return null;
     return stages.find((stage) => stage.id === selectedId) ?? stages.find((stage) => stage.id === query.data?.currentStage?.id) ?? stages[0];
   }, [query.data?.currentStage, selectedId, stages]);
+  const commonTasks = useMemo(() => (tasksQuery.data?.pages.flatMap((page) => page.items) ?? []).filter((task) => !task.stage_id).map((task) => ({ id: task.id, label: task.title, completed: task.status === 'done' })), [tasksQuery.data]);
   const commonAttachments = useMemo(() => (attachmentsQuery.data?.pages.flatMap((page) => page.items) ?? []).filter((attachment) => !attachment.stage_id && !attachment.comment_id).map((attachment) => workflowAttachmentFromApi(attachment, null)), [attachmentsQuery.data]);
   const idPrefix = `workflow-${instanceId.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
   const detailsId = `${idPrefix}-details`;
@@ -303,9 +319,9 @@ export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride 
         <div className={styles.panelHeading}><div><h2 id={`${idPrefix}-stages-title`}>Этапы Workflow</h2></div><span className={styles.totalLabel}>{stages.length} этапов</span></div>
         <ol className={styles.stageList}>{stages.map((stage) => <WorkflowStageItem key={stage.id} stage={stage} selected={stage.id === selectedStage.id} detailsId={detailsId} onSelect={() => setSelectedId(stage.id)} />)}</ol>
       </section>
-      <WorkflowStageDetails key={selectedStage.id} stage={selectedStage} stages={stages} workflow={query.data} instanceId={instanceId} universityId={query.data.universityId} userId={user?.id} canManage={canManage} idPrefix={detailsId} onTransitionOpen={() => setSelectedId(selectedStage.id)} onTransitionClose={() => setSelectedId(null)} onTransitionSuccess={() => setSelectedId(null)} onNotify={setNotification} attachmentsState={realWorkflow ? { loading: attachmentsQuery.isPending, error: attachmentsQuery.isError && !attachmentsQuery.data, retry: () => void attachmentsQuery.refetch(), hasMore: attachmentsQuery.hasNextPage, loadingMore: attachmentsQuery.isFetchingNextPage, loadMore: () => void attachmentsQuery.fetchNextPage() } : undefined} historyState={realWorkflow ? { loading: historyQuery.isPending, error: historyQuery.isError && !historyQuery.data, retry: () => void historyQuery.refetch() } : undefined} historyEvents={historyEvents} historyActorName={user?.name} allowedTargets={allowedTargets} rollbackTargets={rollbackTargets} />
+      <WorkflowStageDetails key={selectedStage.id} stage={selectedStage} stages={stages} workflow={query.data} instanceId={instanceId} universityId={query.data.universityId} userId={user?.id} canManage={canManage} idPrefix={detailsId} onTransitionOpen={() => setSelectedId(selectedStage.id)} onTransitionClose={() => setSelectedId(null)} onTransitionSuccess={() => setSelectedId(null)} onNotify={setNotification} tasksState={realWorkflow ? { loading: tasksQuery.isPending, error: tasksQuery.isError && !tasksQuery.data, retry: () => void tasksQuery.refetch(), hasMore: tasksQuery.hasNextPage, loadingMore: tasksQuery.isFetchingNextPage, loadMore: () => void tasksQuery.fetchNextPage() } : undefined} attachmentsState={realWorkflow ? { loading: attachmentsQuery.isPending, error: attachmentsQuery.isError && !attachmentsQuery.data, retry: () => void attachmentsQuery.refetch(), hasMore: attachmentsQuery.hasNextPage, loadingMore: attachmentsQuery.isFetchingNextPage, loadMore: () => void attachmentsQuery.fetchNextPage() } : undefined} historyState={realWorkflow ? { loading: historyQuery.isPending, error: historyQuery.isError && !historyQuery.data, retry: () => void historyQuery.refetch() } : undefined} historyEvents={historyEvents} historyActorName={user?.name} allowedTargets={allowedTargets} rollbackTargets={rollbackTargets} />
     </div>
-    {realWorkflow ? <WorkflowGlobalResources instanceId={instanceId} attachments={commonAttachments} readOnly={!canManage || !query.data.currentStage || query.data.currentStage.status === 'completed'} /> : null}
+    {realWorkflow ? <WorkflowGlobalResources instanceId={instanceId} tasks={commonTasks} attachments={commonAttachments} readOnly={!canManage || !query.data.currentStage || query.data.currentStage.status === 'completed'} /> : null}
     {notification ? <div className={styles.toastViewport}><Toast intent={notification.intent} title={notification.title} message={notification.message} onClose={() => setNotification(null)} /></div> : null}
   </div>;
 }

@@ -107,6 +107,16 @@ class WorkflowTaskRead(BaseModel):
     updated_at: datetime
 
 
+class WorkflowTaskCreate(BaseModel):
+    stage_id: uuid.UUID
+    title: str = Field(min_length=1, max_length=512)
+
+
+class WorkflowTaskUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=512)
+    status: Literal["open", "done"] | None = None
+
+
 class AllowedTransitionRead(BaseModel):
     id: uuid.UUID
     order_index: int

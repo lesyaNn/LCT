@@ -24,12 +24,12 @@ from :mod:`overdue.compute_overdue`.
 from __future__ import annotations
 
 import uuid
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.exceptions import BadTransition, NotFound
+from app.core.exceptions import BadTransition, Conflict, NotFound
 from app.core.policies import apply_university_scope, ensure_university_access
 from app.models.catalog import ITProduct, ITProgram, Responsible, University, UniversityResponsible
 from app.models.external import ExternalApplication
@@ -270,6 +270,60 @@ def list_task_page(db: Session, instance_id: uuid.UUID, page: int, page_size: in
     rows = db.scalars(stmt.order_by(WorkflowTask.created_at.asc(), WorkflowTask.id)
                       .offset((page - 1) * page_size).limit(page_size)).all()
     return rows, total
+
+
+def _editable_task_stage(instance: WorkflowInstance, stage_id: uuid.UUID | None) -> None:
+    """Tasks belong to template stages; only the current runtime stage is writable."""
+    current = next((stage for stage in instance.instance_stages
+                    if stage.id == instance.current_instance_stage_id), None)
+    if instance.status != "active" or current is None or current.status == "completed":
+        raise Conflict("Задачи завершённого Workflow изменять нельзя")
+    if stage_id is not None and current.template_stage_id != stage_id:
+        raise Conflict("Задачи другого этапа изменять нельзя")
+
+
+def create_task(db: Session, instance_id: uuid.UUID, stage_id: uuid.UUID, title: str) -> WorkflowTask:
+    instance = get_instance_or_404(db, instance_id)
+    _editable_task_stage(instance, stage_id)
+    cleaned = title.strip()
+    if not cleaned:
+        raise Conflict("Введите название задачи")
+    task = WorkflowTask(instance_id=instance_id, stage_id=stage_id,
+                        title=cleaned, description="", status="open")
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+    return task
+
+
+def update_task(db: Session, instance_id: uuid.UUID, task_id: uuid.UUID,
+                *, title: str | None, status: str | None) -> WorkflowTask:
+    instance = get_instance_or_404(db, instance_id)
+    task = db.get(WorkflowTask, task_id)
+    if task is None or task.instance_id != instance_id:
+        raise NotFound("Задача не найдена")
+    _editable_task_stage(instance, task.stage_id)
+    if title is not None:
+        cleaned = title.strip()
+        if not cleaned:
+            raise Conflict("Введите название задачи")
+        task.title = cleaned
+    if status is not None:
+        task.status = status
+        task.completed_at = datetime.now(timezone.utc) if status == "done" else None
+    db.commit()
+    db.refresh(task)
+    return task
+
+
+def delete_task(db: Session, instance_id: uuid.UUID, task_id: uuid.UUID) -> None:
+    instance = get_instance_or_404(db, instance_id)
+    task = db.get(WorkflowTask, task_id)
+    if task is None or task.instance_id != instance_id:
+        raise NotFound("Задача не найдена")
+    _editable_task_stage(instance, task.stage_id)
+    db.delete(task)
+    db.commit()
 
 
 def create_instance(

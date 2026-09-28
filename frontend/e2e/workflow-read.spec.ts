@@ -38,11 +38,39 @@ function instance() {
 
 function stubReads(page: Page) {
   const calls = new Map<string, number>();
+  const taskRows = [
+    { id: 'aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaaa', instance_id: instanceId, stage_id: firstTemplateStage, title: 'Завершённая задача', status: 'done', responsible_id: null, deadline: null, completed_at: now },
+    { id: 'aaaaaaa2-aaaa-4aaa-8aaa-aaaaaaaaaaaa', instance_id: instanceId, stage_id: secondTemplateStage, title: 'Открытая задача', status: 'open', responsible_id: null, deadline: null, completed_at: null },
+  ];
+  const instanceWithTasks = () => {
+    const record = instance();
+    record.stages = record.stages.map((stage) => ({ ...stage, tasks_total: taskRows.filter((task) => task.stage_id === stage.template_stage_id).length, tasks_completed: taskRows.filter((task) => task.stage_id === stage.template_stage_id && task.status === 'done').length }));
+    return record;
+  };
   void page.route('**/api/v1/**', async (route) => {
-    if (route.request().method() !== 'GET') return route.continue();
+    const method = route.request().method();
     const url = new URL(route.request().url());
     const path = url.pathname;
     let body: unknown;
+    if (path.startsWith(`/api/v1/workflow/instances/${instanceId}/tasks`) && method !== 'GET') {
+      const id = path.split('/').at(-1);
+      if (method === 'POST') {
+        const input = route.request().postDataJSON() as { stage_id: string; title: string };
+        const task = { id: 'aaaaaaa3-aaaa-4aaa-8aaa-aaaaaaaaaaaa', instance_id: instanceId, stage_id: input.stage_id, title: input.title, status: 'open', responsible_id: null, deadline: null, completed_at: null };
+        taskRows.push(task);
+        return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(task) });
+      }
+      const task = taskRows.find((row) => row.id === id);
+      if (method === 'PATCH' && task) {
+        Object.assign(task, route.request().postDataJSON());
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(task) });
+      }
+      if (method === 'DELETE' && task) {
+        taskRows.splice(taskRows.indexOf(task), 1);
+        return route.fulfill({ status: 204 });
+      }
+    }
+    if (method !== 'GET') return route.continue();
     if (path === `/api/v1/universities/${universityId}/passport`) body = {
       university: { id: universityId, name: 'Тестовый ВУЗ', city: 'Москва' },
       programs: [],
@@ -54,12 +82,9 @@ function stubReads(page: Page) {
       { id: firstProgram, name: 'Программа А', direction_name: 'ИТ', status: 'active', launch_date: null, responsible_name: null },
       { id: secondProgram, name: 'Программа Б', direction_name: 'ИТ', status: 'planned', launch_date: null, responsible_name: null },
     ], page: 1, page_size: 100, total: 2 };
-    else if (path === '/api/v1/workflow/instances') body = { items: [instance()], page: 1, page_size: 100, total: 1 };
-    else if (path === `/api/v1/workflow/instances/${instanceId}`) body = instance();
-    else if (path === `/api/v1/workflow/instances/${instanceId}/tasks`) body = { items: [
-      { id: 'aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaaa', instance_id: instanceId, stage_id: firstTemplateStage, title: 'Завершённая задача', status: 'done', responsible_id: null, deadline: null, completed_at: now },
-      { id: 'aaaaaaa2-aaaa-4aaa-8aaa-aaaaaaaaaaaa', instance_id: instanceId, stage_id: secondTemplateStage, title: 'Открытая задача', status: 'open', responsible_id: null, deadline: null, completed_at: null },
-    ], page: 1, page_size: 100, total: 2 };
+    else if (path === '/api/v1/workflow/instances') body = { items: [instanceWithTasks()], page: 1, page_size: 100, total: 1 };
+    else if (path === `/api/v1/workflow/instances/${instanceId}`) body = instanceWithTasks();
+    else if (path === `/api/v1/workflow/instances/${instanceId}/tasks`) body = { items: taskRows, page: 1, page_size: 100, total: taskRows.length };
     else if (path === `/api/v1/workflow/instances/${instanceId}/comments`) body = { items: [
       { id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', instance_id: instanceId, stage_id: secondTemplateStage, author_keycloak_sub: 'author-sub', content: 'Реальный комментарий', is_internal: true, created_at: now, updated_at: now },
     ], page: 1, page_size: 100, total: 1 };
@@ -88,7 +113,22 @@ test('Workflow lists university instances and never commits mock mutations', asy
   await page.getByRole('link', { name: /Программа А/ }).click();
   await page.waitForURL((url) => url.pathname === `/workflows/${instanceId}`);
   await expect(page.getByText('Запуск', { exact: true }).first()).toBeVisible();
-  await expect(page.getByText('Задачи этапа')).toHaveCount(0);
+  await expect(page.getByText('Открытая задача')).toBeVisible();
+  await page.getByRole('button', { name: '+ Добавить задачу' }).click();
+  await page.getByRole('textbox', { name: 'Новая задача' }).fill('Проверить договор');
+  await page.getByRole('button', { name: 'Добавить', exact: true }).click();
+  await expect(page.getByText('Проверить договор')).toBeVisible();
+  await expect(page.getByText('0 из 2 выполнено')).toBeVisible();
+  await page.getByRole('checkbox', { name: 'Выполнено: Проверить договор' }).check();
+  await expect(page.getByText('1 из 2 выполнено')).toBeVisible();
+  const createdTask = page.getByRole('listitem').filter({ hasText: 'Проверить договор' });
+  await createdTask.getByRole('button', { name: 'Изменить' }).click();
+  await createdTask.getByRole('textbox', { name: 'Название задачи' }).fill('Проверить лицензию');
+  await createdTask.getByRole('button', { name: 'Сохранить' }).click();
+  await expect(page.getByText('Проверить лицензию')).toBeVisible();
+  await page.getByRole('listitem').filter({ hasText: 'Проверить лицензию' }).getByRole('button', { name: 'Удалить' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Удалить' }).click();
+  await expect(page.getByText('Проверить лицензию')).toHaveCount(0);
   await page.locator('details').filter({ has: page.getByText('История Workflow', { exact: true }) }).first().locator('summary').first().click();
   await page.locator('details details').filter({ has: page.getByText('Запуск', { exact: true }) }).first().locator('summary').click();
   await expect(page.getByText('Реальный комментарий')).toBeVisible();
@@ -96,7 +136,7 @@ test('Workflow lists university instances and never commits mock mutations', asy
   await expect(page.getByText('Доступные переходы')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Перевести на следующий этап' })).toHaveCount(0);
   await page.getByRole('button', { name: /Подготовка/ }).first().click();
-  await expect(page.getByText('Задачи этапа')).toHaveCount(0);
+  await expect(page.getByText('Завершённая задача')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Сохранить' })).toHaveCount(0);
   await page.getByRole('button', { name: /Запуск/ }).first().click();
   const download = page.waitForEvent('download');

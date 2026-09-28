@@ -12,6 +12,7 @@ export const workflowHistoryPresentation: Record<WorkflowHistoryKind, { label: s
 
 export type WorkflowHistoryEvent = {
   id: string;
+  stageId?: string | null;
   kind: WorkflowHistoryKind;
   occurredAt: string;
   actorId: string;
@@ -47,19 +48,19 @@ export function buildWorkflowHistory(
   const stageNames = new Map(stages.map((stage) => [stage.templateStageId ?? stage.id, stage.name]));
   const stageName = (id: string | null) => id ? stageNames.get(id) ?? 'Этап Workflow' : 'Весь Workflow';
   const transitions: WorkflowHistoryEvent[] = source.transitions.map((event) => ({
-    id: `transition:${event.id}`, kind: 'transition', occurredAt: event.created_at,
+    id: `transition:${event.id}`, stageId: event.to_stage_id, kind: 'transition', occurredAt: event.created_at,
     actorId: event.actor_keycloak_sub, stageName: stageName(event.to_stage_id),
     title: `${event.from_stage_id ? stageName(event.from_stage_id) : 'Создание'} → ${event.to_stage_id ? stageName(event.to_stage_id) : 'Завершение'}`,
     text: event.comment || undefined, attachments: [],
   }));
   const comments: WorkflowHistoryEvent[] = source.comments.map((event) => ({
-    id: `comment:${event.id}`, kind: 'comment', occurredAt: event.created_at,
+    id: `comment:${event.id}`, stageId: event.stage_id, kind: 'comment', occurredAt: event.created_at,
     actorId: event.author_keycloak_sub, stageName: stageName(event.stage_id),
     title: workflowHistoryPresentation.comment.label, text: event.content,
     attachments: event.attachments ?? source.attachments.filter((attachment) => attachment.comment_id === event.id),
   }));
   const attachments: WorkflowHistoryEvent[] = source.attachments.filter((event) => !event.comment_id).map((event) => ({
-    id: `attachment:${event.id}`, kind: 'attachment', occurredAt: event.created_at,
+    id: `attachment:${event.id}`, stageId: event.stage_id, kind: 'attachment', occurredAt: event.created_at,
     actorId: event.uploaded_by_keycloak_sub, stageName: stageName(event.stage_id),
     title: workflowHistoryPresentation.attachment.label, attachments: [event],
   }));
@@ -73,7 +74,7 @@ export function buildWorkflowHistory(
 
 export function buildMockWorkflowHistory(stages: UniversityWorkflowStage[]): WorkflowHistoryEvent[] {
   return stages.flatMap((stage) => stage.transitions.map((event) => ({
-    id: `transition:${event.id}`, kind: 'transition' as const,
+    id: `transition:${event.id}`, stageId: stage.id, kind: 'transition' as const,
     occurredAt: event.occurredAt, actorId: '', actorName: event.actor,
     stageName: stage.name,
     title: event.description ?? `${stage.name}: ${event.fromStatus} → ${event.toStatus}`,

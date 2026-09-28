@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
 from app.core.permissions import require_permission, user_permissions
@@ -31,6 +31,8 @@ from app.modules.workflow_instances.schemas import (
     InstanceStageDueDateUpdate,
     WorkflowActivityRead,
     WorkflowTaskRead,
+    WorkflowTaskCreate,
+    WorkflowTaskUpdate,
     AllowedTransitionRead,
 )
 from app.schemas.common import PaginatedResponse
@@ -175,6 +177,44 @@ def list_workflow_tasks(
     service.authorize_scope(user, instance)
     rows, total = service.list_task_page(db, instance_id, page, page_size)
     return PaginatedResponse(items=[WorkflowTaskRead.model_validate(row) for row in rows], page=page, page_size=page_size, total=total)
+
+
+@router.post("/instances/{instance_id}/tasks", response_model=WorkflowTaskRead, status_code=201)
+def create_workflow_task(
+    instance_id: uuid.UUID,
+    data: WorkflowTaskCreate,
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(WRITE),
+) -> WorkflowTaskRead:
+    instance = service.get_instance_or_404(db, instance_id)
+    service.authorize_scope(user, instance)
+    return WorkflowTaskRead.model_validate(service.create_task(db, instance_id, data.stage_id, data.title))
+
+
+@router.patch("/instances/{instance_id}/tasks/{task_id}", response_model=WorkflowTaskRead)
+def update_workflow_task(
+    instance_id: uuid.UUID,
+    task_id: uuid.UUID,
+    data: WorkflowTaskUpdate,
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(WRITE),
+) -> WorkflowTaskRead:
+    instance = service.get_instance_or_404(db, instance_id)
+    service.authorize_scope(user, instance)
+    return WorkflowTaskRead.model_validate(service.update_task(db, instance_id, task_id, title=data.title, status=data.status))
+
+
+@router.delete("/instances/{instance_id}/tasks/{task_id}", status_code=204)
+def delete_workflow_task(
+    instance_id: uuid.UUID,
+    task_id: uuid.UUID,
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(WRITE),
+) -> Response:
+    instance = service.get_instance_or_404(db, instance_id)
+    service.authorize_scope(user, instance)
+    service.delete_task(db, instance_id, task_id)
+    return Response(status_code=204)
 
 
 @router.get("/instances/{instance_id}/allowed-transitions", response_model=list[AllowedTransitionRead])
