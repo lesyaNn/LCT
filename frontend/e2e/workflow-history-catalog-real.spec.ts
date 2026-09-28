@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { createIsolatedWorkflow, loginForWorkflowE2E, validTestPdf } from './workflow-isolated-fixture';
 
 async function login(page: Page, username = process.env.E2E_ADMIN_USERNAME ?? '', password = process.env.E2E_ADMIN_PASSWORD ?? '') {
   await page.goto('/login');
@@ -10,17 +11,18 @@ async function login(page: Page, username = process.env.E2E_ADMIN_USERNAME ?? ''
   await page.waitForURL((url) => url.pathname === '/dashboard');
 }
 
-test('full Workflow history, comment edit with file, and shared modals', async ({ page, browser }) => {
-  const instanceId = process.env.E2E_WORKFLOW_INSTANCE_ID;
-  test.skip(!instanceId || !process.env.E2E_ADMIN_USERNAME || !process.env.E2E_ADMIN_PASSWORD);
-  await login(page);
+test('full Workflow history, comment edit with file, and shared modals', async ({ page, browser, request }) => {
+  test.skip(process.env.E2E_DISPOSABLE_DB !== '1' || !process.env.E2E_WORKFLOW_UNIVERSITY_ID || !process.env.E2E_ADMIN_USERNAME || !process.env.E2E_ADMIN_PASSWORD,
+    'Requires a disposable real DB, university, and E2E_ADMIN credentials.');
+  const authorization = await loginForWorkflowE2E(page);
+  const instanceId = await createIsolatedWorkflow(request, authorization);
   await page.goto(`/workflows/${instanceId}`);
   const history = page.locator('section[aria-labelledby$="-transition-title"]');
   await expect(history.locator('summary').first()).toContainText('История Workflow');
   const events = history.locator('ol > li');
   await expect(events.first()).toBeAttached();
   const before = await events.count();
-  expect(before).toBeGreaterThanOrEqual(3);
+  expect(before).toBeGreaterThanOrEqual(1);
   await expect(history.getByText('Этап изменён').first()).toBeAttached();
   const stageButtons = page.locator('section[aria-labelledby$="-stages-title"] button');
   await stageButtons.first().click();
@@ -32,7 +34,7 @@ test('full Workflow history, comment edit with file, and shared modals', async (
   const comments = page.locator('section[aria-labelledby$="-comments-title"]');
   const marker = `history-${Date.now()}`;
   await comments.getByRole('textbox', { name: 'Добавить комментарий' }).fill(marker);
-  await comments.locator('input[type="file"]').setInputFiles({ name: `${marker}.pdf`, mimeType: 'application/pdf', buffer: Buffer.from('history file') });
+  await comments.locator('input[type="file"]').setInputFiles({ name: `${marker}.pdf`, mimeType: 'application/pdf', buffer: validTestPdf('history file') });
   await comments.getByRole('button', { name: 'Отправить' }).click();
   await expect(comments.getByText(marker, { exact: true })).toBeVisible();
   await history.locator('details').first().locator('summary').first().click();
@@ -87,6 +89,27 @@ test('full Workflow history, comment edit with file, and shared modals', async (
       await dialog.getByRole('button', { name: 'Закрыть' }).click();
     }
   }
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const overview = page.locator('section[aria-labelledby$="-overview-title"]');
+  await overview.getByRole('button', { name: /Установить дедлайн|Редактировать дедлайн/ }).click();
+  const deadlineDialog = page.getByRole('dialog', { name: 'Дедлайн этапа' });
+  await deadlineDialog.getByLabel('Дата').fill('2027-12-31');
+  await deadlineDialog.getByRole('button', { name: 'Сохранить' }).click();
+  await expect(history.getByText(/Дедлайн изменён · Demo Admin/)).toBeAttached();
+
+  await overview.getByRole('button', { name: /Назначить ответственного|Редактировать ответственного/ }).click();
+  const responsibleDialog = page.getByRole('dialog', { name: 'Ответственный Workflow' });
+  await responsibleDialog.getByLabel('Ответственный').selectOption({ index: 1 });
+  await responsibleDialog.getByRole('button', { name: 'Сохранить' }).click();
+  await expect(history.getByText(/Ответственный изменён · Demo Admin/)).toBeAttached();
+
+  await page.getByRole('button', { name: 'Перевести на следующий этап' }).click();
+  const transitionDialog = page.getByRole('dialog', { name: 'Перевести на следующий этап' });
+  await transitionDialog.getByRole('textbox', { name: 'Комментарий' }).fill('Этап завершён в реальном E2E');
+  await transitionDialog.getByRole('button', { name: 'Перевести', exact: true }).click();
+  await expect(page.getByTestId('workflow-current-stage')).toBeVisible();
+  await expect(history.getByText(/Этап изменён · Demo Admin/).first()).toBeAttached();
 });
 
 test('contract and license filters use backend status and university params', async ({ page }) => {

@@ -51,6 +51,18 @@ Artifacts are written to `test-results/` and `playwright-report/`. Five named
 checkpoint screenshots are attached on successful runs; failure screenshot,
 video, and trace are retained automatically.
 
+## Comment attachments and Workflow history
+
+`comment-attachments-real.spec.ts` and the mutating history test require
+`E2E_DISPOSABLE_DB=1`, `E2E_WORKFLOW_UNIVERSITY_ID`, `E2E_ADMIN_USERNAME`,
+`E2E_ADMIN_PASSWORD`, `E2E_BASE_URL`, and `E2E_API_URL`. Run them only against a
+separate Compose project with its own database and Keycloak volumes. Each test
+creates a unique program and Workflow via the real API, then drives the browser
+through the real frontend and backend. PDF uploads contain valid PDF bytes.
+Dispose of the test project and its volumes after the run. These tests skip
+when the disposable DB flag or credentials are absent; a skipped test is not
+evidence of real E2E success.
+
 ## Admin Users / RBAC integration
 
 `admin-users-real.spec.ts` checks real Keycloak login for admin, manager, and

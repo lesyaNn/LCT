@@ -108,3 +108,36 @@ def test_failed_second_file_rolls_back_comment_and_first_file(setup, monkeypatch
         assert db.scalars(select(WorkflowComment).where(WorkflowComment.content == "Не сохранять")).all() == []
         assert db.scalars(select(WorkflowAttachment).where(WorkflowAttachment.instance_id == instance_id)).all() == []
     assert [item for item in storage.root.iterdir() if item.is_file()] == []
+
+
+def test_university_history_hides_deleted_attachment_audit_metadata(setup):
+    client, engine, storage, instance_id = setup
+    base = f"/api/v1/workflow/instances/{instance_id}"
+    uploaded = client.post(
+        f"{base}/attachments",
+        files={"file": ("history.pdf", b"%PDF-1.4\n%%EOF", "application/pdf")},
+    )
+    assert uploaded.status_code == 201, uploaded.text
+    attachment_id = uploaded.json()["id"]
+    with Session(engine) as db:
+        university_id = db.get(WorkflowInstance, instance_id).university_id
+    history_url = f"/api/v1/universities/{university_id}/history"
+    before = client.get(history_url)
+    assert before.status_code == 200, before.text
+    assert any(item.get("attachment", {}).get("attachment_id") == attachment_id
+               for item in before.json() if item.get("attachment"))
+
+    with Session(engine) as db:
+        storage_key = db.get(WorkflowAttachment, attachment_id).storage_key
+    storage.delete(storage_key)
+    missing = client.get(history_url)
+    assert missing.status_code == 200, missing.text
+    assert not any(item.get("attachment", {}).get("attachment_id") == attachment_id
+                   for item in missing.json() if item.get("attachment"))
+
+    deleted = client.delete(f"{base}/attachments/{attachment_id}")
+    assert deleted.status_code == 204, deleted.text
+    after = client.get(history_url)
+    assert after.status_code == 200, after.text
+    assert not any(item.get("attachment", {}).get("attachment_id") == attachment_id
+                   for item in after.json() if item.get("attachment"))
