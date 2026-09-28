@@ -72,6 +72,15 @@ def test_comment_files_persist_and_download(setup):
     listed = client.get(f"{base}/comments")
     assert listed.status_code == 200
     assert len(next(item for item in listed.json()["items"] if item["id"] == record["id"])["attachments"]) == 2
+    edited = client.patch(f"/api/v1/workflow/comments/{record['id']}", json={"content": "Исправленный текст"})
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["content"] == "Исправленный текст"
+    assert {item["id"] for item in edited.json()["attachments"]} == {item["id"] for item in record["attachments"]}
+    assert edited.json()["created_at"] == record["created_at"]
+    assert edited.json()["author_keycloak_sub"] == record["author_keycloak_sub"]
+    with Session(engine) as db:
+        assert db.get(WorkflowComment, record["id"]).content == "Исправленный текст"
+        assert len(db.scalars(select(WorkflowAttachment).where(WorkflowAttachment.comment_id == record["id"])).all()) == 2
     attachment_id = record["attachments"][0]["id"]
     downloaded = client.get(f"{base}/attachments/{attachment_id}/download")
     assert downloaded.status_code == 200

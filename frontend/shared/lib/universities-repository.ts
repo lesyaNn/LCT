@@ -627,6 +627,7 @@ export async function listWorkflowInstancePage(page: number, pageSize = 100): Pr
 export interface WorkflowTaskApiRecord { id: string; instance_id: string; stage_id: string | null; title: string; status: string; responsible_id: string | null; deadline: string | null; completed_at: string | null }
 export interface WorkflowAttachmentApiRecord { id: string; instance_id: string; stage_id: string | null; comment_id?: string | null; original_filename: string; mime_type: string; file_size: number; uploaded_by_keycloak_sub: string; created_at: string; updated_at: string }
 export interface WorkflowTransitionApiRecord { id: string; instance_id: string; from_stage_id: string | null; to_stage_id: string | null; actor_keycloak_sub: string; comment: string; created_at: string }
+export interface WorkflowActivityApiRecord { id: string; type: 'responsible_changed' | 'deadline_changed'; created_at: string; actor_name: string; stage_name: string; title: string }
 export interface WorkflowAllowedApiRecord { id: string; name: string; order_index: number }
 
 export async function listWorkflowTasksPage(instanceId: string, page: number): Promise<WorkflowPage<WorkflowTaskApiRecord>> {
@@ -637,6 +638,9 @@ export async function listWorkflowAttachmentsPage(instanceId: string, page: numb
 }
 export async function listWorkflowHistory(instanceId: string): Promise<WorkflowTransitionApiRecord[]> {
   return unwrapApiResult(await apiFetch<WorkflowTransitionApiRecord[]>(`/api/v1/workflow/instances/${instanceId}/transitions`));
+}
+export async function listWorkflowActivity(instanceId: string): Promise<WorkflowActivityApiRecord[]> {
+  return unwrapApiResult(await apiFetch<WorkflowActivityApiRecord[]>(`/api/v1/workflow/instances/${instanceId}/activity`));
 }
 export async function getWorkflowAllowedTransitions(instanceId: string): Promise<WorkflowAllowedApiRecord[]> {
   return unwrapApiResult(await apiFetch<WorkflowAllowedApiRecord[]>(`/api/v1/workflow/instances/${instanceId}/allowed-transitions`));

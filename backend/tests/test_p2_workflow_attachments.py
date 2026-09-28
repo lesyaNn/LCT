@@ -432,6 +432,7 @@ def test_small_upload_metadata_download_delete(client, db, backend, storage_dir)
     assert d.headers["Content-Type"] == "application/pdf"
     assert d.headers["Content-Length"] == str(len(payload))
     assert d.headers["Content-Disposition"].startswith("attachment; ")
+    assert d.headers["X-Content-Type-Options"] == "nosniff"
 
     # --- delete: row + object gone
     assert len(_stored_files(storage_dir)) == 1

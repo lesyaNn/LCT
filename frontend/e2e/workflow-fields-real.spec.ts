@@ -30,6 +30,8 @@ test('Workflow responsible and current-stage due date persist after reload', asy
   await responsibleDialog.getByRole('combobox').selectOption(first!);
   await responsibleDialog.getByRole('button', { name: 'Сохранить' }).click();
   await expect(responsibleDialog).toHaveCount(0);
+  const history = page.locator('section[aria-labelledby$="-transition-title"]');
+  await expect(history.getByText('Ответственный изменён').first()).toBeVisible();
   await page.reload();
   await expect(responsible.getByRole('button', { name: 'Изменить' })).toBeVisible();
   await responsible.getByRole('button', { name: 'Изменить' }).click();
@@ -47,6 +49,7 @@ test('Workflow responsible and current-stage due date persist after reload', asy
   if (!originalDate) await expect(deadline.getByText('Не установлен')).toBeVisible();
   await dateDialog.locator('input[type="date"]').fill('2030-10-15');
   await dateDialog.getByRole('button', { name: 'Сохранить' }).click();
+  await expect(history.getByText('Дедлайн изменён').first()).toBeVisible();
   await page.reload();
   await expect(deadline.getByRole('button', { name: 'Изменить' })).toBeVisible();
   await deadline.getByRole('button', { name: 'Изменить' }).click();

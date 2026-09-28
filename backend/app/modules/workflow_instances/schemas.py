@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -27,6 +28,15 @@ class InstanceResponsibleUpdate(BaseModel):
 
 class InstanceStageDueDateUpdate(BaseModel):
     due_date: date | None
+
+
+class WorkflowActivityRead(BaseModel):
+    id: uuid.UUID
+    type: Literal["responsible_changed", "deadline_changed"]
+    created_at: datetime
+    actor_name: str
+    stage_name: str
+    title: str
 
 
 class InstanceStageRead(BaseModel):

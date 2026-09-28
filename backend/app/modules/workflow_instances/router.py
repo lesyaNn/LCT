@@ -29,6 +29,7 @@ from app.modules.workflow_instances.schemas import (
     InstanceDetail,
     InstanceResponsibleUpdate,
     InstanceStageDueDateUpdate,
+    WorkflowActivityRead,
     WorkflowTaskRead,
     AllowedTransitionRead,
 )
@@ -108,6 +109,21 @@ def get_workflow_instance(
     detail = service.get_instance_detail(db, instance_id)
     service.authorize_scope(user, detail)
     return detail
+
+
+@router.get(
+    "/instances/{instance_id}/activity",
+    response_model=list[WorkflowActivityRead],
+    summary="Read scoped user-facing workflow field changes",
+)
+def get_workflow_activity(
+    instance_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(READ),
+) -> list[WorkflowActivityRead]:
+    instance = service.get_instance_or_404(db, instance_id)
+    service.authorize_scope(user, instance)
+    return service.list_workflow_activity(db, instance_id)
 
 
 @router.patch(

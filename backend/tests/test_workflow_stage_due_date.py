@@ -66,6 +66,14 @@ def test_current_stage_due_date_round_trip_and_wrong_stage_rejected(setup):
     changed = client.patch(path, json={"due_date": "2026-10-20"})
     assert changed.status_code == 200, changed.text
     assert changed.json()["stages"][0]["due_date"] == "2026-10-20"
+    activity = client.get(f"/api/v1/workflow/instances/{instance_id}/activity")
+    assert activity.status_code == 200, activity.text
+    deadline_changes = [item for item in activity.json() if item["type"] == "deadline_changed"]
+    assert len(deadline_changes) == 2
+    assert deadline_changes[-1]["title"] == "15.10.2026 → 20.10.2026"
+    assert deadline_changes[-1]["stage_name"] == "Current"
+    assert "stage_id" not in deadline_changes[-1]
+    assert "old_value" not in deadline_changes[-1]
     denied = client.patch(f"/api/v1/workflow/instances/{instance_id}/stages/{other_stage_id}/due-date", json={"due_date": "2026-10-21"})
     assert denied.status_code in (400, 409), denied.text
     with Session(engine) as db:
@@ -80,3 +88,4 @@ def test_current_stage_due_date_round_trip_and_wrong_stage_rejected(setup):
     settings.auth_dev_bypass = False
     unauthorized = client.patch(path, json={"due_date": "2026-10-22"})
     assert unauthorized.status_code == 401
+    assert client.get(f"/api/v1/workflow/instances/{instance_id}/activity").status_code == 401

@@ -43,7 +43,69 @@ from app.models.workflow_instances import (
 from app.models.workflow_templates import WorkflowStage, WorkflowTemplate
 
 from .overdue import compute_overdue, today_utc
-from .schemas import InstanceDetail, InstanceStageRead
+from .schemas import InstanceDetail, InstanceStageRead, WorkflowActivityRead
+
+
+def list_workflow_activity(db: Session, instance_id: uuid.UUID) -> list[WorkflowActivityRead]:
+    """Project only known field changes from the security ledger for user history."""
+    from app.modules.audit.models import AuditEvent
+    from app.modules.audit.presentation import actor_display_name, is_uuid_like
+
+    instance = get_instance_or_404(db, instance_id)
+    stage_names = {str(stage.id): stage.name for stage in instance.instance_stages}
+    rows = db.scalars(
+        select(AuditEvent)
+        .where(AuditEvent.entity_type == "workflow_instance",
+               AuditEvent.entity_id == instance_id,
+               AuditEvent.action == "UPDATE")
+        .order_by(AuditEvent.created_at.asc(), AuditEvent.id.asc())
+    ).all()
+    responsible_ids: set[uuid.UUID] = set()
+    for row in rows:
+        for value in (row.old_value, row.new_value):
+            if isinstance(value, dict) and value.get("responsible_id"):
+                try:
+                    responsible_ids.add(uuid.UUID(str(value["responsible_id"])))
+                except (ValueError, TypeError):
+                    pass
+    names = dict(db.execute(select(Responsible.id, Responsible.full_name).where(Responsible.id.in_(responsible_ids))).all()) if responsible_ids else {}
+
+    def responsible_name(raw: object) -> str:
+        if not raw:
+            return "Не назначен"
+        try:
+            return names.get(uuid.UUID(str(raw)), "Ответственный (запись недоступна)")
+        except (ValueError, TypeError):
+            return "Ответственный (запись недоступна)"
+
+    def date_label(raw: object) -> str:
+        if not raw:
+            return "Не установлен"
+        try:
+            return date.fromisoformat(str(raw)).strftime("%d.%m.%Y")
+        except ValueError:
+            return "Дата недоступна"
+
+    events: list[WorkflowActivityRead] = []
+    for row in rows:
+        old = row.old_value if isinstance(row.old_value, dict) else {}
+        new = row.new_value if isinstance(row.new_value, dict) else {}
+        if "responsible_id" in new and old.get("responsible_id") != new.get("responsible_id"):
+            kind = "responsible_changed"
+            title = f"{responsible_name(old.get('responsible_id'))} → {responsible_name(new.get('responsible_id'))}"
+            stage_name = "Весь Workflow"
+        elif "due_date" in new and old.get("due_date") != new.get("due_date"):
+            kind = "deadline_changed"
+            title = f"{date_label(old.get('due_date'))} → {date_label(new.get('due_date'))}"
+            stage_name = stage_names.get(str(new.get("stage_id")), "Этап Workflow")
+        else:
+            continue
+        events.append(WorkflowActivityRead(
+            id=row.id, type=kind, created_at=row.created_at,
+            actor_name=("Системное действие" if is_uuid_like(row.user_name) else actor_display_name(row.user_name, row.user_id)),
+            stage_name=stage_name, title=title,
+        ))
+    return events
 
 
 def authorize_scope(user, instance) -> None:

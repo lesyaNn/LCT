@@ -212,8 +212,6 @@ def _comment_snapshot(comment) -> dict[str, Any]:
         "audit_object_type": "workflow_comment",
         "instance_id": comment.instance_id,
         "stage_id": comment.stage_id,
-        "author_keycloak_sub": comment.author_keycloak_sub,
-        "content": comment.content,
         "is_internal": comment.is_internal,
     }
 
@@ -247,6 +245,11 @@ def _audit_workflow_comments(session: Session, _flush_context, _instances) -> No
         old = dict(current)
         state = inspect(comment)
         for field in current:
+            # Presentation metadata is part of the snapshot, not a mapped
+            # WorkflowComment attribute. Accessing it through state.attrs
+            # raised a 500 on the real PATCH path with audit_context enabled.
+            if field not in state.attrs:
+                continue
             history = state.attrs[field].history
             if history.deleted:
                 old[field] = history.deleted[0]

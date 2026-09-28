@@ -399,6 +399,7 @@ def test_dev2_program_catalog_and_comment_audit(audit_context):
         assert [event.action for event in comment_events] == ["CREATE", "UPDATE", "DELETE"]
         assert [event.entity_type for event in comment_events] == ["workflow_comment"] * 3
         assert all(event.university_id == own for event in meeting_events + comment_events)
+        assert all("content" not in (event.old_value or {}) and "content" not in (event.new_value or {}) for event in comment_events)
 
 
 def test_import_job_boundary_has_one_event(audit_context):

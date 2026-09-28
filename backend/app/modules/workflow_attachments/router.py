@@ -143,6 +143,7 @@ def download_attachment(
     # the DB metadata (which can drift). Unknown size -> chunked, no header.
     headers = {
         "Content-Disposition": content_disposition(attachment.original_filename),
+        "X-Content-Type-Options": "nosniff",
     }
     try:
         verified_size = storage.size(attachment.storage_key)

@@ -129,6 +129,16 @@
 .transitionList strong { font-size: 12px; }
 .transitionList time { color: var(--rtk-color-text-tertiary); font-size: 11px; }
 .transitionList p { color: var(--rtk-color-text-secondary); font-size: 12px; line-height: 1.4; margin: var(--rtk-space-1) 0 0; }
+.historyEvent { min-width: 0; }
+.historyEvent.historytransition { border-left-color: var(--rtk-color-brand); }
+.historyEvent.historycomment { border-left-color: var(--atmr-success-container-soft, var(--rtk-color-brand)); }
+.transitionList li > .historyHeading { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); }
+.historyHeading svg { color: var(--rtk-color-brand); flex: 0 0 auto; }
+.historyHeading time { margin-left: auto; }
+.transitionList li > .historyContent { align-items: stretch; display: flex; flex-direction: column; gap: var(--rtk-space-1); min-width: 0; padding: var(--rtk-space-2) 0 0 var(--rtk-space-4); }
+.historyContent > strong { font-size: 13px; overflow-wrap: anywhere; }
+.historyStage, .historyActor { color: var(--rtk-color-text-tertiary); font-size: 11px; }
+.historyFiles { list-style: none; margin: var(--rtk-space-2) 0 0; padding: 0; }
 .muted { color: var(--rtk-color-text-tertiary); font-size: 12px; margin: 0; }
 .completionSummary { align-items: center; border-radius: var(--rtk-radius-small); display: flex; flex-wrap: wrap; font-size: 12px; gap: var(--rtk-space-2); padding: var(--rtk-space-3); }
 .completionSummary > span:first-child { align-items: center; display: inline-flex; }

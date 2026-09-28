@@ -10,6 +10,7 @@ import Trash from '@atomaro/icons/24/action/Trash';
 import Comments from '@atomaro/icons/24/communication/Comments';
 import Attachment from '@atomaro/icons/24/action/Attachment';
 import { useAuth } from '@/shared/auth/AuthProvider';
+import { queryKeys } from '@/shared/lib/query-keys';
 import { hasPermission } from '@/shared/lib/access-control';
 import { canDeleteWorkflowComment, canEditWorkflowComment } from '@/shared/lib/workflow-comment-permissions';
 import { createWorkflowComment, deleteWorkflowComment, editWorkflowComment, isRealWorkflowMode, isWorkflowApiInstanceId, listWorkflowComments, listWorkflowCommentsPage, workflowCommentsQueryKey, workflowQueryKey, type UniversityWorkflowComment, type WorkflowCommentApiRecord } from '@/shared/lib/universities-repository';
@@ -44,6 +45,7 @@ function useWorkflowMutationInvalidation(instanceId: string) {
   return () => Promise.all([
     queryClient.invalidateQueries({ queryKey: workflowQueryKey(instanceId) }),
     queryClient.invalidateQueries({ queryKey: workflowCommentsQueryKey(instanceId) }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowHistory(instanceId) }),
   ]);
 }
 
@@ -96,14 +98,14 @@ function CommentEditor({ initialValue, disabled, submitLabel, onSubmit, onCancel
   return <form className={styles.editor} onSubmit={submit} noValidate><FormField label={submitLabel === 'Отправить' ? 'Добавить комментарий' : 'Редактировать комментарий'} htmlFor={inputId} error={errors.content?.message} errorId={errorId}><TextArea id={inputId} maxLength={COMMENT_MAX_LENGTH} minLength={1} rows={3} placeholder="Напишите комментарий..." disabled={disabled || isSubmitting || submissionPending} aria-invalid={Boolean(errors.content)} aria-describedby={`${errors.content ? errorId : hintId}`} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={handleKeyDown} {...register('content')} /></FormField>{allowFiles ? <><AttachmentDropZone compact onFiles={addFiles} disabled={disabled || isSubmitting || submissionPending} />{files.length ? <ul className={styles.selectedFiles}>{files.map((file, index) => <li key={`${file.name}-${index}`}><Attachment size={16} fill="currentColor" /><span>{file.name} · {formatFileSize(file.size)}</span><Button variant="ghost" size="s" type="button" disabled={isSubmitting || submissionPending} aria-label={`Убрать ${file.name}`} onClick={() => setFiles((current) => current.filter((_, position) => position !== index))}><Trash size={14} fill="currentColor" />Убрать</Button></li>)}</ul> : null}{fileError ? <p className={styles.validationError} role="alert">{fileError}</p> : null}</> : null}<div className={styles.editorFooter}><span id={hintId} className={styles.counter}>{value.length} / {COMMENT_MAX_LENGTH}</span><div className={styles.editorActions}>{onCancel ? <Button variant="ghost" size="s" type="button" disabled={isSubmitting || submissionPending} onClick={onCancel}>Отмена</Button> : null}<Button variant={submitLabel === 'Отправить' ? 'primary' : 'secondary'} size="s" type="submit" loading={isSubmitting || submissionPending} disabled={disabled || isSubmitting || submissionPending} title={disabled ? 'Действие подключится после появления API' : undefined}>{(isSubmitting || submissionPending) && files.length ? 'Загрузка файлов…' : submitLabel}</Button></div></div>{disabled ? <p className={styles.integrationHint}>Действие станет доступно после подключения API.</p> : null}</form>;
 }
 
-function CommentItem({ comment, instanceId, readOnly, onNotify }: { comment: UniversityWorkflowComment; instanceId: string; readOnly: boolean; onNotify?: (notification: WorkflowTransitionNotification) => void }) {
+function CommentItem({ comment, instanceId, onNotify }: { comment: UniversityWorkflowComment; instanceId: string; onNotify?: (notification: WorkflowTransitionNotification) => void }) {
   const { user } = useAuth();
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const invalidate = useWorkflowMutationInvalidation(instanceId);
   const apiAvailable = isWorkflowApiInstanceId(instanceId);
-  const canEdit = !readOnly && canEditWorkflowComment(comment, user);
-  const canDelete = !readOnly && isRealWorkflowMode() && canDeleteWorkflowComment(comment, user);
+  const canEdit = canEditWorkflowComment(comment, user);
+  const canDelete = isRealWorkflowMode() && canDeleteWorkflowComment(comment, user);
   const updated = comment.updatedAt && comment.updatedAt !== comment.occurredAt ? comment.updatedAt : null;
   const save = useMutation({ mutationFn: (content: string) => editWorkflowComment(comment.id, content), onSuccess: async () => { setEditing(false); await invalidate(); } });
   const remove = useMutation({ mutationFn: () => deleteWorkflowComment(comment.id), onSuccess: async () => { setConfirmDelete(false); await invalidate(); }, onError: (cause) => onNotify?.({ intent: 'error', title: 'Комментарий не удалён', message: normalizeApiError(cause).message }) });
@@ -137,7 +139,7 @@ export function WorkflowComments({ instanceId, stageId, comments, readOnly = fal
     onSuccess: async (serverComment, _content, context) => {
       const queryKey = workflowCommentsQueryKey(instanceId);
       if (realWorkflow) {
-        await queryClient.invalidateQueries({ queryKey });
+        await Promise.all([queryClient.invalidateQueries({ queryKey }), queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowHistory(instanceId) })]);
         return;
       }
       queryClient.setQueryData<WorkflowCommentApiRecord[]>(queryKey, (current) => (current ?? []).map((comment) => comment.id === context.tempId ? serverComment : comment));
@@ -164,5 +166,5 @@ export function WorkflowComments({ instanceId, stageId, comments, readOnly = fal
   const loading = realWorkflow ? realCommentsQuery.isPending : apiCommentsQuery.isPending;
   const failed = realWorkflow ? realCommentsQuery.isError : apiCommentsQuery.isError;
   const retry = () => realWorkflow ? void realCommentsQuery.refetch() : void apiCommentsQuery.refetch();
-  return <section className={styles.section} aria-labelledby={`${stageId}-comments-title`}><div className={styles.heading}><h3 id={`${stageId}-comments-title`}><Comments size={18} fill="currentColor" />Комментарии <span className={styles.count}>{renderedComments.length}</span></h3>{renderedComments.length > 3 ? <Button variant="ghost" size="s" type="button" onClick={() => setShowAll((value) => !value)}>{showAll ? 'Свернуть' : 'Показать все'}</Button> : null}</div>{apiAvailable && loading ? <ListSkeleton items={3} /> : apiAvailable && failed ? <ErrorState title="Не удалось загрузить комментарии" description={queryError} headingLevel={3} onRetry={retry} /> : orderedComments.length ? <ul className={styles.commentList}>{visibleComments.map((comment) => <CommentItem key={comment.id} comment={comment} instanceId={instanceId} readOnly={readOnly} onNotify={onNotify} />)}</ul> : <EmptyState icon={<Comments size={18} fill="currentColor" />} title="Комментариев пока нет" description={readOnly ? 'На этом этапе комментариев не было.' : 'Первый комментарий можно добавить ниже.'} headingLevel={3} />}{realWorkflow && realCommentsQuery.hasNextPage ? <Button variant="ghost" size="s" type="button" loading={realCommentsQuery.isFetchingNextPage} onClick={() => void realCommentsQuery.fetchNextPage()}>Загрузить ещё комментарии</Button> : null}{!readOnly && user && (!realWorkflow || hasPermission(user, 'workflow.change_status')) ? <CommentEditor initialValue="" disabled={!apiAvailable || create.isPending} submitLabel="Отправить" onSubmit={addComment} allowFiles={realWorkflow} onGlobalError={(error) => onNotify?.({ intent: 'error', title: 'Комментарий не сохранён', message: error.message })} /> : null}</section>;
+  return <section className={styles.section} aria-labelledby={`${stageId}-comments-title`}><div className={styles.heading}><h3 id={`${stageId}-comments-title`}><Comments size={18} fill="currentColor" />Комментарии <span className={styles.count}>{renderedComments.length}</span></h3>{renderedComments.length > 3 ? <Button variant="ghost" size="s" type="button" onClick={() => setShowAll((value) => !value)}>{showAll ? 'Свернуть' : 'Показать все'}</Button> : null}</div>{apiAvailable && loading ? <ListSkeleton items={3} /> : apiAvailable && failed ? <ErrorState title="Не удалось загрузить комментарии" description={queryError} headingLevel={3} onRetry={retry} /> : orderedComments.length ? <ul className={styles.commentList}>{visibleComments.map((comment) => <CommentItem key={comment.id} comment={comment} instanceId={instanceId} onNotify={onNotify} />)}</ul> : <EmptyState icon={<Comments size={18} fill="currentColor" />} title="Комментариев пока нет" description={readOnly ? 'На этом этапе комментариев не было.' : 'Первый комментарий можно добавить ниже.'} headingLevel={3} />}{realWorkflow && realCommentsQuery.hasNextPage ? <Button variant="ghost" size="s" type="button" loading={realCommentsQuery.isFetchingNextPage} onClick={() => void realCommentsQuery.fetchNextPage()}>Загрузить ещё комментарии</Button> : null}{!readOnly && user && (!realWorkflow || hasPermission(user, 'workflow.change_status')) ? <CommentEditor initialValue="" disabled={!apiAvailable || create.isPending} submitLabel="Отправить" onSubmit={addComment} allowFiles={realWorkflow} onGlobalError={(error) => onNotify?.({ intent: 'error', title: 'Комментарий не сохранён', message: error.message })} /> : null}</section>;
 }

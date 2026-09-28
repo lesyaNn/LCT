@@ -215,7 +215,7 @@ def transition_instance(
         old_value={"audit_object_type": "workflow_transition",
                    "stage_id": _stage_ref(current), "stage_name": current.name},
         new_value={"audit_object_type": "workflow_transition",
-                   "stage_id": _stage_ref(target), "stage_name": target.name, "comment": text},
+                   "stage_id": _stage_ref(target), "stage_name": target.name},
     )
     db.commit()
     return get_instance_or_404(db, instance.id)
