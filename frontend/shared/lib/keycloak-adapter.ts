@@ -153,13 +153,13 @@ export async function expireKeycloakSession(): Promise<void> {
   if (typeof window !== 'undefined') window.location.replace('/login?reason=session-expired');
 }
 
-export async function loginToKeycloak(returnTo = '/dashboard'): Promise<void> {
+export async function loginToKeycloak(returnTo = '/dashboard', loginHint?: string): Promise<void> {
   const keycloak = await ensureKeycloak();
   sessionExpiredRedirectArmed = false;
   const redirectUrl = new URL('/login', window.location.origin);
   const safeReturnPath = getSafeReturnPath(returnTo);
   if (safeReturnPath !== '/dashboard') redirectUrl.searchParams.set('returnTo', safeReturnPath);
-  await keycloak.login({ redirectUri: redirectUrl.toString() });
+  await keycloak.login({ redirectUri: redirectUrl.toString(), ...(loginHint ? { loginHint } : {}) });
 }
 
 export async function logoutFromKeycloak(): Promise<void> {

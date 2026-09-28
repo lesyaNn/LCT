@@ -23,7 +23,7 @@ export interface AuthContextValue {
   isAuthenticated: boolean;
   user: AuthUser | null;
   error: string | null;
-  login: (returnTo?: string) => Promise<void>;
+  login: (returnTo?: string, loginHint?: string) => Promise<void>;
   logout: () => Promise<void>;
   retry: () => void;
 }
@@ -73,11 +73,11 @@ export function AuthProvider({ children }: Readonly<{ children: React.ReactNode 
     };
   }, [attempt, mode, queryClient]);
 
-  const login = useCallback(async (returnTo = '/dashboard') => {
+  const login = useCallback(async (returnTo = '/dashboard', loginHint?: string) => {
     setBootstrapError(null);
     if (mode === 'keycloak') {
       try {
-        await loginToKeycloak(returnTo);
+        await loginToKeycloak(returnTo, loginHint);
       } catch (cause: unknown) {
         setKeycloakStatus('error');
         setBootstrapError(cause instanceof Error ? cause.message : 'Не удалось выполнить вход. Попробуйте ещё раз.');

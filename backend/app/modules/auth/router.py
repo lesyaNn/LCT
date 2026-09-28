@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 
 from app.core.permissions import require_permission, require_role, user_permissions
 from app.core.security import CurrentUser, get_current_user
+from app.core.policies import get_data_scope
 from app.modules.auth.schemas import MeOut
 from app.schemas.common import ErrorResponse
 
@@ -22,6 +23,7 @@ AUTH_ERRORS = {
 )
 def me(user: CurrentUser = Depends(get_current_user)):
     perms = user_permissions(user)
+    scope = get_data_scope(user)
     if "*" in perms:
         shown: list[str] = ["*"]
     else:
@@ -33,6 +35,7 @@ def me(user: CurrentUser = Depends(get_current_user)):
         name=user.name,
         roles=sorted(user.roles),
         permissions=shown,
+        scope={"kind": scope.kind.value, "university_ids": sorted(str(value) for value in scope.university_ids)},
     )
 
 

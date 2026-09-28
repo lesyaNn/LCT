@@ -8,3 +8,4 @@ class MeOut(BaseModel):
     name: str | None = None
     roles: list[str] = []
     permissions: list[str] = []
+    scope: dict[str, str | list[str]]

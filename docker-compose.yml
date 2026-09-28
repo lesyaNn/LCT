@@ -195,6 +195,7 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
+      DEMO_MODE: ${DEMO_MODE:-false}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/dashboard >/dev/null"]
       interval: 15s

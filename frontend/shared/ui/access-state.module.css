@@ -16,6 +16,12 @@
 .authCard h1 { font-size: clamp(26px, 5vw, 36px); letter-spacing: -.035em; }
 .authCard p:not(.eyebrow) { color: var(--rtk-color-text-secondary); }
 .authCard button { margin-top: var(--rtk-space-3); width: 100%; }
+.demoIntro { color: var(--rtk-color-text-secondary); margin: 0 0 var(--rtk-space-4); }
+.demoRoles { display: grid; gap: var(--rtk-space-3); }
+.demoRole { align-items: center; border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); display: flex; gap: var(--rtk-space-3); justify-content: space-between; padding: var(--rtk-space-3); }
+.demoRole strong { display: block; }
+.demoRole p { color: var(--rtk-color-text-secondary); font-size: 13px; margin: var(--rtk-space-1) 0 0; }
+@media (max-width: 480px) { .demoRole { align-items: stretch; flex-direction: column; } }
 .authAccent { background: var(--rtk-color-brand-secondary); height: 5px; inset: 0 0 auto; position: absolute; }
 .state h1, .state p { margin: 0; }
 .state h1 { font-size: clamp(24px, 4vw, 32px); letter-spacing: -.03em; }

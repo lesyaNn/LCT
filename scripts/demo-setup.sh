@@ -3,6 +3,7 @@
 # Внешних LMS/сайта нет: backend работает на встроенных данных seed,
 # Keycloak локальный (realm rtk), файлы — локальный volume.
 set -euo pipefail
+export DEMO_MODE=true
 
 echo "Setting up Backup Demo Mode (fully local, no internet required)..."
 
@@ -23,6 +24,8 @@ echo "Loading demo seed (idempotent)..."
 docker compose exec -T backend python -m app.db.seed || {
   echo "  WARN: seed failed — проверьте логи backend (docker compose logs backend)"
 }
+docker compose exec -T -e SEED_DEMO_DATA=true backend python -m app.scripts.seed_demo
+docker compose exec -T -e DEMO_MODE=true backend python -m app.scripts.provision_demo_scope
 
 echo ""
 echo "Demo ready (offline-capable):"
