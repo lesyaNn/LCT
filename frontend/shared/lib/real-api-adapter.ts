@@ -127,6 +127,7 @@ export function serializeUniversityListQuery(params: UniversityListQuery): URLSe
   appendRepeated(search, 'responsible_ids', filters.responsibleIds);
   if (filters.dateFrom) search.set('date_from', filters.dateFrom);
   if (filters.dateTo) search.set('date_to', filters.dateTo);
+  if (filters.workflowStageId) search.set('workflow_stage', filters.workflowStageId);
   const supportedSort = 'name';
   search.set('sort_by', supportedSort);
   search.set('sort_order', params.order);

@@ -114,7 +114,7 @@ export const UNIVERSITY_LIST_CAPABILITIES = isMockDataSourceFor('universities')
       dateMeaning: 'last-interaction' as const,
     }
   : {
-      filters: { university: true, program: true, product: true, responsible: true, stage: false, date: true },
+      filters: { university: true, program: true, product: true, responsible: true, stage: true, date: true },
       sorts: { name: true, responsible: false, programs: false, stage: false, last_interaction: false },
       dateMeaning: 'created-at' as const,
     };
@@ -189,6 +189,14 @@ const universitiesMock: UniversityListItem[] = [
 
 export const universitiesQueryKey = queryKeys.universities.all;
 export const universitiesListQueryKey = queryKeys.universities.list;
+export const universityStageOptionsQueryKey = ['universities', 'stage-options'] as const;
+
+export async function getUniversityStageOptions(signal?: AbortSignal): Promise<UniversityStage[]> {
+  if (isMockDataSourceFor('universities')) return universityFilterOptions.stages;
+  const result = await apiFetch<string[]>('/api/v1/universities/stage-options', { signal });
+  if (!result.ok) throw new Error('Не удалось загрузить список этапов.');
+  return result.data.map((name) => ({ id: name, name, tone: 'brand' as const }));
+}
 
 export const universityFilterOptions: UniversityFilterOptions = {
   cities: [...new Set(universitiesMock.map((item) => item.city))].sort((a, b) => a.localeCompare(b, 'ru')),

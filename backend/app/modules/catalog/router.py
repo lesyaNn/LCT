@@ -132,6 +132,7 @@ def list_universities(
     sort_by: UniversitySortBy = Query(default="name"),
     sort_order: SortOrder = Query(default="asc"),
     external_source: Literal["website"] | None = Query(default=None),
+    workflow_stage: str | None = Query(default=None, description="Current stage name of the latest Workflow"),
     unified: UnifiedFilter = Depends(get_unified_filter),
     db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(READ),
@@ -148,9 +149,25 @@ def list_universities(
         sort_order=sort_order,
         unified_filter=unified,
         user=user,
-                external_source=external_source,
+        external_source=external_source,
+        workflow_stage=workflow_stage,
     )
     return PaginatedResponse(items=items, page=page, page_size=page_size, total=total)
+
+
+@router.get(
+    "/universities/stage-options",
+    response_model=list[str],
+    tags=["Universities"],
+    summary="Current Workflow stage options for visible universities",
+)
+def university_stage_options(
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(READ),
+) -> list[str]:
+    from app.modules.catalog.repository import list_university_stage_names
+
+    return list_university_stage_names(db, user=user)
 
 
 @router.get(

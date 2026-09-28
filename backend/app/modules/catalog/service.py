@@ -79,6 +79,7 @@ def list_university_page(
     user=None,
     health_status: str | None = None,
     external_source: str | None = None,
+    workflow_stage: str | None = None,
 ):
     """List universities with presentation aggregates (batched, no N+1)."""
     rows, total = repo.list_universities(
@@ -94,6 +95,7 @@ def list_university_page(
         unified_today=unified_today,
         user=user,
         external_source=external_source,
+        workflow_stage=workflow_stage,
     )
     presentation = repo.university_list_presentation(
         db, [r.id for r in rows], today=unified_today

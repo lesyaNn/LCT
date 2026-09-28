@@ -24,6 +24,7 @@ from app.models.catalog import (
 from app.models.interactions import InteractionNote, Meeting, UniversityProgram
 from app.models.workflow_instances import InstanceStage, WorkflowInstance, WorkflowTask
 from app.modules.catalog import service as catalog_service
+from app.modules.catalog.repository import list_university_stage_names
 
 import pytest
 
@@ -53,7 +54,7 @@ def db():
     with eng.begin() as conn:
         conn.execute(text(
             "CREATE TABLE IF NOT EXISTS instance_stages ("
-            "instance_id CHAR(32) NOT NULL, template_stage_id CHAR(32), "
+            "instance_id CHAR(32) NOT NULL, template_stage_id CHAR(32), responsible_id CHAR(32), "
             "order_index INTEGER NOT NULL, name VARCHAR(512) NOT NULL, "
             "description TEXT, is_required BOOLEAN NOT NULL DEFAULT 1, "
             "status VARCHAR(32) NOT NULL DEFAULT 'pending', due_date DATE, "
@@ -143,6 +144,27 @@ def test_list_empty_db_returns_empty_page(db):
     items, total = catalog_service.list_university_page(
         db, page=1, page_size=20, search=None, city=None, responsible_id=None,
         sort_by="name", sort_order="asc",
+    )
+    assert total == 0
+    assert items == []
+
+
+def test_current_stage_filter_applies_before_pagination(db):
+    ids = _seed(db)
+    assert list_university_stage_names(db) == ["Согласование программы"]
+
+    items, total = catalog_service.list_university_page(
+        db, page=1, page_size=1, search="Московский", city=None,
+        responsible_id=None, sort_by="name", sort_order="asc",
+        workflow_stage="Согласование программы",
+    )
+    assert total == 1
+    assert [item.id for item in items] == [ids["full"]]
+
+    items, total = catalog_service.list_university_page(
+        db, page=1, page_size=1, search=None, city=None,
+        responsible_id=None, sort_by="name", sort_order="asc",
+        workflow_stage="Несуществующий этап",
     )
     assert total == 0
     assert items == []

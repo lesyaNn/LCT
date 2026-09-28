@@ -18,7 +18,11 @@ import Search from '@atomaro/icons/24/action/Search';
 import ChevronSort from '@atomaro/icons/24/navigation/ChevronSort';
 import SortDown from '@atomaro/icons/24/editor/SortDown';
 import SortUp from '@atomaro/icons/24/editor/SortUp';
+import GridColumns2 from '@atomaro/icons/24/editor/GridColumns2';
+import TableIcon from '@atomaro/icons/24/document/Table';
 import { Button } from '@/shared/ui/rtk/button';
+import { IconButton } from '@/shared/ui/rtk/icon-button';
+import { Tooltip } from '@/shared/ui/rtk/tooltip';
 import { FilterToolbar } from '@/shared/ui/rtk/filter-surface';
 import { SearchField } from '@/shared/ui/rtk/filter-field';
 import type { ActiveFilterItem } from '@/shared/ui/rtk/active-filters';
@@ -29,14 +33,13 @@ import { MultiSelect } from '@/shared/ui/rtk/multiselect';
 import { StatusBadge as SemanticStatusBadge } from '@/shared/ui/rtk/status-badge';
 import { TableShell } from '@/shared/ui/rtk/table-shell';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
-import { TableSkeleton } from '@/shared/ui/skeleton';
-import {
-} from '@/shared/lib/universities-repository';
+import { Skeleton, SkeletonGroup, TableSkeleton } from '@/shared/ui/skeleton';
 import {
   getUniversities,
+  getUniversityStageOptions,
   UNIVERSITY_LIST_CAPABILITIES,
-  universityFilterOptions,
   universitiesListQueryKey,
+  universityStageOptionsQueryKey,
   type UniversityFilterOptions,
   type UniversityListItem,
   type UniversityListQuery,
@@ -52,6 +55,8 @@ import styles from './universities-list.module.css';
 
 const DEFAULT_PAGE_SIZE = 8;
 const PAGE_SIZE_OPTIONS = [8, 12, 20];
+const VIEW_STORAGE_KEY = 'universities.view.v1';
+type UniversityView = 'cards' | 'table';
 
 type SearchParamsLike = {
   get: (name: string) => string | null;
@@ -219,8 +224,13 @@ function formatFullDate(isoDate: string): string {
   return new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(isoDate));
 }
 
+function programCountLabel(count: number): string {
+  const form = new Intl.PluralRules('ru-RU').select(count);
+  return `${count} ${form === 'one' ? 'программа' : form === 'few' ? 'программы' : 'программ'}`;
+}
+
 function StageBadge({ item }: { item: UniversityListItem }) {
-  if (item.availability?.stage === false) return <span>—</span>;
+  if (item.availability?.stage === false) return <span>Workflow не запущен</span>;
   return <span className={styles.stageCell}><SemanticStatusBadge intent={item.currentStage.tone}>{item.currentStage.name}</SemanticStatusBadge></span>;
 }
 
@@ -313,40 +323,41 @@ function universityActiveFilters(filters: UniversityFilters, options: University
   return chips.map(({ key, label, patch }) => ({ id: key, label, onRemove: () => onPatch(patch) }));
 }
 
-function filterOptionsFromCatalogs(references?: CatalogReferenceData): UniversityFilterOptions {
+function filterOptionsFromCatalogs(references?: CatalogReferenceData, stages: UniversityFilterOptions['stages'] = []): UniversityFilterOptions {
   if (!references) {
-    return { cities: [], responsibles: [], stages: universityFilterOptions.stages, universities: [], programs: [], products: [] };
+    return { cities: [], responsibles: [], stages, universities: [], programs: [], products: [] };
   }
   return {
     cities: [...new Set(references.universities.map((item) => item.description).filter((city): city is string => Boolean(city)))].sort((left, right) => left.localeCompare(right, 'ru')),
     responsibles: references.responsibles.map((item) => ({ id: item.id, name: item.name, role: item.description })),
-    stages: universityFilterOptions.stages,
+    stages,
     universities: references.universities,
     programs: references.programs,
     products: references.products,
   };
 }
 
-function MobileUniversityCards({ items }: { items: UniversityListItem[] }) {
+function UniversityCards({ items }: { items: UniversityListItem[] }) {
   return (
-    <div className={styles.mobileCards} aria-label="Список вузов в формате карточек">
+    <div className={styles.cards} aria-label="Список вузов в формате карточек">
       {items.map((item) => (
-        <Link className={styles.mobileCard} href={`/universities/${item.id}`} key={item.id}>
-          <div className={styles.mobileCardHeader}>
+        <Link className={styles.card} href={`/universities/${item.id}`} key={item.id}>
+          <div className={styles.cardHeader}>
             <strong>{item.name}</strong>
             <AttentionIndicator active={item.attention} />
           </div>
-          <dl className={styles.mobileDetails}>
-            <div><dt>Этап</dt><dd><StageBadge item={item} /></dd></div>
-            <div><dt>Ответственный</dt><dd>{item.responsible?.name ?? '—'}</dd></div>
-            <div><dt>Программы</dt><dd>{item.availability?.programs === false ? '—' : item.programsCount}</dd></div>
-            <div><dt>Последнее взаимодействие</dt><dd title={item.availability?.lastInteraction === false ? undefined : formatFullDate(item.lastInteractionAt)}>{item.availability?.lastInteraction === false ? '—' : formatRelativeTime(item.lastInteractionAt)}</dd></div>
-          </dl>
-          <span className={styles.mobileCardAction}>Открыть</span>
+          {item.availability?.stage === false
+            ? <div className={styles.cardNoWorkflow}>Workflow не запущен</div>
+            : <div className={styles.cardStage}><span>Текущий этап</span><StageBadge item={item} /></div>}
+          <div className={styles.cardFooter}><span>{item.responsible?.name ?? 'Ответственный не назначен'}</span><span>{programCountLabel(item.programsCount)}</span></div>
         </Link>
       ))}
     </div>
   );
+}
+
+function CardsSkeleton() {
+  return <SkeletonGroup label="Загрузка карточек вузов"><div className={styles.cards}>{Array.from({ length: DEFAULT_PAGE_SIZE }, (_, index) => <div className={styles.card} key={index}><Skeleton variant="text" width="85%" height={20} /><Skeleton variant="text" width="55%" /><Skeleton variant="text" width="70%" /><Skeleton variant="text" width="90%" /></div>)}</div></SkeletonGroup>;
 }
 
 function Pagination({ page, pageSize, total, onPatch }: { page: number; pageSize: number; total: number; onPatch: (patch: Record<string, string | number | string[] | null>) => void }) {
@@ -411,6 +422,7 @@ export function UniversitiesList() {
   const searchParams = useSearchParams();
   const state = useMemo(() => parseUrlState(searchParams), [searchParams]);
   const [searchInput, setSearchInput] = useState(state.filters.search);
+  const [view, setView] = useState<UniversityView>('cards');
   const storageRestoredRef = useRef(false);
   const storageReadyRef = useRef(false);
   const pendingStoredFiltersRef = useRef<UniversityFilters | null>(null);
@@ -420,6 +432,13 @@ export function UniversitiesList() {
   }, [pathname, router, searchParams]);
 
   useEffect(() => setSearchInput(state.filters.search), [state.filters.search]);
+  useEffect(() => {
+    if (window.localStorage.getItem(VIEW_STORAGE_KEY) === 'table') setView('table');
+  }, []);
+  const selectView = (next: UniversityView) => {
+    setView(next);
+    window.localStorage.setItem(VIEW_STORAGE_KEY, next);
+  };
   useEffect(() => {
     if (searchInput === state.filters.search) return undefined;
     const timeout = window.setTimeout(() => goToState({ search: searchInput, page: 1 }), 300);
@@ -463,7 +482,8 @@ export function UniversitiesList() {
     queryFn: ({ signal }) => getCatalogReferenceData(signal),
     staleTime: 5 * 60_000,
   });
-  const filterOptions = useMemo(() => filterOptionsFromCatalogs(catalogsQuery.data), [catalogsQuery.data]);
+  const stagesQuery = useQuery({ queryKey: universityStageOptionsQueryKey, queryFn: ({ signal }) => getUniversityStageOptions(signal), staleTime: 5 * 60_000 });
+  const filterOptions = useMemo(() => filterOptionsFromCatalogs(catalogsQuery.data, stagesQuery.data), [catalogsQuery.data, stagesQuery.data]);
 
   const sorting: SortingState = state.sort ? [{ id: state.sort, desc: state.order === 'desc' }] : [];
   const columns = useMemo<ColumnDef<UniversityListItem>[]>(() => [
@@ -514,19 +534,21 @@ export function UniversitiesList() {
           <h1>ВУЗы</h1>
           <p className={styles.description}>Учебные заведения, программы и задачи, требующие внимания команды.</p>
         </div>
+        <div className={styles.viewToggle} role="group" aria-label="Вид списка вузов">
+          <Tooltip content="Карточки"><IconButton icon={<GridColumns2 size={18} fill="currentColor" />} label="Карточки" size={18} aria-pressed={view === 'cards'} className={view === 'cards' ? styles.viewActive : ''} onClick={() => selectView('cards')} /></Tooltip>
+          <Tooltip content="Таблица"><IconButton icon={<TableIcon size={18} fill="currentColor" />} label="Таблица" size={18} aria-pressed={view === 'table'} className={view === 'table' ? styles.viewActive : ''} onClick={() => selectView('table')} /></Tooltip>
+        </div>
       </header>
       <div className={styles.filterArea}>
         <FilterToolbar label="Фильтры списка вузов" collapsible controls={() => <Filters state={state} options={filterOptions} catalogsLoading={catalogsQuery.isPending} catalogsUnavailable={catalogsQuery.isError} searchInput={searchInput} setSearchInput={setSearchInput} onPatch={goToState} />} onReset={resetFilters} resetDisabled={!hasFilters} mobileCount={activeFilterCount} activeFilters={universityActiveFilters(state.filters, filterOptions, goToState)} />
         {catalogsQuery.isError ? <RouteErrorState compact onRetry={() => void catalogsQuery.refetch()} /> : null}
+        {stagesQuery.isError ? <RouteErrorState compact onRetry={() => void stagesQuery.refetch()} /> : null}
       </div>
-      {query.isPending ? <TableSkeleton rows={6} columns={7} label="Загрузка списка вузов" /> : !query.data ? <RouteErrorState onRetry={() => void query.refetch()} /> : query.data.total === 0 ? <EmptyState icon={<Search size={20} fill="currentColor" />} title={hasFilters ? 'По заданным фильтрам ничего не найдено' : 'Вузы пока не добавлены'} description={hasFilters ? 'Измените условия поиска или сбросьте фильтры.' : 'Когда появятся записи, они будут отображены в этом списке.'} primaryAction={hasFilters ? { label: 'Сбросить фильтры', onClick: resetFilters, variant: 'secondary' } : undefined} /> : (
+      {query.isPending ? view === 'cards' ? <CardsSkeleton /> : <TableSkeleton rows={6} columns={7} label="Загрузка списка вузов" /> : !query.data ? <RouteErrorState onRetry={() => void query.refetch()} /> : query.data.total === 0 ? <EmptyState icon={<Search size={20} fill="currentColor" />} title={hasFilters ? 'По выбранным условиям ВУЗы не найдены' : 'Вузы пока не добавлены'} description={hasFilters ? 'Измените условия поиска или сбросьте фильтры.' : 'Когда появятся записи, они будут отображены в этом списке.'} primaryAction={hasFilters ? { label: 'Сбросить фильтры', onClick: resetFilters, variant: 'secondary' } : undefined} /> : (
         <>
           <p className={styles.fetching} role="status">{query.isFetching ? 'Обновляем список…' : '\u00a0'}</p>
-          <TableShell>
-            <div className={styles.desktopOnly}><DesktopTable table={table} /></div>
-            <div className={styles.mobileOnly}><MobileUniversityCards items={query.data.items} /></div>
-            <Pagination page={query.data.page} pageSize={query.data.pageSize} total={query.data.total} onPatch={goToState} />
-          </TableShell>
+          {view === 'cards' ? <UniversityCards items={query.data.items} /> : <TableShell><DesktopTable table={table} /></TableShell>}
+          <div className={styles.paginationSurface}><Pagination page={query.data.page} pageSize={query.data.pageSize} total={query.data.total} onPatch={goToState} /></div>
         </>
       )}
     </div>

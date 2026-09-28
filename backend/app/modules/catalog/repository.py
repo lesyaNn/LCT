@@ -145,6 +145,37 @@ UNIVERSITY_SORT = {
 }
 
 
+def latest_university_stage_id():
+    """The same latest-instance pointer used by university_list_presentation."""
+    from app.models.workflow_instances import WorkflowInstance
+
+    return (
+        select(WorkflowInstance.current_instance_stage_id)
+        .where(WorkflowInstance.university_id == University.id)
+        .order_by(WorkflowInstance.updated_at.desc(), WorkflowInstance.id.asc())
+        .limit(1)
+        .correlate(University)
+        .scalar_subquery()
+    )
+
+
+def list_university_stage_names(db: Session, user=None) -> list[str]:
+    """Distinct current stages visible in the university list."""
+    from app.models.workflow_instances import InstanceStage
+
+    stmt = (
+        select(InstanceStage.name)
+        .select_from(University)
+        .join(InstanceStage, InstanceStage.id == latest_university_stage_id())
+        .distinct()
+        .order_by(InstanceStage.name)
+    )
+    if user is not None:
+        from app.modules.analytics.filter_service import UnifiedFilterService
+        stmt = UnifiedFilterService.apply_security_scope(stmt, user)
+    return list(db.execute(stmt).scalars().all())
+
+
 def list_universities_health(
     db, *, page: int, page_size: int, search: str | None,
     city: str | None, responsible_id=None, sort_order: str = "asc",
@@ -175,6 +206,7 @@ def university_conditions(
     unified_filter=None,
     today=None,
     external_source: str | None = None,
+    workflow_stage: str | None = None,
 ):
     conds = []
     if external_source == "website":
@@ -205,6 +237,13 @@ def university_conditions(
                 )
             )
         )
+    if workflow_stage:
+        from app.models.workflow_instances import InstanceStage
+
+        conds.append(exists(select(1).select_from(InstanceStage).where(
+            InstanceStage.id == latest_university_stage_id(),
+            InstanceStage.name == workflow_stage,
+        )))
     if unified_filter is not None:
         # P4-01-02: additive AND with legacy filters; EXISTS strategy keeps
         # one row per university (no JOIN fan-out). Import is local so the
@@ -231,6 +270,7 @@ def list_universities(
     unified_filter=None,
     unified_today=None,
     user=None, external_source: str | None = None,
+    workflow_stage: str | None = None,
 ) -> tuple[list[University], int]:
     conds = university_conditions(
         search=search,
@@ -239,6 +279,7 @@ def list_universities(
         unified_filter=unified_filter,
         today=unified_today,
         external_source=external_source,
+        workflow_stage=workflow_stage,
     )
     count_stmt = select(func.count()).select_from(University).where(*conds)
     page_stmt = (
