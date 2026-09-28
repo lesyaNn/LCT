@@ -24,7 +24,9 @@ from app.bootstrap.workflow_defaults import (
     TEMPLATE_DESCRIPTION,
     TEMPLATE_NAME,
     ensure_default_workflow_template,
+    ensure_spec_workflow_template,
 )
+from app.db.seed_workflow import STAGES_14, TEMPLATE_NAME as SPEC_TEMPLATE_NAME
 from app.db.base import Base
 from app.models.audit_outbox import AuditOutbox
 from app.models.catalog import University
@@ -117,6 +119,19 @@ def test_empty_db_creates_default_template(db):
     assert template.description == TEMPLATE_DESCRIPTION
     assert n_stages == 5
     assert n_instances == 0
+
+
+def test_spec_route_has_fourteen_editable_stages_and_is_idempotent(db):
+    assert ensure_spec_workflow_template(db)["status"] == "created"
+    template = db.scalar(select(WorkflowTemplate).where(WorkflowTemplate.name == SPEC_TEMPLATE_NAME))
+    rows = _stage_rows(db, template)
+    assert [(row.name, row.is_required) for row in rows] == STAGES_14
+    assert all(row.sla_days is None for row in rows)
+    rows[0].name = "Согласованный пользователем первый этап"
+    db.commit()
+    assert ensure_spec_workflow_template(db)["status"] == "ready"
+    assert _stage_rows(db, template)[0].name == "Согласованный пользователем первый этап"
+    assert len(_stage_rows(db, template)) == 14
 
 
 # 2. Stages: exactly 5, correct order, names and SLA durations.

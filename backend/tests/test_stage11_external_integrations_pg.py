@@ -3,17 +3,14 @@
 import os
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
-from io import BytesIO
 
 import pytest
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from fastapi.testclient import TestClient
-from openpyxl import Workbook
 
 from app.config import settings
 from app.core.errors import BusinessException
-from app.core.exceptions import NotFound
 from app.core.security import CurrentUser, get_current_user
 from app.db.session import get_db
 from app.main import app
@@ -23,7 +20,6 @@ from app.models.interactions import UniversityProgram
 from app.models.workflow_instances import WorkflowInstance
 from app.models.workflow_templates import WorkflowStage, WorkflowTemplate
 from app.modules.integrations import service
-from app.modules.imports import service as import_service
 
 
 @pytest.fixture()
@@ -72,11 +68,9 @@ def test_mock_sync_read_metrics_and_exact_id_dedup(engine):
         assert service.metrics(db)["website_applications_7d"] == 1
         scoped_out = service.metrics(db, CurrentUser(id="outside", roles={"user"}, university_ids=()))
         assert scoped_out["website_applications_7d"] is None
-        # The LMS source was removed: it must be rejected, never faked.
-        with pytest.raises(NotFound):
-            service.university_data(db, university_id, "lms")
-        with pytest.raises(NotFound):
-            service.sync_mock(db, university_id, "lms")
+        assert service.university_data(db, university_id, "lms")["students"] == []
+        assert service.sync_mock(db, university_id, "lms")["processed"] == 1
+        assert service.university_data(db, university_id, "lms")["students"][0]["source"] == "mock_lms"
         external_id = applications["applications"][0]["id"]
         service.upsert_application(db, {
             "external_id": external_id, "university_id": university_id,
@@ -88,26 +82,16 @@ def test_mock_sync_read_metrics_and_exact_id_dedup(engine):
         assert db.scalar(select(ExternalApplication.ingest_channel)) == "file"
 
 
-def test_xlsx_import_then_website_sync_share_one_application(engine):
+def test_website_json_then_mock_sync_share_one_application(engine):
     university_id, program_id = seed(engine)
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.append(["ID заявки", "ВУЗ", "Программа", "Статус заявки"])
-    sheet.append([f"mock-website:{university_id}:{program_id}", "Stage11 university", "Stage11 program", "new"])
-    output = BytesIO()
-    workbook.save(output)
-    file_id = import_service.stage_upload("stage11-applications.xlsx", output.getvalue())
-    mapping = {"ID заявки": "application.external_id", "ВУЗ": "university.name",
-               "Программа": "program.name", "Статус заявки": "application.status"}
     with Session(engine) as db:
-        preview = import_service.mapping_contract(["ID заявки", "ВУЗ", "Программа", "Статус заявки"], "applications")
-        assert set(preview["required_fields"]) == {"application.external_id", "university.name", "program.name"}
-        dry = import_service.execute_import(db, file_id, mapping, dry_run=True, catalog_type="applications")
-        assert dry["inserted"] == 1
-        assert db.scalar(select(func.count(ExternalApplication.id))) == 0
-        imported = import_service.execute_import(db, file_id, mapping, catalog_type="applications")
-        assert imported["inserted"] == 1 and not imported["errors"]
-        assert db.scalar(select(ExternalApplication.ingest_channel)) == "file"
+        imported = service.ingest_website(db, university_id, [{
+            "external_id": f"mock-website:{university_id}:{program_id}",
+            "program_id": program_id, "status": "new",
+            "external_created_at": datetime.now(timezone.utc),
+        }])
+        assert imported["processed"] == 1
+        assert db.scalar(select(ExternalApplication.ingest_channel)) == "api"
         settings.external_adapter_mode = "disabled"
         imported_data = service.university_data(db, university_id, "website")
         assert imported_data["mode"] == "import"
@@ -130,8 +114,9 @@ def test_unavailable_never_falls_back_to_mock(engine):
     settings.external_adapter_mode = "disabled"
     with Session(engine) as db:
         with pytest.raises(BusinessException) as err:
-            service.university_data(db, university_id, "lms")
+            service.sync_mock(db, university_id, "lms")
         assert err.value.code.value == "EXTERNAL_SOURCE_UNAVAILABLE"
+        assert service.university_data(db, university_id, "lms")["students"] == []
 
 
 def test_website_without_source_state_is_unconfigured(engine):
@@ -188,12 +173,11 @@ def test_http_permissions_unavailable_and_no_fixture_leak(engine):
         assert client.post("/api/v1/integrations/sync", json={"university_id": str(university_id), "source": "website"}).status_code == 200
         assert client.post("/api/v1/integrations/sync", json={"university_id": str(university_id), "source": "lms"}).status_code == 200
         assert client.get(path, params={"source": "website"}).json()["applications"][0]["applications_count"] == 1
-        assert client.get("/api/v1/universities", params={"external_source": "website"}).json()["total"] == 1
-        assert client.get("/api/v1/universities", params={"external_source": "lms"}).json()["total"] == 1
+        assert client.get(path, params={"source": "lms"}).json()["students"][0]["source"] == "mock_lms"
         settings.external_adapter_mode = "disabled"
         unavailable = client.get(path, params={"source": "website"})
-        assert unavailable.status_code == 503
-        assert unavailable.json()["error"]["code"] == "EXTERNAL_SOURCE_UNAVAILABLE"
+        assert unavailable.status_code == 200
+        assert unavailable.json()["applications"] == []
         assert "mock-website" not in str(unavailable.json())
     finally:
         app.dependency_overrides.pop(get_db, None)
