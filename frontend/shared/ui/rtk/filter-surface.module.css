@@ -8,7 +8,7 @@
 .grid > * { min-width: 0; }
 .grid > label { display: flex; flex-direction: column; gap: var(--rtk-space-1); }
 .grid > label > span { color: var(--rtk-color-text-secondary); font-size: 11px; font-weight: 600; line-height: 14px; min-height: 14px; }
-.periodRow { border-top: 1px solid var(--rtk-color-border); margin-top: var(--rtk-space-3); min-width: 0; padding-top: var(--rtk-space-3); }
+.periodRow { margin-top: var(--rtk-space-4); min-width: 0; }
 .panel[hidden] { display: none; }
 .collapseTrigger { margin-bottom: var(--rtk-space-3); }
 .actions { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); justify-content: flex-end; margin-top: var(--rtk-space-3); }

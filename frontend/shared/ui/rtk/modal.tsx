@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useId, useRef, type ReactNode, type RefObject } from 'react';
+import { useEffect, useId, useRef, useSyncExternalStore, type ReactNode, type RefObject } from 'react';
+import { createPortal } from 'react-dom';
 import CloseLarge from '@atomaro/icons/24/navigation/CloseLarge';
 import styles from './modal.module.css';
 
 export function Modal({ title, children, onClose, labelledBy, initialFocusRef, size = 'm' }: { title: string; children: ReactNode; onClose: () => void; labelledBy?: string; initialFocusRef?: RefObject<HTMLElement | null>; size?: 'm' | 'l' }) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const mounted = useSyncExternalStore(() => () => undefined, () => true, () => false);
   const onCloseRef = useRef(onClose);
   const generatedTitleId = useId();
   const titleId = labelledBy ?? `rtk-modal-title-${generatedTitleId}`;
@@ -15,6 +17,7 @@ export function Modal({ title, children, onClose, labelledBy, initialFocusRef, s
   }, [onClose]);
 
   useEffect(() => {
+    if (!mounted) return;
     const previous = document.activeElement as HTMLElement | null;
     (initialFocusRef?.current ?? closeRef.current)?.focus();
     const dialog = closeRef.current?.closest('[role="dialog"]') as HTMLElement | null;
@@ -43,7 +46,8 @@ export function Modal({ title, children, onClose, labelledBy, initialFocusRef, s
       document.removeEventListener('keydown', handleKeyDown);
       previous?.focus();
     };
-  }, [initialFocusRef]);
+  }, [initialFocusRef, mounted]);
 
-  return <div className={styles.overlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><div className={`${styles.dialog} ${styles[size]}`} role="dialog" aria-modal="true" aria-labelledby={titleId}><div className={styles.header}><h2 id={titleId}>{title}</h2><button ref={closeRef} className={styles.close} type="button" aria-label="Закрыть" onClick={onClose}><CloseLarge size={20} fill="currentColor" /></button></div><div className={styles.body}>{children}</div></div></div>;
+  if (!mounted) return null;
+  return createPortal(<div className={styles.overlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><div className={`${styles.dialog} ${styles[size]}`} role="dialog" aria-modal="true" aria-labelledby={titleId}><div className={styles.header}><h2 id={titleId}>{title}</h2><button ref={closeRef} className={styles.close} type="button" aria-label="Закрыть" onClick={onClose}><CloseLarge size={20} fill="currentColor" /></button></div><div className={styles.body}>{children}</div></div></div>, document.body);
 }

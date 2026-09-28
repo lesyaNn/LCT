@@ -96,6 +96,7 @@ services:
         condition: service_healthy
     environment:
       AUTH_DEV_BYPASS: "false"
+      APP_ENV: ${APP_ENV:-dev}
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-rtk}
       # External issuer as seen by browsers (P0-2: override per stand).
       KEYCLOAK_ISSUER: ${KEYCLOAK_EXTERNAL_URL:-http://localhost:8081}/realms/${KEYCLOAK_REALM:-rtk}
@@ -112,6 +113,7 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-rtk}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-rtk}
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
       STORAGE_ROOT: /app/storage
+      UPLOAD_ALLOWED_EXTENSIONS: ${UPLOAD_ALLOWED_EXTENSIONS:-pdf,png,jpg,jpeg,doc,docx,xls,xlsx,zip,gz,gzip,rar}
       REPORTS_ROOT: /app/reports
       # Dev-2 analytics boundary: Dev-1 filter adapter (non-empty filters
       # in /analytics/* stop returning 503 FILTER_PROVIDER_NOT_CONFIGURED).

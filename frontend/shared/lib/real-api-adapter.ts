@@ -641,6 +641,10 @@ function catalogPayloadPage(value: unknown, query: CatalogListQuery): CatalogLis
 export async function realListCatalogItems(query: CatalogListQuery, signal?: AbortSignal): Promise<CatalogListResult> {
   const params = new URLSearchParams({ page: String(query.page), page_size: String(query.pageSize) });
   if (query.search.trim()) params.set('search', query.search.trim());
+  if (query.type === 'agreements') {
+    if (query.universityId) params.set('university_id', query.universityId);
+    if (query.status) params.set('status', query.status);
+  }
   const resource = catalogResourcePath(query.type, query.agreementKind);
   const data = unwrap(await apiFetch<unknown>(`/api/v1/${resource}?${params}`, { signal }), 'Не удалось загрузить каталог.');
   return catalogPayloadPage(data, query);

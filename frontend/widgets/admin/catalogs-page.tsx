@@ -23,6 +23,7 @@ import {
   updateCatalogItem,
   type AgreementCatalogItem,
   type AgreementKind,
+  type AgreementStatus,
   type CatalogContact,
   type CatalogInput,
   type CatalogItem,
@@ -35,7 +36,8 @@ import { FilterToolbar } from '@/shared/ui/rtk/filter-surface';
 import { Tabs } from '@/shared/ui/rtk/tabs';
 import { TabbedSurface } from '@/shared/ui/rtk/tabbed-surface';
 import { EmptyState } from '@/shared/ui/empty-state';
-import { SearchField } from '@/shared/ui/rtk/filter-field';
+import { FilterField, SearchField } from '@/shared/ui/rtk/filter-field';
+import { Select } from '@/shared/ui/rtk/form-controls';
 import { Modal } from '@/shared/ui/rtk/modal';
 import { Drawer } from '@/shared/ui/rtk/drawer';
 import { IconButton } from '@/shared/ui/rtk/icon-button';
@@ -48,6 +50,8 @@ import { CatalogFormModal } from './catalog-form-modal';
 import styles from './catalogs-page.module.css';
 
 const pageSize = 8;
+const contractStatuses: AgreementStatus[] = ['draft', 'signed', 'active', 'expired', 'terminated'];
+const licenseStatuses: AgreementStatus[] = ['active', 'expires_soon', 'expired'];
 
 function agreementSingularLabel(item: CatalogItem): string {
   return item.type === 'agreements' ? (item.kind === 'contracts' ? 'Договор' : 'Лицензия') : 'Запись';
@@ -149,6 +153,8 @@ export function CatalogsPage() {
   // The combined tab renders one of two real resources at a time.
   const [agreementKind, setAgreementKind] = useState<AgreementKind>('contracts');
   const [search, setSearch] = useState('');
+  const [universityId, setUniversityId] = useState('');
+  const [agreementStatus, setAgreementStatus] = useState<AgreementStatus | ''>('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
   const [formItem, setFormItem] = useState<CatalogItem | null | undefined>(undefined);
@@ -160,7 +166,7 @@ export function CatalogsPage() {
 
   useEffect(() => { const timer = window.setTimeout(() => setDebouncedSearch(search), 250); return () => window.clearTimeout(timer); }, [search]);
 
-  const listQuery: CatalogListQuery = useMemo(() => ({ type, search: debouncedSearch, page, pageSize, ...(type === 'agreements' ? { agreementKind } : {}) }), [agreementKind, debouncedSearch, page, type]);
+  const listQuery: CatalogListQuery = useMemo(() => ({ type, search: debouncedSearch, page, pageSize, ...(type === 'agreements' ? { agreementKind, universityId, status: agreementStatus } : {}) }), [agreementKind, agreementStatus, debouncedSearch, page, type, universityId]);
   const query = useQuery({ queryKey: catalogQueryKeys.list(type, listQuery), queryFn: ({ signal }) => listCatalogItems(listQuery, signal), placeholderData: (previous) => previous, staleTime: 15_000 });
   const referencesQuery = useQuery({ queryKey: catalogQueryKeys.references, queryFn: ({ signal }) => getCatalogReferenceData(signal), staleTime: 5 * 60_000 });
   const contactsQuery = useQuery({ queryKey: contactsItem ? catalogQueryKeys.detail(contactsItem.type, contactsItem.id) : queryKeys.catalogs.contactsIdle, queryFn: ({ signal }) => getCatalogItem(contactsItem!.type, contactsItem!.id, signal), enabled: Boolean(contactsItem) });
@@ -193,8 +199,9 @@ export function CatalogsPage() {
     },
   });
 
-  const chooseType = (next: CatalogType) => { setType(next); setSearch(''); setDebouncedSearch(''); setPage(1); setFormItem(undefined); setDeleteTarget(null); setDeleteError(null); setContactsItem(null); };
-  const chooseKind = (next: AgreementKind) => { setAgreementKind(next); setSearch(''); setDebouncedSearch(''); setPage(1); setFormItem(undefined); setDeleteTarget(null); setDeleteError(null); };
+  const resetFilters = () => { setSearch(''); setDebouncedSearch(''); setUniversityId(''); setAgreementStatus(''); setPage(1); };
+  const chooseType = (next: CatalogType) => { setType(next); resetFilters(); setFormItem(undefined); setDeleteTarget(null); setDeleteError(null); setContactsItem(null); };
+  const chooseKind = (next: AgreementKind) => { setAgreementKind(next); resetFilters(); setFormItem(undefined); setDeleteTarget(null); setDeleteError(null); };
   const definition = catalogDefinition(type);
   const references = referencesQuery.data ?? { vendors: [], universities: [], products: [], directions: [], programs: [], responsibles: [], contracts: [] };
   // Responsible rows show university names, resolved from the already loaded
@@ -210,16 +217,16 @@ export function CatalogsPage() {
     <TabbedSurface tabs={<Tabs items={catalogDefinitions} activeId={type} onChange={(id) => chooseType(id as CatalogType)} label="Каталоги" prefix="catalog-tab" />}>
       <div data-testid="catalog-tabs">
         <section id="catalog-panel" role="tabpanel" aria-labelledby={`catalog-tab-${type}`} className={styles.panel}>
+          {type === 'agreements' ? <div className={styles.agreementSwitch} role="group" aria-label="Тип записи"><Button type="button" variant={agreementKind === 'contracts' ? 'primary' : 'ghost'} size="s" data-testid="catalog-agreements-contracts" aria-pressed={agreementKind === 'contracts'} onClick={() => chooseKind('contracts')}>Договоры</Button><Button type="button" variant={agreementKind === 'licenses' ? 'primary' : 'ghost'} size="s" data-testid="catalog-agreements-licenses" aria-pressed={agreementKind === 'licenses'} onClick={() => chooseKind('licenses')}>Лицензии</Button></div> : null}
           <FilterToolbar
             embedded
             label="Фильтры каталога"
-            activeFilters={search ? [{ id: 'search', label: `Поиск: ${search}`, onRemove: () => { setSearch(''); setPage(1); } }] : []}
-            controls={() => <SearchField label="Поиск" value={search} placeholder={definition.searchPlaceholder} onChange={(value) => { setSearch(value); setPage(1); }} />}
+            activeFilters={[...(search ? [{ id: 'search', label: `Поиск: ${search}`, onRemove: () => { setSearch(''); setPage(1); } }] : []), ...(type === 'agreements' && universityId ? [{ id: 'university', label: `ВУЗ: ${references.universities.find((item) => item.id === universityId)?.name ?? 'Выбран'}`, onRemove: () => { setUniversityId(''); setPage(1); } }] : []), ...(type === 'agreements' && agreementStatus ? [{ id: 'status', label: `Состояние: ${agreementStatusLabels[agreementStatus]}`, onRemove: () => { setAgreementStatus(''); setPage(1); } }] : [])]}
+            controls={() => <><SearchField label={type === 'agreements' ? agreementKind === 'contracts' ? 'Номер договора' : 'Номер лицензии' : 'Поиск'} value={search} placeholder={type === 'agreements' ? 'Введите номер' : definition.searchPlaceholder} onChange={(value) => { setSearch(value); setPage(1); }} />{type === 'agreements' ? <><FilterField label="ВУЗ"><Select value={universityId} onChange={(event) => { setUniversityId(event.target.value); setPage(1); }}><option value="">Все ВУЗы</option>{references.universities.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></FilterField><FilterField label="Состояние"><Select value={agreementStatus} onChange={(event) => { setAgreementStatus(event.target.value as AgreementStatus | ''); setPage(1); }}><option value="">Все состояния</option>{(agreementKind === 'contracts' ? contractStatuses : licenseStatuses).map((status) => <option key={status} value={status}>{agreementStatusLabels[status]}</option>)}</Select></FilterField></> : null}</>}
             actions={<div className={styles.actions}>{canWrite ? addButton : <Tooltip content="На текущем этапе каталоги подключены только для чтения.">{addButton}</Tooltip>}<ButtonLink href={`/admin/import?type=${type}`} variant="orange">Импорт</ButtonLink></div>}
-            onReset={() => { setSearch(''); setPage(1); }}
-            resetDisabled={!search}
+            onReset={resetFilters}
+            resetDisabled={!search && !universityId && !agreementStatus}
           />
-          {type === 'agreements' ? <div className={styles.agreementSwitch} role="group" aria-label="Тип записи"><Button type="button" variant={agreementKind === 'contracts' ? 'primary' : 'ghost'} size="s" data-testid="catalog-agreements-contracts" aria-pressed={agreementKind === 'contracts'} onClick={() => chooseKind('contracts')}>Договоры</Button><Button type="button" variant={agreementKind === 'licenses' ? 'primary' : 'ghost'} size="s" data-testid="catalog-agreements-licenses" aria-pressed={agreementKind === 'licenses'} onClick={() => chooseKind('licenses')}>Лицензии</Button></div> : null}
           <div className={styles.surface}>
             <div className={styles.surfaceHeader}><div><p>{query.data ? `Найдено: ${query.data.total}` : 'Загрузка…'}</p></div></div>
             {query.isPending ? <TableSkeleton rows={5} columns={5} label="Загрузка каталога" />

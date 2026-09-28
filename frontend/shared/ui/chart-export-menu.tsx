@@ -56,7 +56,7 @@ export function ChartExportMenu({ filenameSlug, targetRef, testId }: ChartExport
     try {
       await exportChart(target, format, filenameSlug);
     } catch (cause) {
-      console.error('Chart export failed', cause);
+      console.error('Chart export failed', cause instanceof Error ? cause.name : 'unknown');
       setError('Попробуйте ещё раз. Если ошибка повторится, обновите страницу.');
     } finally {
       setBusyFormat(null);

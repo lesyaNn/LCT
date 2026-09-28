@@ -889,6 +889,8 @@ export function mockListCatalogItems(query: CatalogListQuery): CatalogListResult
   const kind = query.type === 'agreements' ? query.agreementKind ?? 'contracts' : undefined;
   const filtered = [...catalogGroup(query.type).values()]
     .filter((item) => (kind ? item.type === 'agreements' && item.kind === kind : true))
+    .filter((item) => !query.universityId || (item.type === 'agreements' && item.universityId === query.universityId))
+    .filter((item) => !query.status || (item.type === 'agreements' && item.status === query.status))
     .filter((item) => !search || catalogSearchText(item).toLocaleLowerCase('ru-RU').includes(search))
     .sort((left, right) => left.name.localeCompare(right.name, 'ru'));
   const start = (query.page - 1) * query.pageSize;

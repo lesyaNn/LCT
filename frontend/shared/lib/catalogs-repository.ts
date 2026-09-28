@@ -181,6 +181,9 @@ export interface CatalogListQuery {
   pageSize: number;
   /** Sub-resource inside the combined agreements tab. */
   agreementKind?: AgreementKind;
+  /** Supported by both contracts and licenses list endpoints. */
+  universityId?: string;
+  status?: AgreementStatus | '';
 }
 
 export interface CatalogListResult {

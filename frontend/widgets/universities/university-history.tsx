@@ -39,7 +39,7 @@ function EventType({ type }: { type: UniversityHistoryEventType }) {
 }
 
 function EventDetails({ event }: { event: UniversityHistoryEvent }) {
-  return <details className={styles.details}><summary>{event.details}</summary>{event.type === 'audit' ? <AuditDiff event={event} /> : <p>{event.details}</p>}</details>;
+  return <details className={styles.details}><summary>{event.details}</summary>{event.type === 'audit' ? <AuditDiff event={event} showTechnical={false} /> : <p>{event.details}</p>}</details>;
 }
 
 function HistoryFilters({ filters, options, onChange, onReset }: { filters: UniversityHistoryFilters; options: ReturnType<typeof getUniversityHistoryFilterOptions>; onChange: (patch: Partial<UniversityHistoryFilters>) => void; onReset: () => void }) {

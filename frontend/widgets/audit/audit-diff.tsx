@@ -37,7 +37,7 @@ function toAuditEvent(event: AuditDiffSource): AuditEvent {
   };
 }
 
-export function AuditDiff({ event }: { event: AuditDiffSource }) {
+export function AuditDiff({ event, showTechnical = true }: { event: AuditDiffSource; showTechnical?: boolean }) {
   const summary = summarizeAuditEvent(toAuditEvent(event));
   const hasValues = event.oldValues !== undefined || event.newValues !== undefined;
   const technicalId = typeof event.entity?.id === 'string' && event.entity.id ? event.entity.id : null;
@@ -55,7 +55,7 @@ export function AuditDiff({ event }: { event: AuditDiffSource }) {
       ) : hasValues ? (
         <p className={styles.muted}>Изменений в полях нет.</p>
       ) : <p className={styles.muted}>Данные до/после изменения не переданы.</p>}
-      {event.requestId || event.ip || event.userAgent || technicalId ? (
+      {showTechnical && (event.requestId || event.ip || event.userAgent || technicalId) ? (
         <details className={styles.technical}>
           <summary>Техническая информация</summary>
           <dl>
