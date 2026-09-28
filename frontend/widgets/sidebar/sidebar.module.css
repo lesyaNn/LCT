@@ -6,7 +6,8 @@
   flex-shrink: 0;
   height: 100dvh;
   max-height: 100dvh;
-  min-height: 100vh;
+  min-height: 0;
+  overflow: hidden;
   padding: var(--rtk-space-5) var(--rtk-space-3) var(--rtk-space-4);
   transition: width 180ms ease;
   width: var(--sidebar-width);
@@ -18,7 +19,7 @@
 .brandVisual { align-items: center; display: flex; min-width: 0; }
 .brandLogo { display: block; height: auto; max-width: 174px; width: 100%; }
 .brandLogoCompact { display: none; height: 46px; object-fit: contain; width: 46px; }
-.nav { display: flex; flex: 1 1 auto; flex-direction: column; gap: var(--rtk-space-1); margin-top: var(--rtk-space-6); min-height: 0; overflow-y: auto; }
+.nav { display: flex; flex: 1 1 auto; flex-direction: column; gap: var(--rtk-space-1); margin-top: var(--rtk-space-6); min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .sectionLabel { color: var(--rtk-color-text-tertiary); font-size: 11px; font-weight: 700; letter-spacing: .06em; margin: 0 0 var(--rtk-space-2); padding: 0 var(--rtk-space-3); text-transform: uppercase; }
 .navItem { align-items: center; background: transparent; border: 0; border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-secondary); cursor: pointer; display: flex; gap: var(--rtk-space-3); min-height: 44px; overflow: hidden; padding: 0 var(--rtk-space-3); position: relative; text-decoration: none; transition: background-color 160ms ease, color 160ms ease; white-space: nowrap; width: 100%; }
 .navItem > span:nth-child(2) { flex: 1; text-align: left; }
@@ -39,7 +40,7 @@
 .subnavItem:hover { background: var(--rtk-color-surface-hover); color: var(--rtk-color-text-primary); }
 .subnavActive { background: var(--rtk-color-brand-soft); color: var(--rtk-color-brand); font-weight: 700; }
 .subnavActive::after { background: var(--rtk-color-brand-secondary); border-radius: 50%; content: ''; height: 6px; margin-left: auto; width: 6px; }
-.mobileDrawerContent { min-height: 100%; }
+.mobileDrawerContent { height: 100%; min-height: 0; overflow: hidden; }
 .mobileDrawerContent .nav { margin-top: var(--rtk-space-4); }
 
 @media (max-width: 768px) {

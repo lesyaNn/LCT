@@ -1,4 +1,4 @@
-.shell { display: flex; height: 100dvh; min-height: 100vh; overflow: hidden; }
+.shell { display: flex; height: 100dvh; overflow: hidden; }
 .workspace { display: flex; flex: 1; flex-direction: column; height: 100dvh; min-width: 0; overflow: hidden; }
 .content { flex: 1 1 auto; min-height: 0; min-width: 0; overflow-x: clip; overflow-y: auto; padding: clamp(var(--rtk-space-5), 3vw, 32px) clamp(var(--rtk-space-5), 4vw, 56px); }
 @media (max-width: 768px) { .content { padding: var(--rtk-space-5) var(--rtk-space-4); } }
