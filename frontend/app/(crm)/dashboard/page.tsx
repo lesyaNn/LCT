@@ -23,14 +23,9 @@ import { Tooltip } from '@/shared/ui/rtk/tooltip';
 import { formatDateTimeRu } from '@/shared/lib/formatters';
 
 const numberFormatter = new Intl.NumberFormat('ru-RU');
-const scoreFormatter = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1, minimumFractionDigits: 1 });
 
 function formatCount(value: number | null) {
   return value === null ? '—' : numberFormatter.format(value);
-}
-
-function formatScore(value: number | null) {
-  return value === null ? '—' : `${scoreFormatter.format(value)}%`;
 }
 
 interface KpiDefinition {
@@ -77,8 +72,7 @@ export default function DashboardPage() {
       .filter(([key]) => filters[key].length)
       .map(([key, label, entries]) => ({ id: key, label: `${label}: ${filters[key].map((id) => entries.find((item) => item.id === id)?.name ?? id).join(', ')}`, onRemove: () => setFilters((current) => ({ ...current, [key]: [] })) })),
   ];
-  const filterBar = <FilterToolbar activeFilters={activeFilters} label="Фильтры аналитики" collapsible controls={() => <>
-        <DateRangeField presets from={filters.dateFrom} to={filters.dateTo} onFromChange={(dateFrom) => setFilters((current) => ({ ...current, dateFrom }))} onToChange={(dateTo) => setFilters((current) => ({ ...current, dateTo }))} onRangeChange={(dateFrom, dateTo) => setFilters((current) => ({ ...current, dateFrom, dateTo }))} />
+  const filterBar = <FilterToolbar activeFilters={activeFilters} label="Фильтры аналитики" collapsible periodControls={<DateRangeField presets from={filters.dateFrom} to={filters.dateTo} onFromChange={(dateFrom) => setFilters((current) => ({ ...current, dateFrom }))} onToChange={(dateTo) => setFilters((current) => ({ ...current, dateTo }))} onRangeChange={(dateFrom, dateTo) => setFilters((current) => ({ ...current, dateFrom, dateTo }))} />} controls={() => <>
         <MultiSelect labelPlacement="outside" label="ВУЗ" values={filters.universityIds} options={references.data?.universities ?? []} disabled={references.isPending || references.isError} onChange={(universityIds) => setFilters((current) => ({ ...current, universityIds }))} />
         <MultiSelect labelPlacement="outside" label="Направление" values={filters.directionIds} options={references.data?.directions ?? []} disabled={references.isPending || references.isError} onChange={(directionIds) => setFilters((current) => ({ ...current, directionIds }))} />
         <MultiSelect labelPlacement="outside" label="Продукт" values={filters.productIds} options={references.data?.products ?? []} disabled={references.isPending || references.isError} onChange={(productIds) => setFilters((current) => ({ ...current, productIds }))} />

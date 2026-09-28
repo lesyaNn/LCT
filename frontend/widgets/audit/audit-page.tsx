@@ -142,7 +142,6 @@ function AuditFilters({ query, result, options, onPatch, onReset }: { query: Aud
         aria-label="Поиск по журналу"
         onChange={(event) => onPatch({ search: event.target.value })}
       /></label>
-      <DateRangeField presets from={query.filters.dateFrom} to={query.filters.dateTo} disabled={!capabilities?.dateRange} onFromChange={(dateFrom) => onPatch({ dateFrom })} onToChange={(dateTo) => onPatch({ dateTo })} onRangeChange={(dateFrom, dateTo) => onPatch({ dateFrom, dateTo })} />
       <MultiSelect labelPlacement="outside" label="Сотрудник" values={query.filters.userIds} options={users} disabled={!capabilities?.users || !options} onChange={(values) => onPatch({ userIds: values })} />
       <MultiSelect labelPlacement="outside" label="ВУЗ" values={query.filters.universityIds} options={universities} disabled={!capabilities?.universities || !options} onChange={(values) => onPatch({ universityIds: values })} />
       <MultiSelect labelPlacement="outside" label="Что произошло" values={query.filters.actions} options={actionOptions} disabled={!capabilities?.actions} onChange={(values) => onPatch({ actions: values })} />
@@ -154,7 +153,7 @@ function AuditFilters({ query, result, options, onPatch, onReset }: { query: Aud
     ...(query.filters.dateFrom || query.filters.dateTo ? [{ id: 'period', label: `Период: ${query.filters.dateFrom || '…'} — ${query.filters.dateTo || '…'}`, onRemove: () => onPatch({ dateFrom: '', dateTo: '' }) }] : []),
     ...([['userIds', 'Сотрудник', users], ['universityIds', 'ВУЗ', universities], ['actions', 'Что произошло', actionOptions], ['sections', 'Раздел', sectionOptions]] as const).filter(([key]) => query.filters[key].length).map(([key, label, entries]) => ({ id: key, label: `${label}: ${query.filters[key].map((id) => entries.find((item) => item.id === id)?.name ?? id).join(', ')}`, onRemove: () => onPatch({ [key]: [] }) })),
   ];
-  return <FilterToolbar activeFilters={chips} label="Фильтры истории изменений" controls={controls} onReset={onReset} resetDisabled={!selectedFilterCount(query.filters)} mobileCount={selectedFilterCount(query.filters)} />;
+  return <FilterToolbar activeFilters={chips} label="Фильтры истории изменений" controls={controls} periodControls={<DateRangeField presets from={query.filters.dateFrom} to={query.filters.dateTo} disabled={!capabilities?.dateRange} onFromChange={(dateFrom) => onPatch({ dateFrom })} onToChange={(dateTo) => onPatch({ dateTo })} onRangeChange={(dateFrom, dateTo) => onPatch({ dateFrom, dateTo })} />} collapsible onReset={onReset} resetDisabled={!selectedFilterCount(query.filters)} mobileCount={selectedFilterCount(query.filters)} />;
 }
 
 function TimeCell({ value }: { value: string }) {

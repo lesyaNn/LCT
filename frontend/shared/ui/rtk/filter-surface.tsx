@@ -14,9 +14,10 @@ export function FilterSurface({ children, className, label = 'Фильтры', m
 }
 
 /** Shared list-filter presentation. Domain controls and their state remain with the page. */
-export function FilterToolbar({ label, controls, onReset, resetDisabled = false, actions, mobileCount = 0, embedded = false, collapsible = false, compact = false, activeFilters = [] }: {
+export function FilterToolbar({ label, controls, periodControls, onReset, resetDisabled = false, actions, mobileCount = 0, embedded = false, collapsible = false, compact = false, activeFilters = [] }: {
   label: string;
   controls: (mobile: boolean) => ReactNode;
+  periodControls?: ReactNode;
   onReset?: () => void;
   resetDisabled?: boolean;
   actions?: ReactNode;
@@ -33,10 +34,10 @@ export function FilterToolbar({ label, controls, onReset, resetDisabled = false,
   return <>
     <FilterSurface mobileDrawer={false} className={`${styles.desktop} ${embedded ? styles.embedded : ''}`} label={label}>
       {collapsible ? <Button variant="secondary" size="s" type="button" className={styles.collapseTrigger} aria-expanded={expanded} aria-controls={panelId} onClick={() => setExpanded((value) => !value)}><Filter size={16} fill="currentColor" />{expanded ? 'Скрыть фильтры' : 'Показать фильтры'}{mobileCount ? ` (${mobileCount})` : ''}</Button> : null}
-      <div id={panelId} className={styles.panel} hidden={collapsible && !expanded}><div className={`${styles.desktopLayout} ${compact ? styles.compact : ''}`}><div className={styles.grid}>{controls(false)}</div>{reset || actions ? <div className={styles.desktopActions}>{reset}{actions}</div> : null}</div></div>
+      <div id={panelId} className={styles.panel} hidden={collapsible && !expanded}><div className={`${styles.desktopLayout} ${compact ? styles.compact : ''}`}><div className={styles.grid}>{controls(false)}</div>{reset || actions ? <div className={styles.desktopActions}>{reset}{actions}</div> : null}</div>{periodControls ? <div className={styles.periodRow}>{periodControls}</div> : null}</div>
     </FilterSurface>
     <Button className={styles.mobileTrigger} variant="secondary" size="s" type="button" onClick={() => setOpen(true)}><Filter size={16} fill="currentColor" />Фильтры{mobileCount ? ` (${mobileCount})` : ''}</Button>
-    {open ? <Drawer title="Фильтры" onClose={() => setOpen(false)}><div className={`${styles.grid} ${styles.mobileGrid}`}>{controls(true)}</div><div className={styles.actions}>{reset}{actions}<Button variant="primary" size="s" type="button" onClick={() => setOpen(false)}>Показать результаты</Button></div></Drawer> : null}
+    {open ? <Drawer title="Фильтры" onClose={() => setOpen(false)}><div className={`${styles.grid} ${styles.mobileGrid}`}>{controls(true)}</div>{periodControls ? <div className={styles.periodRow}>{periodControls}</div> : null}<div className={styles.actions}>{reset}{actions}<Button variant="primary" size="s" type="button" onClick={() => setOpen(false)}>Показать результаты</Button></div></Drawer> : null}
     <ActiveFilters items={activeFilters} onClearAll={onReset} />
   </>;
 }
