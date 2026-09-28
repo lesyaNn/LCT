@@ -12,6 +12,7 @@
   box-shadow: var(--rtk-shadow-elevation-1);
   min-width: 0;
   overflow: hidden;
+  position: relative;
 }
 
 .table {

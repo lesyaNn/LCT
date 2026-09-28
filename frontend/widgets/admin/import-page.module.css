@@ -12,7 +12,7 @@
 .steps .stepActive { color: var(--rtk-color-brand); }
 .steps .stepActive span { background: var(--rtk-color-brand-soft); border-color: var(--rtk-color-brand); color: var(--rtk-color-brand); }
 .fileBlock { display: flex; flex-direction: column; gap: var(--rtk-space-2); }
-.dropzone { align-items: center; background: var(--rtk-color-surface-subtle); border: 1px dashed var(--rtk-color-border-strong); border-radius: var(--rtk-radius-medium); cursor: pointer; display: flex; flex-direction: column; gap: var(--rtk-space-2); justify-content: center; min-height: 180px; padding: var(--rtk-space-5); text-align: center; transition: background-color 140ms ease, border-color 140ms ease; }
+.dropzone { align-items: center; background: var(--rtk-color-surface-subtle); border: 1px dashed var(--rtk-color-border-strong); border-radius: var(--rtk-radius-medium); cursor: pointer; display: flex; flex-direction: column; gap: var(--rtk-space-2); justify-content: center; min-height: 180px; padding: var(--rtk-space-5); position: relative; text-align: center; transition: background-color 140ms ease, border-color 140ms ease; }
 .dropzone:hover, .dropzoneDragging { background: var(--rtk-color-brand-soft); border-color: var(--rtk-color-brand); }
 .dropzoneError { border-color: var(--rtk-color-danger); }
 .dropzone strong { font-size: 15px; }

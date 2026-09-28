@@ -1,6 +1,6 @@
 .shell { display: flex; height: 100dvh; overflow: hidden; }
 .workspace { display: flex; flex: 1; flex-direction: column; height: 100dvh; min-width: 0; overflow: hidden; }
-.content { flex: 1 1 auto; min-height: 0; min-width: 0; overflow-x: clip; overflow-y: auto; padding: clamp(var(--rtk-space-5), 3vw, 32px) clamp(var(--rtk-space-5), 4vw, 56px); }
+.content { flex: 1 1 auto; min-height: 0; min-width: 0; overflow-x: clip; overflow-y: auto; padding: clamp(var(--rtk-space-5), 3vw, 32px) clamp(var(--rtk-space-5), 4vw, 56px); position: relative; }
 @media (max-width: 768px) { .content { padding: var(--rtk-space-5) var(--rtk-space-4); } }
 @media (max-width: 390px) { .content { padding-left: var(--rtk-space-3); padding-right: var(--rtk-space-3); } }
 @media print { .shell { display: block; height: auto; min-height: auto; overflow: visible; } .shell > aside, .workspace > header { display: none !important; } .content { overflow: visible; padding: 0; } }
