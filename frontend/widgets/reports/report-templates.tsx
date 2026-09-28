@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/shared/ui/rtk/button';
-import { FormErrorBanner } from '@/shared/ui/rtk/form-field';
+import { FormErrorBanner, FormField } from '@/shared/ui/rtk/form-field';
+import { Input } from '@/shared/ui/rtk/form-controls';
 import { normalizeApiError } from '@/shared/lib/api-errors';
 import {
   createReportTemplate,
@@ -77,14 +78,19 @@ export function ReportTemplatesSection({ currentValues, onApply }: ReportTemplat
       ) : (
         <p className={styles.muted}>Шаблонов пока нет.</p>
       )}
-      <div className={styles.columnPresets}>
-        <input
-          aria-label="Название шаблона"
-          placeholder="Название шаблона"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          maxLength={256}
-        />
+      <div className={styles.templateActions}>
+        <FormField label="Название шаблона" htmlFor="report-template-name" error={error ?? undefined} errorId="report-template-name-error">
+          <Input
+            id="report-template-name"
+            placeholder="Например, ежемесячный отчёт"
+            value={name}
+            onChange={(event) => { setName(event.target.value); if (error) setError(null); }}
+            maxLength={256}
+            disabled={saveMutation.isPending}
+            aria-invalid={Boolean(error) || undefined}
+            aria-describedby={error ? 'report-template-name-error' : undefined}
+          />
+        </FormField>
         <Button
           variant="ghost"
           size="s"
@@ -96,7 +102,6 @@ export function ReportTemplatesSection({ currentValues, onApply }: ReportTemplat
           Сохранить
         </Button>
       </div>
-      {error ? <FormErrorBanner>{error}</FormErrorBanner> : null}
       {templatesQuery.isError ? (
         <FormErrorBanner>
           Не удалось загрузить шаблоны.{' '}

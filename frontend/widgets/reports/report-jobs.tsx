@@ -198,7 +198,7 @@ export function ReportJobsPanel({ jobs, loading, error, pollingErrors, retryErro
   if (!jobs.length) return <EmptyState title="Отчёты ещё не формировались" description="Созданные задачи появятся здесь." headingLevel={3} />;
 
   return (
-    <TableShell ariaLabel="Задачи отчётов">
+    <TableShell ariaLabel="Задачи отчётов" className={styles.jobsListShell}>
       <div className={styles.jobsDesktop}>
         <table>
           <caption className={styles.visuallyHidden}>Задачи отчётов</caption>
