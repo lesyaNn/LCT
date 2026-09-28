@@ -80,8 +80,8 @@ export function WorkflowTemplatesList() {
         <div className={styles.headerActions}>
           {!demoMode && template.isActive ? <Button type="button" variant="ghost" size="s" disabled={updateTemplate.isPending} onClick={() => { setRetireError(null); setRetireCandidate({ id: template.id, name: template.name }); }}>Отключить</Button> : null}
           {!demoMode && !template.isActive ? <Button type="button" variant="ghost" size="s" disabled={updateTemplate.isPending} onClick={() => void updateTemplate.mutateAsync({ templateId: template.id, patch: { isActive: true } }).catch((cause) => setNotification(normalizeApiError(cause)))}>Активировать</Button> : null}
-          {!demoMode ? <Tooltip content="Удалить"><IconButton icon={<Trash size={18} fill="currentColor" />} label={`Удалить шаблон «${template.name}»`} size={18} intent="danger" disabled={deleteTemplate.isPending} onClick={() => { setDeleteError(null); setDeleteCandidate({ id: template.id, name: template.name }); }} /></Tooltip> : null}
           <Link className={styles.editLink} href={`/admin/workflow/templates/${template.id}/edit`}>Редактировать<ArrowRight size={18} fill="currentColor" /></Link>
+          {!demoMode ? <Tooltip content="Удалить"><IconButton icon={<Trash size={18} fill="currentColor" />} label={`Удалить шаблон «${template.name}»`} size={18} intent="danger" disabled={deleteTemplate.isPending} onClick={() => { setDeleteError(null); setDeleteCandidate({ id: template.id, name: template.name }); }} /></Tooltip> : null}
         </div>
       </li>)}</ul> : <EmptyState title="Шаблонов пока нет" description="Создайте первый шаблон и добавьте в него этапы." headingLevel={3} primaryAction={{ label: 'Новый шаблон', onClick: () => setCreateOpen(true) }} />}
     </section>
