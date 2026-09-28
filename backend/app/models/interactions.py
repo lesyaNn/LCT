@@ -35,6 +35,35 @@ if TYPE_CHECKING:  # pragma: no cover
     from app.models.catalog import Contract, ITProgram, License, Responsible, University
 
 
+class Student(UUIDPKMixin, TimestampMixin, Base):
+    """Learner enrollment in a university program, including LMS sync metadata."""
+
+    __tablename__ = "students"
+    __table_args__ = (
+        Index("ix_students_university_id", "university_id"),
+        Index("ix_students_program_id", "program_id"),
+        Index("ix_students_status", "status"),
+    )
+
+    external_id: Mapped[str] = mapped_column(String(256), unique=True, nullable=False)
+    university_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("universities.id", ondelete="RESTRICT"), nullable=False
+    )
+    program_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("it_programs.id", ondelete="RESTRICT"), nullable=False
+    )
+    full_name: Mapped[str] = mapped_column(String(512), nullable=False)
+    group_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
+    started_at: Mapped[date] = mapped_column(Date, nullable=False)
+    finished_at: Mapped[date | None] = mapped_column(Date, nullable=True)
+    source: Mapped[str] = mapped_column(String(32), nullable=False, default="manual")
+    progress: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    university: Mapped["University"] = relationship(back_populates="students")
+
+
 class UniversityProgram(UUIDPKMixin, TimestampMixin, Base):
     __tablename__ = "university_programs"
     __table_args__ = (

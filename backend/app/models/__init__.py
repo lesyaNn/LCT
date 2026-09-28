@@ -46,9 +46,11 @@ from app.models.interactions import (  # noqa: F401
     InteractionNote,
     Meeting,
     MeetingDocument,
+    Student,
     UniversityProduct,
     UniversityProgram,
 )
+from app.models.teachers import Teacher, TeacherCertificate, TeacherProgram, TeacherQualification  # noqa: F401
 from app.models.workflow_templates import (  # noqa: F401
     WorkflowStage,
     WorkflowTemplate,
@@ -74,6 +76,11 @@ __all__ = [
     "Responsible",
     "UniversityResponsible",
     "UniversityProgram",
+    "Student",
+    "Teacher",
+    "TeacherQualification",
+    "TeacherCertificate",
+    "TeacherProgram",
     "UniversityProduct",
     "Meeting",
     "MeetingDocument",
