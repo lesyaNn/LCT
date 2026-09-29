@@ -141,7 +141,7 @@ docker compose exec -e SEED_DEMO_DATA=true backend python -m app.scripts.seed_de
 
 Как пользоваться:
 1. Открой Swagger UI — операции сгруппированы по тегам (Universities, Workflow, Reports…), у каждой есть русское описание и требуемые права.
-2. Для защищённых ручек нажми **Authorize** и вставь JWT из Keycloak (realm `rtk`, см. [docs/API_INTEGRATION.md](docs/API_INTEGRATION.md)); без токена API вернёт 401.
+2. Для защищённых ручек нажми **Authorize** → **KeycloakLogin**: откроется штатная страница логина Keycloak (Authorization Code + PKCE, пароль вводится только там и никуда больше не передаётся) — войди (например `admin` / `admin123`), токен подставится сам. Других кнопок входа в Swagger нет — это единственный способ. Без токена API вернёт 401.
 3. Для локальной проверки подходят демонстрационные пользователи из раздела ниже.
 4. `openapi.json` можно импортировать в Postman/Insomnia или использовать для генерации API-клиентов.
 
