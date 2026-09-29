@@ -87,6 +87,7 @@ class MatrixCell(BaseModel):
     health_score: int | None = Field(default=None, ge=0, le=100)
     health_level: Literal["stable", "attention", "critical", "no_data"] = "no_data"
     health_factors: list[str] = Field(default_factory=list)
+    workflow_instance_id: UUID | None = None
     risk_level: Literal["none", "low", "high"] = "none"
     license_status: str | None = None
     workflow_progress: float | None = None

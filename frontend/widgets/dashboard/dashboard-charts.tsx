@@ -25,6 +25,7 @@ import {
 } from '@/shared/lib/dashboard-repository';
 import { EmptyState } from '@/shared/ui/empty-state';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
+import { Tooltip as RtkTooltip } from '@/shared/ui/rtk/tooltip';
 import { ChartExportMenu } from '@/shared/ui/chart-export-menu';
 import { attentionSeverityIntent } from '@/shared/lib/status-semantics';
 import styles from './dashboard-charts.module.css';
@@ -172,8 +173,20 @@ function LaunchDynamicsChart({ data }: { data: DashboardAnalytics['launchDynamic
 }
 
 
-const matrixStateLabel: Record<MatrixHealthState, string> = { HEALTHY: 'Стабильно', ATTENTION: 'Требует внимания', CRITICAL: 'Критично', NOT_STARTED: 'Workflow не запущен', COMPLETED: 'Завершён', NOT_LINKED: 'Нет связи' };
-const matrixStateMark: Record<MatrixHealthState, string> = { HEALTHY: '●', ATTENTION: '●', CRITICAL: '●', NOT_STARTED: '○', COMPLETED: '✓', NOT_LINKED: '—' };
+const matrixStateLabel: Record<MatrixHealthState, string> = {
+  HEALTHY: 'Стабильно', ATTENTION: 'Требует внимания', CRITICAL: 'Критично',
+  NOT_STARTED: 'Не запущено', COMPLETED: 'Завершено', NOT_LINKED: 'Не используется',
+};
+const matrixStateMark: Record<MatrixHealthState, string> = {
+  HEALTHY: '●', ATTENTION: '!', CRITICAL: '!', NOT_STARTED: '○', COMPLETED: '✓', NOT_LINKED: '—',
+};
+
+function MatrixCellContent({ state, score }: { state: MatrixHealthState; score: number | null }) {
+  return <span className={`${styles.matrixCell} ${styles[`matrix${state}`]}`}>
+    <span aria-hidden="true" className={styles.matrixMark}>{matrixStateMark[state]}</span>
+    <span className={styles.matrixCellText}>{state === 'HEALTHY' || state === 'ATTENTION' || state === 'CRITICAL' ? <><strong>{score ?? '—'}</strong><small>{matrixStateLabel[state]}</small></> : matrixStateLabel[state]}</span>
+  </span>;
+}
 
 function UniversityProgramMatrix({ matrix }: { matrix: DashboardMatrix }) {
   const byCell = new Map(matrix.cells.map((cell) => [`${cell.universityId}:${cell.programId}`, cell]));
@@ -181,8 +194,16 @@ function UniversityProgramMatrix({ matrix }: { matrix: DashboardMatrix }) {
   if (!matrix.rows.length || !matrix.columns.length) return <EmptyChart />;
   return <div className={styles.matrixWrap}>
     <div className={styles.matrixSummary}>Стабильно: {counts.stable} · Требуют внимания: {counts.attention} · Критично: {counts.critical}</div>
-    <div className={styles.matrixScroll}><table className={styles.matrix}><thead><tr><th>ВУЗ</th>{matrix.columns.map((column) => <th key={column.id} title={column.direction}>{column.name}</th>)}</tr></thead><tbody>{matrix.rows.map((row) => <tr key={row.id}><th scope="row"><Link href={`/universities/${row.id}`}>{row.name}</Link><small>{row.score === null ? 'Недостаточно данных' : `Health ${row.score} · ${row.startedPrograms} из ${row.totalPrograms} запущено`}</small></th>{matrix.columns.map((column) => { const cell = byCell.get(`${row.id}:${column.id}`); if (!cell) return <td key={column.id}>—</td>; const label = `${row.name}, ${column.name}: ${matrixStateLabel[cell.state]}${cell.score === null ? '' : `, Health ${cell.score}`}`; const content = <span className={`${styles.matrixCell} ${styles[`matrix${cell.state}`]}`} aria-label={label} title={[label, cell.milestone, ...cell.factors].filter(Boolean).join(' · ')}>{matrixStateMark[cell.state]}{cell.score === null ? '' : ` ${cell.score}`}</span>; return <td key={column.id}>{cell.state === 'NOT_LINKED' ? content : <Link href={cell.state === 'NOT_STARTED' ? `/universities/${row.id}?tab=workflow&program=${column.id}` : `/universities/${row.id}?tab=workflow&program=${column.id}`}>{content}</Link>}</td>; })}</tr>)}</tbody></table></div>
-    <div className={styles.matrixLegend} aria-label="Легенда матрицы">{(['HEALTHY', 'ATTENTION', 'CRITICAL', 'NOT_STARTED', 'COMPLETED'] as MatrixHealthState[]).map((state) => <span key={state} className={styles.matrixLegendItem}><span className={`${styles.matrixDot} ${styles[`matrix${state}`]}`}>{matrixStateMark[state]}</span>{matrixStateLabel[state]}</span>)}</div>
+    <div className={styles.matrixScroll}><table className={styles.matrix}><thead><tr><th>ВУЗ</th>{matrix.columns.map((column) => <th key={column.id} title={column.direction}>{column.name}</th>)}</tr></thead><tbody>{matrix.rows.map((row) => <tr key={row.id}><th scope="row"><Link href={`/universities/${row.id}`}>{row.name}</Link><small>{row.score === null ? 'Недостаточно данных' : `Health ${row.score} · ${row.startedPrograms} из ${row.totalPrograms} запущено`}</small></th>{matrix.columns.map((column) => {
+      const cell = byCell.get(`${row.id}:${column.id}`);
+      if (!cell) return <td key={column.id}>—</td>;
+      const label = `${row.name}, ${column.name}: ${matrixStateLabel[cell.state]}${cell.score === null || cell.state === 'COMPLETED' ? '' : `, Health ${cell.score}`}`;
+      const details = <span className={styles.matrixTooltip}><strong>{row.name} · {column.name}</strong><span>Статус: {matrixStateLabel[cell.state]}</span>{cell.state === 'COMPLETED' ? <span>Workflow завершён.</span> : cell.state === 'NOT_STARTED' ? <span>Workflow ещё не запущен.</span> : cell.state === 'NOT_LINKED' ? <span>Программа не связана с ВУЗом.</span> : <>{cell.score !== null ? <span>Health Score: {cell.score}</span> : null}{cell.milestone ? <span>Текущий этап: {cell.milestone}</span> : null}{cell.factors.length ? <span>Причины: {cell.factors.join('; ')}</span> : null}</>}</span>;
+      const content = <MatrixCellContent state={cell.state} score={cell.score} />;
+      const href = cell.workflowInstanceId ? `/workflows/${cell.workflowInstanceId}` : `/universities/${row.id}?tab=workflow&program=${column.id}`;
+      return <td key={column.id}><RtkTooltip content={details}>{cell.state === 'NOT_LINKED' ? <span aria-label={label}>{content}</span> : <Link href={href} aria-label={label}>{content}</Link>}</RtkTooltip></td>;
+    })}</tr>)}</tbody></table></div>
+    <div className={styles.matrixLegend} aria-label="Легенда матрицы">{(['COMPLETED', 'HEALTHY', 'ATTENTION', 'CRITICAL', 'NOT_STARTED', 'NOT_LINKED'] as MatrixHealthState[]).map((state) => <span key={state} className={styles.matrixLegendItem}><span className={`${styles.matrixDot} ${styles[`matrix${state}`]}`}>{matrixStateMark[state]}</span>{matrixStateLabel[state]}</span>)}</div>
   </div>;
 }
 

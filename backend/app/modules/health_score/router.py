@@ -28,12 +28,23 @@ def _health(university_id: UUID, db: Session, user: CurrentUser):
     if row is None:
         raise HTTPException(status_code=404, detail="University not found")
     factors = []
+    columns = {column.id: column.name for column in matrix.columns}
+    programs = []
     for cell in matrix.cells:
+        if cell.health_state == "NOT_LINKED":
+            continue
         factors.extend(cell.health_factors)
+        programs.append({
+            "program_id": cell.program_id, "program_name": columns[cell.program_id],
+            "state": cell.health_state, "score": cell.health_score,
+            "workflow_instance_id": cell.workflow_instance_id,
+            "current_stage": cell.next_milestone, "factors": cell.health_factors,
+        })
     return {
         "university_id": university_id, "score": row.health_score, "level": row.health_level,
         "started_programs": row.started_programs, "total_programs": row.total_programs,
         "factors": [{"label": label} for label in dict.fromkeys(factors)],
+        "programs": programs,
         "calculated_at": datetime.now(timezone.utc),
     }
 

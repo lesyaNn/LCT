@@ -53,7 +53,7 @@ export interface AttentionItem {
 }
 
 export type MatrixHealthState = 'HEALTHY' | 'ATTENTION' | 'CRITICAL' | 'NOT_STARTED' | 'COMPLETED' | 'NOT_LINKED';
-export interface DashboardMatrixCell { universityId: string; programId: string; state: MatrixHealthState; score: number | null; factors: string[]; milestone: string | null }
+export interface DashboardMatrixCell { universityId: string; programId: string; state: MatrixHealthState; score: number | null; factors: string[]; milestone: string | null; workflowInstanceId: string | null }
 export interface DashboardMatrixRow { id: string; name: string; city: string | null; score: number | null; level: 'stable' | 'attention' | 'critical' | 'no_data'; startedPrograms: number; totalPrograms: number }
 export interface DashboardMatrix { rows: DashboardMatrixRow[]; columns: Array<{ id: string; name: string; direction: string }>; cells: DashboardMatrixCell[] }
 
@@ -92,7 +92,7 @@ const dashboardOverviewMock: DashboardOverview = {
   lmsSyncedAt: null,
 };
 
-type AnalyticsMatrixDto = { rows: Array<{ id: string; name: string; city: string | null; health_score: number | null; health_level: DashboardMatrixRow['level']; started_programs: number; total_programs: number }>; columns: Array<{ id: string; name: string; direction: string }>; cells: Array<{ university_id: string; program_id: string; health_state: MatrixHealthState; health_score: number | null; health_factors: string[]; next_milestone: string | null }> };
+type AnalyticsMatrixDto = { rows: Array<{ id: string; name: string; city: string | null; health_score: number | null; health_level: DashboardMatrixRow['level']; started_programs: number; total_programs: number }>; columns: Array<{ id: string; name: string; direction: string }>; cells: Array<{ university_id: string; program_id: string; health_state: MatrixHealthState; health_score: number | null; health_factors: string[]; next_milestone: string | null; workflow_instance_id: string | null }> };
 
 type AnalyticsOverviewDto = {
   kpi: { universities: number; overdue_stages: number; expiring_licenses: number; active_programs: number; launched_programs: number };
@@ -164,7 +164,7 @@ const dashboardAnalyticsMock: DashboardAnalytics = {
 };
 
 function mapDashboardMatrix(dto: AnalyticsMatrixDto): DashboardMatrix {
-  return { rows: dto.rows.map((row) => ({ id: row.id, name: row.name, city: row.city, score: row.health_score, level: row.health_level, startedPrograms: row.started_programs, totalPrograms: row.total_programs })), columns: dto.columns, cells: dto.cells.map((cell) => ({ universityId: cell.university_id, programId: cell.program_id, state: cell.health_state, score: cell.health_score, factors: cell.health_factors, milestone: cell.next_milestone })) };
+  return { rows: dto.rows.map((row) => ({ id: row.id, name: row.name, city: row.city, score: row.health_score, level: row.health_level, startedPrograms: row.started_programs, totalPrograms: row.total_programs })), columns: dto.columns, cells: dto.cells.map((cell) => ({ universityId: cell.university_id, programId: cell.program_id, state: cell.health_state, score: cell.health_score, factors: cell.health_factors, milestone: cell.next_milestone, workflowInstanceId: cell.workflow_instance_id })) };
 }
 
 function mapDashboardAnalytics(overview: AnalyticsOverviewDto, matrix: AnalyticsMatrixDto): DashboardAnalytics {
@@ -197,7 +197,7 @@ export async function getDashboardData(filters: DashboardFilters = EMPTY_DASHBOA
   });
 }
 
-export interface UniversityHealth { university_id: string; score: number | null; level: 'stable' | 'attention' | 'critical' | 'no_data'; started_programs: number; total_programs: number; factors: Array<{ label: string }> }
+export interface UniversityHealth { university_id: string; score: number | null; level: 'stable' | 'attention' | 'critical' | 'no_data'; started_programs: number; total_programs: number; factors: Array<{ label: string }>; programs: Array<{ program_id: string; program_name: string; state: MatrixHealthState; score: number | null; workflow_instance_id: string | null; current_stage: string | null; factors: string[] }> }
 export async function getUniversityHealth(id: string): Promise<UniversityHealth | null> {
   if (isMockDataSourceFor('passport')) return null;
   const result = await apiFetch<UniversityHealth>(`/api/v1/universities/${encodeURIComponent(id)}/health-score`);
