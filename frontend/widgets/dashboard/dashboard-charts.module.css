@@ -317,15 +317,20 @@
 .matrixHEALTHY, .matrixCOMPLETED { color: var(--rtk-color-success); }
 .matrixATTENTION { color: var(--rtk-color-warning); }
 .matrixCRITICAL { color: var(--rtk-color-danger); }
-.matrixNOT_STARTED, .matrixNOT_LINKED { color: var(--rtk-color-text-tertiary); }
+.matrixNOT_STARTED, .matrixNOT_LINKED { color: var(--rtk-color-text-tertiary); font-weight: 400; opacity: .72; }
 .matrixLegend { display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); }
 .matrixLegendItem { align-items: center; display: inline-flex; gap: 5px; }
 .matrixDot { font-size: 14px; font-weight: 700; }
 @media (max-width: 768px) { .matrixScroll { max-height: 420px; } .matrix { min-width: 620px; } }
 .matrix td { min-width: 116px; }
 .matrixCell { font-weight: 600; line-height: 1.15; min-height: 37px; min-width: 95px; }
+.matrixCell.matrixNOT_STARTED, .matrixCell.matrixNOT_LINKED { font-weight: 400; }
+.matrixNOT_STARTED .matrixCellText, .matrixNOT_LINKED .matrixCellText { font-weight: 400; }
+.matrixNOT_STARTED .matrixMark, .matrixNOT_LINKED .matrixMark { font-size: 12px; font-weight: 400; }
 .matrixMark { font-size: 14px; }
 .matrixCellText { display: flex; flex-direction: column; gap: 2px; }
 .matrixCellText small { color: inherit; font-size: 10px; font-weight: 500; }
 .matrixTooltip { display: flex; flex-direction: column; gap: 5px; text-align: left; white-space: normal; }
 .matrixTooltip strong { color: var(--rtk-color-text-primary); }
+.funnelCanvas { height: 360px; min-width: 0; width: 100%; }
+.topUniversitiesCanvas, .workloadCanvas { height: 270px; min-width: 0; width: 100%; }

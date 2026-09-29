@@ -16,9 +16,9 @@ import { useAuth } from '@/shared/auth/AuthProvider';
 import { hasPermission, hasRole } from '@/shared/lib/access-control';
 import { formatDateTimeRu } from '@/shared/lib/formatters';
 import { normalizeApiError } from '@/shared/lib/api-errors';
+import { getUniversityHealth } from '@/shared/lib/dashboard-repository';
 import { queryKeys } from '@/shared/lib/query-keys';
 import {
-  getUniversityHealth,
   getWorkflowSelectorPrograms,
   getUniversityPassport,
   isRealWorkflowMode,

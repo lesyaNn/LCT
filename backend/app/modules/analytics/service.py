@@ -1,7 +1,7 @@
 """Pure aggregations over the loaded selection."""
 
 from collections import Counter, defaultdict
-from datetime import date
+from datetime import date, datetime
 
 from app.db.seed_workflow import STAGES_14
 from app.modules.analytics.repository import AnalyticsData
@@ -19,6 +19,66 @@ LEGEND = {
     "archived": "Программа в архиве",
 }
 PROGRAM_STATUSES = ("planned", "active", "launched", "archived")
+
+
+def _month_key(value: date | datetime) -> str:
+    return value.strftime("%Y-%m")
+
+
+def _stage_funnel(data: AnalyticsData) -> list[dict]:
+    instances = [item for item in data.instances if item.status != "archived"]
+    stages_by_instance = grouped(data.stages, lambda item: item.instance_id)
+    template_names = {item.id: item.name for item in data.templates}
+    buckets: dict[tuple, dict] = {}
+    for instance in instances:
+        ordered = sorted(stages_by_instance[instance.id], key=lambda item: item.order_index)
+        if not ordered:
+            continue
+        current_index = next((index for index, item in enumerate(ordered) if item.id == instance.current_instance_stage_id), None)
+        reached_index = len(ordered) - 1 if instance.status == "completed" else current_index
+        template_name = template_names.get(instance.template_id)
+        for index, stage in enumerate(ordered):
+            key = (instance.template_id, stage.order_index, stage.name)
+            bucket = buckets.setdefault(key, {"stage": stage.name, "template": template_name, "order": stage.order_index, "reached": 0, "current": 0, "completed": 0})
+            if reached_index is not None and index <= reached_index:
+                bucket["reached"] += 1
+            if current_index == index:
+                bucket["current"] += 1
+            if stage.completed_at is not None or stage.status == "completed":
+                bucket["completed"] += 1
+    return [{field: item[field] for field in ("stage", "template", "reached", "current", "completed")}
+            for item in sorted(buckets.values(), key=lambda value: (value["template"] or "", value["order"]))]
+
+
+def _monthly_events(data: AnalyticsData) -> list[dict]:
+    counts = Counter()
+    for item in (*data.instances, *data.transitions, *data.interaction_notes):
+        if item.created_at is not None:
+            counts[_month_key(item.created_at)] += 1
+    for item in data.meetings:
+        counts[_month_key(item.meeting_at)] += 1
+    return [{"month": month, "count": counts[month]} for month in sorted(counts)]
+
+
+def _top_universities(data: AnalyticsData) -> list[dict]:
+    names = {item.id: item.name for item in data.universities}
+    counts = Counter(item.university_id for item in (*data.meetings, *data.interaction_notes))
+    return [{"university_id": university_id, "university": names[university_id], "count": count}
+            for university_id, count in sorted(counts.items(), key=lambda pair: (-pair[1], names[pair[0]]))[:10]]
+
+
+def _responsible_workload(data: AnalyticsData) -> list[dict]:
+    stages_by_instance = grouped(data.stages, lambda item: item.instance_id)
+    responsible_names = {item.id: item.full_name for item in data.responsibles}
+    buckets: dict[object, dict] = {}
+    for instance in data.instances:
+        if instance.status == "archived":
+            continue
+        current = next((stage for stage in stages_by_instance[instance.id] if stage.id == instance.current_instance_stage_id), None)
+        responsible_id = (current.responsible_id if current and current.responsible_id is not None else instance.responsible_id)
+        bucket = buckets.setdefault(responsible_id, {"responsible_id": responsible_id, "responsible": responsible_names.get(responsible_id, "Без ответственного"), "in_progress": 0, "completed": 0})
+        bucket["completed" if instance.status == "completed" else "in_progress"] += 1
+    return sorted(buckets.values(), key=lambda item: (-(item["in_progress"] + item["completed"]), item["responsible"]))
 
 
 def grouped(items, key):
@@ -85,6 +145,10 @@ def build_overview(data: AnalyticsData, *, today: date) -> Overview:
         "health_trend": [],
         "launch_dynamics": [{"month": f"{m // 12:04d}-{m % 12 + 1:02d}",
             "actual": launches[(m, "launched")], "planned": launches[(m, "planned")]} for m in launch_months],
+        "stage_funnel": _stage_funnel(data),
+        "monthly_events": _monthly_events(data),
+        "top_universities": _top_universities(data),
+        "responsible_workload": _responsible_workload(data),
     })
 
 

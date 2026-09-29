@@ -53,6 +53,32 @@ class LaunchPoint(BaseModel):
     planned: int = 0
 
 
+class StageFunnelBucket(BaseModel):
+    stage: str
+    template: str | None = None
+    reached: int = 0
+    current: int = 0
+    completed: int = 0
+
+
+class MonthlyEventBucket(BaseModel):
+    month: str
+    count: int = 0
+
+
+class UniversityInteractionBucket(BaseModel):
+    university_id: UUID
+    university: str
+    count: int = 0
+
+
+class ResponsibleWorkloadBucket(BaseModel):
+    responsible_id: UUID | None = None
+    responsible: str
+    in_progress: int = 0
+    completed: int = 0
+
+
 class Overview(BaseModel):
     kpi: KPI
     workflow_distribution: list[WorkflowBucket] = Field(default_factory=list)
@@ -61,6 +87,10 @@ class Overview(BaseModel):
     overdue_items: list[OverdueItem] = Field(default_factory=list)
     health_trend: list[TrendPoint] = Field(default_factory=list)
     launch_dynamics: list[LaunchPoint] = Field(default_factory=list)
+    stage_funnel: list[StageFunnelBucket] = Field(default_factory=list)
+    monthly_events: list[MonthlyEventBucket] = Field(default_factory=list)
+    top_universities: list[UniversityInteractionBucket] = Field(default_factory=list)
+    responsible_workload: list[ResponsibleWorkloadBucket] = Field(default_factory=list)
 
 
 class MatrixRow(BaseModel):

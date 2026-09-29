@@ -8,9 +8,10 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload, raiseload
 
-from app.models.catalog import ITProgram, License, University
-from app.models.interactions import UniversityProgram
-from app.models.workflow_instances import InstanceStage, WorkflowInstance, WorkflowTask
+from app.models.catalog import ITProgram, License, Responsible, University
+from app.models.interactions import InteractionNote, Meeting, UniversityProgram
+from app.models.workflow_instances import InstanceStage, WorkflowInstance, WorkflowStageTransition, WorkflowTask
+from app.models.workflow_templates import WorkflowTemplate
 from app.modules.analytics.integration import Selection
 
 
@@ -24,6 +25,11 @@ class AnalyticsData:
     instances: list[Any] = field(default_factory=list)
     stages: list[Any] = field(default_factory=list)
     tasks: list[Any] = field(default_factory=list)
+    transitions: list[Any] = field(default_factory=list)
+    meetings: list[Any] = field(default_factory=list)
+    interaction_notes: list[Any] = field(default_factory=list)
+    responsibles: list[Any] = field(default_factory=list)
+    templates: list[Any] = field(default_factory=list)
 
 
 def selected_rows(db, model, predicate, ids=None, options=()):
@@ -57,6 +63,12 @@ def load_data(db: Session, selection: Selection, *, today: date, filters: dict |
     instance_ids = [item.id for item in data.instances]
     data.stages = selected_rows(db, InstanceStage, InstanceStage.instance_id.in_(instance_ids)) if instance_ids else []
     data.tasks = selected_rows(db, WorkflowTask, WorkflowTask.instance_id.in_(instance_ids)) if instance_ids else []
+    data.transitions = selected_rows(db, WorkflowStageTransition, WorkflowStageTransition.instance_id.in_(instance_ids)) if instance_ids else []
+    data.meetings = selected_rows(db, Meeting, Meeting.university_id.in_(uni_ids))
+    data.interaction_notes = selected_rows(db, InteractionNote, InteractionNote.university_id.in_(uni_ids))
+    data.responsibles = list(db.scalars(select(Responsible)))
+    template_ids = {item.template_id for item in data.instances}
+    data.templates = selected_rows(db, WorkflowTemplate, WorkflowTemplate.id.in_(template_ids)) if template_ids else []
     data.scores = {}
     data.trend = []
     return data
