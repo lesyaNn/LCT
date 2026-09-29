@@ -2,7 +2,7 @@
 .embedded { background: transparent; border-radius: 0; box-shadow: none; padding: 0; }
 .desktopLayout { align-items: end; display: flex; gap: var(--rtk-space-3); min-width: 0; }
 .grid { align-items: end; display: grid; flex: 1 1 auto; gap: var(--rtk-space-3); grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); min-width: 0; }
-.compact .grid { flex: 0 1 260px; grid-template-columns: minmax(0, 1fr); margin-left: auto; }
+.compact .grid { flex: 0 1 260px; grid-template-columns: minmax(0, 1fr); }
 .desktopActions { align-items: center; display: flex; flex: 0 0 auto; gap: var(--rtk-space-2); }
 .desktopActions button { min-height: 46px; }
 .grid > * { min-width: 0; }

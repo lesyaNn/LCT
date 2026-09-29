@@ -18,13 +18,10 @@ import Search from '@atomaro/icons/24/action/Search';
 import ChevronSort from '@atomaro/icons/24/navigation/ChevronSort';
 import SortDown from '@atomaro/icons/24/editor/SortDown';
 import SortUp from '@atomaro/icons/24/editor/SortUp';
-import GridColumns2 from '@atomaro/icons/24/editor/GridColumns2';
-import TableIcon from '@atomaro/icons/24/document/Table';
 import User from '@atomaro/icons/24/communication/User';
 import BookOpen from '@atomaro/icons/24/culture/BookOpen';
 import { Button } from '@/shared/ui/rtk/button';
-import { IconButton } from '@/shared/ui/rtk/icon-button';
-import { Tooltip } from '@/shared/ui/rtk/tooltip';
+import { Tabs } from '@/shared/ui/rtk/tabs';
 import { FilterToolbar } from '@/shared/ui/rtk/filter-surface';
 import { SearchField } from '@/shared/ui/rtk/filter-field';
 import type { ActiveFilterItem } from '@/shared/ui/rtk/active-filters';
@@ -551,10 +548,7 @@ export function UniversitiesList() {
           <h1>ВУЗы</h1>
           <p className={styles.description}>Учебные заведения, программы и задачи, требующие внимания команды.</p>
         </div>
-        <div className={styles.viewToggle} role="group" aria-label="Вид списка вузов">
-          <Tooltip content="Карточки"><IconButton icon={<GridColumns2 size={18} fill="currentColor" />} label="Карточки" size={18} aria-pressed={view === 'cards'} className={view === 'cards' ? styles.viewActive : ''} onClick={() => selectView('cards')} /></Tooltip>
-          <Tooltip content="Таблица"><IconButton icon={<TableIcon size={18} fill="currentColor" />} label="Таблица" size={18} aria-pressed={view === 'table'} className={view === 'table' ? styles.viewActive : ''} onClick={() => selectView('table')} /></Tooltip>
-        </div>
+        <Tabs items={[{ id: 'cards', label: 'Карточки' }, { id: 'table', label: 'Таблица' }]} activeId={view} onChange={(id) => selectView(id as UniversityView)} label="Представление вузов" prefix="university-view" />
       </header>
       <div className={styles.filterArea}>
         <FilterToolbar label="Фильтры списка вузов" collapsible controls={() => <Filters state={state} options={filterOptions} catalogsLoading={catalogsQuery.isPending} catalogsUnavailable={catalogsQuery.isError} searchInput={searchInput} setSearchInput={setSearchInput} onPatch={goToState} />} onReset={resetFilters} resetDisabled={!hasFilters} mobileCount={activeFilterCount} activeFilters={universityActiveFilters(state.filters, filterOptions, goToState)} />

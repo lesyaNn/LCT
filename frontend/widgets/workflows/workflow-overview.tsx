@@ -50,7 +50,7 @@ export function WorkflowOverviewPage() {
   const selects = [
     { key: 'university', label: 'ВУЗ', all: 'Все ВУЗы' },
     { key: 'program', label: 'Программа', all: 'Все программы' },
-    { key: 'responsible', label: 'Ответственный за ВУЗ', all: 'Все сотрудники' },
+    { key: 'responsible', label: 'Ответственный за этап', all: 'Все сотрудники' },
     { key: 'stage', label: 'Этап', all: 'Все этапы' },
   ] as const;
   const filterControls = () => <><label><span>Поиск</span><Input type="search" placeholder="ВУЗ, программа или этап" value={filters.search} onChange={(event) => update('search', event.target.value)} /></label>{selects.map(({ key, label, all }) => <label key={key}><span>{label}</span><Select value={filters[key]} onChange={(event) => update(key, event.target.value)}><option value="">{all}</option>{options(items, key).map(([id, name]) => <option value={id} key={id}>{name}</option>)}</Select></label>)}<label><span>Статус</span><Select value={filters.status} onChange={(event) => update('status', event.target.value)}><option value="">Все статусы</option><option value="in_progress">В работе</option><option value="overdue">Просрочен</option><option value="completed">Завершён</option></Select></label></>;

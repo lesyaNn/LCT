@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import User from '@atomaro/icons/24/communication/User';
+import Calendar from '@atomaro/icons/24/communication/Calendar';
 import { formatDateRu } from '@/shared/lib/formatters';
 import { isMockDataSourceFor } from '@/shared/lib/data-source';
 import type { WorkflowOverviewItem } from '@/shared/lib/workflow-overview-repository';
@@ -15,12 +17,19 @@ export function WorkflowCard({ item, dragHandle }: { item: WorkflowOverviewItem;
   const href = isMockDataSourceFor('workflow') && item.programKey
     ? `/universities/${encodeURIComponent(item.universityId)}?tab=workflow&program=${encodeURIComponent(item.programKey)}&workflow=${encodeURIComponent(item.instanceId)}`
     : `/workflows/${encodeURIComponent(item.instanceId)}`;
-  return <article className={styles.card}>
-    <div className={styles.cardTop}><Link className={styles.cardTitle} href={href}>{item.universityName}</Link><div className={styles.cardTopActions}>{dragHandle}<WorkflowArchiveAction instanceId={item.instanceId} universityId={item.universityId} active={item.status !== 'completed'} /></div></div>
-    <p className={styles.program}>{item.programName ?? 'Программа не привязана'}</p>
+  const responsible = item.stage.responsible;
+  return <article className={`${styles.card} ${item.status === 'overdue' ? styles.cardOverdue : ''}`}>
+    <Link className={styles.cardHitArea} href={href} aria-label={`Открыть Workflow: ${item.universityName}${item.programName ? ` — ${item.programName}` : ''}`} onKeyDown={(event) => {
+      if (event.key === ' ') { event.preventDefault(); event.currentTarget.click(); }
+    }} />
+    <div className={styles.cardTop}><strong className={styles.cardTitle}>{item.universityName}</strong><div className={styles.cardTopActions}>{dragHandle}<WorkflowArchiveAction instanceId={item.instanceId} universityId={item.universityId} active={item.status !== 'completed'} /></div></div>
+    {item.programName ? <p className={styles.program}>{item.programName}</p> : null}
     <p className={styles.stageName}>{item.stage.name}</p>
-    <StatusBadge intent={item.status === 'completed' ? 'success' : item.status === 'overdue' ? 'danger' : 'brand'}>{statusLabel(item.status)}</StatusBadge>
-    <dl className={styles.meta}><div><dt>Ответственный за ВУЗ</dt><dd>{item.responsible?.name ?? 'Не назначен'}</dd></div><div><dt>Срок этапа</dt><dd>{item.stage.deadline ? formatDateRu(item.stage.deadline) : 'Не указан'}</dd></div></dl>
-    <div className={styles.cardActions}><Link href={href}>Открыть / перевести</Link><Link href={`/universities/${encodeURIComponent(item.universityId)}?tab=responsibles`}>Сменить ответственного за ВУЗ</Link></div>
+    <StatusBadge intent={item.status === 'completed' ? 'success' : item.status === 'overdue' ? 'orange' : 'brand'}>{statusLabel(item.status)}</StatusBadge>
+    {responsible || item.stage.deadline ? <dl className={styles.meta}>
+      {responsible ? <div className={styles.metaItem}><User size={20} fill="currentColor" /><div><dt>Ответственный за этап</dt><dd>{responsible.name}</dd></div></div> : null}
+      {item.stage.deadline ? <div className={`${styles.metaItem} ${styles.deadlineMeta}`}><Calendar size={20} fill="currentColor" /><div><dt>Срок этапа</dt><dd>{formatDateRu(item.stage.deadline)}</dd></div></div> : null}
+    </dl> : null}
+    <div className={styles.cardActions}><Link href={href}>Открыть / перевести</Link></div>
   </article>;
 }

@@ -5,10 +5,7 @@
   min-width: 0;
 }
 
-.header { align-items: flex-start; display: flex; gap: var(--rtk-space-3); justify-content: space-between; }
-.viewToggle { align-items: center; background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); display: inline-flex; flex: 0 0 auto; gap: 2px; padding: 3px; }
-.viewToggle button { border-radius: var(--rtk-radius-small); }
-.viewToggle .viewActive { background: var(--rtk-color-brand); color: var(--rtk-color-text-inverse); }
+.header { align-items: end; display: flex; flex-wrap: wrap; gap: var(--rtk-space-4); justify-content: space-between; }
 .eyebrow {
   color: var(--rtk-color-brand);
   font-size: 12px;

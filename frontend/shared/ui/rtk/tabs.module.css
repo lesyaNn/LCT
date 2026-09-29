@@ -1,6 +1,6 @@
 .root { border-bottom: 1px solid var(--rtk-color-border); overflow-x: auto; }
 .list { display: flex; gap: var(--rtk-space-1); min-width: max-content; }
 .tab, .active { border: 0; border-bottom: 3px solid transparent; background: transparent; color: var(--rtk-color-text-secondary); cursor: pointer; font: inherit; font-weight: 700; min-height: 48px; padding: 0 var(--rtk-space-4); white-space: nowrap; }
-.tab:hover { color: var(--rtk-color-text); background: var(--rtk-color-surface-muted); }
-.tab:focus-visible, .active:focus-visible { outline: 3px solid var(--rtk-color-focus); outline-offset: -3px; }
+.tab:hover { color: var(--rtk-color-text-primary); background: var(--rtk-color-surface-hover); }
+.tab:focus-visible, .active:focus-visible { outline: 3px solid var(--rtk-color-brand); outline-offset: -3px; }
 .active { border-bottom-color: var(--rtk-color-brand); color: var(--rtk-color-brand); }
