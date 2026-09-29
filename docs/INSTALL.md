@@ -1,4 +1,4 @@
-# Установка (P5-15-01)
+# Установка
 
 ## Требования
 - Docker + Docker Compose v2, 4GB RAM, 10GB диска.
@@ -36,7 +36,7 @@ docker compose up -d --build
   `import-staging`.
 - БД: `docker compose exec postgres pg_dump -U rtk -d rtk > backup.sql`.
 
-## Секреты (L5)
+## Секреты
 
 Значения `change-me` в `.env.example` / `docker-compose.yml` (`:-change-me`) —
 **только для локального хакатон-стенда**. Для любого общего/прод-стенда:

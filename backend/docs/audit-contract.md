@@ -1,9 +1,9 @@
-# P5 audit contract
+# Контракт аудита
 
 ## CANONICAL_NAME_COMPATIBILITY
 
-`audit_events` is the existing P1/P2 canonical ledger. Migration `000021_audit_p5`
-evolves it in place; there is no `audit_logs` table. The P5 public names
+`audit_events` is the canonical ledger. Migration `000021_audit_p5`
+evolves it in place; there is no `audit_logs` table. The public names
 `timestamp` and `ip` map to physical `created_at` and `ip_address`. The old
 `before_data` and `after_data` text columns become `old_value` and `new_value`
 JSONB. Existing integer event and entity IDs are mapped deterministically to
@@ -17,12 +17,12 @@ worker relay later materializes `audit_events` in one transaction. Delivery is
 eventually consistent and idempotent (the outbox UUID is the audit event UUID);
 an unavailable audit sink therefore never rolls back the workflow transition.
 
-### M9 integration decision
+### Запись событий
 
-Workflow transitions use the Dev-1 outbox: the business change, history, and
+Workflow transitions use the outbox: the business change, history, and
 sanitized audit intent commit in one transaction. The relay delivers to
 `audit_events` later and retries a failed sink without undoing the transition.
-Other mounted mutation paths, including Dev-2's student, catalog, and workflow
+Other mounted mutation paths, including student, catalog, and workflow
 comment coverage, currently call `AuditService.log_event` in the business
 transaction. `AuditService` never commits on its own. A failed direct audit
 insert therefore aborts that business mutation; a rollback removes both.

@@ -1,47 +1,29 @@
-# Архитектура (P5-15-01 + P5-16-01)
+# Архитектура CRM
 
-## Слои
-1. **Presentation** — React SPA (nginx, same-origin `/api/` proxy, runtime `/config.json`).
-2. **API** — FastAPI (`/api/v1`): auth, catalog, passports, workflow, health-score,
-   analytics, reports (только создание job + статус + скачивание), import.
-3. **Domain** — сервисы: passport, workflow engine, health calculator (T/D/S/E/L),
-   policy engine (RBAC + university scope), audit logger.
-4. **Data** — PostgreSQL: две БД на одном сервере — `rtk` (миграции `backend/migrations/`,
-   единственный источник истины схемы) и `keycloak` (таблицы Keycloak/Liquibase).
-5. **Identity** — Keycloak 26 (realm `rtk`, клиент `rtk-frontend`, `aud=rtk-api`).
-6. **Reporting/Background** — отдельный `worker`-контейнер: report jobs и
-   `xlsx_import` через атомарный claim (`FOR UPDATE SKIP LOCKED`), до 3 попыток.
-   BackgroundTasks в API запрещены.
-7. **Infrastructure** — Docker Compose: postgres, redis, keycloak, backend, worker,
-   frontend; volumes `pgdata/redisdata/import-staging/workflow-storage/reports-storage`;
-   сеть `rtk-net`; healthchecks у всех сервисов.
+## Компоненты
 
-## Контекст (Mermaid)
+1. **Frontend** — Next.js App Router, React и TypeScript. Страницы получают данные через репозитории и TanStack Query. В обычном режиме репозитории обращаются к API; mock-режим включается только явной настройкой среды разработки.
+2. **API** — FastAPI (`/api/v1`) для вузов, каталогов, Workflow, импорта, аналитики, отчётов, пользователей и аудита.
+3. **Данные** — PostgreSQL. SQL-миграции в `backend/migrations/` определяют схему CRM; Keycloak использует отдельную базу.
+4. **Авторизация** — Keycloak выдаёт токены; backend проверяет JWT, роли, разрешения и область доступа к вузам.
+5. **Фоновые задачи** — отдельный worker обрабатывает импорт и формирование отчётов. Redis используется для очередей и кэша.
+6. **Развёртывание** — Docker Compose запускает frontend, backend, worker, Keycloak, PostgreSQL и Redis.
+
 ```mermaid
 flowchart LR
-  user["User/Manager/Admin<br/>(браузер)"] --> fe["Frontend<br/>(React SPA :3000)"]
-  fe --> be["Backend API<br/>(FastAPI :8000)"]
-  be --> db[("PostgreSQL<br/>rtk + keycloak")]
-  be --> kc["Keycloak<br/>(OIDC :8081)"]
-  be --> redis[("Redis<br/>(cache/jobs)")]
-  be -.->|"только jobs"| worker["Worker<br/>(reports/imports)"]
-  worker --> db
+  user[Пользователь] --> frontend[Next.js frontend]
+  frontend --> api[FastAPI]
+  api --> postgres[(PostgreSQL)]
+  api --> keycloak[Keycloak]
+  api --> redis[(Redis)]
+  worker[Worker] --> redis
+  worker --> postgres
 ```
 
-## Кэширование
-- Backend: `app/services/cache.py` (каталоги 5 мин, health-score 5 мин,
-  аналитика 1 мин) поверх `app/infrastructure/redis.py` (in-memory fallback);
-  инвалидация писателями после CREATE/UPDATE/DELETE.
-- Frontend: `src/api/queryClient.ts` (stale 30s, GC 5min, retry 2, без refetch
-  при фокусе) + `src/stores/filters.ts` (фильтры в sessionStorage).
-  Целевой стек — TanStack Query + zustand/persist с теми же ключами.
+## Внешние данные
 
-## Внешние интеграции
-Живых LMS/сайта нет: стаб `modules/integrations` (deferred, не смонтирован),
-демо работает на seed без внешней сети (см. `scripts/demo-setup.sh`).
+Импорт справочников и интеграционные адаптеры имеют отдельные API-контракты. Доступность внешних LMS и сайта зависит от настроенного источника; ошибка реального API не подменяется mock-данными.
 
-## ArchiMate
-8 слоёв P5-16-01 отражены выше; `.archimate`-модель — в
-`docs/archimate/architecture.archimate` (Dev-3, открывается в Archi),
-PNG-схема — `docs/archimate/architecture.png`; генератор и инструкция —
-`docs/archimate/README.md`.
+## Модель ArchiMate
+
+Исходная модель, PNG-схема и инструкция по генерации находятся в [`docs/archimate/`](archimate/README.md).

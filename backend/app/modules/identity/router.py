@@ -1,6 +1,6 @@
 """LEGACY QUARANTINE (M7) — DO NOT MOUNT in ``app/api/router.py``.
 
-Reactivation requires the checklist in ``docs/AUDIT.md`` (§0): Keycloak is
+Reactivation requires the checklist in ``docs/DEFERRED_MODULES.md``: Keycloak is
 the identity source; a local ``users`` table + fake ``admin@rtk.local``
 fallback must not come back without review.
 See ``scripts/check_legacy_quarantine.py``.

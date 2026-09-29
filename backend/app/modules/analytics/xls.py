@@ -16,7 +16,7 @@ real legacy ``.xls`` workbook (BIFF8 via :mod:`xlwt`), not a renamed
 Only the *styling* is re-implemented, because BIFF8 and OOXML have no
 shared styling API (xlwt has no autofilter and no freeze panes).
 
-Known BIFF8 limits (see ``REPORTS_REVIEW.md``): at most 65 536 rows and 256
+Known BIFF8 limits: at most 65 536 rows and 256
 columns per sheet. The report block needs 6 metadata rows, so the data
 capacity is ``65 536 - 6`` rows. Exceeding either limit raises
 :class:`XlsCapacityError` and fails the job with a readable message instead

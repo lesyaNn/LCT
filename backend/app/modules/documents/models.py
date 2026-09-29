@@ -1,4 +1,4 @@
-"""DEFERRED module — forward stub, see ``docs/AUDIT.md`` (§0).
+"""DEFERRED module — forward stub, see ``docs/DEFERRED_MODULES.md``.
 
 Forward file-registry stub overlapping the canon ``documents`` table;
 isolated on ``DeferredBase`` metadata. Canon:

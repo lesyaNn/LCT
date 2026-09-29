@@ -102,199 +102,40 @@ CRM позволит контролировать взаимодействие �
 | Церемония награждения | 30 октября | офлайн в Москве |
 
 &nbsp;
-## 🚀 Quick Start — Minimal Auth Stack
+## Запуск
 
-Этап 1: рабочий стенд авторизации `Browser → React → Keycloak → FastAPI (JWT + RBAC)`.
-Запуск одной командой:
-
-```bash
-cp .env.example .env
-docker compose up --build
-```
-
-После запуска:
-
-| Сервис   | URL                          |
-|----------|------------------------------|
-| Frontend | http://localhost:3000        |
-| Backend  | http://localhost:8000        |
-| Swagger  | http://localhost:8000/docs   |
-| Keycloak | http://localhost:8081        |
-
-Сценарий: открыть Frontend → **Войти** → логин на странице Keycloak →
-возврат в React → профиль + роль + кнопки **Проверить Backend** / **Проверить Admin доступ**.
-
-### 👥 Demo-пользователи (DEMO ONLY, не для production)
-
-| Username  | Email                 | Пароль     | Роль    |
-|-----------|-----------------------|------------|---------|
-| `admin`   | admin@example.local   | `admin123` | admin   |
-| `manager` | manager@example.local | `manager123` | manager |
-| `user`    | user@example.local    | `user123`  | user    |
-
-Realm `rtk` импортируется автоматически из `keycloak/realm-export.json`
-при первом старте (`start-dev --import-realm`). Access token содержит `aud=rtk-api`
-через client scope `rtk-api-audience`; Backend проверяет signature/exp/iss/aud
-по JWKS (`AUTH_DEV_BYPASS=false` в compose — fail closed).
-
-### ♻️ Полный пересброс dev-Keycloak
-
-Импорт выполняется только на пустых данных. Для пересоздания с нуля:
+Требуются Docker и Docker Compose. Настройки среды находятся в `.env.example`.
 
 ```bash
-docker compose down
-docker compose up --build keycloak   # ждём healthy, затем остальное
-docker compose up --build
-```
-
-### 🧪 Backend-тесты (без реального Keycloak, JWKS мокируется)
-
-```bash
-cd backend
-PYTHONPATH=. python -m pytest tests/ -q   # pure-unit; DB-интеграция скипается без PG
-# Полная интеграция (схема только из SQL-миграций):
-TEST_DATABASE_URL=postgresql+psycopg://rtk:change-me@localhost:5433/rtk_p1_test \
-  PYTHONPATH=. python -m pytest tests/ -q
-```
-
-### 🗄️ P1 — ядро схемы БД (PostgreSQL + SQL migrations + seed)
-
-SQL-файлы `backend/migrations/` — **единственный источник истины схемы**
-(20 версий: `000001_core_catalog` … `000020_job_attempts`).
-Python ORM (`backend/app/models/` + `audit_events`) — только runtime-описание,
-схемой не управляет (`create_all`/`drop_all`/Alembic DDL удалены из активных
-путей; история Alembic лежит в `backend/alembic/` как read-only архив).
-P1-ядро содержит 21 таблицу: universities, it_directions, it_programs, vendors, it_products,
-contracts, licenses, responsibles, university_responsibles, teachers,
-teacher_qualifications, teacher_certificates, teacher_programs, students,
-university_programs, university_products, meetings, meeting_documents,
-documents, interaction_notes, audit_events. Все PK — UUID (генерирует
-приложение, без `gen_random_uuid()`), все даты — `timestamptz`,
-статусы лицензий/договоров/готовности — вычисляемые `@property`. Миграция
-Б2 добавляет ещё 8 таблиц: workflow_templates, workflow_stages,
-workflow_instances, instance_stages, transitions, comments, tasks, attachments.
-
-```bash
-# 1. Поднять инфраструктуру (postgres healthy -> backend сам применит миграции)
 cp .env.example .env
 docker compose up -d --build
-
-# 2. Локально (без compose): создать БД и применить миграции
-cd backend
-DATABASE_URL=postgresql+psycopg://rtk:change-me@localhost:5433/rtk \
-  python scripts/migrate.py up
-
-# 3. Проверить версию (latest: 000020_job_attempts)
-DATABASE_URL=... python scripts/migrate.py status
-DATABASE_URL=... python scripts/migrate.py verify
-
-# 4. Загрузить демо-данные (идемпотентно, повтор безопасен; только ПОСЛЕ migrate)
-DATABASE_URL=... python -m app.db.seed
-# или:  DATABASE_URL=... python scripts/seed_demo.py
-# perf-нагрузка (тоже только после migrate, таблицы не создаёт):
-#   DATABASE_URL=... python scripts/seed_performance.py
-
-# 5. Инспекция схемы (таблицы, FK, индексы, timestamptz, версия миграций)
-DATABASE_URL=... python scripts/db_inspect.py
-
-# 6. EXPLAIN по ключевым запросам (паспорт, преподаватели, лицензии, встречи)
-DATABASE_URL=... python scripts/check_explain.py
-
-# 7. Тесты: без PG — только pure-unit (DB-тесты скипаются, никакого SQLite DDL);
-#    полная интеграция — через TEST_DATABASE_URL (схема только из SQL-миграций)
-python -m pytest tests/ -q
-TEST_DATABASE_URL=postgresql+psycopg://rtk:change-me@localhost:5433/rtk_p1_test \
-  python -m pytest tests/ -q
-TEST_DATABASE_URL=postgresql+psycopg://postgres@localhost:55433/rtk_p1_test \
-  python -m pytest tests/test_p1_schema.py -q
+./scripts/wait-healthy.sh
 ```
 
-Откат и пересоздание схемы с нуля:
+| Сервис | Адрес |
+| --- | --- |
+| CRM | http://localhost:3000 |
+| API | http://localhost:8000 |
+| Swagger | http://localhost:8000/docs |
+| Keycloak | http://localhost:8081 |
 
-```bash
-cd backend
-DATABASE_URL=... python scripts/migrate.py down --to base --yes  # чистит схему приложения полностью
-DATABASE_URL=... python scripts/migrate.py up                     # создаёт заново без ошибок
-# Частичный откат: DATABASE_URL=... python scripts/migrate.py down --to 000007_passport_perf_indexes --yes
-```
+Подробности установки, обновления и резервного копирования — в
+[инструкции по установке](docs/INSTALL.md).
 
-Переход существующей БД со старого Alembic-head (`7f3a1c9e2b06`):
+### Демонстрационные учётные записи
 
-```bash
-cd backend
-DATABASE_URL=... python scripts/migrate.py baseline  # строгая проверка + mark applied, данные целы
-DATABASE_URL=... python scripts/migrate.py up        # применяет новый workflow runtime
-DATABASE_URL=... python scripts/migrate.py verify
-```
+| Логин | Пароль | Роль |
+| --- | --- | --- |
+| `admin` | `admin123` | Администратор |
+| `manager` | `manager123` | Руководитель |
+| `user` | `user123` | Пользователь/KAM |
 
-Проверка seed: повторный `python -m app.db.seed` печатает те же счётчики
-(10 вузов, 34 преподавателя, 750 студентов, …) — дубликатов нет.
+Учётные записи предназначены для локальной демонстрации. В обычном режиме
+авторизация проходит через Keycloak. Демонстрационный вход сохранён.
 
-Проверка эквивалентности двух схем, приведённых к одной версии (каталог + pg_dump):
+## Frontend и Workflow
 
-```bash
-cd backend
-python scripts/check_migrations.py \
-  --source postgresql://rtk:change-me@localhost:5433/rtk_schema_source \
-  --target postgresql://rtk:change-me@localhost:5433/rtk_schema_target
-# -> SCHEMA EQUIVALENCE: PASS (... tables, ... columns)
-```
-
-### 🗄️ PostgreSQL: две базы — `rtk` (приложение) и `keycloak` (авторизация)
-
-Один PostgreSQL service, две изолированные databases:
-
-```text
-PostgreSQL
-├── rtk      — application database, managed by SQL migrations (scripts/migrate.py)
-│   ├── universities, teachers, students, licenses, contracts, ...
-│   └── schema_migrations (+ legacy alembic_version row on adopted DBs)
-└── keycloak — authentication database, managed by Keycloak (Liquibase)
-    ├── KEYCLOAK INTERNAL TABLES (realm, client, user_entity, ...)
-    └── realm `rtk` + client `rtk-frontend` (import из keycloak/realm-export.json)
-```
-
-* Backend работает только с `rtk` (`DATABASE_URL=...@postgres:5432/rtk`), к таблицам
-  Keycloak не обращается — только JWT/OIDC по JWKS.
-* Keycloak работает только с `keycloak` (`KC_DB=postgres`,
-  `KC_DB_URL=jdbc:postgresql://postgres:5432/keycloak`). SQL-миграции таблиц Keycloak
-  не создают; Keycloak не трогает таблицы `rtk`.
-* Bootstrap обеих БД на чистом pgdata: `docker/postgres/init-databases.sh`
-  (монтируется в `/docker-entrypoint-initdb.d/` сервиса `postgres`).
-  Переменные: `KEYCLOAK_DB` / `KEYCLOAK_DB_USER` / `KEYCLOAK_DB_PASSWORD`
-  (см. `.env.example`). Для уже существующего volume скрипт не выполняется
-  (особенность postgres image) — одноразово выполнить SQL из README ниже.
-* `start-dev --import-realm` сохранён; повторный импорт безопасен
-  (стратегия `IGNORE_EXISTING`: «Realm already exists. Import skipped»).
-
-```bash
-# Проверка изоляции
-docker compose exec postgres psql -U rtk -d rtk -c "\l"            # есть rtk и keycloak
-docker compose exec postgres psql -U rtk -d rtk -c "\dt"           # только P1 + schema_migrations
-docker compose exec postgres psql -U rtk -d keycloak -t \
-  -c "SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tablename IN ('universities','teachers','students','licenses','schema_migrations','alembic_version');"
-# -> 0 (P1-таблиц в keycloak нет)
-
-# Одноразовый bootstrap keycloak-БД на СУЩЕСТВУЮЩЕМ volume (на fresh pgdata не нужен):
-docker compose exec postgres psql -U rtk -d rtk -v ON_ERROR_STOP=1 <<'EOSQL'
-DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'keycloak') THEN
-CREATE ROLE keycloak WITH LOGIN PASSWORD 'change-me';
-ELSE ALTER ROLE keycloak WITH LOGIN PASSWORD 'change-me'; END IF; END $$;
-SELECT 'CREATE DATABASE "keycloak" OWNER "keycloak"'
-WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'keycloak')\gexec
-GRANT ALL PRIVILEGES ON DATABASE "keycloak" TO "keycloak";
-EOSQL
-```
-
-### 🖥️ Frontend P3-01-01
-
-Ветка `feature/p3-01-01` содержит единый frontend на **Next.js App Router + React + TypeScript**.
-App Shell (Sidebar, Topbar, Breadcrumbs, User Menu и адаптивная навигация) находится в
-`frontend/widgets/` и использует локальные CSS Modules с семантическими токенами Rostelecom
-Design System Gen2. В этой задаче авторизация остаётся mock-реализацией; существующий backend,
-Keycloak и инфраструктура репозитория сохранены без переписывания.
-
-Локальный запуск frontend:
+Frontend построен на Next.js App Router, React и TypeScript. Для локального запуска:
 
 ```bash
 cd frontend
@@ -302,41 +143,16 @@ npm install
 npm run dev
 ```
 
-Проверки frontend: `npm run lint`, `npm run typecheck`, `npm run build`.
-Официальные UI-источники: [Design System Gen2](https://design.rt.ru/gen2/designsystem/gettingStarted/intro)
-и [React Storybook](https://design.rt.ru/gen2/react-storybook/?path=/docs/welcome-introduction--docs&globals=cssVariables:Rostelecom+Light+Theme).
+Проверки: `npm run lint`, `npm run typecheck`. Приложение работает с backend API;
+mock-режим доступен только при явной настройке среды разработки.
 
-### ⏭️ Б2: interaction pipeline
+Шаблоны Workflow создаются администратором через интерфейс. Для вуза и программы
+можно запустить экземпляр Workflow, пройти этапы, вести задачи, комментарии и
+вложения.
 
-В ветке `raisw` добавлен канонический UUID-runtime взаимодействия с вузом.
-Миграции `backend/migrations/000011_workflow_templates` … `000017_tasks_priority` создают шаблоны
-этапов, экземпляры, историю переходов, комментарии, задачи и привязки к
-`documents`. Legacy-пакет `app.modules.workflow` намеренно остаётся
-изолированным.
+## Документация
 
-Основные API-пути: `/api/v1/workflow/templates`,
-`/api/v1/workflow/instances`, `/transition`, `/comments`, `/tasks` и
-`/attachments`. Переходы идут только вперёд, проверяют `expected_revision`,
-записывают append-only историю и audit event. UI-канбан, SLA-уведомления и
-фоновая автоматизация остаются следующим слоем.
-
-### ✅ DEFAULT WORKFLOW (стандартный шаблон при запуске)
-
-После запуска backend автоматически доступен стандартный workflow:
-
-«Стандартный маршрут взаимодействия с вузом»
-
-Stages:
-
-1. Первичный контакт (SLA 5 дней)
-2. Согласование программы (SLA 10 дней)
-3. Подготовка документов (SLA 10 дней)
-4. Согласование договора (SLA 15 дней)
-5. Запуск программы (SLA 10 дней)
-
-`seed_demo` для этого НЕ требуется: шаблон создаётся startup-bootstrap
-(`backend/app/bootstrap/workflow_defaults.py`, вызывается из lifespan в
-`backend/app/main.py`) сразу после миграций при обычном `docker compose up`.
-Повторные рестарты — NO-OP: дублей, перезаписи пользовательских правок и
-audit/outbox-записей нет. Workflow instance создаётся только вручную —
-когда пользователь запускает шаблон для конкретного вуза/программы.
+- [Руководство пользователя](docs/USER_GUIDE.md) и [руководство администратора](docs/ADMIN_GUIDE.md)
+- [Архитектура](docs/ARCHITECTURE.md) и [интеграция по API](docs/API_INTEGRATION.md)
+- [Безопасность](docs/SECURITY.md) и [импорт данных](frontend/public/docs/admin-guide/import.md)
+- Встроенный справочный центр: http://localhost:3000/docs

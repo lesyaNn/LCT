@@ -1,4 +1,4 @@
-# Безопасность (P5-15-01)
+# Безопасность
 
 ## Модель
 - Аутентификация: Keycloak OIDC, JWT RS256, проверка signature/exp/iss/aud по JWKS.

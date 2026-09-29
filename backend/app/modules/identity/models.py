@@ -1,4 +1,4 @@
-"""DEFERRED module — forward stub, see ``docs/AUDIT.md`` (§0).
+"""DEFERRED module — forward stub, see ``docs/DEFERRED_MODULES.md``.
 
 Forward user-stub superseded by Keycloak (sub -> responsibles);
 isolated on ``DeferredBase`` metadata. Canon: ``app.core.security``.

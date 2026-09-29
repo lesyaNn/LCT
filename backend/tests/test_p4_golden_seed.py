@@ -1,7 +1,7 @@
 """P4-12-01 golden cross-check: one seed, same numbers everywhere (PG only).
 
-The spec's sample numbers are contradictory (see P4_DEV2_HANDOFF), so this
-test freezes a minimal deterministic seed and asserts the core acceptance
+The spec's sample numbers are contradictory, so this test freezes a minimal
+deterministic seed and asserts the core acceptance
 invariant: list count == dataset total == overview KPI == xlsx/json/pdf row
 counts. Any drift between list/analytics/exports fails loudly here instead
 of surprising P3/INT-06.

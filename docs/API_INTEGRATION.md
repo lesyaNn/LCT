@@ -1,4 +1,4 @@
-# Интеграция по API (P5-15-01)
+# Интеграция по API
 
 - **Base URL**: `http://localhost:8000/api/v1` (через frontend — same-origin `/api/v1`).
 - **Спека**: `/openapi.json`, Swagger `/docs`, ReDoc `/redoc`. Схема Bearer

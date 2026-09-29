@@ -1,6 +1,6 @@
 """LEGACY QUARANTINE (M7) — DO NOT MOUNT in ``app/api/router.py``.
 
-Reactivation requires the checklist in ``docs/AUDIT.md`` (§0): service
+Reactivation requires the checklist in ``docs/DEFERRED_MODULES.md``: service
 layer, UUID identities, ``PaginatedResponse``, RBAC + data-scope, audit.
 Direct ``db.query``/``db.commit`` in handlers below is the reason this
 router stays unmounted (see ``scripts/check_legacy_quarantine.py``).

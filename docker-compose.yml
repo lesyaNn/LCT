@@ -185,7 +185,6 @@ services:
         API_PROXY_TARGET: http://backend:8000
         NEXT_PUBLIC_DATA_SOURCE: ${NEXT_PUBLIC_DATA_SOURCE:-real}
         NEXT_PUBLIC_REAL_API_DOMAINS: ${NEXT_PUBLIC_REAL_API_DOMAINS:-universities,catalogs,passport}
-        NEXT_PUBLIC_ALLOW_MOCK_API_IN_PRODUCTION: ${NEXT_PUBLIC_ALLOW_MOCK_API_IN_PRODUCTION:-false}
     restart: unless-stopped
     networks: [rtk-net]
     ports:

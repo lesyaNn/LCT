@@ -3,7 +3,7 @@
 LEGACY QUARANTINE (M7) — DO NOT MOUNT in ``app/api/router.py`` (prefix
 ``/reports`` collides with the canonical async ``analytics/reports_router``;
 ``app.modules.universities.models`` import below is dangling).
-Reactivation requires the checklist in ``docs/AUDIT.md`` (§0).
+Reactivation requires the checklist in ``docs/DEFERRED_MODULES.md``.
 See ``scripts/check_legacy_quarantine.py``.
 """
 from fastapi import APIRouter, Depends

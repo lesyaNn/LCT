@@ -4,14 +4,12 @@ export type DataSourceMode = 'mock' | 'real';
 export type DataSourceDomain = 'universities' | 'catalogs' | 'passport' | 'workflow';
 
 const mockRequested = process.env.NEXT_PUBLIC_DATA_SOURCE === 'mock';
-const mockAllowed = process.env.NODE_ENV !== 'production'
-  || process.env.NEXT_PUBLIC_ALLOW_MOCK_API_IN_PRODUCTION === 'true';
+const mockAllowed = process.env.NODE_ENV !== 'production';
 
 /**
  * Public, build-time Next.js data-source selection.
  *
- * Real API is fail-safe: a production bundle ignores `mock` unless the
- * dedicated production opt-in is also present. Components never read these
+ * Production bundles always use the real API. Components never read these
  * variables directly; repositories are the only selection boundary.
  */
 export const DATA_SOURCE_MODE: DataSourceMode = mockRequested && mockAllowed ? 'mock' : 'real';

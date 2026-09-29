@@ -9,7 +9,7 @@ Pins the resolution of the "two schema universes" blocker:
 * ``AuditEvent.user_id`` accepts Keycloak ``sub``; entity identity is UUID (000021).
 
 The deferred-module table (reasons + reactivation checklist) lives in
-``docs/AUDIT.md`` (§0); this test pins its enforcement side.
+``docs/DEFERRED_MODULES.md``; this test pins its enforcement side.
 
 Pure-unit: no database, no Keycloak.
 """
@@ -67,7 +67,7 @@ DEFERRED_TABLES = frozenset(
 )
 
 # Router prefixes (without the /api/v1 mount prefix) that must stay
-# unmounted until the reactivation checklist in docs/AUDIT.md (§0) is done.
+# unmounted until the reactivation checklist in docs/DEFERRED_MODULES.md is done.
 # NOTE (P2-08-03): "/health-score" стал production (ranking) и убран отсюда;
 # NOTE (P4-06-01): "/reports" стал production (canonical async reports:
 # POST queued job + status + download, migration 000018) и убран отсюда;
@@ -159,7 +159,7 @@ def test_mounted_routers_are_only_the_production_contract():
 def test_deferred_prefixes_absent_from_openapi_paths():
     """Deferred forward scaffolding must not leak into the prod contract.
 
-    Module list mirrors ``docs/AUDIT.md`` (§0): universities-CRUD,
+    Module list mirrors ``docs/DEFERRED_MODULES.md``: universities-CRUD,
     programs, workflow, documents,
     dashboard, reporting, notifications. P5 mounted audit events and Stage 11
     mounts the canonical /integrations API; old mock fallback is gone.

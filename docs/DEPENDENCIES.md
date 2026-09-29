@@ -1,4 +1,4 @@
-# Перечень библиотек и компонентов (P5-15-01)
+# Перечень библиотек и компонентов
 
 > Снимок на develop. Версии backend — замерены в собранном образе
 > (`python -c "from importlib.metadata import distributions"`),

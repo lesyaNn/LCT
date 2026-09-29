@@ -1,4 +1,4 @@
-# P5-16-01: ArchiMate + PNG
+# Модель ArchiMate
 
 - `architecture.archimate` — модель (ArchiMate Open Exchange).
 - `architecture.png` — проверенная схема для презентации.

@@ -1,4 +1,4 @@
-# P5-18: offline-демо (без сети) + видеобекап
+# Демонстрация без внешней сети
 
 ## Офлайн-прогон
 
@@ -6,10 +6,10 @@
 ./scripts/demo-setup.sh   # .env → up --build → wait-healthy → seed (идемпотентно)
 ```
 
-Всё локально: PostgreSQL/Redis/Keycloak (realm `rtk`, импорт из
-`keycloak/realm-export.json`), seed 10 вузов, файлы — локальные volumes.
-Внешних LMS/сайта нет (стаб `modules/integrations` не смонтирован, демо на
-seed — mock-адаптеры P5-08-02 отсутствуют и здесь не требуются).
+Локально работают PostgreSQL, Redis и Keycloak (realm `rtk`, импорт из
+`keycloak/realm-export.json`). Демонстрационные записи добавляет seed;
+файлы хранятся в локальных volumes. Для основных сценариев CRM внешнее
+подключение к LMS или сайту не требуется.
 
 Единственное сетевое требование — Docker-образы (`postgres:16-alpine`,
 `redis:7-alpine`, `keycloak:26.7.4`, `python:3.12-slim`): скачайте заранее
@@ -21,12 +21,3 @@ seed — mock-адаптеры P5-08-02 отсутствуют и здесь н�
 curl -sf http://localhost:8000/health && curl -sf http://localhost:3000/health
 SMOKE_TOKEN=<токен-из-браузера> ./scripts/smoke.sh
 ```
-
-## Видеобекап (`demo-backup.mp4`)
-
-MP4 в репозитории не хранится (бинарник). Порядок записи: поднять стенд по
-разделу выше → записать скринкаст (заявка → паспорт вуза → отчёты) →
-положить файл рядом с релиз-заметкой / в shared-диск команды и указать
-ссылку здесь:
-
-- `demo-backup.mp4`: _ссылка заполняется исполнителем_

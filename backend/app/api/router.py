@@ -6,7 +6,7 @@ catalog CRUD/overview, workflow templates/stages, workflow instances (+ canonica
 B2 transitions/comments), workflow instance attachments,
 and async analytics reports (P4-06-01:
 POST queued job + status + download). Deferred forward-stub routers stay
-unmounted; see ``docs/AUDIT.md`` for their reactivation requirements.
+unmounted; see ``docs/DEFERRED_MODULES.md`` for their reactivation requirements.
 """
 
 from fastapi import APIRouter
