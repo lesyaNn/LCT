@@ -20,6 +20,8 @@ import SortDown from '@atomaro/icons/24/editor/SortDown';
 import SortUp from '@atomaro/icons/24/editor/SortUp';
 import GridColumns2 from '@atomaro/icons/24/editor/GridColumns2';
 import TableIcon from '@atomaro/icons/24/document/Table';
+import User from '@atomaro/icons/24/communication/User';
+import BookOpen from '@atomaro/icons/24/culture/BookOpen';
 import { Button } from '@/shared/ui/rtk/button';
 import { IconButton } from '@/shared/ui/rtk/icon-button';
 import { Tooltip } from '@/shared/ui/rtk/tooltip';
@@ -340,18 +342,33 @@ function filterOptionsFromCatalogs(references?: CatalogReferenceData, stages: Un
 function UniversityCards({ items }: { items: UniversityListItem[] }) {
   return (
     <div className={styles.cards} aria-label="Список вузов в формате карточек">
-      {items.map((item) => (
-        <Link className={styles.card} href={`/universities/${item.id}`} key={item.id}>
-          <div className={styles.cardHeader}>
-            <strong>{item.name}</strong>
-            <AttentionIndicator active={item.attention} />
-          </div>
-          {item.availability?.stage === false
-            ? <div className={styles.cardNoWorkflow}>Workflow не запущен</div>
-            : <div className={styles.cardStage}><span>Текущий этап</span><StageBadge item={item} /></div>}
-          <div className={styles.cardFooter}><span>{item.responsible?.name ?? 'Ответственный не назначен'}</span><span>{programCountLabel(item.programsCount)}</span></div>
-        </Link>
-      ))}
+      {items.map((item) => {
+        const hasWorkflow = item.availability?.stage !== false;
+        const needsAttention = item.attention;
+        const stageTone = needsAttention ? 'warning' : item.currentStage.tone;
+        return (
+          <Link className={styles.card} href={`/universities/${item.id}`} key={item.id} onKeyDown={(event) => {
+            if (event.key === ' ') { event.preventDefault(); event.currentTarget.click(); }
+          }}>
+            <div className={styles.cardHeader}>
+              <strong>{item.name}</strong>
+              {needsAttention && !hasWorkflow ? <AttentionIndicator active /> : null}
+            </div>
+            {hasWorkflow
+              ? <div className={styles.cardStage}>
+                  <span className={styles.cardStageLabel}>Текущий этап</span>
+                  <div className={styles.cardStagePanel} data-tone={stageTone}>
+                    <SemanticStatusBadge intent={stageTone} icon={needsAttention ? <Attention size={20} fill="currentColor" /> : undefined} variant="inline">{item.currentStage.name}</SemanticStatusBadge>
+                  </div>
+                </div>
+              : <div className={styles.cardNoWorkflow}><SemanticStatusBadge intent="neutral">Workflow не запущен</SemanticStatusBadge></div>}
+            <div className={styles.cardFooter}>
+              {item.responsible && item.availability?.responsible !== false ? <span className={styles.cardMeta}><User size={18} fill="currentColor" />{item.responsible.name}</span> : null}
+              {item.availability?.programs !== false ? <span className={styles.cardMeta}><BookOpen size={18} fill="currentColor" />{programCountLabel(item.programsCount)}</span> : null}
+            </div>
+          </Link>
+        );
+      })}
     </div>
   );
 }
