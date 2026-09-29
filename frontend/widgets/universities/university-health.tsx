@@ -2,6 +2,10 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import Checklist from '@atomaro/icons/24/action/Checklist';
+import ErrorStroke from '@atomaro/icons/24/alert/ErrorStroke';
+import StatisticsBoard from '@atomaro/icons/24/business/StatisticsBoard';
+import TimeStroke from '@atomaro/icons/24/alert/TimeStroke';
 import { getUniversityHealth, type MatrixHealthState, type UniversityHealthProgram } from '@/shared/lib/dashboard-repository';
 import { queryKeys } from '@/shared/lib/query-keys';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
@@ -43,7 +47,7 @@ export function UniversityHealth({ universityId }: { universityId: string }) {
         <div><p className={styles.eyebrow}>Текущее состояние взаимодействия</p><h2 id="health-title">Health Score</h2><p className={styles.score} data-level={health.level}>{health.score === null ? '—' : <>{health.score}<span> / 100</span></>}</p><strong className={styles.level} data-level={health.level}>{levelLabel[health.level]}</strong></div>
         <p className={styles.intro}>Оценка показывает текущее состояние взаимодействия с ВУЗом: активные Workflow, сроки, задачи и связанные лицензии. Она не оценивает качество или рейтинг ВУЗа.</p>
       </div>
-      <dl className={styles.summaryStats}><div><dt>Программы с Workflow</dt><dd>{health.started_programs} из {health.total_programs}</dd></div><div><dt>Требуют внимания</dt><dd>{attention}</dd></div><div><dt>Критично</dt><dd>{critical}</dd></div></dl>
+      <dl className={styles.summaryStats}><div><dt><Checklist size={18} fill="currentColor" />Workflow активны</dt><dd>{health.started_programs} из {health.total_programs}</dd></div><div><dt><TimeStroke size={18} fill="currentColor" />Требуют внимания</dt><dd data-tone="warning">{attention}</dd></div><div><dt><ErrorStroke size={18} fill="currentColor" />Критично</dt><dd data-tone="danger">{critical}</dd></div><div><dt><StatisticsBoard size={18} fill="currentColor" />Охват программ</dt><dd>{health.total_programs ? `${Math.round(health.started_programs / health.total_programs * 100)}%` : '—'}</dd></div></dl>
     </section>
     <section className={styles.surface} aria-labelledby="health-why"><h3 id="health-why">Почему такая оценка</h3><div className={styles.factorColumns}><div><h4>Стабильно</h4><p className={styles.empty}>{health.factors.length ? 'Активные Workflow оцениваются по срокам и задачам.' : 'Критичных факторов не обнаружено.'}</p></div><div><h4>Требует внимания</h4>{health.factors.length ? <ul className={styles.factors}>{health.factors.map((factor) => <li key={factor.label}><span aria-hidden="true">!</span>{factor.label}</li>)}</ul> : <p className={styles.empty}>Нет активных проблем.</p>}</div></div></section>
     <section className={styles.surface} aria-labelledby="health-coverage"><h3 id="health-coverage">Охват программ</h3><p className={styles.coverage}>{health.started_programs} из {health.total_programs} Workflow запущено. Незапущенные программы не снижают Health Score.</p></section>

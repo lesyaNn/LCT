@@ -37,6 +37,8 @@ def overdue_items(data: AnalyticsData, today: date) -> list[dict]:
             instance = instances.get(item.instance_id)
             if instance is None or item.completed_at is not None:
                 continue
+            if kind == "stage" and item.id != instance.current_instance_stage_id:
+                continue
             if item.status not in ({"pending", "current"} if kind == "stage" else {"open"}):
                 continue
             due = item.due_date if kind == "stage" else item.deadline
@@ -126,7 +128,10 @@ def build_matrix(data: AnalyticsData, *, today: date) -> Matrix:
                     "license_status": None, "workflow_progress": None, "overdue_count": 0, "next_milestone": None})
                 continue
             started += 1
-            current = next((stage for stage in stages[instance.id] if stage.status == "current"), None)
+            # The runtime pointer is authoritative. Current stages intentionally
+            # keep the ``pending`` status in the snapshot; lifecycle state is
+            # represented by ``current_instance_stage_id``.
+            current = next((stage for stage in stages[instance.id] if stage.id == instance.current_instance_stage_id), None)
             health = calculate_workflow_health(instance=instance, stage=current, tasks=tasks[instance.id], licenses=licenses[pair], today=today)
             scores.append(health.score or 0)
             state = "COMPLETED" if health.completed else {"stable": "HEALTHY", "attention": "ATTENTION", "critical": "CRITICAL"}[health.level]
