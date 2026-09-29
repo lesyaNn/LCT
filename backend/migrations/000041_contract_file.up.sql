@@ -1,0 +1,5 @@
+ALTER TABLE contracts
+    ADD COLUMN file_path VARCHAR(1024) NULL,
+    ADD COLUMN file_name VARCHAR(512) NULL,
+    ADD COLUMN file_size INTEGER NULL,
+    ADD COLUMN file_mime_type VARCHAR(128) NULL;

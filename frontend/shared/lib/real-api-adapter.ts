@@ -621,6 +621,8 @@ function agreementItem(value: unknown): AgreementCatalogItem {
     status: stringValue(item.status) as AgreementStatus,
     statusRaw: stringValue(item.status_raw) as ContractStatusRaw,
     licenseCount: typeof item.license_count === 'number' ? item.license_count : 0,
+    fileName: stringValue(item.file_name),
+    fileSize: typeof item.file_size === 'number' ? item.file_size : null,
   };
 }
 

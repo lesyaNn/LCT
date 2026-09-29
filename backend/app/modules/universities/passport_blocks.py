@@ -391,7 +391,7 @@ def get_documents(db, university_id: uuid.UUID) -> list[DocumentShort]:
     rows = (
         db.execute(
             select(Document)
-            .where(Document.university_id == university_id)
+            .where(Document.university_id == university_id, Document.contract_id.is_(None), Document.license_id.is_(None))
             .order_by(Document.created_at.desc())
             .limit(DOCUMENTS_LIMIT)
         )
@@ -421,9 +421,8 @@ def get_documents_page(
     *, search: str | None = None, document_type: str | None = None,
     status: str | None = None,
 ) -> tuple[list[DocumentShort], int, list[str]]:
-    base = Document.university_id == university_id
-    types = db.scalars(select(Document.document_type).where(base).distinct().order_by(Document.document_type)).all()
-    conditions = [base]
+    conditions = [Document.university_id == university_id, Document.contract_id.is_(None), Document.license_id.is_(None)]
+    types = db.scalars(select(Document.document_type).where(*conditions).distinct().order_by(Document.document_type)).all()
     if search:
         from app.modules.catalog.repository import like_pattern
         pattern = like_pattern(search.strip())

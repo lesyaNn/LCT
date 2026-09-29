@@ -339,6 +339,9 @@ class ContractRead(BaseModel):
     status_raw: str
     transfer_status_raw: str
     comment: str | None = None
+    file_name: str | None = None
+    file_size: int | None = None
+    file_mime_type: str | None = None
     created_at: datetime
     updated_at: datetime
     # Resolved labels for the list/detail views: the tables keep FKs only, and

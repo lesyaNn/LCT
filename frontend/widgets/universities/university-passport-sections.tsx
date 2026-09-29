@@ -1,25 +1,21 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import DocumentText from '@atomaro/icons/24/document/DocumentText';
-import CloseSmall from '@atomaro/icons/24/navigation/CloseSmall';
 import Calendar from '@atomaro/icons/24/communication/Calendar';
 import { useAuth } from '@/shared/auth/AuthProvider';
 import { hasPermission } from '@/shared/lib/access-control';
 import { isMockDataSourceFor } from '@/shared/lib/data-source';
 import Mail from '@atomaro/icons/24/communication/Mail';
 import Phone from '@atomaro/icons/24/technology/Phone';
-import { Button, ButtonLink } from '@/shared/ui/rtk/button';
-import { canMutateCatalog } from '@/shared/lib/catalogs-repository';
+import { Button } from '@/shared/ui/rtk/button';
 import { FilterToolbar } from '@/shared/ui/rtk/filter-surface';
-import { FilterField, SearchField } from '@/shared/ui/rtk/filter-field';
+import { FilterField } from '@/shared/ui/rtk/filter-field';
 import { Avatar } from '@/shared/ui/rtk/avatar';
 import { Drawer } from '@/shared/ui/rtk/drawer';
 import { Modal } from '@/shared/ui/rtk/modal';
-import { AttachmentDropZone } from './workflow-attachments';
 import { EmptyState } from '@/shared/ui/empty-state';
-import { Input, Select, TextArea } from '@/shared/ui/rtk/form-controls';
+import { Select, TextArea } from '@/shared/ui/rtk/form-controls';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { Toast } from '@/shared/ui/rtk/toast';
@@ -27,20 +23,15 @@ import { normalizeApiError } from '@/shared/lib/api-errors';
 import { adminUsersQueryKeys, assignUniversityResponsible, listResponsibleCandidates } from '@/shared/lib/users-repository';
 import { queryKeys } from '@/shared/lib/query-keys';
 import { formatDateRu, formatDateTimeRu } from '@/shared/lib/formatters';
-import { documentStatusIntent, licenseStatusIntent, productStatusIntent } from '@/shared/lib/status-semantics';
+import { licenseStatusIntent, productStatusIntent } from '@/shared/lib/status-semantics';
 import {
   getUniversityProducts,
   getUniversityLicenses,
-  getUniversityDocuments,
-  downloadUniversityDocument,
-  createUniversityDocument,
   getUniversityMeetings,
   deleteUniversityMeeting,
   getUniversityResponsibles,
   universityProductsQueryKey,
   universityLicensesQueryKey,
-  universityDocumentsPageQueryKey,
-  universityDocumentsQueryKey,
   universityMeetingsQueryKey,
   universityPassportQueryKey,
   universityResponsiblesQueryKey,
@@ -48,15 +39,13 @@ import {
   type UniversityProductStatus,
   type UniversityLicenseRow,
   type UniversityLicenseStatus,
-  type UniversityDocumentRow,
-  type UniversityDocumentStatus,
-  type UniversityDocumentType,
   type UniversityMeetingRow,
   type UniversityMeetingType,
 } from '@/shared/lib/universities-repository';
 import { PassportDataTable, PassportTableSkeleton, type PassportMobileField, type PassportTableColumn } from './passport-data-table';
 import { MeetingMutationForm, ProductAssignmentForm } from './passport-mutation-forms';
 import styles from './university-passport-sections.module.css';
+import { PassportDocumentsSection } from './passport-documents-section';
 
 const formatDate = formatDateRu;
 
@@ -108,15 +97,10 @@ function ProductsSection({ id }: { id: string }) {
 export { ProductsSection };
 
 const licenseStatusLabels: Record<UniversityLicenseStatus, string> = { active: 'Действует', expires_soon: 'Скоро истекает', expired: 'Просрочена' };
-const documentStatusLabels: Record<UniversityDocumentStatus, string> = { signed: 'Подписан', pending: 'На подписи', expired: 'Просрочен', archived: 'В архиве' };
 const meetingTypeLabels: Record<UniversityMeetingType, string> = { online: 'Онлайн', offline: 'Очно', phone: 'Телефон', email: 'Email' };
 
 function LicenseStatusBadge({ status }: { status: UniversityLicenseStatus }) {
   return <StatusBadge intent={licenseStatusIntent[status]}>{licenseStatusLabels[status]}</StatusBadge>;
-}
-
-function DocumentStatusBadge({ status }: { status: UniversityDocumentStatus }) {
-  return <StatusBadge intent={documentStatusIntent[status]}>{documentStatusLabels[status]}</StatusBadge>;
 }
 
 function LicensesSection({ id }: { id: string }) {
@@ -147,78 +131,8 @@ function LicensesSection({ id }: { id: string }) {
   return <section className={styles.section} aria-label="Лицензии"><FilterToolbar embedded compact label="Фильтры лицензий" controls={() => <FilterField label="Статус"><Select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as UniversityLicenseStatus | 'all')}><option value="all">Все статусы</option>{Object.entries(licenseStatusLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</Select></FilterField>} activeFilters={statusFilter === 'all' ? [] : [{ id: 'status', label: `Статус: ${licenseStatusLabels[statusFilter]}`, onRemove: () => setStatusFilter('all') }]} mobileCount={statusFilter === 'all' ? 0 : 1} /><PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Лицензии пока не добавлены" /></section>;
 }
 
-const documentTypeLabels: Record<UniversityDocumentType, string> = {
-  contract: 'Договор', license: 'Лицензия', act: 'Акт', protocol: 'Протокол', other: 'Иное',
-};
-const documentTypeLabel = (value: string) => documentTypeLabels[value as UniversityDocumentType] ?? value;
-
-function DocumentFile({ row, universityId }: { row: UniversityDocumentRow; universityId: string }) {
-  const [downloading, setDownloading] = useState(false);
-  const [error, setError] = useState('');
-  const download = async () => {
-    setDownloading(true);
-    setError('');
-    try {
-      const blob = await downloadUniversityDocument(universityId, row.id);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = row.fileName;
-      link.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (cause) { setError(normalizeApiError(cause).message); }
-    finally { setDownloading(false); }
-  };
-  return <div className={styles.fileCell}><DocumentText size={20} fill="currentColor" /><div>{row.hasFile ? <button className={styles.fileNameButton} type="button" disabled={downloading} onClick={() => void download()} aria-label={`Скачать ${row.fileName}`}>{row.fileName}</button> : <span className={styles.primaryCell} title={row.fileName}>{row.fileName || 'Нет файла'}</span>}<span className={styles.secondaryCell}>{row.hasFile ? row.fileSize : 'Файл недоступен'}</span>{error ? <span className={styles.fileError} role="alert">{error}</span> : null}</div></div>;
-}
-
 function DocumentsSection({ id }: { id: string }) {
-  const { user } = useAuth();
-  const queryClient = useQueryClient();
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState<UniversityDocumentStatus | 'all'>('all');
-  const [page, setPage] = useState(1);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [newType, setNewType] = useState<UniversityDocumentType>('other');
-  const [newTitle, setNewTitle] = useState('');
-  const [newFile, setNewFile] = useState<File | null>(null);
-  const [createError, setCreateError] = useState('');
-  const canCreate = hasPermission(user, 'university.edit') && !isMockDataSourceFor('passport');
-  const create = useMutation({
-    mutationFn: () => createUniversityDocument(id, { type: newType, title: newTitle.trim(), file: newFile! }),
-    onSuccess: async () => {
-      setCreateOpen(false); setNewTitle(''); setNewFile(null); setCreateError(''); setPage(1);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: universityDocumentsQueryKey(id) }),
-        queryClient.invalidateQueries({ queryKey: universityPassportQueryKey(id) }),
-      ]);
-    },
-    onError: (cause) => setCreateError(normalizeApiError(cause).message),
-  });
-  useEffect(() => { const timer = window.setTimeout(() => setDebouncedSearch(search), 250); return () => window.clearTimeout(timer); }, [search]);
-  const query = useQuery({ queryKey: universityDocumentsPageQueryKey(id, page, debouncedSearch, typeFilter, statusFilter), queryFn: ({ signal }) => getUniversityDocuments(id, page, 20, debouncedSearch, typeFilter, statusFilter, signal), placeholderData: keepPreviousData, staleTime: 30_000 });
-  const types = query.data?.types ?? [];
-  const rows = query.data?.items ?? [];
-  const columns: PassportTableColumn<UniversityDocumentRow>[] = [
-    { id: 'name', label: 'Документ', render: (row) => <><strong className={styles.primaryCell}>{row.name}</strong><span className={styles.secondaryCell}>{documentTypeLabel(row.type)}</span></> },
-    { id: 'file', label: 'Файл', render: (row) => <DocumentFile row={row} universityId={id} /> },
-    { id: 'status', label: 'Статус документа', render: (row) => <DocumentStatusBadge status={row.status} /> },
-    { id: 'signedAt', label: 'Подписан', render: (row) => row.signedAt ? formatDate(row.signedAt) : '—' },
-    { id: 'expiresAt', label: 'Истекает', render: (row) => row.expiresAt ? formatDate(row.expiresAt) : '—' },
-    { id: 'uploadedAt', label: 'Дата', render: (row) => formatDate(row.uploadedAt) },
-  ];
-  const mobileFields: PassportMobileField<UniversityDocumentRow>[] = [
-    { label: 'Документ', render: (row) => <><strong className={styles.primaryCell}>{row.name}</strong><span className={styles.secondaryCell}>{documentTypeLabel(row.type)}</span></> },
-    { label: 'Файл', render: (row) => <DocumentFile row={row} universityId={id} /> },
-    { label: 'Статус документа', render: (row) => <DocumentStatusBadge status={row.status} /> },
-    { label: 'Дата', render: (row) => formatDate(row.uploadedAt) },
-  ];
-  const reset = () => { setSearch(''); setDebouncedSearch(''); setTypeFilter('all'); setStatusFilter('all'); setPage(1); };
-  if (query.isPending) return <section className={styles.section} aria-label="Документы"><PassportTableSkeleton /></section>;
-  if (!query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
-  return <section className={styles.section} aria-label="Документы"><SectionToolbar title="Документы">{canMutateCatalog(user?.role) ? <ButtonLink href={`/admin/catalogs?type=agreements&kind=contracts&universityId=${encodeURIComponent(id)}`} variant="ghost" size="s">Редактировать договоры и их статус</ButtonLink> : null}</SectionToolbar><p>Здесь показаны статусы файлов. Статус договора — отдельной записи в каталоге договоров.</p><FilterToolbar embedded label="Фильтры документов" controls={() => <><SearchField label="Поиск документа" value={search} placeholder="Название или файл" onChange={(value) => { setSearch(value); setPage(1); }} /><FilterField label="Тип"><Select value={typeFilter} onChange={(event) => { setTypeFilter(event.target.value); setPage(1); }}><option value="all">Все типы</option>{types.map((type) => <option value={type} key={type}>{documentTypeLabel(type)}</option>)}</Select></FilterField><FilterField label="Статус документа"><Select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value as UniversityDocumentStatus | 'all'); setPage(1); }}><option value="all">Все статусы</option>{Object.entries(documentStatusLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</Select></FilterField></>} actions={canCreate ? <Button variant="primary" size="s" type="button" onClick={() => setCreateOpen(true)}>Добавить документ</Button> : undefined} onReset={reset} resetDisabled={!search && typeFilter === 'all' && statusFilter === 'all'} activeFilters={[...(search ? [{ id: 'search', label: `Поиск: ${search}`, onRemove: () => { setSearch(''); setPage(1); } }] : []), ...(typeFilter !== 'all' ? [{ id: 'type', label: `Тип: ${documentTypeLabel(typeFilter)}`, onRemove: () => { setTypeFilter('all'); setPage(1); } }] : []), ...(statusFilter !== 'all' ? [{ id: 'status', label: `Статус документа: ${documentStatusLabels[statusFilter]}`, onRemove: () => { setStatusFilter('all'); setPage(1); } }] : [])]} mobileCount={Number(Boolean(search)) + Number(typeFilter !== 'all') + Number(statusFilter !== 'all')} /><PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage={search || typeFilter !== 'all' || statusFilter !== 'all' ? 'Документы не найдены' : 'Документы пока не добавлены'} serverPagination={{ page, pageSize: 20, total: query.data.total, onPageChange: setPage }} />{createOpen ? <Modal title="Добавить документ" onClose={() => { if (!create.isPending) setCreateOpen(false); }}><form className={styles.documentForm} onSubmit={(event) => { event.preventDefault(); if (newTitle.trim() && newFile) create.mutate(); }}><label>Тип документа<Select value={newType} disabled={create.isPending} onChange={(event) => setNewType(event.target.value as UniversityDocumentType)}>{Object.entries(documentTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></label><label>Название<Input value={newTitle} maxLength={1024} required disabled={create.isPending} onChange={(event) => setNewTitle(event.target.value)} /></label><div className={styles.documentFileField}><span>Файл</span><AttachmentDropZone compact multiple={false} accept="" label="Выбрать файл" disabled={create.isPending} onFiles={(files) => setNewFile(files[0] ?? null)} />{newFile ? <div className={styles.selectedDocument}><DocumentText size={16} fill="currentColor" /><span>{newFile.name}</span><Button variant="ghost" size="s" type="button" aria-label={`Убрать ${newFile.name}`} disabled={create.isPending} onClick={() => setNewFile(null)}><CloseSmall size={16} fill="currentColor" /></Button></div> : null}</div>{createError ? <p role="alert" className={styles.fileError}>{createError}</p> : null}<div className={styles.documentFormActions}><Button variant="ghost" size="s" type="button" disabled={create.isPending} onClick={() => setCreateOpen(false)}>Отмена</Button><Button variant="primary" size="s" type="submit" disabled={!newTitle.trim() || !newFile || create.isPending} loading={create.isPending}>Сохранить</Button></div></form></Modal> : null}</section>;
+  return <PassportDocumentsSection id={id} />;
 }
 
 function MeetingParticipants({ participants }: { participants: UniversityMeetingRow['participants'] }) {

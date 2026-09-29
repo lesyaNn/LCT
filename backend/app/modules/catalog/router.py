@@ -13,8 +13,8 @@ from __future__ import annotations
 import uuid
 from typing import Literal
 
-from fastapi import APIRouter, Body, Depends, Query
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.permissions import require_permission, require_role
@@ -23,6 +23,9 @@ from app.core.security import CurrentUser
 from app.modules.analytics.filters import UnifiedFilter, get_unified_filter
 from app.modules.audit.service import get_audit_db
 from app.modules.catalog import passport_relations, service
+from app.modules.catalog.contract_files import attach_contract_file, contract_or_404, detach_contract_file
+from app.modules.workflow_attachments.router import get_storage
+from app.modules.workflow_attachments.storage import StorageBackend
 from app.modules.catalog.schemas import (
     ContractCreate,
     ContractDetail,
@@ -773,6 +776,55 @@ def patch_contract(
     return service.patch_contract(db, contract_id, data)
 
 
+@router.post("/contracts/{contract_id}/file", response_model=ContractDetail, tags=["Contracts"])
+def upload_contract_file(
+    contract_id: uuid.UUID,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_audit_db),
+    storage: StorageBackend = Depends(get_storage),
+    user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+) -> ContractDetail:
+    contract = contract_or_404(db, contract_id)
+    ensure_university_visible(contract.university_id, user)
+    attach_contract_file(db, storage, contract, file)
+    return service.get_contract_detail(db, contract_id)
+
+
+@router.get("/contracts/{contract_id}/file", tags=["Contracts"])
+def download_contract_file(
+    contract_id: uuid.UUID,
+    db: Session = Depends(get_audit_db),
+    storage: StorageBackend = Depends(get_storage),
+    user: CurrentUser = Depends(READ),
+) -> StreamingResponse:
+    contract = contract_or_404(db, contract_id)
+    ensure_university_visible(contract.university_id, user)
+    if not contract.file_path or not storage.exists(contract.file_path):
+        raise HTTPException(status_code=404, detail="Contract file not found")
+
+    def stream():
+        with storage.open_stream(contract.file_path) as handle:
+            while chunk := handle.read(64 * 1024):
+                yield chunk
+
+    from urllib.parse import quote
+    name = contract.file_name or "contract"
+    return StreamingResponse(stream(), media_type=contract.file_mime_type or "application/octet-stream",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(name)}"})
+
+
+@router.delete("/contracts/{contract_id}/file", response_model=None, status_code=204, tags=["Contracts"])
+def delete_contract_file(
+    contract_id: uuid.UUID,
+    db: Session = Depends(get_audit_db),
+    storage: StorageBackend = Depends(get_storage),
+    user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+) -> None:
+    contract = contract_or_404(db, contract_id)
+    ensure_university_visible(contract.university_id, user)
+    detach_contract_file(db, storage, contract)
+
+
 @router.delete(
     "/contracts/{contract_id}",
     response_model=None,
@@ -783,11 +835,18 @@ def patch_contract(
 def delete_contract(
     contract_id: uuid.UUID,
     db: Session = Depends(get_audit_db),
+    storage: StorageBackend = Depends(get_storage),
     user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
 ) -> None:
     detail = service.get_contract_detail(db, contract_id)
     ensure_university_visible(detail.university_id, user)
+    key = contract_or_404(db, contract_id).file_path
     service.delete_contract(db, contract_id)
+    if key:
+        try:
+            storage.delete(key)
+        except Exception:
+            pass
 
 
 @router.post(

@@ -19,7 +19,7 @@ import uuid
 from datetime import date
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Date, ForeignKey, Index, String, Text, UniqueConstraint, text
+from sqlalchemy import Boolean, Date, ForeignKey, Index, Integer, String, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -231,6 +231,11 @@ class Contract(UUIDPKMixin, TimestampMixin, Base):
         String(32), nullable=False, default="pending"
     )
     comment: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+
+    file_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    file_name: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    file_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    file_mime_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     university: Mapped["University"] = relationship(back_populates="contracts")
     product: Mapped["ITProduct | None"] = relationship()

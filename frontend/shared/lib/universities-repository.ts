@@ -1257,40 +1257,8 @@ export async function getUniversityLicenses(id: string, queryClient?: QueryClien
   return fromDataSource({ domain: 'passport', mock: () => getMockUniversityLicenses(id), real: () => realGetUniversityLicenses(id, queryClient) });
 }
 
-/** Typed frontend adapter for the future university documents endpoint. */
-async function getMockUniversityDocuments(id: string): Promise<UniversityDocumentRow[]> {
-  const university = getUniversityOrThrow(id);
-  const numericId = getUniversityNumericId(id);
-  const documents = [
-    ['Договор', 'Договор на обучение', 'contract-2026.pdf', '2,4 МБ', 'signed'],
-    ['Приложение', 'Приложение к договору', 'appendix-programs.docx', '184 КБ', 'pending'],
-    ['Акт', 'Акт оказанных услуг', 'service-act-08.pdf', '1,1 МБ', 'signed'],
-    ['Лицензия', 'Лицензия на образовательную деятельность', 'education-license.pdf', '856 КБ', 'expired'],
-    ['Отчёт', 'Отчёт о запуске программы', 'launch-report.xlsx', '326 КБ', 'signed'],
-  ] as const;
-  return documents.map(([type, name, fileName, fileSize, status], index) => ({
-    id: `${id}-document-${index + 1}`,
-    type,
-    name,
-    fileName,
-    hasFile: false,
-    fileSize,
-    signedAt: status === 'signed' ? `2026-0${((index + numericId) % 8) + 1}-12` : null,
-    expiresAt: index === 3 ? '2026-08-15' : index === 1 ? '2026-11-30' : null,
-    status,
-    uploadedBy: index % 2 === 0 ? university.responsible?.name ?? 'Анна Иванова' : 'Борис Петров',
-    uploadedAt: `2026-0${((index + numericId) % 8) + 1}-${String(index + 10).padStart(2, '0')}`,
-    downloadUrl: undefined,
-  }));
-}
-
 export async function getUniversityDocuments(id: string, page = 1, pageSize = 20, search = '', type = 'all', status = 'all', signal?: AbortSignal): Promise<PaginatedResult<UniversityDocumentRow> & { types: string[] }> {
-  return fromDataSource({ domain: 'passport', signal, mock: async () => {
-    const all = await getMockUniversityDocuments(id);
-    const types = [...new Set(all.map((row) => row.type))];
-    const filtered = all.filter((row) => (type === 'all' || row.type === type) && (status === 'all' || row.status === status) && (!search || `${row.name} ${row.fileName}`.toLocaleLowerCase('ru-RU').includes(search.toLocaleLowerCase('ru-RU'))));
-    return { items: filtered.slice((page - 1) * pageSize, page * pageSize), total: filtered.length, page, pageSize, types };
-  }, real: () => realGetUniversityDocuments(id, page, pageSize, search, type, status, signal) });
+  return realGetUniversityDocuments(id, page, pageSize, search, type, status, signal);
 }
 
 export async function downloadUniversityDocument(universityId: string, documentId: string): Promise<Blob> {

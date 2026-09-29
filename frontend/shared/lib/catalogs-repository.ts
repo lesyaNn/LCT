@@ -1,5 +1,6 @@
 import type { UserRole } from '@/shared/types/user';
 import { ApiRequestError } from './api-errors';
+import { apiDownload, apiFetch, apiUploadFormData } from './api-client';
 import { fromDataSource } from './data-source';
 import { queryKeys } from './query-keys';
 import {
@@ -106,6 +107,8 @@ export interface ContractCatalogItem extends CatalogItemBase {
   transferStatus: TransferStatus;
   licenseCount: number;
   comment: string;
+  fileName: string;
+  fileSize: number | null;
 }
 
 export interface LicenseCatalogItem extends CatalogItemBase {
@@ -265,6 +268,24 @@ export async function createCatalogItem(input: CatalogInput): Promise<CatalogIte
 
 export async function updateCatalogItem(id: string, input: CatalogInput): Promise<CatalogItem> {
   return fromDataSource({ domain: 'catalogs', mock: () => mockUpdateCatalogItem(id, input), real: () => realUpdateCatalogItem(id, input) });
+}
+
+export async function uploadContractFile(id: string, file: File): Promise<void> {
+  const body = new FormData();
+  body.append('file', file, file.name);
+  const result = await apiUploadFormData(`/api/v1/contracts/${encodeURIComponent(id)}/file`, body);
+  if (!result.ok) throw new ApiRequestError(result.status, result.body, result.error);
+}
+
+export async function downloadContractFile(id: string): Promise<Blob> {
+  const result = await apiDownload(`/api/v1/contracts/${encodeURIComponent(id)}/file`);
+  if (!result.ok) throw new ApiRequestError(result.status, result.body, result.error);
+  return result.data;
+}
+
+export async function deleteContractFile(id: string): Promise<void> {
+  const result = await apiFetch(`/api/v1/contracts/${encodeURIComponent(id)}/file`, { method: 'DELETE' });
+  if (!result.ok) throw new ApiRequestError(result.status, result.body, result.error);
 }
 
 export async function deleteCatalogItem(type: CatalogType, id: string, kind?: AgreementKind): Promise<void> {
