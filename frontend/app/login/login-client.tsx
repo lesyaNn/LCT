@@ -4,10 +4,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AuthError, AuthLoading, AuthRequired } from '@/shared/ui/access-state';
 import { useAuth } from '@/shared/auth/AuthProvider';
-import { authService } from '@/shared/lib/auth-service';
 import { getSafeReturnPath } from '@/shared/lib/keycloak-adapter';
 
-export default function LoginClient({ demoEnabled }: { demoEnabled: boolean }) {
+export default function LoginClient() {
   const router = useRouter();
   const { status, error, login, retry } = useAuth();
   const [{ returnTo, notice }] = useState(() => {
@@ -26,12 +25,10 @@ export default function LoginClient({ demoEnabled }: { demoEnabled: boolean }) {
 
   useEffect(() => {
     if (status === 'authenticated') router.replace(returnTo);
-    if (status === 'unauthenticated' && authService.mode() === 'keycloak' && (!demoEnabled || new URLSearchParams(window.location.search).has('openAuth'))) void login(returnTo, demoEnabled ? '__demo__' : undefined);
-  }, [demoEnabled, login, returnTo, router, status]);
+  }, [returnTo, router, status]);
 
-  if (status === 'loading' || status === 'authenticated'
-    || (status === 'unauthenticated' && authService.mode() === 'keycloak' && !demoEnabled)) return <AuthLoading />;
+  if (status === 'authenticated') return <AuthLoading />;
   if (status === 'error') return <AuthError message={error ?? 'Не удалось проверить сессию.'} onRetry={retry} />;
 
-  return <AuthRequired message={notice} onLogin={() => void login(returnTo, demoEnabled ? '__demo__' : undefined)} />;
+  return <AuthRequired message={notice} onLogin={() => void login(returnTo)} />;
 }
