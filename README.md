@@ -4,6 +4,7 @@
 
 CRM помогает команде ИТ Школы РТК вести работу с вузами в одном месте. В системе собраны карточки университетов, образовательные программы, продукты, договоры, лицензии, встречи и ответственные сотрудники. Работа по каждому направлению проходит через настраиваемый Workflow с задачами, комментариями, файлами и историей изменений.
 
+
 |Параметр|Значение|
 |:---|:---|
 |Заказчик|ИТ Школа РТК, ООО «Ростелеком Информационные Технологии»|
@@ -33,6 +34,7 @@ docker compose exec backend python scripts/create_workflow_template.py
 
 ## Роли
 
+
 |Роль|Доступ|
 |:---|:---|
 |Пользователь|Просмотр вузов и Workflow, работа с этапами, задачами, комментариями, файлами и отчётами|
@@ -40,6 +42,7 @@ docker compose exec backend python scripts/create_workflow_template.py
 |Администратор|Полный доступ, управление пользователями, справочниками и шаблонами Workflow|
 
 ## Технологии
+
 
 |Часть системы|Технологии|
 |:---|:---|
@@ -56,19 +59,20 @@ docker compose exec backend python scripts/create_workflow_template.py
 
 ### Функциональная архитектура
 
-![Функциональная архитектура](docs/images/architecture/functional-architecture.jpg)
+!\[Функциональная архитектура\](docs/images/architecture/functional-architecture.jpg)
 
 ### Компонентная архитектура
 
-![Компонентная архитектура](docs/images/architecture/component-architecture.jpg)
+!\[Компонентная архитектура\](docs/images/architecture/component-architecture.jpg)
 
 ### Схема базы данных
 
 Общая схема (полный размер — [full.png](docs/images/db-schema/full.png)):
 
-![Схема БД — обзор](docs/images/db-schema/01-overview.png)
+!\[Схема БД — обзор\](docs/images/db-schema/01-overview.png)
 
 Детализация по доменам:
+
 
 |Домен|Схема|
 |:---|:---|
@@ -81,7 +85,7 @@ docker compose exec backend python scripts/create_workflow_template.py
 
 Понадобятся Docker, Docker Compose v2, 4 ГБ свободной оперативной памяти и около 10 ГБ на диске.
 
-### 1. Подготовить окружение
+### 1\. Подготовить окружение
 
 Linux и macOS:
 
@@ -95,7 +99,7 @@ Windows PowerShell:
 Copy-Item .env.example .env
 ```
 
-### 2. Запустить сервисы
+### 2\. Запустить сервисы
 
 ```bash
 docker compose up -d --build
@@ -109,7 +113,7 @@ docker compose up -d --build
 docker compose ps
 ```
 
-### 3. Загрузить демонстрационные данные
+### 3\. Загрузить демонстрационные данные
 
 ```bash
 docker compose exec -e SEED_DEMO_DATA=true backend python -m app.scripts.seed_demo
@@ -117,7 +121,8 @@ docker compose exec -e SEED_DEMO_DATA=true backend python -m app.scripts.seed_de
 
 Команду можно запускать повторно. Она не создаёт дубликаты и не удаляет существующие данные.
 
-### 4. Открыть приложение
+### 4\. Открыть приложение
+
 
 |Сервис|Адрес|
 |:---|:---|
@@ -126,35 +131,38 @@ docker compose exec -e SEED_DEMO_DATA=true backend python -m app.scripts.seed_de
 |Swagger UI|<http://localhost:8000/docs>|
 |ReDoc|<http://localhost:8000/redoc>|
 |Keycloak|<http://localhost:8081>|
-|Swagger (стенд)|https://158.160.202.104/docs|
-|ReDoc (стенд)|https://158.160.202.104/redoc|
-|OpenAPI JSON (стенд)|https://158.160.202.104/openapi.json|
+|Swagger (стенд)|<https://158.160.202.104/docs>|
+|ReDoc (стенд)|<https://158.160.202.104/redoc>|
+|OpenAPI JSON (стенд)|<https://158.160.202.104/openapi.json>|
 
-Swagger: https://158.160.202.104/docs
-ReDoc: https://158.160.202.104/redoc
-OpenAPI JSON: https://158.160.202.104/openapi.json
+Swagger: [https://158.160.202.104](https://158.160.202.104/docs)`/api`[/docs](https://158.160.202.104/docs)
+ReDoc: [https://158.160.202.104](https://158.160.202.104/redoc)`/api`[/redoc](https://158.160.202.104/redoc)
+OpenAPI JSON: <https://158.160.202.104/openapi.json>
 
 Подробная инструкция по запуску, обновлению, резервному копированию и диагностике — в [docs/INSTALL.md](docs/INSTALL.md).
 
-### 5. API-документация (Swagger)
+### 5\. API-документация (Swagger)
 
 После запуска стенда интерактивная документация backend доступна без дополнительной настройки:
 
+
 |Ресурс|Адрес|
 |:---|:---|
-|Swagger UI|http://localhost:8000/docs|
-|ReDoc|http://localhost:8000/redoc|
-|OpenAPI-спека (JSON)|http://localhost:8000/openapi.json|
+|Swagger UI|<http://localhost:8000/docs>|
+|ReDoc|<http://localhost:8000/redoc>|
+|OpenAPI-спека (JSON)|<http://localhost:8000/openapi.json>|
 
 Как пользоваться:
+
 1. Открой Swagger UI — операции сгруппированы по тегам (Universities, Workflow, Reports…), у каждой есть русское описание и требуемые права.
-2. Для защищённых ручек нажми **Authorize** → **KeycloakLogin**: откроется штатная страница логина Keycloak (Authorization Code + PKCE, пароль вводится только там и никуда больше не передаётся) — войди (например `admin` / `admin123`), токен подставится сам. Других кнопок входа в Swagger нет — это единственный способ. Без токена API вернёт 401.
+2. Для защищённых ручек нажми **Authorize** → **KeycloakLogin**: откроется штатная страница логина Keycloak (Authorization Code \+ PKCE, пароль вводится только там и никуда больше не передаётся) — войди (например `admin` / `admin123`), токен подставится сам. Других кнопок входа в Swagger нет — это единственный способ. Без токена API вернёт 401.
 3. Для локальной проверки подходят демонстрационные пользователи из раздела ниже.
 4. `openapi.json` можно импортировать в Postman/Insomnia или использовать для генерации API-клиентов.
 
 Дока собирается из кода backend автоматически. После правок описаний в `backend/app/modules/**/router.py` пересобери образ: `docker compose up -d --build backend`.
 
 ## Демонстрационные пользователи
+
 
 |Логин|Пароль|Роль|
 |:---|:---|:---|
@@ -203,6 +211,7 @@ docker compose down -v
 
 Основные параметры находятся в `.env`.
 
+
 |Переменная|Назначение|
 |:---|:---|
 |`POSTGRES_PASSWORD`|Пароль базы приложения|
@@ -218,6 +227,7 @@ docker compose down -v
 
 ## Структура репозитория
 
+
 |Каталог|Содержимое|
 |:---|:---|
 |`backend`|FastAPI, серверная логика, модели, миграции, фоновые задачи и тесты|
@@ -228,6 +238,7 @@ docker compose down -v
 |`scripts`|Подготовка демонстрационного стенда, проверка запуска и диагностика Docker|
 
 ## Документация
+
 
 |Документ|Содержание|
 |:---|:---|
