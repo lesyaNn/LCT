@@ -103,7 +103,8 @@ def _norm(search: str | None) -> str | None:
     response_model=UniversityDetail,
     status_code=201,
     tags=["Universities"],
-    summary="Create university",
+    summary="Создать вуз",
+    description="Создаёт вуз с названием и городом. Требуются роли admin или manager.",
 )
 def create_university(
     data: UniversityCreate,
@@ -117,7 +118,8 @@ def create_university(
     "/universities",
     response_model=PaginatedResponse[UniversityListItem],
     tags=["Universities"],
-    summary="List universities (paginated, search, filters, sorting)",
+    summary="Список вузов",
+    description="Возвращает страницу вузов с поиском по названию и городу, фильтрами (город, ответственный, стадия Workflow) и сортировкой. Требуется право university.read.",
 )
 def list_universities(
     page: int = Query(default=1, ge=1),
@@ -162,7 +164,8 @@ def list_universities(
     "/universities/stage-options",
     response_model=list[str],
     tags=["Universities"],
-    summary="Current Workflow stage options for visible universities",
+    summary="Стадии Workflow вузов",
+    description="Возвращает названия текущих стадий Workflow для видимых пользователю вузов. Требуется право university.read.",
 )
 def university_stage_options(
     db: Session = Depends(get_audit_db),
@@ -177,7 +180,8 @@ def university_stage_options(
     "/universities/{university_id}",
     response_model=UniversityDetail,
     tags=["Universities"],
-    summary="Get university by id (with responsibles)",
+    summary="Получить вуз по id",
+    description="Возвращает вуз по id вместе со связанными ответственными. Требуется право university.read.",
 )
 def get_university(
     university_id: uuid.UUID,
@@ -193,7 +197,8 @@ def get_university(
     "/universities/{university_id}",
     response_model=UniversityDetail,
     tags=["Universities"],
-    summary="Partially update university",
+    summary="Частично обновить вуз",
+    description="Частично обновляет название и город вуза. Требуется право university.edit.",
 )
 def patch_university(
     university_id: uuid.UUID,
@@ -218,7 +223,8 @@ def patch_university(
     response_model=None,
     status_code=204,
     tags=["Universities"],
-    summary="Hard-delete university (409 while referenced, M4 policy)",
+    summary="Удалить вуз",
+    description="Безвозвратно удаляет вуз; при наличии связанных записей возвращается 409. Требуются роли admin или manager.",
 )
 def delete_university(
     university_id: uuid.UUID,
@@ -234,7 +240,8 @@ def delete_university(
     response_model=UniversityProgramRead,
     status_code=201,
     tags=["Universities"],
-    summary="Attach an existing catalog program to a university",
+    summary="Привязать программу к вузу",
+    description="Привязывает существующую программу каталога к вузу. Требуется право university.edit.",
 )
 def attach_university_program(
     university_id: uuid.UUID,
@@ -251,7 +258,8 @@ def attach_university_program(
     response_model=UniversityProductRead,
     status_code=201,
     tags=["Universities"],
-    summary="Attach an existing catalog product to a university",
+    summary="Привязать продукт к вузу",
+    description="Привязывает существующий продукт каталога к вузу. Требуется право university.edit.",
 )
 def attach_university_product(
     university_id: uuid.UUID,
@@ -267,7 +275,8 @@ def attach_university_product(
     "/universities/{university_id}/responsibles/primary",
     response_model=UniversityResponsibleRead,
     tags=["Universities"],
-    summary="Atomically change the primary responsible",
+    summary="Сменить основного ответственного",
+    description="Атомарно меняет основного ответственного вуза. Требуется право university.edit.",
 )
 def change_primary_responsible(
     university_id: uuid.UUID,
@@ -283,7 +292,8 @@ def change_primary_responsible(
     "/universities/{university_id}/responsibles/{responsible_id}",
     response_model=UniversityResponsibleRead,
     tags=["Universities"],
-    summary="Assign a responsible to a university (idempotent)",
+    summary="Назначить ответственного вузу",
+    description="Назначает ответственного вузу (идемпотентно: 201 при создании связи, 200 если связь уже есть). Требуются роли admin или manager.",
 )
 def assign_responsible(
     university_id: uuid.UUID,
@@ -305,7 +315,8 @@ def assign_responsible(
     response_model=None,
     status_code=204,
     tags=["Universities"],
-    summary="Unassign a responsible from a university",
+    summary="Отвязать ответственного от вуза",
+    description="Отвязывает ответственного от вуза. Требуются роли admin или manager.",
 )
 def unassign_responsible(
     university_id: uuid.UUID,
@@ -325,7 +336,8 @@ def unassign_responsible(
     response_model=DirectionDetail,
     status_code=201,
     tags=["Directions"],
-    summary="Create direction",
+    summary="Создать направление",
+    description="Создаёт ИТ-направление с кодом и названием. Требуются роли admin или manager.",
 )
 def create_direction(
     data: DirectionCreate,
@@ -339,7 +351,8 @@ def create_direction(
     "/directions",
     response_model=PaginatedResponse[DirectionRead],
     tags=["Directions"],
-    summary="List directions (paginated, search, sorting)",
+    summary="Список направлений",
+    description="Возвращает страницу направлений с поиском по коду и названию, пагинацией и сортировкой. Требуется право university.read.",
 )
 def list_directions(
     page: int = Query(default=1, ge=1),
@@ -365,7 +378,8 @@ def list_directions(
     "/directions/{direction_id}",
     response_model=DirectionDetail,
     tags=["Directions"],
-    summary="Get direction by id (with programs)",
+    summary="Получить направление по id",
+    description="Возвращает направление по id вместе с программами. Требуется право university.read.",
 )
 def get_direction(
     direction_id: uuid.UUID,
@@ -379,7 +393,8 @@ def get_direction(
     "/directions/{direction_id}",
     response_model=DirectionDetail,
     tags=["Directions"],
-    summary="Partially update direction",
+    summary="Частично обновить направление",
+    description="Частично обновляет код и название направления. Требуются роли admin или manager.",
 )
 def patch_direction(
     direction_id: uuid.UUID,
@@ -395,7 +410,8 @@ def patch_direction(
     response_model=None,
     status_code=204,
     tags=["Directions"],
-    summary="Hard-delete direction (RESTRICT when programs exist)",
+    summary="Удалить направление",
+    description="Безвозвратно удаляет направление; при наличии программ — ошибка (RESTRICT). Требуются роли admin или manager.",
 )
 def delete_direction(
     direction_id: uuid.UUID,
@@ -413,7 +429,8 @@ def delete_direction(
     response_model=ProgramDetail,
     status_code=201,
     tags=["Programs"],
-    summary="Create program (global, belongs to a direction)",
+    summary="Создать программу",
+    description="Создаёт программу внутри направления. Требуются роли admin или manager.",
 )
 def create_program(
     data: ProgramCreate,
@@ -429,7 +446,8 @@ def create_program(
     "/programs",
     response_model=PaginatedResponse[ProgramRead],
     tags=["Programs"],
-    summary="List programs (paginated, search, direction filter, sorting)",
+    summary="Список программ",
+    description="Возвращает страницу программ с поиском по названию, фильтром по направлению, пагинацией и сортировкой. Требуется право university.read.",
 )
 def list_programs(
     page: int = Query(default=1, ge=1),
@@ -457,7 +475,8 @@ def list_programs(
     "/programs/{program_id}",
     response_model=ProgramDetail,
     tags=["Programs"],
-    summary="Get program by id (with direction)",
+    summary="Получить программу по id",
+    description="Возвращает программу по id вместе с направлением. Требуется право university.read.",
 )
 def get_program(
     program_id: uuid.UUID,
@@ -471,7 +490,8 @@ def get_program(
     "/programs/{program_id}",
     response_model=ProgramDetail,
     tags=["Programs"],
-    summary="Partially update program",
+    summary="Частично обновить программу",
+    description="Частично обновляет программу (направление, название, описание). Требуются роли admin или manager.",
 )
 def patch_program(
     program_id: uuid.UUID,
@@ -493,7 +513,8 @@ def patch_program(
     response_model=None,
     status_code=204,
     tags=["Programs"],
-    summary="Hard-delete program (RESTRICT when linked)",
+    summary="Удалить программу",
+    description="Безвозвратно удаляет программу; при наличии связей — ошибка (RESTRICT). Требуются роли admin или manager.",
 )
 def delete_program(
     program_id: uuid.UUID,
@@ -511,7 +532,8 @@ def delete_program(
     response_model=ProductDetail,
     status_code=201,
     tags=["Products"],
-    summary="Create product",
+    summary="Создать продукт",
+    description="Создаёт продукт с вендором, программой, названием и версией. Требуются роли admin или manager.",
 )
 def create_product(
     data: ProductCreate,
@@ -528,7 +550,8 @@ def create_product(
     "/products",
     response_model=PaginatedResponse[ProductRead],
     tags=["Products"],
-    summary="List products (paginated, search, vendor filter, sorting)",
+    summary="Список продуктов",
+    description="Возвращает страницу продуктов с поиском по названию, фильтрами по вендору и направлению, пагинацией и сортировкой. Требуется право university.read.",
 )
 def list_products(
     page: int = Query(default=1, ge=1),
@@ -558,7 +581,8 @@ def list_products(
     "/products/{product_id}",
     response_model=ProductDetail,
     tags=["Products"],
-    summary="Get product by id (with vendor)",
+    summary="Получить продукт по id",
+    description="Возвращает продукт по id вместе с вендором. Требуется право university.read.",
 )
 def get_product(
     product_id: uuid.UUID,
@@ -572,7 +596,8 @@ def get_product(
     "/products/{product_id}",
     response_model=ProductDetail,
     tags=["Products"],
-    summary="Partially update product",
+    summary="Частично обновить продукт",
+    description="Частично обновляет продукт (вендор, название, версия, программа). Требуются роли admin или manager.",
 )
 def patch_product(
     product_id: uuid.UUID,
@@ -592,7 +617,8 @@ def patch_product(
     response_model=None,
     status_code=204,
     tags=["Products"],
-    summary="Hard-delete product (RESTRICT when licensed/linked)",
+    summary="Удалить продукт",
+    description="Безвозвратно удаляет продукт; при наличии лицензий или связей — ошибка (RESTRICT). Требуются роли admin или manager.",
 )
 def delete_product(
     product_id: uuid.UUID,
@@ -610,7 +636,8 @@ def delete_product(
     response_model=VendorDetail,
     status_code=201,
     tags=["Vendors"],
-    summary="Create vendor",
+    summary="Создать вендора",
+    description="Создаёт вендора с названием и контактами. Требуются роли admin или manager.",
 )
 def create_vendor(
     data: VendorCreate,
@@ -624,7 +651,8 @@ def create_vendor(
     "/vendors",
     response_model=PaginatedResponse[VendorRead],
     tags=["Vendors"],
-    summary="List vendors (paginated, search, sorting)",
+    summary="Список вендоров",
+    description="Возвращает страницу вендоров с поиском по названию, пагинацией и сортировкой. Требуется право university.read.",
 )
 def list_vendors(
     page: int = Query(default=1, ge=1),
@@ -650,7 +678,8 @@ def list_vendors(
     "/vendors/{vendor_id}",
     response_model=VendorDetail,
     tags=["Vendors"],
-    summary="Get vendor by id (with products)",
+    summary="Получить вендора по id",
+    description="Возвращает вендора по id вместе с продуктами. Требуется право university.read.",
 )
 def get_vendor(
     vendor_id: uuid.UUID,
@@ -664,7 +693,8 @@ def get_vendor(
     "/vendors/{vendor_id}",
     response_model=VendorDetail,
     tags=["Vendors"],
-    summary="Partially update vendor",
+    summary="Частично обновить вендора",
+    description="Частично обновляет название и контакты вендора. Требуются роли admin или manager.",
 )
 def patch_vendor(
     vendor_id: uuid.UUID,
@@ -680,7 +710,8 @@ def patch_vendor(
     response_model=None,
     status_code=204,
     tags=["Vendors"],
-    summary="Hard-delete vendor (RESTRICT when products exist)",
+    summary="Удалить вендора",
+    description="Безвозвратно удаляет вендора; при наличии продуктов — ошибка (RESTRICT). Требуются роли admin или manager.",
 )
 def delete_vendor(
     vendor_id: uuid.UUID,
@@ -702,7 +733,8 @@ def delete_vendor(
     response_model=ContractDetail,
     status_code=201,
     tags=["Contracts"],
-    summary="Create contract",
+    summary="Создать договор",
+    description="Создаёт договор, привязанный к вузу и продукту. Требуются роли admin или manager.",
 )
 def create_contract(
     data: ContractCreate,
@@ -717,7 +749,8 @@ def create_contract(
     "/contracts",
     response_model=PaginatedResponse[ContractRead],
     tags=["Contracts"],
-    summary="List contracts (paginated, search, filters, sorting)",
+    summary="Список договоров",
+    description="Возвращает страницу договоров с поиском по номеру, фильтрами по вузу, продукту и статусу, пагинацией и сортировкой. Требуется право university.read.",
 )
 def list_contracts(
     page: int = Query(default=1, ge=1),
@@ -745,7 +778,8 @@ def list_contracts(
     "/contracts/{contract_id}",
     response_model=ContractDetail,
     tags=["Contracts"],
-    summary="Get contract by id (with its licenses)",
+    summary="Получить договор по id",
+    description="Возвращает договор по id вместе с лицензиями. Требуется право university.read.",
 )
 def get_contract(
     contract_id: uuid.UUID,
@@ -761,7 +795,8 @@ def get_contract(
     "/contracts/{contract_id}",
     response_model=ContractDetail,
     tags=["Contracts"],
-    summary="Update contract",
+    summary="Обновить договор",
+    description="Обновляет договор, включая смену вуза с проверкой видимости. Требуются роли admin или manager.",
 )
 def patch_contract(
     contract_id: uuid.UUID,
@@ -776,7 +811,13 @@ def patch_contract(
     return service.patch_contract(db, contract_id, data)
 
 
-@router.post("/contracts/{contract_id}/file", response_model=ContractDetail, tags=["Contracts"])
+@router.post(
+    "/contracts/{contract_id}/file",
+    response_model=ContractDetail,
+    tags=["Contracts"],
+    summary="Загрузить файл договора",
+    description="Загружает файл договора (скан или копия) в хранилище. Требуются роли admin или manager.",
+)
 def upload_contract_file(
     contract_id: uuid.UUID,
     file: UploadFile = File(...),
@@ -790,7 +831,12 @@ def upload_contract_file(
     return service.get_contract_detail(db, contract_id)
 
 
-@router.get("/contracts/{contract_id}/file", tags=["Contracts"])
+@router.get(
+    "/contracts/{contract_id}/file",
+    tags=["Contracts"],
+    summary="Скачать файл договора",
+    description="Скачивает файл договора потоком; 404 если файла нет. Требуется право university.read.",
+)
 def download_contract_file(
     contract_id: uuid.UUID,
     db: Session = Depends(get_audit_db),
@@ -813,7 +859,14 @@ def download_contract_file(
         headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(name)}"})
 
 
-@router.delete("/contracts/{contract_id}/file", response_model=None, status_code=204, tags=["Contracts"])
+@router.delete(
+    "/contracts/{contract_id}/file",
+    response_model=None,
+    status_code=204,
+    tags=["Contracts"],
+    summary="Удалить файл договора",
+    description="Удаляет файл договора из хранилища, сам договор сохраняется. Требуются роли admin или manager.",
+)
 def delete_contract_file(
     contract_id: uuid.UUID,
     db: Session = Depends(get_audit_db),
@@ -830,7 +883,8 @@ def delete_contract_file(
     response_model=None,
     status_code=204,
     tags=["Contracts"],
-    summary="Hard-delete contract (409 while licenses reference it)",
+    summary="Удалить договор",
+    description="Безвозвратно удаляет договор вместе с файлом; при наличии лицензий — 409. Требуются роли admin или manager.",
 )
 def delete_contract(
     contract_id: uuid.UUID,
@@ -854,7 +908,8 @@ def delete_contract(
     response_model=LicenseRead,
     status_code=201,
     tags=["Licenses"],
-    summary="Create license",
+    summary="Создать лицензию",
+    description="Создаёт лицензию, привязанную к вузу, продукту и договору. Требуются роли admin или manager.",
 )
 def create_license(
     data: LicenseCreate,
@@ -869,7 +924,8 @@ def create_license(
     "/licenses",
     response_model=PaginatedResponse[LicenseRead],
     tags=["Licenses"],
-    summary="List licenses (paginated, search, filters, sorting)",
+    summary="Список лицензий",
+    description="Возвращает страницу лицензий с поиском по номеру, фильтрами по вузу, продукту и статусу, пагинацией и сортировкой. Требуется право university.read.",
 )
 def list_licenses(
     page: int = Query(default=1, ge=1),
@@ -897,7 +953,8 @@ def list_licenses(
     "/licenses/{license_id}",
     response_model=LicenseRead,
     tags=["Licenses"],
-    summary="Get license by id",
+    summary="Получить лицензию по id",
+    description="Возвращает лицензию по id. Требуется право university.read.",
 )
 def get_license(
     license_id: uuid.UUID,
@@ -913,7 +970,8 @@ def get_license(
     "/licenses/{license_id}",
     response_model=LicenseRead,
     tags=["Licenses"],
-    summary="Update license",
+    summary="Обновить лицензию",
+    description="Обновляет лицензию, включая смену вуза с проверкой видимости. Требуются роли admin или manager.",
 )
 def patch_license(
     license_id: uuid.UUID,
@@ -933,7 +991,8 @@ def patch_license(
     response_model=None,
     status_code=204,
     tags=["Licenses"],
-    summary="Hard-delete license",
+    summary="Удалить лицензию",
+    description="Безвозвратно удаляет лицензию. Требуются роли admin или manager.",
 )
 def delete_license(
     license_id: uuid.UUID,
@@ -952,7 +1011,8 @@ def delete_license(
     response_model=ResponsibleDetail,
     status_code=201,
     tags=["Responsibles"],
-    summary="Create responsible",
+    summary="Создать ответственного",
+    description="Создаёт ответственного с ФИО, email, телефоном и ролью. Требуются роли admin или manager.",
 )
 def create_responsible(
     data: ResponsibleCreate,
@@ -973,7 +1033,8 @@ def create_responsible(
     "/responsibles",
     response_model=PaginatedResponse[ResponsibleRead],
     tags=["Responsibles"],
-    summary="List responsibles (paginated, search, filters, sorting)",
+    summary="Список ответственных",
+    description="Возвращает страницу ответственных с поиском по имени и email, фильтрами по роли и вузу, пагинацией и сортировкой. Требуется право university.read.",
 )
 def list_responsibles(
     page: int = Query(default=1, ge=1),
@@ -1005,7 +1066,8 @@ def list_responsibles(
     "/responsibles/{responsible_id}",
     response_model=ResponsibleDetail,
     tags=["Responsibles"],
-    summary="Get responsible by id (with universities)",
+    summary="Получить ответственного по id",
+    description="Возвращает ответственного по id вместе с вузами. Требуется право university.read.",
 )
 def get_responsible(
     responsible_id: uuid.UUID,
@@ -1019,7 +1081,8 @@ def get_responsible(
     "/responsibles/{responsible_id}",
     response_model=ResponsibleDetail,
     tags=["Responsibles"],
-    summary="Partially update responsible",
+    summary="Частично обновить ответственного",
+    description="Частично обновляет данные ответственного. Требуются роли admin или manager.",
 )
 def patch_responsible(
     responsible_id: uuid.UUID,
@@ -1049,7 +1112,8 @@ def patch_responsible(
     response_model=None,
     status_code=204,
     tags=["Responsibles"],
-    summary="Hard-delete responsible (links cascade, university survives)",
+    summary="Удалить ответственного",
+    description="Безвозвратно удаляет ответственного; связи с вузами каскадируются, вузы сохраняются. Требуются роли admin или manager.",
 )
 def delete_responsible(
     responsible_id: uuid.UUID,
@@ -1069,7 +1133,7 @@ ERROR_RESPONSES = {
     summary="Загруженные в БД данные (просмотр)",
     description=(
         "Возвращает строки каталога (вуз, вендор, ПО, договор, лицензия, "
-        "ответственные) и справочник ИТ-направлений. Только чтение."
+        "ответственные) и справочник ИТ-направлений. Только чтение. Требуется право catalog.read."
     ),
     responses=ERROR_RESPONSES,
 )

@@ -46,7 +46,8 @@ WRITE = require_permission("workflow.change_status")
     "/instances/{instance_id}/comments/with-attachments",
     response_model=WorkflowCommentRead,
     status_code=201,
-    summary="Create a comment and its attachments atomically",
+    summary="Комментарий с вложениями",
+    description="Создаёт комментарий экземпляра вместе с вложениями (1–10 файлов) атомарно. Требуемое право: workflow.change_status.",
 )
 def add_comment_with_attachments(
     instance_id: uuid.UUID,
@@ -69,7 +70,8 @@ def add_comment_with_attachments(
 @router.post(
     "/instances/{instance_id}/transition",
     response_model=InstanceDetail,
-    summary="Move the workflow instance to a later stage (atomic)",
+    summary="Переход экземпляра на этап",
+    description="Переводит экземпляр workflow на более поздний этап атомарно, опционально с комментарием. Требуемое право: workflow.change_status.",
 )
 def transition_instance(
     instance_id: uuid.UUID,
@@ -92,7 +94,8 @@ def transition_instance(
 @router.post(
     "/instances/{instance_id}/complete",
     response_model=InstanceDetail,
-    summary="Complete the final workflow stage and instance atomically",
+    summary="Завершение экземпляра",
+    description="Атомарно завершает финальный этап и весь экземпляр workflow. Требуемое право: workflow.change_status.",
 )
 def complete_instance(
     instance_id: uuid.UUID,
@@ -108,7 +111,8 @@ def complete_instance(
 @router.get(
     "/instances/{instance_id}/rollback-targets",
     response_model=list[AllowedTransitionRead],
-    summary="Previous closed stages the instance can roll back to (newest first)",
+    summary="Цели отката экземпляра",
+    description="Возвращает предыдущие закрытые этапы, на которые можно откатить экземпляр (сначала новые). Требуемое право: workflow.read.",
 )
 def list_rollback_targets(
     instance_id: uuid.UUID,
@@ -127,7 +131,8 @@ def list_rollback_targets(
 @router.post(
     "/instances/{instance_id}/rollback",
     response_model=InstanceDetail,
-    summary="Step the workflow instance back to a previous stage (atomic)",
+    summary="Откат экземпляра на этап",
+    description="Возвращает экземпляр workflow на предыдущий этап атомарно, опционально с комментарием. Требуемое право: workflow.change_status.",
 )
 def rollback_instance(
     instance_id: uuid.UUID,
@@ -150,7 +155,8 @@ def rollback_instance(
 @router.get(
     "/instances/{instance_id}/transitions",
     response_model=list[WorkflowStageTransitionRead],
-    summary="Transition history: prev/new stage + actor + comment (oldest first)",
+    summary="История переходов экземпляра",
+    description="Возвращает историю переходов экземпляра: предыдущий и новый этапы, автор и комментарий. Требуемое право: workflow.read.",
 )
 def list_transitions(
     instance_id: uuid.UUID,
@@ -165,7 +171,8 @@ def list_transitions(
 @router.get(
     "/instances/{instance_id}/comments",
     response_model=PaginatedResponse[WorkflowCommentRead],
-    summary="Instance comments, oldest first (paginated)",
+    summary="Список комментариев экземпляра",
+    description="Возвращает постраничный список комментариев экземпляра, сначала старые. Требуемое право: workflow.read.",
 )
 def list_comments(
     instance_id: uuid.UUID,
@@ -190,7 +197,8 @@ def list_comments(
     "/instances/{instance_id}/comments",
     response_model=WorkflowCommentRead,
     status_code=201,
-    summary="Add an instance comment",
+    summary="Добавление комментария",
+    description="Добавляет комментарий к экземпляру workflow, опционально с привязкой к этапу. Требуемое право: workflow.change_status.",
 )
 def add_comment(
     instance_id: uuid.UUID,
@@ -206,7 +214,8 @@ def add_comment(
 @router.patch(
     "/comments/{comment_id}",
     response_model=WorkflowCommentRead,
-    summary="Edit a comment (author within 15 minutes, admin any time)",
+    summary="Редактирование комментария",
+    description="Редактирует комментарий workflow: автор — в течение 15 минут, admin — в любое время. Требуемое право: workflow.change_status.",
 )
 def edit_comment(
     comment_id: uuid.UUID,
@@ -227,7 +236,8 @@ def edit_comment(
     "/comments/{comment_id}",
     status_code=204,
     response_model=None,
-    summary="Delete a comment (author within 15 minutes, admin any time)",
+    summary="Удаление комментария",
+    description="Удаляет комментарий workflow: автор — в течение 15 минут, admin — в любое время. Требуемое право: workflow.change_status.",
 )
 def delete_comment(
     comment_id: uuid.UUID,

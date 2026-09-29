@@ -14,7 +14,12 @@ from app.modules.education.schemas import UniversityEducationRead
 router = APIRouter(tags=["Education statistics"])
 
 
-@router.get("/universities/{university_id}/education-statistics", response_model=UniversityEducationRead)
+@router.get(
+    "/universities/{university_id}/education-statistics",
+    response_model=UniversityEducationRead,
+    summary="Статистика образования вуза",
+    description="Возвращает образовательную статистику вуза (university_id в пути). Требуется право university.read.",
+)
 def get_education_statistics(university_id: UUID, db: Session = Depends(get_db),
                              user: CurrentUser = Depends(require_permission("university.read"))):
     return service.university_education(db, university_id, user)

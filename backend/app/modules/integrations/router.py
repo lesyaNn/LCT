@@ -70,7 +70,12 @@ class WebsiteIngestRequest(BaseModel):
     applications: list[WebsiteApplicationRecord] = Field(max_length=1000)
 
 
-@router.get("/integrations/capabilities", summary="Configured external adapter capabilities")
+@router.get(
+    "/integrations/capabilities",
+    summary="Возможности внешних интеграций",
+    description="Возвращает флаги доступных внешних адаптеров (демо-LMS, демо-сайт, live-провайдер). Требуется право university.read.",
+    response_model=dict,
+)
 def integration_capabilities(
     _user: CurrentUser = Depends(require_permission("university.read")),
 ) -> dict:
@@ -79,14 +84,24 @@ def integration_capabilities(
             "live_provider_configured": False}
 
 
-@router.post("/integrations/sync")
+@router.post(
+    "/integrations/sync",
+    summary="Синхронизация внешних данных",
+    description="Запускает демо-синхронизацию данных вуза из источника lms или website (поле source). Требуется право university.edit и доступ к вузу.",
+    response_model=dict,
+)
 def sync_external(req: SyncRequest, db: Session = Depends(get_audit_db),
                   user: CurrentUser = Depends(require_permission("university.edit"))) -> dict:
     require_university_scope(user, req.university_id)
     return service.sync_mock(db, req.university_id, req.source)
 
 
-@router.post("/integrations/lms/ingest", summary="Ingest per-program LMS statistics without learner identities")
+@router.post(
+    "/integrations/lms/ingest",
+    summary="Загрузка статистики LMS по программам",
+    description="Принимает агрегированные счётчики learners_count и flows_count по программам (до 1000 записей, без персональных данных). Требуется право university.edit и доступ к вузу.",
+    response_model=dict,
+)
 def ingest_lms(req: LmsIngestRequest, db: Session = Depends(get_audit_db),
                user: CurrentUser = Depends(require_permission("university.edit"))) -> dict:
     require_university_scope(user, req.university_id)
@@ -94,7 +109,12 @@ def ingest_lms(req: LmsIngestRequest, db: Session = Depends(get_audit_db),
                               [item.model_dump(mode="python") for item in req.programs])
 
 
-@router.post("/integrations/website/ingest", summary="Ingest CRM-owned website JSON contract")
+@router.post(
+    "/integrations/website/ingest",
+    summary="Загрузка заявок с сайта",
+    description="Принимает заявки сайта в CRM-контракте (external_id, program_id, статус, flow_name, до 1000 записей). Требуется право university.edit и доступ к вузу.",
+    response_model=dict,
+)
 def ingest_website(req: WebsiteIngestRequest, db: Session = Depends(get_audit_db),
                    user: CurrentUser = Depends(require_permission("university.edit"))) -> dict:
     require_university_scope(user, req.university_id)
@@ -102,7 +122,12 @@ def ingest_website(req: WebsiteIngestRequest, db: Session = Depends(get_audit_db
                                   [item.model_dump(mode="python") for item in req.applications])
 
 
-@router.get("/universities/{university_id}/external-data")
+@router.get(
+    "/universities/{university_id}/external-data",
+    summary="Внешние данные вуза",
+    description="Возвращает сохранённые внешние данные вуза по источнику lms или website (query-параметр source). Требуется право university.read и доступ к вузу.",
+    response_model=dict,
+)
 def get_university_external_data(
     university_id: uuid.UUID,
     source: Literal["lms", "website"] = Query(...),
@@ -113,13 +138,23 @@ def get_university_external_data(
     return service.university_data(db, university_id, source)
 
 
-@router.get("/integrations/metrics")
+@router.get(
+    "/integrations/metrics",
+    summary="Метрики интеграций",
+    description="Возвращает сводные метрики внешних интеграций. Требуется право analytics.read.",
+    response_model=dict,
+)
 def get_integration_metrics(db: Session = Depends(get_db),
                             _user: CurrentUser = Depends(require_permission("analytics.read"))) -> dict:
     return service.metrics(db, _user)
 
 
-@router.post("/workflow/instances/from-external")
+@router.post(
+    "/workflow/instances/from-external",
+    summary="Создание workflow из внешней заявки",
+    description="Создаёт экземпляр workflow из заявки сайта по external_id, опционально по template_id. Требуется право workflow.change_status и доступ к вузу.",
+    response_model=dict,
+)
 def create_workflow_from_external(
     req: ExternalWorkflowRequest,
     db: Session = Depends(get_audit_db),

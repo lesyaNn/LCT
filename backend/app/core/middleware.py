@@ -8,10 +8,12 @@ they arrive, so a client cannot bypass the limit by omitting
 from __future__ import annotations
 
 import uuid
+from urllib.parse import urlsplit
 
 from starlette.datastructures import Headers, MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from app.config import settings
 from app.schemas.errors import ERROR_MESSAGES, ErrorCode, ErrorResponse
 
 from app.core.rate_limit import bucket_key, check_rate_limit, hash_client_id
@@ -22,6 +24,17 @@ MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024
 # stream limiter in workflow_attachments.service.
 REQUEST_BODY_LIMIT_BYTES = MAX_FILE_SIZE_BYTES + 1024 * 1024
 
+def _keycloak_origin() -> str:
+    """Origin, которому Swagger UI разрешает ходить за токеном (OAuth2 code-flow)."""
+    try:
+        parts = urlsplit(settings.keycloak_issuer)
+        if parts.scheme and parts.netloc:
+            return f"{parts.scheme}://{parts.netloc}"
+    except ValueError:
+        pass
+    return "http://localhost:8081"
+
+
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
@@ -30,13 +43,16 @@ SECURITY_HEADERS = {
     "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
     # FastAPI docs use jsDelivr for their pinned UI bundles and an inline
     # bootstrap script.  No wildcard sources are allowed.
+    # connect-src includes Keycloak: Swagger UI обменивает OAuth2-код на токен
+    # из браузера. img-src включает favicon Swagger UI.
     "Content-Security-Policy": (
         "default-src 'self'; "
         "base-uri 'self'; frame-ancestors 'none'; object-src 'none'; "
         "script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; "
         "style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com 'unsafe-inline'; "
-        "img-src 'self' data:; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; "
-        "connect-src 'self'"
+        "img-src 'self' data: https://fastapi.tiangolo.com; "
+        "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; "
+        f"connect-src 'self' {_keycloak_origin()} https://cdn.jsdelivr.net"
     ),
 }
 

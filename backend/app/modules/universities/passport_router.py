@@ -39,7 +39,8 @@ from app.modules.universities.passport_blocks import document_to_short
 router = APIRouter(prefix="/universities", tags=["universities-passport"])
 
 
-@router.get("/{university_id}/history", summary="Human-readable history of one university")
+@router.get("/{university_id}/history", summary="История вуза",
+    description="Возвращает человекочитаемую историю вуза (события и документы). Требуется право university.read.")
 def get_university_history(
     university_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -53,7 +54,8 @@ def get_university_history(
 @router.get(
     "/{university_id}/passport",
     response_model=UniversityPassport,
-    summary="University digital passport (aggregated)",
+    summary="Паспорт вуза",
+    description="Возвращает агрегированный цифровой паспорт вуза; параметр include подключает блок audit. Требуется право university.read.",
 )
 def get_university_passport(
     university_id: uuid.UUID,
@@ -72,7 +74,8 @@ def get_university_passport(
 @router.get(
     "/{university_id}/passport/programs",
     response_model=PaginatedPrograms,
-    summary="University passport programs (paginated)",
+    summary="Программы паспорта вуза",
+    description="Возвращает страницу программ вуза с фильтром по статусу. Требуется право university.read.",
 )
 def get_university_passport_programs(
     university_id: uuid.UUID,
@@ -90,7 +93,8 @@ def get_university_passport_programs(
 @router.get(
     "/{university_id}/passport/documents",
     response_model=PaginatedDocuments,
-    summary="University documents with server-side filters and pagination",
+    summary="Документы паспорта вуза",
+    description="Возвращает страницу документов вуза с поиском и фильтрами по типу и статусу. Требуется право university.read.",
 )
 def get_university_passport_documents(
     university_id: uuid.UUID,
@@ -114,7 +118,8 @@ def get_university_passport_documents(
     "/{university_id}/passport/documents",
     response_model=DocumentShort,
     status_code=201,
-    summary="Upload a university business document",
+    summary="Загрузить документ вуза",
+    description="Загружает деловой документ вуза (тип, заголовок и файл). Требуется право university.edit.",
 )
 def upload_university_document(
     university_id: uuid.UUID,
@@ -137,7 +142,8 @@ def upload_university_document(
 
 @router.get(
     "/{university_id}/passport/documents/{document_id}/download",
-    summary="Download a university document with authentication and scope checks",
+    summary="Скачать документ вуза",
+    description="Скачивает файл документа вуза с проверкой доступа. Требуется право university.read.",
 )
 def download_university_document(
     university_id: uuid.UUID,

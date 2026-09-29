@@ -1,8 +1,9 @@
 """P5-11-01: Swagger/OpenAPI contract checks.
 
-Locks: professional title/version, BearerAuth scheme (contract name),
-per-operation summaries + tags, documented error responses, valid
-/api/v1 versioning, and that /docs is served.
+Locks: professional title/version, single KeycloakLogin OAuth2 scheme
+(Authorization Code + PKCE, no manual-token button), per-operation
+summaries + tags, documented error responses, valid /api/v1 versioning,
+and that /docs (+ oauth2 redirect page) is served.
 """
 
 from fastapi.testclient import TestClient
@@ -25,13 +26,14 @@ def test_title_and_version():
     assert spec["info"]["description"]
 
 
-def test_bearer_auth_scheme():
+def test_keycloak_login_scheme():
     spec = _spec()
     schemes = spec["components"]["securitySchemes"]
-    assert "BearerAuth" in schemes, schemes
-    assert "HTTPBearer" not in schemes
-    assert schemes["BearerAuth"]["scheme"] == "bearer"
-    assert schemes["BearerAuth"]["bearerFormat"] == "JWT"
+    assert list(schemes) == ["KeycloakLogin"], schemes
+    flow = schemes["KeycloakLogin"]["flows"]["authorizationCode"]
+    assert schemes["KeycloakLogin"]["type"] == "oauth2"
+    assert flow["authorizationUrl"].endswith("/protocol/openid-connect/auth")
+    assert flow["tokenUrl"].endswith("/protocol/openid-connect/token")
 
 
 def test_all_operations_have_summary_and_tags():
@@ -45,14 +47,14 @@ def test_all_operations_have_summary_and_tags():
             assert op.get("tags"), (method, path)
 
 
-def test_protected_operations_reference_bearer_auth():
+def test_protected_operations_reference_keycloak_login():
     spec = _spec()
     protected = ["/api/v1/import/sheets/preview", "/api/v1/import/execute",
                  "/api/v1/auth/me"]
     for path in protected:
         ops = spec["paths"][path]
         op = next(iter(ops.values()))
-        assert {"BearerAuth": []} in op.get("security", []), path
+        assert op.get("security") == [{"KeycloakLogin": []}], path
 
 
 def test_error_responses_documented():
@@ -78,6 +80,15 @@ def test_docs_and_redoc_served():
     assert "SwaggerUIBundle" in docs.text
     assert "cdn.jsdelivr.net" in docs.text
     assert "cdn.jsdelivr.net" in docs.headers["content-security-policy"]
+    assert "oauth2-redirect.html" in docs.text
+    # Принудительный показ страницы логина Keycloak (prompt=login).
+    assert "prompt" in docs.text
+    redirect = client.get("/docs/oauth2-redirect.html")
+    assert redirect.status_code == 200
+    assert "swaggerUIRedirectOauth2" in redirect.text
+    # Попап обязан вернуть redirectUrl в Swagger, иначе обмен кода на токен
+    # идёт с redirect_uri=null (invalid_grant/Incorrect redirect_uri).
+    assert "redirectUrl:n" in redirect.text.replace(" ", "")
     redoc = client.get("/redoc")
     assert redoc.status_code == 200
     assert "redoc.standalone.js" in redoc.text
@@ -100,7 +111,7 @@ def test_all_business_operations_are_documented_and_secure():
             assert operation["summary"].strip()
             assert operation["description"].strip()
             assert operation["tags"]
-            assert {"BearerAuth": []} in operation.get("security", [])
+            assert operation.get("security") == [{"KeycloakLogin": []}]
             for code in ("401", "403", "422"):
                 response = operation["responses"][code]
                 assert response["content"]["application/json"]["schema"] == {
@@ -132,7 +143,7 @@ def test_all_openapi_refs_resolve():
 
     walk(spec)
     assert "ErrorResponse" in spec["components"]["schemas"]
-    assert "BearerAuth" in spec["components"]["securitySchemes"]
+    assert "KeycloakLogin" in spec["components"]["securitySchemes"]
 
 
 def test_representative_examples():

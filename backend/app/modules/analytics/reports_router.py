@@ -212,6 +212,7 @@ def preview_report(
     "",
     response_model=PaginatedResponse[ReportJobRead],
     summary="Список задач отчётов",
+    description="Возвращает постраничный список задач отчётов: администраторы видят все, остальные — только свои. Требуется право reports.read.",
 )
 def list_report_jobs(
     page: int = Query(default=1, ge=1),

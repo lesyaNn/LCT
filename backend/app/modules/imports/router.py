@@ -103,6 +103,7 @@ def _read_model(job: ReportJob) -> ImportJobRead:
     response_model=ImportUploadResponse,
     status_code=201,
     summary="Загрузить XLSX и прочитать листы",
+    description="Принимает XLSX-файл, сохраняет во временное хранилище и возвращает список листов. Требуется право import.write.",
     responses={401: ERROR_RESPONSES[401], 403: ERROR_RESPONSES[403], 422: ERROR_RESPONSES[422]},
 )
 def upload_file(
@@ -132,6 +133,7 @@ def upload_file(
     "/sheets/preview",
     response_model=ImportSheetPreview,
     summary="Предпросмотр одного листа",
+    description="Возвращает заголовки, первые строки и число строк одного листа. Требуется право import.read.",
     responses={401: ERROR_RESPONSES[401], 403: ERROR_RESPONSES[403], 404: ERROR_RESPONSES[404]},
 )
 def preview_sheet(
@@ -158,7 +160,7 @@ def preview_sheet(
         "job_id. Один ``sheet`` — импорт листа, ``sheets`` — пачка листов "
         "в каноническом порядке одной транзакцией (dry-run пачки видит "
         "межлистовые зависимости). Исполнением владеет worker-контейнер; "
-        "API только создаёт jobs — BackgroundTasks запрещены."
+        "API только создаёт jobs — BackgroundTasks запрещены. Требуется право import.write."
     ),
     responses={401: ERROR_RESPONSES[401], 403: ERROR_RESPONSES[403], 422: ERROR_RESPONSES[422]},
 )
@@ -217,6 +219,7 @@ def execute_import(
     "/jobs",
     response_model=list[ImportJobRead],
     summary="Журнал импортов",
+    description="Возвращает журнал задач XLSX-импорта (до 100, новые первыми). Требуется право import.read.",
 )
 def list_import_jobs(
     db: Session = Depends(get_audit_db),
@@ -237,6 +240,7 @@ def list_import_jobs(
     "/jobs/{job_id}",
     response_model=ImportJobRead,
     summary="Статус импорта",
+    description="Возвращает статус и результат задачи импорта по job_id. Требуется право import.read.",
     responses={401: ERROR_RESPONSES[401], 403: ERROR_RESPONSES[403], 404: ERROR_RESPONSES[404]},
 )
 def get_import_job(
@@ -254,7 +258,7 @@ def get_import_job(
 @router.get(
     "/jobs/{job_id}/report",
     summary="Скачать отчёт об ошибках",
-    description="XLSX со списком построчных ошибок. 404 — ошибок нет или отчёта нет.",
+    description="XLSX со списком построчных ошибок. 404 — ошибок нет или отчёта нет. Требуется право import.read.",
     responses={401: ERROR_RESPONSES[401], 403: ERROR_RESPONSES[403], 404: ERROR_RESPONSES[404]},
 )
 def download_import_report(

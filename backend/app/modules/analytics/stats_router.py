@@ -118,6 +118,7 @@ class StatisticsRequest(BaseModel):
     "",
     response_model=ReportStatsResponse,
     summary="Статистика по выбранной выборке",
+    description="Считает агрегаты (срезы по измерениям) для того же UnifiedFilter, что таблица и предпросмотр. Требуется право reports.read.",
     responses={
         401: {"model": ErrorResponse, "description": "AUTH_REQUIRED"},
         403: {"model": ErrorResponse, "description": "FORBIDDEN"},

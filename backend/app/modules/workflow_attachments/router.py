@@ -45,7 +45,8 @@ def get_storage() -> StorageBackend:
     "/instances/{instance_id}/attachments",
     response_model=AttachmentRead,
     status_code=201,
-    summary="Upload a file to a workflow instance (streamed, max 50 MiB)",
+    summary="Загрузка вложения",
+    description="Загружает файл в экземпляр workflow потоково (максимум 50 МиБ). Требуемое право: workflow.change_status.",
 )
 def upload_attachment(
     instance_id: uuid.UUID,
@@ -71,7 +72,8 @@ def upload_attachment(
 @router.get(
     "/instances/{instance_id}/attachments",
     response_model=PaginatedResponse[AttachmentRead],
-    summary="List attachment metadata for an instance (oldest first)",
+    summary="Список вложений экземпляра",
+    description="Возвращает постраничный список метаданных вложений экземпляра, сначала старые. Требуемое право: workflow.read.",
 )
 def list_attachments(
     instance_id: uuid.UUID,
@@ -95,7 +97,8 @@ def list_attachments(
 @router.get(
     "/instances/{instance_id}/attachments/{attachment_id}",
     response_model=AttachmentRead,
-    summary="Get attachment metadata (no storage paths leaked)",
+    summary="Метаданные вложения",
+    description="Возвращает метаданные вложения экземпляра без путей хранилища. Требуемое право: workflow.read.",
 )
 def get_attachment_metadata(
     instance_id: uuid.UUID,
@@ -113,7 +116,8 @@ def get_attachment_metadata(
 
 @router.get(
     "/instances/{instance_id}/attachments/{attachment_id}/download",
-    summary="Download attachment bytes (streamed)",
+    summary="Скачивание вложения",
+    description="Скачивает байты вложения экземпляра потоково. Требуемое право: workflow.read.",
     response_class=StreamingResponse,
 )
 def download_attachment(
@@ -164,7 +168,8 @@ def download_attachment(
 @router.delete(
     "/instances/{instance_id}/attachments/{attachment_id}",
     status_code=204,
-    summary="Delete attachment object and metadata",
+    summary="Удаление вложения",
+    description="Удаляет объект вложения и его метаданные (автор или admin). Требуемое право: workflow.change_status.",
 )
 def delete_attachment(
     instance_id: uuid.UUID,

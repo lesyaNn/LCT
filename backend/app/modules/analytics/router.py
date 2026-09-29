@@ -104,7 +104,12 @@ def get_analytics(kind, db, raw, user, provider):
     return result
 
 
-@router.get("/overview", response_model=Overview)
+@router.get(
+    "/overview",
+    response_model=Overview,
+    summary="Обзор аналитики",
+    description="Возвращает агрегированный обзор (Overview) по UnifiedFilter из query-параметров. Требуется право analytics.read.",
+)
 def overview(
     filters: dict = Depends(filter_input),
     db: Session = Depends(get_db),
@@ -114,7 +119,12 @@ def overview(
     return get_analytics("overview", db, filters, user, provider)
 
 
-@router.get("/matrix", response_model=Matrix)
+@router.get(
+    "/matrix",
+    response_model=Matrix,
+    summary="Матрица аналитики",
+    description="Возвращает матрицу «вуз × программа» (Matrix) по UnifiedFilter из query-параметров. Требуется право analytics.read.",
+)
 def matrix(
     filters: dict = Depends(filter_input),
     db: Session = Depends(get_db),

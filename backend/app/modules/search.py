@@ -103,7 +103,12 @@ def search(db: Session, user: CurrentUser, q: str) -> SearchResults:
     return result
 
 
-@router.get("", response_model=SearchResults)
+@router.get(
+    "",
+    response_model=SearchResults,
+    summary="Глобальный поиск по CRM",
+    description="Ищет вузы, workflow, документы, договоры, продукты и ответственных по строке q (минимум 2 символа, до 5 совпадений на раздел). Состав выдачи зависит от прав university.read и workflow.read.",
+)
 def global_search(q: str = Query(default="", max_length=100), db: Session = Depends(get_db),
                   user: CurrentUser = Depends(get_current_user)) -> SearchResults:
     return search(db, user, q)
