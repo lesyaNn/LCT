@@ -40,7 +40,7 @@ export interface LaunchDynamicsItem {
 }
 
 export interface StageFunnelItem { stage: string; template: string | null; reached: number; current: number; completed: number }
-export interface MonthlyEventItem { monthKey: string; monthLabel: string; count: number }
+export interface MonthlyEventItem { monthKey: string; monthLabel: string; count: number; statusChanges: number; completed: number }
 export interface TopUniversityItem { universityId: string; university: string; count: number }
 export interface ResponsibleWorkloadItem { responsibleId: string | null; responsible: string; inProgress: number; completed: number }
 
@@ -94,7 +94,7 @@ type AnalyticsOverviewDto = {
   program_statuses: Array<{ status: string; count: number }>;
   launch_dynamics?: Array<{ month: string; actual: number; planned: number }>;
   stage_funnel?: Array<{ stage: string; template: string | null; reached: number; current: number; completed: number }>;
-  monthly_events?: Array<{ month: string; count: number }>;
+  monthly_events?: Array<{ month: string; count: number; status_changes: number; completed: number }>;
   top_universities?: Array<{ university_id: string; university: string; count: number }>;
   responsible_workload?: Array<{ responsible_id: string | null; responsible: string; in_progress: number; completed: number }>;
   overdue_items: Array<{ id?: string; university_id?: string | null; university: string; stage?: string | null; task?: string | null; days_overdue: number; type: 'stage' | 'task' }>;
@@ -137,7 +137,7 @@ function mapDashboardAnalytics(overview: AnalyticsOverviewDto, matrix: Analytics
     programStatuses: overview.program_statuses.filter((item): item is { status: ProgramStatus; count: number } => item.status in tones).map((item) => ({ status: item.status, label: programStatusLabels[item.status], count: item.count, tone: tones[item.status] })),
     launchDynamics: (overview.launch_dynamics ?? []).map((item) => { const date = new Date(`${item.month}-01T12:00:00`); return { monthKey: item.month, monthLabel: monthFormatter.format(date).replace('.', ''), actual: item.actual, planned: item.planned }; }),
     stageFunnel: overview.stage_funnel ?? [],
-    monthlyEvents: (overview.monthly_events ?? []).map((item) => { const date = new Date(`${item.month}-01T12:00:00`); return { monthKey: item.month, monthLabel: monthFormatter.format(date).replace('.', ''), count: item.count }; }),
+    monthlyEvents: (overview.monthly_events ?? []).map((item) => { const date = new Date(`${item.month}-01T12:00:00`); return { monthKey: item.month, monthLabel: monthFormatter.format(date).replace('.', ''), count: item.count, statusChanges: item.status_changes, completed: item.completed }; }),
     topUniversities: (overview.top_universities ?? []).map((item) => ({ universityId: item.university_id, university: item.university, count: item.count })),
     responsibleWorkload: (overview.responsible_workload ?? []).map((item) => ({ responsibleId: item.responsible_id, responsible: item.responsible, inProgress: item.in_progress, completed: item.completed })),
     attentionItems: overview.overdue_items.filter((item) => Boolean(item.university_id)).slice(0, 5).map((item, index) => ({ id: item.id ?? `overdue-${index}`, universityId: item.university_id!, universityName: item.university, problemCode: item.type === 'stage' ? 'WF-OVERDUE' : 'TASK-OVERDUE', problemLabel: item.stage ?? item.task ?? 'Просрочено', severity: item.days_overdue > 14 ? 'red' : item.days_overdue > 7 ? 'orange' : 'yellow', overdueDays: item.days_overdue })),

@@ -185,21 +185,21 @@ function StageFunnelTooltip({ active, payload }: TooltipContentProps) {
 }
 
 function StageFunnelChart({ data }: { data: DashboardAnalytics['stageFunnel'] }) {
-  return <div className={styles.funnelCanvas} role="img" aria-label="Воронка этапов Workflow"><ResponsiveContainer width="100%" height="100%"><BarChart data={data} layout="vertical" margin={{ top: 4, right: 8, bottom: 4, left: 8 }}><CartesianGrid stroke="var(--rtk-color-border)" horizontal={false} /><XAxis type="number" allowDecimals={false} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} /><YAxis dataKey="stage" type="category" width={250} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={(value: string) => value.length > 38 ? `${value.slice(0, 38)}…` : value} interval={0} /><Tooltip content={StageFunnelTooltip} cursor={{ fill: 'var(--rtk-color-surface-hover)' }} /><Bar dataKey="reached" name="Дошли до этапа или дальше" fill="var(--rtk-color-brand)" radius={[0, 4, 4, 0]} isAnimationActive={false} /></BarChart></ResponsiveContainer></div>;
+  return <div className={styles.funnelCanvas} role="img" aria-label="Воронка этапов Workflow"><ResponsiveContainer width="100%" height="100%"><BarChart data={data} layout="vertical" margin={{ top: 4, right: 8, bottom: 4, left: 8 }}><CartesianGrid stroke="var(--rtk-color-border)" horizontal={false} /><XAxis type="number" allowDecimals={false} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} /><YAxis dataKey="stage" type="category" width={250} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={(value: string) => value.length > 38 ? `${value.slice(0, 38)}…` : value} interval={0} /><Tooltip content={StageFunnelTooltip} cursor={{ fill: 'var(--rtk-color-surface-hover)' }} /><Bar dataKey="reached" name="Дошли до этапа или дальше" fill="var(--rtk-color-warning)" radius={[0, 4, 4, 0]} isAnimationActive={false} /></BarChart></ResponsiveContainer></div>;
 }
 
 function MonthlyEventsTooltip({ active, payload }: TooltipContentProps) {
   if (!active || !payload?.length) return null;
   const point = payload[0]?.payload as MonthlyEventItem | undefined;
-  return point ? <div className={styles.tooltip}><strong>{point.monthLabel}</strong><span>Событий: {formatCount(point.count)}</span></div> : null;
+  return point ? <div className={styles.tooltip}><strong>{point.monthLabel}</strong><span>Событий: {formatCount(point.count)}</span><span>Смены статусов: {formatCount(point.statusChanges)}</span><span>Завершено: {formatCount(point.completed)}</span></div> : null;
 }
 
 function MonthlyEventsChart({ data }: { data: DashboardAnalytics['monthlyEvents'] }) {
-  return <div className={styles.chartCanvas} role="img" aria-label="Динамика событий по месяцам"><ResponsiveContainer width="100%" height="100%"><LineChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: 0 }}><CartesianGrid stroke="var(--rtk-color-border)" strokeDasharray="3 3" vertical={false} /><XAxis dataKey="monthLabel" tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} /><YAxis allowDecimals={false} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} width={36} /><Tooltip content={MonthlyEventsTooltip} cursor={{ stroke: 'var(--rtk-color-border-strong)' }} /><Line type="monotone" dataKey="count" name="События" stroke="var(--rtk-color-brand)" strokeWidth={3} dot={{ r: 3, fill: 'var(--rtk-color-brand)' }} activeDot={{ r: 5 }} isAnimationActive={false} /></LineChart></ResponsiveContainer></div>;
+  return <div className={styles.chartCanvas} role="img" aria-label="Динамика событий, смен статусов и завершений по месяцам"><ResponsiveContainer width="100%" height="100%"><LineChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: 0 }}><CartesianGrid stroke="var(--rtk-color-border)" strokeDasharray="3 3" vertical={false} /><XAxis dataKey="monthLabel" tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} /><YAxis allowDecimals={false} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} width={36} /><Tooltip content={MonthlyEventsTooltip} cursor={{ stroke: 'var(--rtk-color-border-strong)' }} /><Legend /><Line type="monotone" dataKey="count" name="События" stroke="var(--rtk-color-brand)" strokeWidth={3} dot={{ r: 3, fill: 'var(--rtk-color-brand)' }} activeDot={{ r: 5 }} isAnimationActive={false} /><Line type="monotone" dataKey="statusChanges" name="Смены статусов" stroke="var(--rtk-color-warning)" strokeWidth={2} dot={{ r: 3, fill: 'var(--rtk-color-warning)' }} activeDot={{ r: 5 }} isAnimationActive={false} /><Line type="monotone" dataKey="completed" name="Завершено" stroke="var(--rtk-color-success)" strokeWidth={2} dot={{ r: 3, fill: 'var(--rtk-color-success)' }} activeDot={{ r: 5 }} isAnimationActive={false} /></LineChart></ResponsiveContainer></div>;
 }
 
 function TopUniversitiesChart({ data }: { data: DashboardAnalytics['topUniversities'] }) {
-  return <div className={styles.topUniversitiesCanvas} role="img" aria-label="Топ-10 ВУЗов по числу взаимодействий"><ResponsiveContainer width="100%" height="100%"><BarChart data={data} layout="vertical" margin={{ top: 4, right: 8, bottom: 4, left: 8 }}><CartesianGrid stroke="var(--rtk-color-border)" horizontal={false} /><XAxis type="number" allowDecimals={false} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} /><YAxis dataKey="university" type="category" width={190} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={(value: string) => value.length > 27 ? `${value.slice(0, 27)}…` : value} interval={0} /><Tooltip formatter={(value) => [formatCount(Number(value)), 'Взаимодействия']} /><Bar dataKey="count" fill="var(--rtk-color-brand)" radius={[0, 4, 4, 0]} isAnimationActive={false} /></BarChart></ResponsiveContainer></div>;
+  return <div className={styles.topUniversitiesCanvas} role="img" aria-label="Топ-10 ВУЗов по числу взаимодействий"><ResponsiveContainer width="100%" height="100%"><BarChart data={data} layout="vertical" margin={{ top: 4, right: 8, bottom: 4, left: 8 }}><CartesianGrid stroke="var(--rtk-color-border)" horizontal={false} /><XAxis type="number" allowDecimals={false} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} /><YAxis dataKey="university" type="category" width={190} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={(value: string) => value.length > 27 ? `${value.slice(0, 27)}…` : value} interval={0} /><Tooltip formatter={(value) => [formatCount(Number(value)), 'Взаимодействия']} /><Bar dataKey="count" fill="var(--rtk-color-warning)" radius={[0, 4, 4, 0]} isAnimationActive={false} /></BarChart></ResponsiveContainer></div>;
 }
 
 function ResponsibleWorkloadChart({ data }: { data: DashboardAnalytics['responsibleWorkload'] }) {
@@ -275,16 +275,16 @@ function AnalyticsGrid({ data }: { data: DashboardAnalytics }) {
   const hasLaunches = data.launchDynamics.some((item) => item.actual > 0 || item.planned > 0);
   return (
     <div className={styles.grid}>
+      <div className={styles.funnelWide}><ChartCard title="Воронка этапов" description="Сколько взаимодействий дошли до этапа или дальше. За всё время." exportSlug="stage-funnel" exportTestId="chart-export-stage-funnel" canExport={false}>
+        {data.stageFunnel.length ? <StageFunnelChart data={data.stageFunnel} /> : <EmptyChart />}
+      </ChartCard></div>
       <ChartCard title="Программы по статусам" description="Текущее распределение программ в реестре." exportSlug="programs" exportTestId="chart-export-programs" canExport={programStatuses.length > 0}>
         {programStatuses.length ? <ProgramStatusChart data={programStatuses} /> : <EmptyChart />}
       </ChartCard>
       <ChartCard title="Динамика запусков" description="Фактические и планируемые запуски за последние 12 месяцев." exportSlug="dynamics" exportTestId="chart-export-dynamics" canExport={hasLaunches}>
         {hasLaunches ? <LaunchDynamicsChart data={data.launchDynamics} /> : <EmptyChart />}
       </ChartCard>
-      <ChartCard title="Воронка этапов" description="Сколько взаимодействий дошли до этапа или дальше. За всё время." exportSlug="stage-funnel" exportTestId="chart-export-stage-funnel" canExport={false}>
-        {data.stageFunnel.length ? <StageFunnelChart data={data.stageFunnel} /> : <EmptyChart />}
-      </ChartCard>
-      <ChartCard title="Динамика по месяцам" description="Количество событий за месяц. За всё время." exportSlug="monthly-events" exportTestId="chart-export-monthly-events" canExport={false}>
+      <ChartCard title="Динамика по месяцам" description="События, смены этапов и завершённые Workflow за месяц. За всё время." exportSlug="monthly-events" exportTestId="chart-export-monthly-events" canExport={false}>
         {data.monthlyEvents.length ? <MonthlyEventsChart data={data.monthlyEvents} /> : <EmptyChart />}
       </ChartCard>
       <ChartCard title="Топ-10 ВУЗов по числу взаимодействий" description="Встречи и заметки, сохранённые в CRM." exportSlug="top-universities" exportTestId="chart-export-top-universities" canExport={false}>
@@ -293,10 +293,10 @@ function AnalyticsGrid({ data }: { data: DashboardAnalytics }) {
       <ChartCard title="Нагрузка по ответственным" description="Workflow, назначенные ответственному: в работе и завершённые." exportSlug="responsible-workload" exportTestId="chart-export-responsible-workload" canExport={false}>
         {data.responsibleWorkload.length ? <ResponsibleWorkloadChart data={data.responsibleWorkload} /> : <EmptyChart />}
       </ChartCard>
-      <div className={styles.attentionWide}><ChartCard title="ВУЗы × программы" description="Состояние взаимодействий по доступным программам." exportSlug="university-program-matrix" exportTestId="chart-export-matrix" canExport={false}><UniversityProgramMatrix matrix={data.matrix} /></ChartCard></div>
-      <div className={styles.attentionWide}><ChartCard title="Приоритетные задачи" description="Элементы, требующие первоочередного внимания." exportSlug="attention" exportTestId="chart-export-attention" canExport={false}>
+      <div className={styles.priorityPanel}><ChartCard title="Приоритетные задачи" description="Элементы, требующие первоочередного внимания." exportSlug="attention" exportTestId="chart-export-attention" canExport={false}>
         {data.attentionItems.length ? <AttentionList data={data.attentionItems} /> : <EmptyChart />}
       </ChartCard></div>
+      <div className={styles.attentionWide}><ChartCard title="ВУЗы × программы" description="Состояние взаимодействий по доступным программам." exportSlug="university-program-matrix" exportTestId="chart-export-matrix" canExport={false}><UniversityProgramMatrix matrix={data.matrix} /></ChartCard></div>
     </div>
   );
 }

@@ -21,7 +21,8 @@
   gap: var(--rtk-space-4);
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
-.attentionWide { grid-column: 1 / -1; min-width: 0; }
+.funnelWide, .attentionWide { grid-column: 1 / -1; min-width: 0; }
+.priorityPanel { min-width: 0; }
 
 .card,
 .skeletonCard {

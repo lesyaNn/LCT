@@ -61,12 +61,21 @@ def _stage_funnel(data: AnalyticsData) -> list[dict]:
 
 def _monthly_events(data: AnalyticsData) -> list[dict]:
     counts = Counter()
+    status_changes = Counter()
+    completed = Counter()
     for item in (*data.instances, *data.transitions, *data.interaction_notes):
         if item.created_at is not None:
             counts[_month_key(item.created_at)] += 1
+    for item in data.transitions:
+        if item.created_at is not None and item.from_stage_id is not None:
+            status_changes[_month_key(item.created_at)] += 1
     for item in data.meetings:
         counts[_month_key(item.meeting_at)] += 1
-    return [{"month": month, "count": counts[month]} for month in sorted(counts)]
+    for item in data.instances:
+        if item.status == "completed" and item.completed_at is not None:
+            completed[_month_key(item.completed_at)] += 1
+    months = sorted(set(counts) | set(status_changes) | set(completed))
+    return [{"month": month, "count": counts[month], "status_changes": status_changes[month], "completed": completed[month]} for month in months]
 
 
 def _top_universities(data: AnalyticsData) -> list[dict]:

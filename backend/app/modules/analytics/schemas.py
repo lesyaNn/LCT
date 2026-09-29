@@ -64,6 +64,8 @@ class StageFunnelBucket(BaseModel):
 class MonthlyEventBucket(BaseModel):
     month: str
     count: int = 0
+    status_changes: int = 0
+    completed: int = 0
 
 
 class UniversityInteractionBucket(BaseModel):
