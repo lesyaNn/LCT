@@ -126,6 +126,13 @@ docker compose exec -e SEED_DEMO_DATA=true backend python -m app.scripts.seed_de
 |Swagger UI|<http://localhost:8000/docs>|
 |ReDoc|<http://localhost:8000/redoc>|
 |Keycloak|<http://localhost:8081>|
+|Swagger (стенд)|https://158.160.202.104/docs|
+|ReDoc (стенд)|https://158.160.202.104/redoc|
+|OpenAPI JSON (стенд)|https://158.160.202.104/openapi.json|
+
+Swagger: https://158.160.202.104/docs
+ReDoc: https://158.160.202.104/redoc
+OpenAPI JSON: https://158.160.202.104/openapi.json
 
 Подробная инструкция по запуску, обновлению, резервному копированию и диагностике — в [docs/INSTALL.md](docs/INSTALL.md).
 
