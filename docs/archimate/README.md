@@ -1,11 +1,7 @@
-# Модель ArchiMate
+# Исходная Archi-модель
 
-- `architecture.archimate` — модель (ArchiMate Open Exchange).
-- `architecture.png` — проверенная схема для презентации.
-- Пересоздать PNG из модели и контекста можно командой:
-
-```bash
-python docs/archimate/render_architecture.py
-```
-
-Для редактирования самой модели откройте `architecture.archimate` в Archi.
+- `lks.archimate` — исходная модель «CRM ИТ Школы РТК», открывается в Archi
+  (https://www.archimatetool.com).
+- Экспорты из модели лежат в [`../images/architecture/`](../images/architecture/):
+  `functional-architecture.jpg` и `component-architecture.jpg` — они же вшиты
+  в [`../ARCHITECTURE.md`](../ARCHITECTURE.md).
