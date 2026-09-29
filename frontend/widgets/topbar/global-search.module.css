@@ -1,0 +1,28 @@
+.root { position: relative; flex: 0 1 380px; min-width: 180px; }
+.field { position: relative; }
+.field input { height: 42px; min-height: 42px; padding-left: 38px; }
+.magnifier { border: 2px solid currentColor; border-radius: 50%; color: var(--rtk-color-text-secondary); height: 14px; left: 13px; pointer-events: none; position: absolute; top: 12px; width: 14px; }
+.magnifier::after { background: currentColor; content: ''; height: 2px; position: absolute; right: -6px; top: 11px; transform: rotate(45deg); width: 7px; }
+.dropdown { background: #fff; border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); box-shadow: 0 16px 36px rgba(16, 24, 40, .18); max-height: min(65vh, 520px); overflow-y: auto; position: fixed; z-index: 1000; }
+.group { padding: 6px; }
+.group + .group { border-top: 1px solid var(--rtk-color-border); }
+.heading { color: var(--rtk-color-text-secondary); font-size: 11px; font-weight: 700; letter-spacing: .06em; padding: 8px 10px 4px; text-transform: uppercase; }
+.option { align-items: center; background: transparent; border: 0; border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-primary); cursor: pointer; display: flex; gap: 10px; padding: 9px 10px; text-align: left; width: 100%; }
+.option:hover, .selected { background: var(--rtk-color-surface-hover); }
+.option span { display: flex; flex-direction: column; min-width: 0; }
+.option strong, .option small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.option strong { font-size: 13px; font-weight: 600; }
+.option small { color: var(--rtk-color-text-secondary); font-size: 12px; margin-top: 2px; }
+.message { color: var(--rtk-color-text-secondary); font-size: 13px; margin: 0; padding: 18px; }
+.mobileButton, .close { display: none; }
+@media (max-width: 768px) {
+  .root { flex: 0 0 auto; min-width: 44px; }
+  .root:not(.mobileOpen) .field { display: none; }
+  .mobileButton { background: transparent; border: 0; border-radius: var(--rtk-radius-small); display: block; height: 44px; position: relative; width: 44px; }
+  .mobileButton .magnifier { left: 14px; top: 13px; }
+  .mobileOpen { align-items: center; background: #fff; display: flex; gap: 8px; left: 0; padding: 8px 12px; position: fixed; right: 0; top: 0; z-index: 1001; }
+  .mobileOpen .mobileButton { display: none; }
+  .mobileOpen .field { flex: 1; }
+  .close { background: transparent; border: 0; color: var(--rtk-color-brand); display: block; }
+  .mobileDropdown { left: 0; max-height: calc(100dvh - 64px); right: 0; top: 64px; width: 100%; }
+}
