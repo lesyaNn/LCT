@@ -62,6 +62,7 @@ class InstanceStageRead(BaseModel):
     is_required: bool
     status: str
     due_date: date | None
+    started_at: datetime | None
     completed_at: datetime | None
     is_overdue: bool = False
     days_overdue: int = 0

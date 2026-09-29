@@ -134,7 +134,9 @@ def test_transition_skips_optional_records_history_and_audit(db):
     ).scalars()}
     assert by_order[1].status == "completed"
     assert by_order[1].completed_at is not None
+    assert by_order[3].started_at is not None
     assert by_order[2].status == "skipped"
+    assert by_order[2].started_at is None
     assert by_order[3].status == "pending"
 
     history = service.list_transitions(db, instance.id)
@@ -289,9 +291,12 @@ def test_rollback_reopens_stages_and_records_history(db):
     ).scalars()}
     assert by_order[1].status == "pending"
     assert by_order[1].completed_at is None
+    assert by_order[1].started_at is not None
     assert by_order[2].status == "pending"
     assert by_order[2].completed_at is None
+    assert by_order[2].started_at is None
     assert by_order[3].status == "pending"
+    assert by_order[3].started_at is None
 
     history = service.list_transitions(db, instance.id)
     assert len(history) == 4  # creation + 2 forward + rollback

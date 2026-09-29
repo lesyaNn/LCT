@@ -351,6 +351,8 @@ def test_post_creates_snapshot_pointers_and_transition(client, db):
     assert [s["order_index"] for s in stages] == [1, 2, 3]
     assert [s["name"] for s in stages] == ["Stage 1", "Stage 2", "Stage 3"]
     assert [s["status"] for s in stages] == ["pending"] * 3
+    assert stages[0]["started_at"] is not None
+    assert all(s["started_at"] is None for s in stages[1:])
     assert all(s["completed_at"] is None for s in stages)
 
     today = today_utc()

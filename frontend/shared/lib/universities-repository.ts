@@ -567,6 +567,7 @@ export interface WorkflowInstanceApiStage {
   is_required: boolean;
   status: string;
   due_date: string | null;
+  started_at?: string | null;
   completed_at: string | null;
   is_overdue: boolean;
   days_overdue: number;
@@ -907,7 +908,7 @@ export function getApiUniversityWorkflow(instance: WorkflowInstanceApiRecord): U
       name: stage.name,
       status,
       deadline: stage.due_date ?? '',
-      startedAt: null,
+      startedAt: stage.started_at ?? null,
       completedAt: stage.completed_at,
       completion: stage.completed_at && stage.due_date && stage.completed_at.slice(0, 10) > stage.due_date ? 'late' : stage.completed_at ? 'on_time' : null,
       isOptional: !stage.is_required,

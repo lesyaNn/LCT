@@ -3,7 +3,8 @@
 Runtime-only description of SQL migrations ``000012_workflow_instances``,
 ``000013_instance_stages``, ``000014_transition_history_restrict`` and
 ``000038_instance_stage_responsible`` and ``000039_workflow_instance_archive`` (which
-are the schema source of truth): types, nullability, FK, constraints and
+are the schema source of truth), plus ``000042_instance_stage_started_at``:
+types, nullability, FK, constraints and
 indexes mirror the ``*.up.sql`` exactly. Never drives DDL.
 
 Parent ``WorkflowInstance`` = one university running one template; children
@@ -27,6 +28,7 @@ intentionally NOT reused; canonical names avoid that set entirely.
 
 import uuid
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
@@ -42,6 +44,9 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+if TYPE_CHECKING:
+    from app.models.catalog import Responsible
 
 from app.db.base import Base
 from app.models.mixins import TimestampMixin, UUIDPKMixin
@@ -383,6 +388,9 @@ class InstanceStage(UUIDPKMixin, TimestampMixin, Base):
     is_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
     due_date: Mapped[date | None] = mapped_column(Date, nullable=True, default=None)
+    started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
     )

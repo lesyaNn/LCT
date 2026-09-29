@@ -179,6 +179,7 @@ def _stage_to_read(row: InstanceStage, today: date, counts: tuple[int, int] = (0
         is_required=row.is_required,
         status=row.status,
         due_date=row.due_date,
+        started_at=row.started_at,
         completed_at=row.completed_at,
         is_overdue=overdue,
         days_overdue=days,
@@ -429,6 +430,7 @@ def create_instance(
     if snapshots:
         db.flush()  # snapshot ids for the current pointer (same transaction)
         first = snapshots[0]
+        first.started_at = datetime.now(timezone.utc)
         instance.current_instance_stage_id = first.id
         instance.current_stage_id = first.template_stage_id
         db.add(

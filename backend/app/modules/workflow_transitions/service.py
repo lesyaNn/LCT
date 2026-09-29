@@ -192,6 +192,7 @@ def transition_instance(
         skipped.completed_at = now
     # The target row stays "pending" (B1 creation semantics: the current row
     # is pending; the pointer disambiguates current from upcoming).
+    target.started_at = now
     instance.current_instance_stage_id = target.id
     instance.current_stage_id = target.template_stage_id
     db.add(
@@ -331,10 +332,13 @@ def rollback_instance(
         instance, stages, target_instance_stage_id, comment
     )
 
+    now = utcnow()
     text = comment.strip()
     for row in reopened:
         row.status = "pending"
         row.completed_at = None
+        row.started_at = now if row.id == target.id else None
+    current.started_at = None
     instance.current_instance_stage_id = target.id
     instance.current_stage_id = target.template_stage_id
     db.add(
