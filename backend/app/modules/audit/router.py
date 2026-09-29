@@ -122,7 +122,12 @@ class AuditFilterOptionsRead(BaseModel):
     entity_types: list[str]
 
 
-@router.get("/filter-options", response_model=AuditFilterOptionsRead)
+@router.get(
+    "/filter-options",
+    response_model=AuditFilterOptionsRead,
+    summary="Опции фильтров аудита",
+    description="Возвращает доступных акторов, вузы, действия и типы сущностей для фильтров журнала. Требуется право audit.read; выборка ограничена scope пользователя.",
+)
 def audit_filter_options(
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(require_permission("audit.read")),
@@ -150,6 +155,8 @@ def audit_filter_options(
 
 @router.get(
     "/events", response_model=PaginatedResponse[AuditEventRead],
+    summary="Список событий аудита",
+    description="Возвращает постраничный журнал событий с фильтрами по датам, пользователям, вузам, действиям, типам сущностей и поиску. Требуется право audit.read.",
     responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse},
                422: {"model": ErrorResponse}},
 )

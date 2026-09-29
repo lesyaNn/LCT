@@ -81,7 +81,13 @@ def _read_model(tpl: ReportTemplate) -> ReportTemplateRead:
     )
 
 
-@router.post("", response_model=ReportTemplateRead, status_code=201)
+@router.post(
+    "",
+    response_model=ReportTemplateRead,
+    status_code=201,
+    summary="Сохранить шаблон отчёта",
+    description="Сохраняет параметры формы (format, filters, columns) как шаблон; is_shared=true только для администраторов. Требуется право reports.create.",
+)
 def create_template(
     body: ReportTemplateCreate,
     db: Session = Depends(get_audit_db),
@@ -110,7 +116,12 @@ def create_template(
     return _read_model(tpl)
 
 
-@router.get("", response_model=list[ReportTemplateRead])
+@router.get(
+    "",
+    response_model=list[ReportTemplateRead],
+    summary="Список шаблонов отчётов",
+    description="Возвращает свои и общие шаблоны (до 100, сначала общие). Требуется право reports.read.",
+)
 def list_templates(
     db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(require_permission("reports.read")),
@@ -129,7 +140,12 @@ def list_templates(
     return [_read_model(t) for t in db.execute(stmt).scalars().all()]
 
 
-@router.delete("/{template_id}", status_code=204)
+@router.delete(
+    "/{template_id}",
+    status_code=204,
+    summary="Удалить шаблон отчёта",
+    description="Удаляет свой шаблон; чужой — только для администраторов, неизвестный id — 404. Требуется право reports.read.",
+)
 def delete_template(
     template_id: str,
     db: Session = Depends(get_audit_db),

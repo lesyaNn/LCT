@@ -30,7 +30,8 @@ WRITE = require_permission("university.edit")
     response_model=MeetingRead,
     status_code=201,
     tags=["Universities"],
-    summary="Create meeting for a university",
+    summary="Создать встречу",
+    description="Создаёт встречу для вуза. Требуется право university.edit.",
 )
 def create_meeting(
     university_id: uuid.UUID,
@@ -47,7 +48,8 @@ def create_meeting(
     "/universities/{university_id}/meetings",
     response_model=PaginatedResponse[MeetingRead],
     tags=["Universities"],
-    summary="List university meetings (paginated, newest first)",
+    summary="Список встреч вуза",
+    description="Возвращает страницу встреч вуза, новые первыми. Требуется право university.read.",
 )
 def list_meetings(
     university_id: uuid.UUID,
@@ -66,7 +68,8 @@ def list_meetings(
     "/meetings/{meeting_id}",
     response_model=MeetingRead,
     tags=["Universities"],
-    summary="Get meeting by id",
+    summary="Получить встречу по id",
+    description="Возвращает встречу по id. Требуется право university.read.",
 )
 def get_meeting(
     meeting_id: uuid.UUID,
@@ -80,7 +83,8 @@ def get_meeting(
     "/meetings/{meeting_id}",
     response_model=MeetingRead,
     tags=["Universities"],
-    summary="Partially update meeting",
+    summary="Частично обновить встречу",
+    description="Частично обновляет встречу. Требуется право university.edit.",
 )
 def patch_meeting(
     meeting_id: uuid.UUID,
@@ -96,7 +100,8 @@ def patch_meeting(
     status_code=204,
     response_model=None,
     tags=["Universities"],
-    summary="Delete meeting (its document links cascade)",
+    summary="Удалить встречу",
+    description="Удаляет встречу (связи с документами каскадируются). Требуется право university.edit.",
 )
 def delete_meeting(
     meeting_id: uuid.UUID,

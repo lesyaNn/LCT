@@ -50,7 +50,8 @@ ASSIGN = require_permission("university_responsible.manage")
     "/instances",
     response_model=InstanceDetail,
     status_code=201,
-    summary="Create workflow instance (snapshot active template stages)",
+    summary="Создание экземпляра Workflow",
+    description="Создаёт экземпляр workflow для вуза со снапшотом этапов активного шаблона. Требуемое право: workflow.change_status.",
 )
 def create_workflow_instance(
     data: InstanceCreate,
@@ -75,7 +76,12 @@ def create_workflow_instance(
     )
 
 
-@router.get("/instances", response_model=PaginatedResponse[InstanceDetail])
+@router.get(
+    "/instances",
+    response_model=PaginatedResponse[InstanceDetail],
+    summary="Список экземпляров Workflow",
+    description="Возвращает постраничный список экземпляров workflow, опционально с фильтром по university_id. Требуемое право: workflow.read.",
+)
 def list_workflow_instances(
     university_id: uuid.UUID | None = None,
     page: int = Query(default=1, ge=1),
@@ -89,7 +95,12 @@ def list_workflow_instances(
     return PaginatedResponse(items=items, page=page, page_size=page_size, total=total)
 
 
-@router.get("/instances/by-program/{program_id}", response_model=InstanceDetail | None)
+@router.get(
+    "/instances/by-program/{program_id}",
+    response_model=InstanceDetail | None,
+    summary="Экземпляр Workflow по программе",
+    description="Возвращает экземпляр workflow для указанных university_id и program_id (или null, если отсутствует). Требуемое право: workflow.read.",
+)
 def get_workflow_by_program(
     program_id: uuid.UUID,
     university_id: uuid.UUID,
@@ -103,7 +114,8 @@ def get_workflow_by_program(
 @router.get(
     "/instances/{instance_id}",
     response_model=InstanceDetail,
-    summary="Get workflow instance with runtime stages in order",
+    summary="Карточка экземпляра Workflow",
+    description="Возвращает экземпляр workflow с runtime-этапами в порядке следования. Требуемое право: workflow.read.",
 )
 def get_workflow_instance(
     instance_id: uuid.UUID,
@@ -118,7 +130,8 @@ def get_workflow_instance(
 @router.post(
     "/instances/{instance_id}/archive",
     response_model=InstanceDetail,
-    summary="Archive an active workflow without deleting its history or files",
+    summary="Архивирование экземпляра Workflow",
+    description="Архивирует активный экземпляр workflow без удаления истории и файлов. Требуемое право: workflow.change_status.",
 )
 def archive_workflow_instance(
     instance_id: uuid.UUID,
@@ -133,7 +146,8 @@ def archive_workflow_instance(
 @router.get(
     "/instances/{instance_id}/activity",
     response_model=list[WorkflowActivityRead],
-    summary="Read scoped user-facing workflow field changes",
+    summary="Лента активности экземпляра",
+    description="Возвращает пользовательские изменения полей экземпляра workflow в рамках доступа вуза. Требуемое право: workflow.read.",
 )
 def get_workflow_activity(
     instance_id: uuid.UUID,
@@ -148,7 +162,8 @@ def get_workflow_activity(
 @router.patch(
     "/instances/{instance_id}",
     response_model=InstanceDetail,
-    summary="Assign or clear the workflow instance responsible",
+    summary="Назначение ответственного за экземпляр",
+    description="Назначает или очищает ответственного за экземпляр workflow. Требуемое право: university_responsible.manage.",
 )
 def update_workflow_instance_responsible(
     instance_id: uuid.UUID,
@@ -167,7 +182,8 @@ def update_workflow_instance_responsible(
 @router.patch(
     "/instances/{instance_id}/stages/{stage_id}/responsible",
     response_model=InstanceDetail,
-    summary="Assign or clear a runtime stage responsible override",
+    summary="Назначение ответственного за этап",
+    description="Назначает или очищает персональное переопределение ответственного runtime-этапа. Требуемое право: university_responsible.manage.",
 )
 def update_workflow_stage_responsible(
     instance_id: uuid.UUID,
@@ -186,7 +202,8 @@ def update_workflow_stage_responsible(
 @router.patch(
     "/instances/{instance_id}/stages/{stage_id}/due-date",
     response_model=InstanceDetail,
-    summary="Set the due date of the current runtime stage",
+    summary="Установка срока этапа",
+    description="Устанавливает дедлайн текущего runtime-этапа экземпляра workflow. Требуемое право: workflow.change_status.",
 )
 def update_workflow_stage_due_date(
     instance_id: uuid.UUID,
@@ -202,7 +219,12 @@ def update_workflow_stage_due_date(
     )
 
 
-@router.get("/instances/{instance_id}/tasks", response_model=PaginatedResponse[WorkflowTaskRead])
+@router.get(
+    "/instances/{instance_id}/tasks",
+    response_model=PaginatedResponse[WorkflowTaskRead],
+    summary="Список задач экземпляра",
+    description="Возвращает постраничный список задач экземпляра workflow. Требуемое право: workflow.read.",
+)
 def list_workflow_tasks(
     instance_id: uuid.UUID,
     page: int = Query(default=1, ge=1),
@@ -216,7 +238,13 @@ def list_workflow_tasks(
     return PaginatedResponse(items=[WorkflowTaskRead.model_validate(row) for row in rows], page=page, page_size=page_size, total=total)
 
 
-@router.post("/instances/{instance_id}/tasks", response_model=WorkflowTaskRead, status_code=201)
+@router.post(
+    "/instances/{instance_id}/tasks",
+    response_model=WorkflowTaskRead,
+    status_code=201,
+    summary="Создание задачи экземпляра",
+    description="Создаёт задачу в экземпляре workflow для указанного этапа. Требуемое право: workflow.change_status.",
+)
 def create_workflow_task(
     instance_id: uuid.UUID,
     data: WorkflowTaskCreate,
@@ -228,7 +256,12 @@ def create_workflow_task(
     return WorkflowTaskRead.model_validate(service.create_task(db, instance_id, data.stage_id, data.title))
 
 
-@router.patch("/instances/{instance_id}/tasks/{task_id}", response_model=WorkflowTaskRead)
+@router.patch(
+    "/instances/{instance_id}/tasks/{task_id}",
+    response_model=WorkflowTaskRead,
+    summary="Обновление задачи экземпляра",
+    description="Обновляет название или статус задачи экземпляра workflow. Требуемое право: workflow.change_status.",
+)
 def update_workflow_task(
     instance_id: uuid.UUID,
     task_id: uuid.UUID,
@@ -241,7 +274,12 @@ def update_workflow_task(
     return WorkflowTaskRead.model_validate(service.update_task(db, instance_id, task_id, title=data.title, status=data.status))
 
 
-@router.delete("/instances/{instance_id}/tasks/{task_id}", status_code=204)
+@router.delete(
+    "/instances/{instance_id}/tasks/{task_id}",
+    status_code=204,
+    summary="Удаление задачи экземпляра",
+    description="Удаляет задачу экземпляра workflow. Требуемое право: workflow.change_status.",
+)
 def delete_workflow_task(
     instance_id: uuid.UUID,
     task_id: uuid.UUID,
@@ -254,7 +292,12 @@ def delete_workflow_task(
     return Response(status_code=204)
 
 
-@router.get("/instances/{instance_id}/allowed-transitions", response_model=list[AllowedTransitionRead])
+@router.get(
+    "/instances/{instance_id}/allowed-transitions",
+    response_model=list[AllowedTransitionRead],
+    summary="Доступные переходы экземпляра",
+    description="Возвращает этапы, на которые можно перевести экземпляр из текущего состояния. Требуемое право: workflow.read.",
+)
 def get_allowed_transitions(
     instance_id: uuid.UUID,
     db: Session = Depends(get_db),

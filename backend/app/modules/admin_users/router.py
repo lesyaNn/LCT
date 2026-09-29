@@ -34,7 +34,12 @@ def live_admin(
     return actor
 
 
-@router.get("", response_model=AdminUsersPage)
+@router.get(
+    "",
+    response_model=AdminUsersPage,
+    summary="Список пользователей",
+    description="Возвращает постраничный список пользователей Keycloak с поиском по строке и фильтром по роли. Требуется право admin.users (проверка live_admin).",
+)
 def list_admin_users(
     search: str = Query(default="", max_length=256),
     role: Literal["user", "manager", "admin"] | None = None,
@@ -47,7 +52,13 @@ def list_admin_users(
                               page=page, page_size=page_size)
 
 
-@router.post("/invite", response_model=InviteResult, status_code=201)
+@router.post(
+    "/invite",
+    response_model=InviteResult,
+    status_code=201,
+    summary="Пригласить пользователя",
+    description="Создаёт/приглашает пользователя в Keycloak по email, имени и ролям. Требуется право admin.users.",
+)
 def invite_admin_user(
     data: UserInvite, actor: CurrentUser = Depends(live_admin),
     db: Session = Depends(get_audit_db),
@@ -57,7 +68,12 @@ def invite_admin_user(
     return InviteResult(user=user, status=status)
 
 
-@router.get("/{user_id}", response_model=AdminUserOut)
+@router.get(
+    "/{user_id}",
+    response_model=AdminUserOut,
+    summary="Карточка пользователя",
+    description="Возвращает одного пользователя по UUID из Keycloak. Требуется право admin.users.",
+)
 def get_admin_user(
     user_id: UUID, _actor: CurrentUser = Depends(live_admin),
     kc: KeycloakAdminClient = Depends(get_keycloak_admin_client),
@@ -65,7 +81,12 @@ def get_admin_user(
     return service.get_user(kc, str(user_id))
 
 
-@router.patch("/{user_id}", response_model=AdminUserOut)
+@router.patch(
+    "/{user_id}",
+    response_model=AdminUserOut,
+    summary="Обновить пользователя",
+    description="Обновляет имя, email и роли пользователя в Keycloak. Требуется право admin.users.",
+)
 def update_admin_user(
     user_id: UUID, change: UserUpdate, actor: CurrentUser = Depends(live_admin),
     db: Session = Depends(get_audit_db),
@@ -74,7 +95,12 @@ def update_admin_user(
     return service.update_user(db, kc, actor, str(user_id), change)
 
 
-@router.post("/{user_id}/block", response_model=AdminUserOut)
+@router.post(
+    "/{user_id}/block",
+    response_model=AdminUserOut,
+    summary="Заблокировать/разблокировать пользователя",
+    description="Включает или отключает учётную запись (флаг blocked в теле запроса). Требуется право admin.users.",
+)
 def block_admin_user(
     user_id: UUID, change: UserBlock, actor: CurrentUser = Depends(live_admin),
     db: Session = Depends(get_audit_db),
@@ -83,7 +109,12 @@ def block_admin_user(
     return service.set_blocked(db, kc, actor, str(user_id), change.blocked)
 
 
-@router.post("/{user_id}/password-reset", response_model=PasswordResetResult)
+@router.post(
+    "/{user_id}/password-reset",
+    response_model=PasswordResetResult,
+    summary="Сбросить пароль пользователя",
+    description="Инициирует сброс пароля пользователя в Keycloak. Требуется право admin.users.",
+)
 def reset_admin_user_password(
     user_id: UUID, actor: CurrentUser = Depends(live_admin),
     db: Session = Depends(get_audit_db),

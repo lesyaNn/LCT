@@ -129,6 +129,24 @@ docker compose exec -e SEED_DEMO_DATA=true backend python -m app.scripts.seed_de
 
 Подробная инструкция по запуску, обновлению, резервному копированию и диагностике — в [docs/INSTALL.md](docs/INSTALL.md).
 
+### 5. API-документация (Swagger)
+
+После запуска стенда интерактивная документация backend доступна без дополнительной настройки:
+
+|Ресурс|Адрес|
+|:---|:---|
+|Swagger UI|http://localhost:8000/docs|
+|ReDoc|http://localhost:8000/redoc|
+|OpenAPI-спека (JSON)|http://localhost:8000/openapi.json|
+
+Как пользоваться:
+1. Открой Swagger UI — операции сгруппированы по тегам (Universities, Workflow, Reports…), у каждой есть русское описание и требуемые права.
+2. Для защищённых ручек нажми **Authorize** и вставь JWT из Keycloak (realm `rtk`, см. [docs/API_INTEGRATION.md](docs/API_INTEGRATION.md)); без токена API вернёт 401.
+3. Для локальной проверки подходят демонстрационные пользователи из раздела ниже.
+4. `openapi.json` можно импортировать в Postman/Insomnia или использовать для генерации API-клиентов.
+
+Дока собирается из кода backend автоматически. После правок описаний в `backend/app/modules/**/router.py` пересобери образ: `docker compose up -d --build backend`.
+
 ## Демонстрационные пользователи
 
 |Логин|Пароль|Роль|

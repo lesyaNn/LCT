@@ -40,7 +40,8 @@ ADMIN = require_role("admin")
 @router.get(
     "/templates",
     response_model=PaginatedResponse[TemplateRead],
-    summary="List workflow templates (paginated, stable ordering)",
+    summary="Список шаблонов Workflow",
+    description="Возвращает постраничный список шаблонов workflow в стабильном порядке. Доступно только роли admin.",
 )
 def list_templates(
     page: int = Query(default=1, ge=1),
@@ -56,7 +57,8 @@ def list_templates(
     "/templates",
     response_model=TemplateDetail,
     status_code=201,
-    summary="Create workflow template",
+    summary="Создание шаблона Workflow",
+    description="Создаёт новый шаблон workflow с названием, описанием и флагом активности. Доступно только роли admin.",
 )
 def create_template(
     data: TemplateCreate,
@@ -71,7 +73,8 @@ def create_template(
 @router.get(
     "/templates/{template_id}",
     response_model=TemplateDetail,
-    summary="Get workflow template with stages in order",
+    summary="Карточка шаблона Workflow",
+    description="Возвращает шаблон workflow с этапами в порядке следования. Доступно только роли admin.",
 )
 def get_template(
     template_id: uuid.UUID,
@@ -84,7 +87,8 @@ def get_template(
 @router.patch(
     "/templates/{template_id}",
     response_model=TemplateDetail,
-    summary="Partially update workflow template",
+    summary="Частичное обновление шаблона",
+    description="Частично обновляет поля шаблона workflow (название, описание, активность). Доступно только роли admin.",
 )
 def patch_template(
     template_id: uuid.UUID,
@@ -106,7 +110,8 @@ def patch_template(
 @router.delete(
     "/templates/{template_id}",
     response_model=dict[str, str],
-    summary="Delete an unused workflow template",
+    summary="Удаление шаблона Workflow",
+    description="Удаляет неиспользуемый шаблон workflow. Доступно только роли admin.",
 )
 def delete_template(
     template_id: uuid.UUID,
@@ -124,7 +129,8 @@ def delete_template(
     "/templates/{template_id}/stages",
     response_model=StageRead,
     status_code=201,
-    summary="Add stage at a position (omitted = append)",
+    summary="Добавление этапа в шаблон",
+    description="Добавляет этап в шаблон workflow на указанную позицию (без позиции — в конец). Доступно только роли admin.",
 )
 def create_stage(
     template_id: uuid.UUID,
@@ -147,7 +153,8 @@ def create_stage(
 @router.patch(
     "/templates/{template_id}/stages/{stage_id}",
     response_model=StageRead,
-    summary="Partially update workflow stage",
+    summary="Частичное обновление этапа",
+    description="Частично обновляет поля этапа шаблона workflow (название, порядок, SLA). Доступно только роли admin.",
 )
 def patch_stage(
     template_id: uuid.UUID,
