@@ -2,7 +2,6 @@
 .label { color: var(--rtk-color-text-secondary); display: block; font-size: 11px; font-weight: 600; line-height: 14px; min-height: 14px; }
 .search { min-width: 0; position: relative; }
 .search input { height: 46px; min-height: 46px; padding-right: 36px; }
-.search input::-webkit-search-cancel-button { display: none; }
 .clear { align-items: center; background: transparent; border: 0; border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-secondary); cursor: pointer; display: inline-flex; height: 32px; justify-content: center; position: absolute; right: 7px; top: 7px; width: 32px; }
 .clear:hover { background: var(--rtk-color-surface-hover); color: var(--rtk-color-text-primary); }
 .clear:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }

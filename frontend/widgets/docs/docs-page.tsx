@@ -58,7 +58,7 @@ const markdownComponents: Components = {
   table: ({ children, ...props }) => <div className={styles.tableWrap}><table {...props}>{children}</table></div>,
   pre: ({ children, ...props }) => <pre className={styles.codeBlock} {...props}>{children}</pre>,
   img: ({ src, alt }) => src && typeof src === 'string' && src.startsWith('/docs/images/')
-    ? <figure className={styles.figure}><Image src={src} alt={alt ?? ''} width={src.endsWith('/workflow-templates.png') ? 2330 : 1200} height={src.endsWith('/workflow-templates.png') ? 676 : 760} unoptimized /><figcaption>{alt}</figcaption></figure>
+    ? <span className={styles.figure} role="figure" aria-label={alt ?? ''}><Image src={src} alt={alt ?? ''} width={src.endsWith('/workflow-templates.png') ? 2352 : 1200} height={src.endsWith('/workflow-templates.png') ? 662 : 760} unoptimized /><span className={styles.caption}>{alt}</span></span>
     : null,
 };
 
