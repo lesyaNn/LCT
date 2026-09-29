@@ -16,6 +16,7 @@ export function Icon({ name, size = 20 }: IconProps) {
     audit: <><path d="M12 3 5 6v5c0 4.4 2.8 8.3 7 10 4.2-1.7 7-5.6 7-10V6l-7-3Z" /><path d="m9 12 2 2 4-4" /></>,
     admin: <><circle cx="12" cy="8" r="3" /><path d="M5 21c.5-3.7 2.8-5.5 7-5.5s6.5 1.8 7 5.5M19 8h2M20 5.5l1.5-1.5M20 10.5l1.5 1.5" /></>,
     docs: <><path d="M6 3h9l3 3v15H6V3Z" /><path d="M15 3v4h4M9 12h6M9 16h6" /></>,
+    api: <><path d="m8 7-5 5 5 5M16 7l5 5-5 5M14 4l-4 16" /></>,
     menu: <><path d="M4 7h16M4 12h16M4 17h16" /></>,
     'chevron-down': <path d="m6 9 6 6 6-6" />,
     'chevron-right': <path d="m9 6 6 6-6 6" />,

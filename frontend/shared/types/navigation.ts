@@ -5,7 +5,8 @@ export type IconName =
   | 'report'
   | 'audit'
   | 'admin'
-  | 'docs';
+  | 'docs'
+  | 'api';
 
 export interface NavigationItem {
   label: string;

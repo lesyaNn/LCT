@@ -65,9 +65,12 @@ const markdownComponents: Components = {
     if (!src || typeof src !== 'string' || !src.startsWith('/docs/images/')) return null;
     const dimensions: Record<string, [number, number]> = {
       'docs-programs-products.jpg': [1100, 545],
-      'docs-workflow-list.jpg': [1100, 655],
-      'docs-workflow-current-stage.jpg': [645, 400],
-      'docs-workflow-history.jpg': [620, 450],
+      'docs-workflow-list.png': [2348, 1650],
+      'docs-workflow-current-stage.png': [1544, 886],
+      'docs-workflow-history.png': [1284, 642],
+      'universities-cards.png': [2316, 1710],
+      'universities-table.png': [2296, 1688],
+      'university-passport.png': [3336, 1812],
       'workflow-templates.png': [2352, 662],
     };
     const [width, height] = dimensions[src.split('/').at(-1) ?? ''] ?? [1200, 760];

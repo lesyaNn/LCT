@@ -9,10 +9,6 @@ export const metadata: Metadata = {
   description: 'CRM для взаимодействия с вузами и контроля подготовки ИТ-кадров.',
   manifest: '/manifest.webmanifest',
   icons: {
-    icon: [
-      { url: '/favicon-16.svg', sizes: '16x16', type: 'image/svg+xml' },
-      { url: '/favicon-32.svg', sizes: '32x32', type: 'image/svg+xml' },
-    ],
     apple: [{ url: '/apple-touch-icon.svg', sizes: '180x180', type: 'image/svg+xml' }],
   },
   openGraph: {

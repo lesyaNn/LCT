@@ -36,8 +36,10 @@ export function Sidebar({ user, pathname, collapsed, mobileOpen = false, onToggl
 }
 
 function SidebarContent({ user, pathname, collapsed, mobile = false, onToggleCollapse, onCloseMobile }: SidebarProps & { mobile?: boolean }) {
-  const items = getVisibleNavigationItems(user).filter((item) => item.href !== '/admin' && !item.href.startsWith('/admin/'));
-  const adminItems = getVisibleNavigationItems(user).filter((item) => item.href.startsWith('/admin/'));
+  const visibleItems = getVisibleNavigationItems(user);
+  const items = visibleItems.filter((item) => item.href !== '/admin' && !item.href.startsWith('/admin/') && item.href !== '/api-testing');
+  const adminItems = visibleItems.filter((item) => item.href.startsWith('/admin/'));
+  const apiTestingItem = visibleItems.find((item) => item.href === '/api-testing');
   const [adminOpen, setAdminOpen] = useState(false);
   const adminExpanded = adminOpen || pathname.startsWith('/admin');
   const activeHref = items
@@ -85,6 +87,17 @@ function SidebarContent({ user, pathname, collapsed, mobile = false, onToggleCol
             })}
           </div> : null}
         </> : null}
+        {apiTestingItem ? <Link
+          className={`${styles.navItem} ${pathname === apiTestingItem.href ? styles.active : ''}`}
+          href={apiTestingItem.href}
+          onClick={mobile ? onCloseMobile : undefined}
+          title={collapsed && !mobile ? apiTestingItem.label : undefined}
+          aria-current={pathname === apiTestingItem.href ? 'page' : undefined}
+        >
+          <Icon name={apiTestingItem.icon} size={20} />
+          {(!collapsed || mobile) && <span>{apiTestingItem.label}</span>}
+          {pathname === apiTestingItem.href && <span className={styles.activeMarker} aria-hidden="true" />}
+        </Link> : null}
       </nav>
 
       {!mobile && onToggleCollapse ? <div className={styles.sidebarFooter}><IconButton icon="chevron-right" label={collapsed ? 'Развернуть меню' : 'Свернуть меню'} className={`${styles.collapseButton} ${collapsed ? styles.collapseButtonRotated : ''}`} onClick={onToggleCollapse} /></div> : null}

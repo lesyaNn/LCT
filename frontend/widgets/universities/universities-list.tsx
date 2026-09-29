@@ -557,7 +557,7 @@ export function UniversitiesList() {
       </div>
       {query.isPending ? view === 'cards' ? <CardsSkeleton /> : <TableSkeleton rows={6} columns={7} label="Загрузка списка вузов" /> : !query.data ? <RouteErrorState onRetry={() => void query.refetch()} /> : query.data.total === 0 ? <EmptyState icon={<Search size={20} fill="currentColor" />} title={hasFilters ? 'По выбранным условиям ВУЗы не найдены' : 'Вузы пока не добавлены'} description={hasFilters ? 'Измените условия поиска или сбросьте фильтры.' : 'Когда появятся записи, они будут отображены в этом списке.'} primaryAction={hasFilters ? { label: 'Сбросить фильтры', onClick: resetFilters, variant: 'secondary' } : undefined} /> : (
         <>
-          <p className={styles.fetching} role="status">{query.isFetching ? 'Обновляем список…' : '\u00a0'}</p>
+          {query.isFetching ? <p className={styles.fetching} role="status">Обновляем список…</p> : null}
           {view === 'cards' ? <UniversityCards items={query.data.items} /> : <TableShell><DesktopTable table={table} /></TableShell>}
           <div className={styles.paginationSurface}><Pagination page={query.data.page} pageSize={query.data.pageSize} total={query.data.total} onPatch={goToState} /></div>
         </>

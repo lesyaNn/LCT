@@ -11,7 +11,15 @@ export type ApiOptions = {
   body?: unknown;
   signal?: AbortSignal;
   anonymous?: boolean;
+  headers?: Record<string, string>;
 };
+
+const safeHeaders = new Set(['accept', 'accept-language', 'x-request-id']);
+
+function allowedHeaders(headers: Record<string, string> | undefined): Record<string, string> {
+  return Object.fromEntries(Object.entries(headers ?? {}).filter(([key, value]) =>
+    safeHeaders.has(key.toLowerCase()) && !/[\r\n]/.test(value)));
+}
 
 export type ApiUploadOptions = {
   signal?: AbortSignal;
@@ -28,6 +36,7 @@ async function request<T>(path: string, options: ApiOptions, token?: string): Pr
     response = await fetch(`${apiBaseUrl()}${path}`, {
       method: options.method ?? 'GET',
       headers: {
+        ...allowedHeaders(options.headers),
         ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
