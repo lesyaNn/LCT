@@ -108,7 +108,9 @@ def build_matrix(data: AnalyticsData, *, today: date) -> Matrix:
     row_health = {}
     for university in sorted(data.universities, key=lambda item: (item.name, str(item.id))):
         scores = []
+        levels = []
         started = 0
+        active_workflows = 0
         total = sum(1 for link in data.existing_pairs if link[0] == university.id)
         for program in sorted(data.programs, key=lambda item: (item.name, str(item.id))):
             pair = university.id, program.id
@@ -118,25 +120,34 @@ def build_matrix(data: AnalyticsData, *, today: date) -> Matrix:
                 cells.append({"university_id": university.id, "program_id": program.id,
                     "status": "not_used", "health_state": "NOT_LINKED", "health_score": None,
                     "health_level": "no_data", "health_factors": [], "risk_level": "none",
-                    "license_status": None, "workflow_progress": None, "overdue_count": 0, "next_milestone": None})
+                    "license_status": None, "workflow_progress": None, "overdue_count": 0, "next_milestone": None,
+                    "stages_completed": 0, "stages_total": 0, "deadline": None, "overdue_days": 0})
                 continue
             total = max(total, 1)
             if instance is None:
                 cells.append({"university_id": university.id, "program_id": program.id,
                     "status": "planned", "health_state": "NOT_STARTED", "health_score": None,
                     "health_level": "no_data", "health_factors": [], "risk_level": "none",
-                    "license_status": None, "workflow_progress": None, "overdue_count": 0, "next_milestone": None})
+                    "license_status": None, "workflow_progress": None, "overdue_count": 0, "next_milestone": None,
+                    "stages_completed": 0, "stages_total": 0, "deadline": None, "overdue_days": 0})
                 continue
             started += 1
+            if instance.status == "active":
+                active_workflows += 1
             # The runtime pointer is authoritative. Current stages intentionally
             # keep the ``pending`` status in the snapshot; lifecycle state is
             # represented by ``current_instance_stage_id``.
             current = next((stage for stage in stages[instance.id] if stage.id == instance.current_instance_stage_id), None)
             health = calculate_workflow_health(instance=instance, stage=current, tasks=tasks[instance.id], licenses=licenses[pair], today=today)
             scores.append(health.score or 0)
+            levels.append(health.level)
             state = "COMPLETED" if health.completed else {"stable": "HEALTHY", "attention": "ATTENTION", "critical": "CRITICAL"}[health.level]
             old_status = "launched" if link.status == "launched" else "in_progress" if link.status == "active" else link.status
             late_count = sum(compute_overdue(t.deadline, t.completed_at, today)[0] for t in tasks[instance.id])
+            completed_stages = sum(1 for item in stages[instance.id] if item.completed_at is not None or item.status == "completed")
+            total_stages = len(stages[instance.id])
+            stage_due = current.due_date if current else None
+            stage_late, stage_days = compute_overdue(stage_due, current.completed_at if current else None, today)
             cells.append({"university_id": university.id, "program_id": program.id, "status": old_status,
                 "health_state": state, "health_score": health.score, "health_level": health.level,
                 "workflow_instance_id": instance.id,
@@ -144,13 +155,22 @@ def build_matrix(data: AnalyticsData, *, today: date) -> Matrix:
                 # scoring decision still comes exclusively from the domain model.
                 "health_factors": [f"{factor.label} ({factor.detail})" if factor.detail else factor.label for factor in health.factors], "risk_level": "high" if health.level == "critical" else "low" if health.level == "attention" else "none",
                 "license_status": next((status for status in ("expired", "expires_soon", "active") if status in [derive_license_status(getattr(item, "expires_at", None), today) for item in licenses[pair]]), None),
-                "workflow_progress": None, "overdue_count": late_count,
-                "next_milestone": current.name if current else None})
+                "workflow_progress": (completed_stages / total_stages * 100) if total_stages else None, "overdue_count": late_count,
+                "next_milestone": current.name if current else None,
+                "stages_completed": completed_stages, "stages_total": total_stages,
+                "deadline": stage_due, "overdue_days": stage_days if stage_late else 0})
         score = aggregate_health(scores)
-        row_health[university.id] = (score, health_level(score), started, total)
+        level = health_level(score)
+        if "critical" in levels:
+            level = "critical"
+            score = min(score, 59) if score is not None else score
+        elif "attention" in levels and level == "stable":
+            level = "attention"
+            score = min(score, 84) if score is not None else score
+        row_health[university.id] = (score, level, started, active_workflows, total)
     return Matrix.model_validate({"rows": [{"id": i.id, "name": i.name, "city": i.city,
         "health_score": row_health[i.id][0], "health_level": row_health[i.id][1],
-        "started_programs": row_health[i.id][2], "total_programs": row_health[i.id][3]}
+        "started_programs": row_health[i.id][2], "active_workflows": row_health[i.id][3], "total_programs": row_health[i.id][4]}
         for i in sorted(data.universities, key=lambda i: (i.name, str(i.id)))],
         "columns": [{"id": i.id, "name": i.name, "direction": i.direction.name}
         for i in sorted(data.programs, key=lambda i: (i.name, str(i.id)))], "cells": cells, "legend": {

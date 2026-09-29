@@ -372,11 +372,9 @@ async function getMockUniversityPassport(id: string): Promise<UniversityPassport
       nextStage: getPassportNextStage(university.currentStage.id),
     },
     timeline: [
-      { id: `${id}-event-1`, type: 'meeting', occurredAt: '2026-09-20T11:30:00+03:00', description: 'Провели встречу с координатором программы.' },
       { id: `${id}-event-2`, type: 'document', occurredAt: '2026-09-18T16:10:00+03:00', description: 'Получили подписанный пакет документов.' },
       { id: `${id}-event-3`, type: 'workflow', occurredAt: '2026-09-16T13:45:00+03:00', description: `Этап изменён: ${university.currentStage.name}.` },
       { id: `${id}-event-4`, type: 'note', occurredAt: '2026-09-14T09:20:00+03:00', description: 'Добавили заметку по подготовке преподавателей.' },
-      { id: `${id}-event-5`, type: 'meeting', occurredAt: '2026-09-12T15:00:00+03:00', description: 'Согласовали план ближайших запусков.' },
     ],
   };
 }
@@ -983,12 +981,10 @@ const historyEvents = (id: string, university: UniversityListItem): UniversityHi
   const assigned = assignedMockResponsible(id);
   return [
     ...(assignment && assigned ? [{ id: `${id}-responsible-assignment-${assignment.assignedAt}`, occurredAt: assignment.assignedAt, type: 'audit' as const, user: anna, action: 'Изменён ответственный', details: assignment.reason ? `Новый ответственный: ${assigned.name}. Причина: ${assignment.reason}` : `Новый ответственный: ${assigned.name}.`, entity: { id: `${id}-responsible`, label: 'Ответственный ВУЗа' }, oldValues: { responsible: university.responsible?.name ?? null }, newValues: { responsible: assigned.name }, ip: 'mock', userAgent: 'CRM demo' }] : []),
-    { id: `${id}-history-1`, occurredAt: '2026-09-20T11:30:00+03:00', type: 'meeting', user: anna, action: 'Проведена встреча', details: 'Рабочая встреча с координатором программы', entity: { id: `${id}-meeting-1`, label: 'Встреча с координатором' } },
     { id: `${id}-history-2`, occurredAt: '2026-09-19T15:20:00+03:00', type: 'audit', user: boris, action: 'Изменён срок этапа', details: `${currentStageName} → новый срок 30 сент. 2026 г.`, entity: { id: `${id}-workflow-stage-11`, label: currentStageName }, oldValues: { deadline: '2026-09-18', status: 'attention' }, newValues: { deadline: '2026-09-30', status: 'current' }, ip: '10.24.18.42', userAgent: 'Chrome 128 · macOS' },
     { id: `${id}-history-4`, occurredAt: '2026-09-17T10:05:00+03:00', type: 'workflow', user: anna, action: 'Этап завершён', details: 'Подготовка преподавателей → Подготовка инфраструктуры', entity: { id: `${id}-workflow-stage-7`, label: 'Подготовка инфраструктуры' } },
     { id: `${id}-history-5`, occurredAt: '2026-09-16T13:45:00+03:00', type: 'note', user: { id: 'responsible-elena', name: 'Елена Смирнова' }, action: 'Добавлена заметка', details: 'Нужно подтвердить готовность аудитории к пилоту.', entity: { id: `${id}-note-1`, label: 'Подготовка к пилоту' } },
     { id: `${id}-history-6`, occurredAt: '2026-09-15T09:30:00+03:00', type: 'audit', user: anna, action: 'Изменён ответственный', details: 'Ответственный обновлён в карточке Workflow', entity: { id: `${id}-workflow-stage-10`, label: 'Пилотный запуск' }, oldValues: { responsible: 'Борис Петров' }, newValues: { responsible: anna.name }, ip: '10.24.18.42', userAgent: 'Chrome 128 · macOS' },
-    { id: `${id}-history-7`, occurredAt: '2026-09-12T15:00:00+03:00', type: 'meeting', user: { id: 'responsible-elena', name: 'Елена Смирнова' }, action: 'Зафиксированы договорённости', details: 'Согласовали план ближайших запусков', entity: { id: `${id}-meeting-2`, label: 'План ближайших запусков' } },
     { id: `${id}-history-9`, occurredAt: '2026-09-09T17:10:00+03:00', type: 'workflow', user: boris, action: 'Этап изменён', details: `Текущий этап: ${currentStageName}`, entity: { id: `${id}-workflow-stage-11`, label: currentStageName } },
     { id: `${id}-history-10`, occurredAt: '2026-09-06T14:35:00+03:00', type: 'note', user: anna, action: 'Добавлена заметка', details: 'Обновили план подготовки преподавателей.', entity: { id: `${id}-note-2`, label: 'План подготовки преподавателей' } },
   ];
@@ -1281,34 +1277,8 @@ export async function createUniversityDocument(universityId: string, input: { ty
 }
 
 /** Typed frontend adapter for the future university meetings endpoint. */
-async function getMockUniversityMeetings(id: string): Promise<UniversityMeetingRow[]> {
-  const university = getUniversityOrThrow(id);
-  const numericId = getUniversityNumericId(id);
-  const types: UniversityMeetingType[] = ['online', 'offline', 'phone', 'email', 'online'];
-  const subjects = ['Согласование плана запуска', 'Рабочая встреча с координатором', 'Уточнение пакета документов', 'Подтверждение сроков обучения', 'Итоги месяца'];
-  const participants: UniversityMeetingParticipant[] = [
-    { id: 'participant-anna', name: 'Анна Иванова', initials: 'АИ' },
-    { id: 'participant-boris', name: 'Борис Петров', initials: 'БП' },
-    { id: 'participant-elena', name: 'Елена Смирнова', initials: 'ЕС' },
-  ];
-  return subjects.map((subject, index) => ({
-    id: `${id}-meeting-${index + 1}`,
-    occurredAt: `2026-09-${String(20 - index * 3).padStart(2, '0')}T${String(10 + index).padStart(2, '0')}:30:00+03:00`,
-    type: types[(index + numericId) % types.length],
-    subject,
-    participants: participants.slice(0, 2 + (index % 2)),
-    outcome: index === 1 ? 'Согласовали обновлённый план.' : 'Зафиксировали договорённости и следующие шаги.',
-    nextAction: index === 2 ? 'Проверить комплект документов' : 'Подтвердить дату следующей встречи',
-    dueDate: index === 0 ? '2026-09-28' : index === 2 ? '2026-09-25' : null,
-    author: university.responsible?.name ?? 'Анна Иванова',
-  }));
-}
-
 export async function getUniversityMeetings(id: string, page = 1, pageSize = 20, signal?: AbortSignal): Promise<PaginatedResult<UniversityMeetingRow>> {
-  return fromDataSource({ domain: 'passport', signal, mock: async () => {
-    const items = await getMockUniversityMeetings(id);
-    return { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: items.length };
-  }, real: () => realGetUniversityMeetings(id, page, pageSize, signal) });
+  return realGetUniversityMeetings(id, page, pageSize, signal);
 }
 
 export async function createUniversityMeeting(universityId: string, input: UniversityMeetingInput): Promise<{ id: string }> {

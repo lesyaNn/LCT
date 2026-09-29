@@ -16,7 +16,9 @@ import { useAuth } from '@/shared/auth/AuthProvider';
 import { hasPermission, hasRole } from '@/shared/lib/access-control';
 import { formatDateTimeRu } from '@/shared/lib/formatters';
 import { normalizeApiError } from '@/shared/lib/api-errors';
+import { queryKeys } from '@/shared/lib/query-keys';
 import {
+  getUniversityHealth,
   getWorkflowSelectorPrograms,
   getUniversityPassport,
   isRealWorkflowMode,
@@ -96,12 +98,15 @@ function PassportHeader({ passport, onTabChange }: { passport: UniversityPasspor
 
 function OverviewMetrics({ passport }: { passport: UniversityPassport }) {
   const { metrics } = passport;
+  const healthQuery = useQuery({ queryKey: queryKeys.universities.health(passport.id), queryFn: () => getUniversityHealth(passport.id), staleTime: 30_000 });
+  const health = healthQuery.data;
   const licensesTotal = metrics.licenses.active + metrics.licenses.expiring + metrics.licenses.overdue;
   return (
     <section className={styles.section} aria-labelledby="passport-metrics-title">
       <div className={styles.sectionHeading}><h2 id="passport-metrics-title">Ключевые показатели</h2></div>
       <div className={styles.metricsGrid}>
-        <MetricCard label="Активные программы" value={metrics.activePrograms} icon={Book} />
+        <MetricCard label="Активные программы" value={health?.active_workflows ?? '—'} icon={Book} />
+        <MetricCard label="Health Score" value={health?.score === null || health?.score === undefined ? '—' : `${health.score} / 100`} icon={StatisticsBoard} />
         <MetricCard label="Лицензии" value={licensesTotal} icon={Education} indicators={[{ value: metrics.licenses.active, label: 'действуют', intent: 'success' }, { value: metrics.licenses.expiring, label: 'истекают', intent: 'warning' }, { value: metrics.licenses.overdue, label: 'просрочены', intent: 'danger' }]} />
         <MetricCard label="Документы" value={metrics.documents.limited ? `≥${metrics.documents.total}` : metrics.documents.total} icon={DocumentText} indicators={metrics.documents.limited ? undefined : [{ value: metrics.documents.signed, label: 'подписано', intent: 'success' }, { value: metrics.documents.overdue, label: 'просрочено', intent: 'danger' }]} />
       </div>

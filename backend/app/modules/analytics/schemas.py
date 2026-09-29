@@ -70,6 +70,7 @@ class MatrixRow(BaseModel):
     health_score: int | None = Field(default=None, ge=0, le=100)
     health_level: Literal["stable", "attention", "critical", "no_data"] = "no_data"
     started_programs: int = 0
+    active_workflows: int = 0
     total_programs: int = 0
 
 
@@ -94,6 +95,10 @@ class MatrixCell(BaseModel):
     overdue_count: int = 0
     next_milestone: str | None = None
     workflow_scope: Literal["university"] = "university"
+    stages_completed: int = 0
+    stages_total: int = 0
+    deadline: date | None = None
+    overdue_days: int = 0
 
 
 class Matrix(BaseModel):
