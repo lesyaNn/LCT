@@ -163,7 +163,9 @@ def custom_openapi():
         "type": "oauth2",
         "description": (
             "Вход через Keycloak (realm rtk, публичный клиент rtk-frontend, "
-            "Authorization Code + PKCE). Удобно для Swagger UI: токен подставится автоматически."
+            "Authorization Code + PKCE). Для авторизации нажмите кнопку "
+            "Authorize ниже: откроется страница логина Keycloak — войдите, "
+            "токен подставится автоматически."
         ),
         "flows": {
             "authorizationCode": {
