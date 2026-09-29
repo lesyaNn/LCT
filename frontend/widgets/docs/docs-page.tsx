@@ -1,6 +1,7 @@
 'use client';
 
 import Search from '@atomaro/icons/24/action/Search';
+import Edit from '@atomaro/icons/24/editor/Edit';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useMemo, useState } from 'react';
@@ -51,15 +52,27 @@ function DocsNavigation({ sections, activeArticleId, query, onQueryChange, onNav
 }
 
 const markdownComponents: Components = {
+  code: ({ children, ...props }) => String(children).trim() === ':edit:'
+    ? <span className={styles.inlineIcon} role="img" aria-label="Редактировать"><Edit size={18} fill="currentColor" /></span>
+    : <code {...props}>{children}</code>,
   a: ({ href, children, ...props }) => {
     if (href?.startsWith('/docs')) return <Link href={href} {...props}>{children}</Link>;
     return <a href={href} target={href?.startsWith('#') ? undefined : '_blank'} rel={href?.startsWith('#') ? undefined : 'noopener noreferrer'} {...props}>{children}</a>;
   },
   table: ({ children, ...props }) => <div className={styles.tableWrap}><table {...props}>{children}</table></div>,
   pre: ({ children, ...props }) => <pre className={styles.codeBlock} {...props}>{children}</pre>,
-  img: ({ src, alt }) => src && typeof src === 'string' && src.startsWith('/docs/images/')
-    ? <span className={styles.figure} role="figure" aria-label={alt ?? ''}><Image src={src} alt={alt ?? ''} width={src.endsWith('/workflow-templates.png') ? 2352 : 1200} height={src.endsWith('/workflow-templates.png') ? 662 : 760} unoptimized /><span className={styles.caption}>{alt}</span></span>
-    : null,
+  img: ({ src, alt }) => {
+    if (!src || typeof src !== 'string' || !src.startsWith('/docs/images/')) return null;
+    const dimensions: Record<string, [number, number]> = {
+      'docs-programs-products.jpg': [1100, 545],
+      'docs-workflow-list.jpg': [1100, 655],
+      'docs-workflow-current-stage.jpg': [645, 400],
+      'docs-workflow-history.jpg': [620, 450],
+      'workflow-templates.png': [2352, 662],
+    };
+    const [width, height] = dimensions[src.split('/').at(-1) ?? ''] ?? [1200, 760];
+    return <span className={styles.figure} role="figure" aria-label={alt ?? ''}><Image src={src} alt={alt ?? ''} width={width} height={height} unoptimized /><span className={styles.caption}>{alt}</span></span>;
+  },
 };
 
 function ArticleContent({ article }: { article: DocsArticle }) {

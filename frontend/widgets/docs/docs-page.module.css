@@ -1,5 +1,6 @@
 .docsShell { align-items: start; display: grid; gap: var(--rtk-space-6); grid-template-columns: minmax(220px, 270px) minmax(0, 1fr); min-width: 0; }
-.sidebar { align-self: start; background: var(--rtk-color-surface); border-radius: var(--rtk-radius-medium); box-shadow: var(--rtk-shadow-elevation-1); max-height: calc(100dvh - var(--topbar-height) - 2 * var(--rtk-space-5)); min-width: 0; overflow-y: auto; overscroll-behavior: contain; padding: var(--rtk-space-4); position: sticky; top: var(--rtk-space-5); }
+.sidebar { align-self: start; background: var(--rtk-color-surface); border-radius: var(--rtk-radius-medium); box-shadow: var(--rtk-shadow-elevation-1); max-height: calc(100dvh - var(--topbar-height) - var(--rtk-space-5)); min-width: 0; overflow-y: auto; overscroll-behavior: contain; padding: var(--rtk-space-4); position: sticky; top: 0; }
+.inlineIcon { color: var(--rtk-color-text-primary); display: inline-flex; line-height: 1; vertical-align: -0.2em; }
 .searchField { align-items: center; background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-tertiary); display: flex; gap: var(--rtk-space-2); padding: 0 var(--rtk-space-3); }
 .searchField:focus-within { border-color: var(--rtk-color-brand); box-shadow: 0 0 0 2px var(--rtk-color-brand-soft); }
 .searchField input { background: transparent; border: 0; box-shadow: none; min-width: 0; padding-left: 0; padding-right: 0; }
