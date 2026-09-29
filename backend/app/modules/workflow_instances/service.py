@@ -91,7 +91,12 @@ def list_workflow_activity(db: Session, instance_id: uuid.UUID) -> list[Workflow
     for row in rows:
         old = row.old_value if isinstance(row.old_value, dict) else {}
         new = row.new_value if isinstance(row.new_value, dict) else {}
-        if "stage_responsible_id" in new and old.get("stage_responsible_id") != new.get("stage_responsible_id"):
+        if new.get("status") == "completed" and old.get("status") == "active":
+            kind = "workflow_completed"
+            stage_id = None
+            stage_name = "Весь Workflow"
+            title = "Workflow завершён"
+        elif "stage_responsible_id" in new and old.get("stage_responsible_id") != new.get("stage_responsible_id"):
             kind = "stage_responsible_changed"
             stage_id = uuid.UUID(str(new["stage_id"])) if str(new.get("stage_id")) in stage_names else None
             stage_name = stage_names.get(str(new.get("stage_id")), "Этап Workflow")
@@ -110,7 +115,7 @@ def list_workflow_activity(db: Session, instance_id: uuid.UUID) -> list[Workflow
             continue
         events.append(WorkflowActivityRead(
             id=row.id, type=kind, created_at=row.created_at,
-            actor_name=("Системное действие" if is_uuid_like(row.user_name) else actor_display_name(row.user_name, row.user_id)),
+            actor_name=("Системное действие" if kind != "workflow_completed" and is_uuid_like(row.user_name) else actor_display_name(row.user_name, row.user_id)),
             stage_id=stage_id, stage_name=stage_name, title=title,
         ))
     return events
@@ -475,8 +480,8 @@ def set_instance_responsible(
     (``university_responsibles``) can be assigned; ``None`` clears it.
     """
     instance = get_instance_or_404(db, instance_id)
-    if instance.status == "archived":
-        raise BadTransition("Archived Workflow cannot be changed")
+    if instance.status != "active":
+        raise BadTransition("Only an active Workflow can be changed")
     old_responsible_id = instance.responsible_id
     if responsible_id is not None:
         if db.get(Responsible, responsible_id) is None:

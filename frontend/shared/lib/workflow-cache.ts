@@ -40,6 +40,7 @@ export function invalidateWorkflowRelatedQueries(queryClient: QueryClient, insta
   const invalidations = [
     invalidateWorkflowDetail(queryClient, instanceId),
     queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowOverview }),
+    queryClient.invalidateQueries({ queryKey: ['workflow', 'instances'] }),
     queryClient.invalidateQueries({ queryKey: universitiesQueryKey }),
     queryClient.invalidateQueries({ queryKey: dashboardQueryKey }),
     queryClient.invalidateQueries({ queryKey: queryKeys.audit.all }),

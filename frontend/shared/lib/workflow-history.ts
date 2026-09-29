@@ -1,7 +1,7 @@
 import { listWorkflowActivity, listWorkflowAttachmentsPage, listWorkflowCommentsPage, listWorkflowHistory, type UniversityWorkflowStage, type WorkflowActivityApiRecord, type WorkflowAttachmentApiRecord, type WorkflowCommentApiRecord, type WorkflowPage, type WorkflowTransitionApiRecord } from './universities-repository';
 import type { WorkflowAttachmentApiRecord as CommentAttachmentRecord } from './workflow-attachments';
 
-export type WorkflowHistoryKind = 'transition' | 'comment' | 'attachment' | 'responsible_changed' | 'stage_responsible_changed' | 'deadline_changed';
+export type WorkflowHistoryKind = 'transition' | 'comment' | 'attachment' | 'responsible_changed' | 'stage_responsible_changed' | 'deadline_changed' | 'workflow_completed';
 export const workflowHistoryPresentation: Record<WorkflowHistoryKind, { label: string; icon: WorkflowHistoryKind }> = {
   transition: { label: 'Этап изменён', icon: 'transition' },
   comment: { label: 'Комментарий', icon: 'comment' },
@@ -9,6 +9,7 @@ export const workflowHistoryPresentation: Record<WorkflowHistoryKind, { label: s
   responsible_changed: { label: 'Ответственный Workflow изменён', icon: 'responsible_changed' },
   stage_responsible_changed: { label: 'Ответственный этапа изменён', icon: 'stage_responsible_changed' },
   deadline_changed: { label: 'Дедлайн изменён', icon: 'deadline_changed' },
+  workflow_completed: { label: 'Workflow завершён', icon: 'transition' },
 };
 
 export type WorkflowHistoryEvent = {

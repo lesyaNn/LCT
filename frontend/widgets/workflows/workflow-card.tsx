@@ -30,6 +30,6 @@ export function WorkflowCard({ item, dragHandle }: { item: WorkflowOverviewItem;
       {responsible ? <div className={styles.metaItem}><User size={20} fill="currentColor" /><div><dt>Ответственный за этап</dt><dd>{responsible.name}</dd></div></div> : null}
       {item.stage.deadline ? <div className={`${styles.metaItem} ${styles.deadlineMeta}`}><Calendar size={20} fill="currentColor" /><div><dt>Срок этапа</dt><dd>{formatDateRu(item.stage.deadline)}</dd></div></div> : null}
     </dl> : null}
-    <div className={styles.cardActions}><Link href={href}>Открыть / перевести</Link></div>
+    <div className={styles.cardActions}><Link href={href}>{item.status === 'completed' ? 'Открыть историю' : 'Открыть / перевести'}</Link></div>
   </article>;
 }

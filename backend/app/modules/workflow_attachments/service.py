@@ -27,7 +27,7 @@ from typing import BinaryIO
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import NotFound
+from app.core.exceptions import Conflict, NotFound
 from app.core.errors import BusinessException
 from app.schemas.errors import ErrorCode
 from app.core.policies import ensure_university_access
@@ -178,6 +178,8 @@ def stage_attachment(
 ) -> WorkflowAttachment:
     """Store one object and stage its metadata in the caller's transaction."""
     instance = get_instance_or_404(db, instance_id)
+    if instance.status != "active":
+        raise Conflict("Completed Workflow cannot be changed")
     safe_name = sanitize_filename(filename)
     mime = check_file_type(safe_name, content_type)
     key = new_storage_key()
@@ -232,6 +234,8 @@ def delete_attachment(
 ) -> None:
     """Physical object first, metadata row second (no false 204)."""
     instance = get_instance_or_404(db, attachment.instance_id)
+    if instance.status != "active":
+        raise Conflict("Completed Workflow cannot be changed")
     try:
         storage.delete(attachment.storage_key)
     except StorageObjectNotFound:

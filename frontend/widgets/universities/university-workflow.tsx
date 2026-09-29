@@ -1,7 +1,7 @@
 'use client';
 
 import type { ComponentType } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Attachment from '@atomaro/icons/24/action/Attachment';
@@ -19,8 +19,9 @@ import { hasPermission, hasRole } from '@/shared/lib/access-control';
 import type { WorkflowTransitionTarget } from '@/shared/lib/workflow-transition';
 import { formatDateRu, formatDateTimeRu, getRelativeDueDateRu } from '@/shared/lib/formatters';
 import { workflowStageStatusSemantics, type WorkflowStageIcon } from '@/shared/lib/status-semantics';
-import { getApiUniversityWorkflow, getUniversityResponsibles, getUniversityWorkflow, getWorkflowAllowedTransitions, getWorkflowRollbackTargets, isRealWorkflowMode, listWorkflowTasksPage, universityResponsiblesQueryKey, updateWorkflowResponsible, updateWorkflowStageResponsible, updateWorkflowStageDueDate, workflowQueryKey, type UniversityWorkflow, type UniversityWorkflowAttachment, type UniversityWorkflowStage, type UniversityWorkflowStageStatus, type UniversityWorkflowTask } from '@/shared/lib/universities-repository';
+import { completeWorkflowInstance, getApiUniversityWorkflow, getUniversityResponsibles, getUniversityWorkflow, getWorkflowAllowedTransitions, getWorkflowRollbackTargets, isRealWorkflowMode, listWorkflowTasksPage, universityResponsiblesQueryKey, updateWorkflowResponsible, updateWorkflowStageResponsible, updateWorkflowStageDueDate, workflowQueryKey, type UniversityWorkflow, type UniversityWorkflowAttachment, type UniversityWorkflowStage, type UniversityWorkflowStageStatus, type UniversityWorkflowTask } from '@/shared/lib/universities-repository';
 import { queryKeys } from '@/shared/lib/query-keys';
+import { invalidateWorkflowRelatedQueries } from '@/shared/lib/workflow-cache';
 import { workflowAttachmentFromApi } from '@/shared/lib/workflow-attachments';
 import { buildMockWorkflowHistory, buildWorkflowHistory, countWorkflowStageResources, loadWorkflowHistory, workflowHistoryPresentation, type WorkflowHistoryEvent } from '@/shared/lib/workflow-history';
 import { getWorkflowSelectorPrograms, workflowProgramsQueryKey } from '@/shared/lib/universities-repository';
@@ -139,15 +140,34 @@ function getStageActions(stage: UniversityWorkflowStage, canAdvance: boolean, ca
 function StageActionPanel({ stage, stages, instanceId, universityId, userId, canManage, allowedTargets, rollbackTargets, onTransitionOpen, onTransitionClose, onTransitionSuccess, onNotify }: { stage: UniversityWorkflowStage; stages: UniversityWorkflowStage[]; instanceId: string; universityId?: string | null; userId?: string | null; canManage: boolean; allowedTargets?: WorkflowTransitionTarget[]; rollbackTargets?: WorkflowTransitionTarget[]; onTransitionOpen: () => void; onTransitionClose: () => void; onTransitionSuccess: () => void; onNotify: (notification: WorkflowTransitionNotification) => void }) {
   const [transitionContext, setTransitionContext] = useState<{ currentStage: UniversityWorkflowStage; stages: UniversityWorkflowStage[] } | null>(null);
   const [rollbackContext, setRollbackContext] = useState<{ currentStage: UniversityWorkflowStage; stages: UniversityWorkflowStage[] } | null>(null);
-  const actions = getStageActions(stage, canManage && (allowedTargets === undefined || allowedTargets.length > 0), canManage && (rollbackTargets === undefined || rollbackTargets.length > 0));
+  const [completeOpen, setCompleteOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const complete = useMutation({
+    mutationFn: () => completeWorkflowInstance(instanceId),
+    onSuccess: async (record) => {
+      queryClient.setQueryData(workflowQueryKey(instanceId), getApiUniversityWorkflow(record));
+      setCompleteOpen(false);
+      await invalidateWorkflowRelatedQueries(queryClient, instanceId, universityId);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowHistory(instanceId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowAllowed(instanceId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowRollbackTargets(instanceId) }),
+      ]);
+      onNotify({ intent: 'success', title: 'Workflow завершён', message: 'История и материалы сохранены.' });
+      onTransitionSuccess();
+    },
+    onError: (cause) => onNotify({ intent: 'error', title: 'Не удалось завершить Workflow', message: normalizeApiError(cause).message }),
+  });
+  const isFinalStage = canManage && isRealWorkflowMode() && !stages.some((item) => item.orderIndex > stage.orderIndex);
+  const actions = getStageActions(stage, canManage && !isFinalStage && (allowedTargets === undefined || allowedTargets.length > 0), canManage && (rollbackTargets === undefined || rollbackTargets.length > 0));
   const transitionAction = actions.find((action) => action.label.startsWith('Перевести'));
   const rollbackAction = actions.find((action) => action.label.startsWith('Вернуть'));
-  if (!actions.length && !transitionContext && !rollbackContext) return null;
+  if (!actions.length && !isFinalStage && !transitionContext && !rollbackContext) return null;
   return <div className={styles.stageAction} aria-label="Действия этапа"><div className={styles.stageActionButtons}>{actions.map((action) => {
     const openTransition = action === transitionAction;
     const openRollback = action === rollbackAction;
     return <Button key={action.label} variant={action.variant} size="s" type="button" onClick={() => { onTransitionOpen(); if (openTransition) setTransitionContext({ currentStage: stage, stages }); if (openRollback) setRollbackContext({ currentStage: stage, stages }); }}>{action.label}</Button>;
-  })}</div><span>Комментарий и подтверждение обязательны для перехода.</span>{transitionContext ? <WorkflowTransitionModal open instanceId={instanceId} universityId={universityId} currentStage={transitionContext.currentStage} stages={transitionContext.stages} allowedTargets={allowedTargets} userId={userId} onClose={() => { setTransitionContext(null); onTransitionClose(); }} onSuccess={() => { setTransitionContext(null); onTransitionSuccess(); }} onNotify={onNotify} /> : null}{rollbackContext ? <WorkflowRollbackModal open instanceId={instanceId} universityId={universityId} currentStage={rollbackContext.currentStage} stages={rollbackContext.stages} allowedTargets={rollbackTargets} userId={userId} onClose={() => { setRollbackContext(null); onTransitionClose(); }} onSuccess={() => { setRollbackContext(null); onTransitionSuccess(); }} onNotify={onNotify} /> : null}</div>;
+  })}{isFinalStage ? <Button variant="primary" size="s" type="button" onClick={() => setCompleteOpen(true)}>Завершить Workflow</Button> : null}</div>{actions.length ? <span>Комментарий и подтверждение обязательны для перехода.</span> : null}{completeOpen ? <Modal title="Завершить Workflow?" onClose={() => { if (!complete.isPending) setCompleteOpen(false); }}><p>После завершения Workflow перейдёт в состояние «Завершён». История и материалы сохранятся.</p><div className={styles.stageActionButtons}><Button variant="ghost" size="s" type="button" disabled={complete.isPending} onClick={() => setCompleteOpen(false)}>Отмена</Button><Button variant="primary" size="s" type="button" loading={complete.isPending} disabled={complete.isPending} onClick={() => complete.mutate()}>Завершить Workflow</Button></div></Modal> : null}{transitionContext ? <WorkflowTransitionModal open instanceId={instanceId} universityId={universityId} currentStage={transitionContext.currentStage} stages={transitionContext.stages} allowedTargets={allowedTargets} userId={userId} onClose={() => { setTransitionContext(null); onTransitionClose(); }} onSuccess={() => { setTransitionContext(null); onTransitionSuccess(); }} onNotify={onNotify} /> : null}{rollbackContext ? <WorkflowRollbackModal open instanceId={instanceId} universityId={universityId} currentStage={rollbackContext.currentStage} stages={rollbackContext.stages} allowedTargets={rollbackTargets} userId={userId} onClose={() => { setRollbackContext(null); onTransitionClose(); }} onSuccess={() => { setRollbackContext(null); onTransitionSuccess(); }} onNotify={onNotify} /> : null}</div>;
 }
 
 function CompletionSummary({ stage }: { stage: UniversityWorkflowStage }) {
@@ -158,7 +178,7 @@ function CompletionSummary({ stage }: { stage: UniversityWorkflowStage }) {
 
 type WorkflowResourceState = { loading: boolean; error: boolean; retry: () => void; hasMore?: boolean; loadingMore?: boolean; loadMore?: () => void };
 
-const historyIcons = { transition: History, comment: Comments, attachment: Attachment, responsible_changed: History, stage_responsible_changed: History, deadline_changed: History };
+const historyIcons = { transition: History, comment: Comments, attachment: Attachment, responsible_changed: History, stage_responsible_changed: History, deadline_changed: History, workflow_completed: CheckLarge };
 
 function WorkflowHistorySection({ idPrefix, instanceId, events, stages, userId, userName, state }: { idPrefix: string; instanceId: string; events: WorkflowHistoryEvent[]; stages: UniversityWorkflowStage[]; userId?: string; userName?: string; state?: WorkflowResourceState }) {
   const currentStage = stages.find((stage) => stage.status === 'current' || stage.status === 'overdue');
@@ -178,7 +198,7 @@ function WorkflowHistorySection({ idPrefix, instanceId, events, stages, userId, 
       const presentation = workflowHistoryPresentation[event.kind];
       const Icon = historyIcons[presentation.icon];
       const actor = event.actorName ?? (event.actorId === userId ? userName : undefined) ?? 'Участник Workflow';
-      return <li className={`${styles.historyEvent} ${styles[`history${event.kind}`]}`} key={event.id}><div className={styles.historyHeading}><Icon size={18} fill="currentColor" /><span className={styles.historyMetadata}>{presentation.label} · {actor}</span><time dateTime={event.occurredAt}>{formatDateTimeRu(event.occurredAt)}</time></div><div className={styles.historyContent}>{event.kind === 'transition' || event.kind === 'responsible_changed' || event.kind === 'stage_responsible_changed' || event.kind === 'deadline_changed' ? <strong>{event.title}</strong> : null}{event.text ? <p>{event.text}</p> : null}{event.attachments.length ? <ul className={styles.historyFiles}>{event.attachments.map((record) => <AttachmentRow key={record.id} attachment={workflowAttachmentFromApi(record, null)} instanceId={instanceId} canDelete={false} compact onOpen={() => undefined} onDelete={() => undefined} />)}</ul> : null}</div></li>;
+      return <li className={`${styles.historyEvent} ${styles[`history${event.kind}`]}`} key={event.id}><div className={styles.historyHeading}><Icon size={18} fill="currentColor" /><span className={styles.historyMetadata}>{presentation.label} · {actor}</span><time dateTime={event.occurredAt}>{formatDateTimeRu(event.occurredAt)}</time></div><div className={styles.historyContent}>{event.kind === 'transition' || event.kind === 'responsible_changed' || event.kind === 'stage_responsible_changed' || event.kind === 'deadline_changed' || event.kind === 'workflow_completed' ? <strong>{event.title}</strong> : null}{event.text ? <p>{event.text}</p> : null}{event.attachments.length ? <ul className={styles.historyFiles}>{event.attachments.map((record) => <AttachmentRow key={record.id} attachment={workflowAttachmentFromApi(record, null)} instanceId={instanceId} canDelete={false} compact onOpen={() => undefined} onDelete={() => undefined} />)}</ul> : null}</div></li>;
     })}</ol></details>;
   }) : <EmptyState title="Событий пока нет" description="История появится после первого действия." headingLevel={3} />}</div></details></section>;
 }
@@ -278,7 +298,7 @@ function WorkflowHeader({ workflow }: { workflow: UniversityWorkflow }) {
   const progress = workflow.totalSteps ? Math.round((workflow.completedSteps / workflow.totalSteps) * 100) : 0;
   return (
     <header className={styles.pageHeader}>
-      <div className={styles.headerMain}><h1>Взаимодействие с вузом</h1><p className={styles.headerContext}>{[workflow.universityName, workflow.universityCity, workflow.workflowName].filter((part, index, parts) => part && parts.findIndex((other) => other.toLocaleLowerCase('ru-RU') === part.toLocaleLowerCase('ru-RU')) === index).join(' · ')}</p></div>
+      <div className={styles.headerMain}><h1>Взаимодействие с вузом</h1>{workflow.status === 'completed' ? <StatusBadge intent="success">Завершён</StatusBadge> : null}<p className={styles.headerContext}>{[workflow.universityName, workflow.universityCity, workflow.workflowName].filter((part, index, parts) => part && parts.findIndex((other) => other.toLocaleLowerCase('ru-RU') === part.toLocaleLowerCase('ru-RU')) === index).join(' · ')}</p></div>
       <div className={styles.overallProgress}><div className={styles.progressLabel}><span>Прогресс Workflow</span><strong>{workflow.completedSteps} из {workflow.totalSteps} этапов завершено</strong></div><div className={styles.progressTrack} role="progressbar" aria-label={`Прогресс Workflow: завершено ${workflow.completedSteps} из ${workflow.totalSteps} этапов`} aria-valuemin={0} aria-valuemax={workflow.totalSteps} aria-valuenow={workflow.completedSteps}><span style={{ width: `${progress}%` }} /></div></div>
     </header>
   );
@@ -305,16 +325,16 @@ export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride 
   const historyQuery = useQuery({ queryKey: queryKeys.universities.workflowHistory(instanceId), queryFn: () => loadWorkflowHistory(instanceId), enabled: realWorkflow && Boolean(query.data), staleTime: 30_000 });
   const allowedQuery = useQuery({ queryKey: queryKeys.universities.workflowAllowed(instanceId), queryFn: () => getWorkflowAllowedTransitions(instanceId), enabled: realWorkflow && Boolean(query.data), staleTime: 30_000 });
   const rollbackQuery = useQuery({ queryKey: queryKeys.universities.workflowRollbackTargets(instanceId), queryFn: () => getWorkflowRollbackTargets(instanceId), enabled: realWorkflow && Boolean(query.data), staleTime: 30_000 });
-  const canManage = realWorkflow ? hasPermission(user, 'workflow.change_status') && query.data?.status !== 'archived' : (canAdvanceOverride ?? (user?.role === 'admin' || user?.role === 'manager'));
+  const canManage = realWorkflow ? hasPermission(user, 'workflow.change_status') && query.data?.status === 'active' : (canAdvanceOverride ?? (user?.role === 'admin' || user?.role === 'manager'));
   const allowedTargets = realWorkflow ? allowedQuery.data?.map((item) => ({ id: item.id, orderIndex: item.order_index, name: item.name })) ?? [] : undefined;
   const rollbackTargets = realWorkflow ? rollbackQuery.data?.map((item) => ({ id: item.id, orderIndex: item.order_index, name: item.name })) ?? [] : undefined;
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [notification, setNotification] = useState<WorkflowTransitionNotification | null>(null);
-  useEffect(() => {
-    if (!notification) return undefined;
-    const timer = window.setTimeout(() => setNotification(null), 5000);
-    return () => window.clearTimeout(timer);
-  }, [notification]);
+  const [notifications, setNotifications] = useState<(WorkflowTransitionNotification & { id: number })[]>([]);
+  const notify = (item: WorkflowTransitionNotification) => {
+    const id = Date.now() + Math.random();
+    setNotifications((current) => [...current, { ...item, id }].slice(-5));
+    window.setTimeout(() => setNotifications((current) => current.filter((entry) => entry.id !== id)), 5000);
+  };
   const resourceCounts = useMemo(() => historyQuery.data ? countWorkflowStageResources(historyQuery.data) : null, [historyQuery.data]);
   const stages = useMemo(() => query.data?.stages.map((stage) => realWorkflow ? {
     ...stage,
@@ -339,15 +359,16 @@ export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride 
 
   return <div className={`${styles.page} ${mode === 'embedded' ? styles.embedded : ''}`}>
     {mode === 'page' ? <WorkflowHeader workflow={query.data} /> : null}
+    {mode === 'embedded' && query.data.status === 'completed' ? <StatusBadge intent="success">Workflow завершён</StatusBadge> : null}
     <div className={styles.layout}>
       <section className={styles.stagesPanel} aria-labelledby={`${idPrefix}-stages-title`}>
         <div className={styles.panelHeading}><div><h2 id={`${idPrefix}-stages-title`}>Этапы Workflow</h2></div><span className={styles.totalLabel}>{stages.length} этапов</span></div>
         <ol className={styles.stageList}>{stages.map((stage) => <WorkflowStageItem key={stage.id} stage={stage} selected={stage.id === selectedStage.id} detailsId={detailsId} onSelect={() => setSelectedId(stage.id)} />)}</ol>
       </section>
-      <WorkflowStageDetails key={selectedStage.id} stage={selectedStage} stages={stages} workflow={query.data} instanceId={instanceId} universityId={query.data.universityId} userId={user?.id} canManage={canManage} idPrefix={detailsId} onTransitionOpen={() => setSelectedId(selectedStage.id)} onTransitionClose={() => setSelectedId(null)} onTransitionSuccess={() => setSelectedId(null)} onNotify={setNotification} tasksState={realWorkflow ? { loading: tasksQuery.isPending, error: tasksQuery.isError && !tasksQuery.data, retry: () => void tasksQuery.refetch(), hasMore: tasksQuery.hasNextPage, loadingMore: tasksQuery.isFetchingNextPage, loadMore: () => void tasksQuery.fetchNextPage() } : undefined} attachmentsState={realWorkflow ? { loading: historyQuery.isPending, error: historyQuery.isError && !historyQuery.data, retry: () => void historyQuery.refetch() } : undefined} historyState={realWorkflow ? { loading: historyQuery.isPending, error: historyQuery.isError && !historyQuery.data, retry: () => void historyQuery.refetch() } : undefined} historyEvents={historyEvents} historyActorName={user?.name} allowedTargets={allowedTargets} rollbackTargets={rollbackTargets} />
+      <WorkflowStageDetails key={selectedStage.id} stage={selectedStage} stages={stages} workflow={query.data} instanceId={instanceId} universityId={query.data.universityId} userId={user?.id} canManage={canManage} idPrefix={detailsId} onTransitionOpen={() => setSelectedId(selectedStage.id)} onTransitionClose={() => setSelectedId(null)} onTransitionSuccess={() => setSelectedId(null)} onNotify={notify} tasksState={realWorkflow ? { loading: tasksQuery.isPending, error: tasksQuery.isError && !tasksQuery.data, retry: () => void tasksQuery.refetch(), hasMore: tasksQuery.hasNextPage, loadingMore: tasksQuery.isFetchingNextPage, loadMore: () => void tasksQuery.fetchNextPage() } : undefined} attachmentsState={realWorkflow ? { loading: historyQuery.isPending, error: historyQuery.isError && !historyQuery.data, retry: () => void historyQuery.refetch() } : undefined} historyState={realWorkflow ? { loading: historyQuery.isPending, error: historyQuery.isError && !historyQuery.data, retry: () => void historyQuery.refetch() } : undefined} historyEvents={historyEvents} historyActorName={user?.name} allowedTargets={allowedTargets} rollbackTargets={rollbackTargets} />
     </div>
     {realWorkflow ? <WorkflowGlobalResources instanceId={instanceId} tasks={commonTasks} attachments={commonAttachments} readOnly={!canManage || !query.data.currentStage || query.data.currentStage.status === 'completed'} /> : null}
-    {notification ? <div className={styles.toastViewport}><Toast intent={notification.intent} title={notification.title} message={notification.message} onClose={() => setNotification(null)} /></div> : null}
+    {notifications.length ? <div className={styles.toastViewport}>{notifications.map((item) => <Toast key={item.id} intent={item.intent} title={item.title} message={item.message} onClose={() => setNotifications((current) => current.filter((entry) => entry.id !== item.id))} />)}</div> : null}
   </div>;
 }
 

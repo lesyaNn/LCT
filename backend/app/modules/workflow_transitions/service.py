@@ -221,6 +221,40 @@ def transition_instance(
     return get_instance_or_404(db, instance.id)
 
 
+def validate_completion(instance: WorkflowInstance, stages: list[InstanceStage]) -> InstanceStage:
+    if instance.status != "active":
+        raise BadTransition("Only an active Workflow can be completed")
+    current = _current_stage(instance, stages)
+    if any(stage.order_index > current.order_index for stage in stages):
+        raise BadTransition("Workflow can only be completed at its final stage")
+    return current
+
+
+def complete_instance(db: Session, instance_id: uuid.UUID, actor: str) -> WorkflowInstance:
+    """Close the final runtime stage and instance in one transaction."""
+    instance = db.execute(
+        select(WorkflowInstance).where(WorkflowInstance.id == instance_id).with_for_update()
+    ).scalar_one_or_none()
+    if instance is None:
+        raise NotFound("Workflow instance not found")
+    stages = _ordered_stages(instance_id, db)
+    current = validate_completion(instance, stages)
+    now = utcnow()
+    current.status = "completed"
+    current.completed_at = now
+    instance.status = "completed"
+    instance.completed_at = now
+    AuditService(db).log_event(
+        context=context_for(db, actor), action="UPDATE",
+        entity_type="workflow_instance", entity_id=instance.id,
+        university_id=instance.university_id,
+        old_value={"status": "active"},
+        new_value={"status": "completed", "stage_id": str(current.template_stage_id) if current.template_stage_id else None},
+    )
+    db.commit()
+    return get_instance_or_404(db, instance.id)
+
+
 def rollback_targets(instance: WorkflowInstance, stages: list[InstanceStage]) -> list[InstanceStage]:
     """Previous closed stages eligible for rollback, newest first."""
     if instance.status != "active" or instance.current_instance_stage_id is None:
@@ -387,6 +421,8 @@ def get_comment_or_404(db: Session, comment_id: uuid.UUID) -> WorkflowComment:
 
 
 def _ensure_current_comment_stage(db: Session, instance: WorkflowInstance, stage_id: uuid.UUID | None) -> None:
+    if instance.status != "active":
+        raise BadTransition("Completed Workflow cannot be changed")
     if stage_id is None:
         return  # General instance discussion has no stage anchor.
     current = db.get(InstanceStage, instance.current_instance_stage_id) if instance.current_instance_stage_id else None

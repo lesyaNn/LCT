@@ -72,7 +72,7 @@ async function universityInstances(university: UniversityListItem): Promise<Work
       workflow,
       stage,
       stageKey: workflowStageKey(workflow, stage),
-      status: stage.status === 'overdue' ? 'overdue' : workflow.stages.every((step) => step.status === 'completed' || step.status === 'skipped') ? 'completed' : 'in_progress',
+      status: workflow.status === 'completed' ? 'completed' : stage.status === 'overdue' ? 'overdue' : 'in_progress',
     } satisfies WorkflowOverviewItem;
   }));
   return entries.flatMap((entry) => entry.status === 'fulfilled' && entry.value ? [entry.value] : []);
@@ -95,7 +95,7 @@ export async function getWorkflowOverview(): Promise<WorkflowOverview> {
         workflow,
         stage,
         stageKey: workflowStageKey(workflow, stage),
-        status: stage.status === 'overdue' ? 'overdue' as const : record.status === 'completed' ? 'completed' as const : 'in_progress' as const,
+        status: record.status === 'completed' ? 'completed' as const : stage.status === 'overdue' ? 'overdue' as const : 'in_progress' as const,
       }] : [];
     });
     return { items, unavailableUniversities: 0, limited: page.total > page.items.length };

@@ -171,7 +171,8 @@
 .stageAction { border-top: 1px solid var(--rtk-color-border); display: flex; flex-direction: column; gap: var(--rtk-space-2); padding-top: var(--rtk-space-4); }
 .stageActionButtons { display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); }
 .stageAction span { color: var(--rtk-color-text-tertiary); font-size: 11px; }
-.toastViewport { display: flex; flex-direction: column; gap: var(--rtk-space-2); pointer-events: none; position: fixed; right: var(--rtk-space-5); top: var(--rtk-space-5); z-index: 140; }
+.toastViewport { bottom: var(--rtk-space-5); display: flex; flex-direction: column; gap: var(--rtk-space-2); max-height: calc(100vh - 2 * var(--rtk-space-5)); max-width: min(420px, calc(100vw - 2 * var(--rtk-space-5))); overflow-y: auto; pointer-events: none; position: fixed; right: var(--rtk-space-5); z-index: 140; }
+.toastViewport > * { pointer-events: auto; }
 .emptyState { align-items: center; color: var(--rtk-color-text-secondary); display: flex; flex-direction: column; gap: var(--rtk-space-2); justify-content: center; min-height: 240px; text-align: center; }
 .emptyState svg { color: var(--rtk-color-brand); }
 .emptyState p { margin: 0; }
@@ -189,5 +190,5 @@
 @media (max-width: 900px) { .layout, .skeletonLayout { grid-template-columns: 1fr; } }
 @media (max-width: 480px) { .stagesPanel, .detailPanel, .overallProgress { padding: var(--rtk-space-4); } .detailFacts { grid-template-columns: 1fr; } .detailHeader { flex-direction: column; } .stageButton { gap: var(--rtk-space-2); grid-template-columns: 36px minmax(0, 1fr); min-height: 52px; padding: var(--rtk-space-2); } .stageMarker { height: 36px; width: 36px; } .stageItem:not(:last-child)::after { left: 18px; top: 44px; } .stageMeta { align-items: flex-start; flex-direction: column; gap: var(--rtk-space-1); } .progressLabel { align-items: flex-start; flex-direction: column; gap: var(--rtk-space-1); } .taskList label { min-height: 44px; } .stageActionButtons { align-items: stretch; flex-direction: column; } .stageActionButtons > button { width: 100%; } .completionSummary time { margin-left: 0; width: 100%; } }
 @media (max-width: 480px) { .instancesHeader { align-items: stretch; flex-direction: column; } .instancesHeader > button { width: 100%; } }
-@media (max-width: 480px) { .toastViewport { left: var(--rtk-space-3); right: var(--rtk-space-3); top: var(--rtk-space-3); } .toastViewport > * { max-width: none; } }
+@media (max-width: 480px) { .toastViewport { bottom: var(--rtk-space-3); left: var(--rtk-space-3); max-height: calc(100vh - 2 * var(--rtk-space-3)); max-width: none; right: var(--rtk-space-3); } .toastViewport > * { max-width: none; } }
 @media (prefers-reduced-motion: reduce) { .progressTrack span, .taskProgress span, .skeletonStages span, .skeletonDetails span, .skeletonHeader span, .detailPanel { animation: none; transition: none; } }

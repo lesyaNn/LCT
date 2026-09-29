@@ -127,6 +127,7 @@ def test_transition_skips_optional_records_history_and_audit(db):
     assert moved.current_instance_stage_id == rows[2].id
     assert moved.current_stage_id == stages[2].id
 
+
     db.expire_all()
     by_order = {r.order_index: r for r in db.execute(
         select(InstanceStage).where(InstanceStage.instance_id == instance.id)
@@ -162,6 +163,28 @@ def test_transition_skips_optional_records_history_and_audit(db):
     assert len(events) == 1
     assert events[0].user_id == "actor-1"
     assert events[0].university_id == moved.university_id
+
+
+def test_complete_final_stage_persists_and_rejects_mutations(db):
+    from app.modules.workflow_instances import service as instance_service
+
+    instance, rows, _ = _graph(db)
+    with pytest.raises(BadTransition, match="final stage"):
+        service.complete_instance(db, instance.id, "actor-1")
+    service.transition_instance(db, instance.id, rows[-1].id, "Последний этап", "actor-1")
+    service.complete_instance(db, instance.id, "actor-1")
+    db.expire_all()
+    saved = instance_service.get_instance_detail(db, instance.id)
+    assert saved.status == "completed" and saved.completed_at is not None
+    assert saved.stages[-1].status == "completed"
+    assert saved.stages[-1].completed_at is not None
+    assert any(event.type == "workflow_completed" for event in instance_service.list_workflow_activity(db, instance.id))
+    with pytest.raises(BadTransition, match="active"):
+        service.complete_instance(db, instance.id, "actor-1")
+    with pytest.raises(Conflict, match="Задачи"):
+        instance_service.create_task(db, instance.id, rows[-1].template_stage_id, "Новая задача")
+    with pytest.raises(BadTransition, match="Completed"):
+        service.add_comment(db, instance.id, WorkflowCommentCreate(content="Новый комментарий"), "actor-1")
 
 
 def test_transition_blocked_by_required_stage(db):

@@ -13,7 +13,7 @@ import pytest
 from app.core.exceptions import BadTransition
 from app.models.workflow_instances import InstanceStage, WorkflowInstance
 from app.modules.workflow_instances.overdue import compute_overdue
-from app.modules.workflow_transitions.service import validate_transition
+from app.modules.workflow_transitions.service import validate_completion, validate_transition
 
 
 def _instance(required_middle: bool = False
@@ -68,6 +68,17 @@ def test_validate_transition_skips_only_optional_stages():
     assert current.name == "Contacts"
     assert target.name == "Agreement"
     assert [stage.name for stage in skipped] == ["Meeting"]
+
+
+def test_completion_requires_last_runtime_stage_and_active_instance():
+    instance, stages = _instance()
+    with pytest.raises(BadTransition, match="final stage"):
+        validate_completion(instance, stages)
+    instance.current_instance_stage_id = stages[-1].id
+    assert validate_completion(instance, stages) is stages[-1]
+    instance.status = "completed"
+    with pytest.raises(BadTransition, match="active"):
+        validate_completion(instance, stages)
 
 
 def test_validate_transition_rejects_required_stage_skip():

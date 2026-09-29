@@ -89,6 +89,22 @@ def transition_instance(
     return instance_service.get_instance_detail(db, instance.id)
 
 
+@router.post(
+    "/instances/{instance_id}/complete",
+    response_model=InstanceDetail,
+    summary="Complete the final workflow stage and instance atomically",
+)
+def complete_instance(
+    instance_id: uuid.UUID,
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(WRITE),
+) -> InstanceDetail:
+    existing = service.get_instance_or_404(db, instance_id)
+    instance_service.authorize_scope(user, existing)
+    instance = service.complete_instance(db, instance_id, user.id)
+    return instance_service.get_instance_detail(db, instance.id)
+
+
 @router.get(
     "/instances/{instance_id}/rollback-targets",
     response_model=list[AllowedTransitionRead],
