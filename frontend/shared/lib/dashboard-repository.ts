@@ -197,7 +197,8 @@ export async function getDashboardData(filters: DashboardFilters = EMPTY_DASHBOA
   });
 }
 
-export interface UniversityHealth { university_id: string; score: number | null; level: 'stable' | 'attention' | 'critical' | 'no_data'; started_programs: number; total_programs: number; factors: Array<{ label: string }>; programs: Array<{ program_id: string; program_name: string; state: MatrixHealthState; score: number | null; workflow_instance_id: string | null; current_stage: string | null; factors: string[] }> }
+export interface UniversityHealthProgram { program_id: string; program_name: string; state: MatrixHealthState; score: number | null; workflow_instance_id: string | null; current_stage: string | null; factors: string[] }
+export interface UniversityHealth { university_id: string; score: number | null; level: 'stable' | 'attention' | 'critical' | 'no_data'; started_programs: number; total_programs: number; factors: Array<{ label: string }>; programs: UniversityHealthProgram[] }
 export async function getUniversityHealth(id: string): Promise<UniversityHealth | null> {
   if (isMockDataSourceFor('passport')) return null;
   const result = await apiFetch<UniversityHealth>(`/api/v1/universities/${encodeURIComponent(id)}/health-score`);

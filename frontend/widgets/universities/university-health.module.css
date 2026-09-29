@@ -29,7 +29,20 @@
 .programState[data-state='ATTENTION'] { color: var(--rtk-color-warning); }
 .programState[data-state='CRITICAL'] { color: var(--rtk-color-danger); }
 .program strong { font-size: 13px; text-align: right; }
-@media (max-width: 768px) { .summaryMain { align-items: flex-start; flex-direction: column; gap: var(--rtk-space-2); } .summaryStats { flex-wrap: wrap; gap: var(--rtk-space-4); } }
+.chartGrid { display: grid; gap: var(--rtk-space-4); grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.chart { display: flex; flex-direction: column; gap: var(--rtk-space-3); }
+.barRow { align-items: center; display: grid; font-size: 12px; gap: var(--rtk-space-2); grid-template-columns: minmax(100px, 1fr) minmax(80px, 2fr) 28px; }
+.chartName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.barTrack { background: var(--rtk-color-surface-subtle); border-radius: 999px; height: 8px; overflow: hidden; }
+.barFill { border-radius: inherit; display: block; height: 100%; min-width: 4px; }
+.barHEALTHY { background: var(--rtk-color-success); }
+.barATTENTION { background: var(--rtk-color-warning); }
+.barCRITICAL { background: var(--rtk-color-danger); }
+.barNOT_STARTED, .barNOT_LINKED { background: var(--rtk-color-text-tertiary); }
+.barCOMPLETED { background: var(--rtk-color-success); }
+.factorColumns { display: grid; gap: var(--rtk-space-5); grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.factorColumns h4 { color: var(--rtk-color-text-secondary); font-size: 12px; margin: 0 0 var(--rtk-space-2); }
+@media (max-width: 768px) { .summaryMain { align-items: flex-start; flex-direction: column; gap: var(--rtk-space-2); } .summaryStats { flex-wrap: wrap; gap: var(--rtk-space-4); } .chartGrid, .factorColumns { grid-template-columns: 1fr; } }
 @media (max-width: 480px) { .summary, .surface { padding: var(--rtk-space-4); } .program { gap: 4px; grid-template-columns: minmax(0, 1fr) 36px; } .programState { grid-column: 1; grid-row: 2; } .program strong { grid-column: 2; grid-row: 1 / 3; } }
 .factors a { color: var(--rtk-color-brand); text-decoration: none; }
 .factors a:hover { text-decoration: underline; }

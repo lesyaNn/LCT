@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { getUniversityHealth, type MatrixHealthState } from '@/shared/lib/dashboard-repository';
+import { getUniversityHealth, type MatrixHealthState, type UniversityHealthProgram } from '@/shared/lib/dashboard-repository';
 import { queryKeys } from '@/shared/lib/query-keys';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { Skeleton } from '@/shared/ui/skeleton';
@@ -17,6 +17,17 @@ const stateMark: Record<MatrixHealthState, string> = {
 };
 const levelLabel = { stable: 'Стабильно', attention: 'Требует внимания', critical: 'Критично', no_data: 'Недостаточно данных' } as const;
 
+function StateChart({ programs }: { programs: UniversityHealthProgram[] }) {
+  const states = (['HEALTHY', 'ATTENTION', 'CRITICAL', 'NOT_STARTED', 'COMPLETED'] as MatrixHealthState[]).map((state) => ({ state, count: programs.filter((program) => program.state === state).length })).filter((item) => item.count > 0);
+  const max = Math.max(1, ...states.map((item) => item.count));
+  return <div className={styles.chart} role="img" aria-label="Распределение программ по состояниям">{states.length ? states.map((item) => <div className={styles.barRow} key={item.state}><span>{stateLabel[item.state]}</span><span className={styles.barTrack}><span className={`${styles.barFill} ${styles[`bar${item.state}`]}`} style={{ width: `${(item.count / max) * 100}%` }} /></span><strong>{item.count}</strong></div>) : <p className={styles.empty}>Нет связанных программ.</p>}</div>;
+}
+
+function ScoreChart({ programs }: { programs: UniversityHealthProgram[] }) {
+  const items = programs.filter((program) => program.score !== null && program.state !== 'COMPLETED').sort((left, right) => (right.score ?? 0) - (left.score ?? 0));
+  return <div className={styles.chart} role="img" aria-label="Health Score по активным программам">{items.length ? items.map((item) => <div className={styles.barRow} key={item.program_id}><span className={styles.chartName}>{item.program_name}</span><span className={styles.barTrack}><span className={`${styles.barFill} ${styles[`bar${item.state}`]}`} style={{ width: `${item.score}%` }} /></span><strong>{item.score}</strong></div>) : <p className={styles.empty}>Нет активных Workflow с числовой оценкой.</p>}</div>;
+}
+
 export function UniversityHealth({ universityId }: { universityId: string }) {
   const query = useQuery({ queryKey: queryKeys.universities.health(universityId), queryFn: () => getUniversityHealth(universityId), staleTime: 30_000 });
   if (query.isPending) return <Skeleton height={360} />;
@@ -25,6 +36,7 @@ export function UniversityHealth({ universityId }: { universityId: string }) {
   if (!health) return <p className={styles.empty}>Health Score доступен при подключении к CRM.</p>;
   const attention = health.programs.filter((item) => item.state === 'ATTENTION').length;
   const critical = health.programs.filter((item) => item.state === 'CRITICAL').length;
+  const actionable = health.programs.filter((item) => item.factors.length > 0);
   return <div className={styles.page}>
     <section className={styles.summary} aria-labelledby="health-title">
       <div className={styles.summaryMain}>
@@ -33,12 +45,13 @@ export function UniversityHealth({ universityId }: { universityId: string }) {
       </div>
       <dl className={styles.summaryStats}><div><dt>Программы с Workflow</dt><dd>{health.started_programs} из {health.total_programs}</dd></div><div><dt>Требуют внимания</dt><dd>{attention}</dd></div><div><dt>Критично</dt><dd>{critical}</dd></div></dl>
     </section>
-    <section className={styles.surface} aria-labelledby="health-why"><h3 id="health-why">Почему такая оценка</h3>{health.factors.length ? <ul className={styles.factors}>{health.factors.map((factor) => <li key={factor.label}><span aria-hidden="true">!</span>{factor.label}</li>)}</ul> : <p className={styles.empty}>Критичных факторов не обнаружено.</p>}</section>
+    <section className={styles.surface} aria-labelledby="health-why"><h3 id="health-why">Почему такая оценка</h3><div className={styles.factorColumns}><div><h4>Стабильно</h4><p className={styles.empty}>{health.factors.length ? 'Активные Workflow оцениваются по срокам и задачам.' : 'Критичных факторов не обнаружено.'}</p></div><div><h4>Требует внимания</h4>{health.factors.length ? <ul className={styles.factors}>{health.factors.map((factor) => <li key={factor.label}><span aria-hidden="true">!</span>{factor.label}</li>)}</ul> : <p className={styles.empty}>Нет активных проблем.</p>}</div></div></section>
     <section className={styles.surface} aria-labelledby="health-coverage"><h3 id="health-coverage">Охват программ</h3><p className={styles.coverage}>{health.started_programs} из {health.total_programs} Workflow запущено. Незапущенные программы не снижают Health Score.</p></section>
+    <div className={styles.chartGrid}><section className={styles.surface} aria-labelledby="health-states"><h3 id="health-states">Состояние программ</h3><StateChart programs={health.programs} /></section><section className={styles.surface} aria-labelledby="health-by-program"><h3 id="health-by-program">Health Score по программам</h3><ScoreChart programs={health.programs} /></section></div>
     <section className={styles.surface} aria-labelledby="health-programs"><h3 id="health-programs">По программам</h3>{health.programs.length ? <div className={styles.programs}>{health.programs.map((program) => {
       const href = program.workflow_instance_id ? `/workflows/${program.workflow_instance_id}` : `/universities/${universityId}?tab=workflow&program=${program.program_id}`;
       return <Link className={styles.program} href={href} key={program.program_id} aria-label={`${program.program_name}: ${stateLabel[program.state]}${program.score !== null && program.state !== 'COMPLETED' ? `, Health ${program.score}` : ''}`}><span className={styles.programName}>{program.program_name}</span><span className={styles.programState} data-state={program.state}><span aria-hidden="true">{stateMark[program.state]}</span>{stateLabel[program.state]}</span><strong>{program.state === 'COMPLETED' || program.state === 'NOT_STARTED' ? '—' : program.score ?? '—'}</strong></Link>;
     })}</div> : <p className={styles.empty}>У ВУЗа пока нет связанных программ.</p>}</section>
-    <section className={styles.surface} aria-labelledby="health-attention"><h3 id="health-attention">Требует внимания</h3>{health.programs.some((program) => program.factors.length) ? <ul className={styles.factors}>{health.programs.filter((program) => program.factors.length).map((program) => <li key={program.program_id}><span aria-hidden="true">!</span><Link href={program.workflow_instance_id ? `/workflows/${program.workflow_instance_id}` : `/universities/${universityId}?tab=workflow&program=${program.program_id}`}>{program.program_name}</Link>: {program.factors.join('; ')}</li>)}</ul> : <p className={styles.empty}>Критичных факторов не обнаружено.</p>}</section>
+    <section className={styles.surface} aria-labelledby="health-attention"><h3 id="health-attention">Требует внимания</h3>{actionable.length ? <ul className={styles.factors}>{actionable.map((program) => <li key={program.program_id}><span aria-hidden="true">!</span><Link href={program.workflow_instance_id ? `/workflows/${program.workflow_instance_id}` : `/universities/${universityId}?tab=workflow&program=${program.program_id}`}>{program.program_name}</Link>: {program.factors.join('; ')}</li>)}</ul> : <p className={styles.empty}>Взаимодействие идёт стабильно.</p>}</section>
   </div>;
 }
