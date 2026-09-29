@@ -57,14 +57,14 @@ def search(db: Session, user: CurrentUser, q: str) -> SearchResults:
         docs = apply_university_scope(
             select(Document.id, Document.title, Document.university_id, University.name)
             .join(University, University.id == Document.university_id)
-            .where(Document.title.ilike(pattern, escape="\\")), Document.university_id, user,
+            .where(or_(Document.title.ilike(pattern, escape="\\"), University.name.ilike(pattern, escape="\\"))), Document.university_id, user,
         )
         result.documents = [SearchHit(id=id, title=title, subtitle=name, university_id=university_id)
                             for id, title, university_id, name in db.execute(docs.order_by(Document.title, Document.id).limit(LIMIT))]
         contracts = apply_university_scope(
             select(Contract.id, Contract.contract_number, Contract.university_id, University.name)
             .join(University, University.id == Contract.university_id)
-            .where(Contract.contract_number.ilike(pattern, escape="\\")), Contract.university_id, user,
+            .where(or_(Contract.contract_number.ilike(pattern, escape="\\"), University.name.ilike(pattern, escape="\\"))), Contract.university_id, user,
         )
         result.contracts = [SearchHit(id=id, title=number, subtitle=name, university_id=university_id)
                             for id, number, university_id, name in db.execute(contracts.order_by(Contract.contract_number, Contract.id).limit(LIMIT))]

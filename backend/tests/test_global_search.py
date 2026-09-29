@@ -59,6 +59,13 @@ def test_router_query_limit_and_whitespace():
     assert module.global_search(q=" ", db=EmptyDb(), user=CurrentUser(roles={"admin"})) == module.SearchResults()
 
 
+def test_documents_and_contracts_can_match_visible_university_name(monkeypatch):
+    db = EmptyDb()
+    monkeypatch.setattr(module, "list_universities", lambda _db, **kwargs: ([], 0))
+    module.search(db, CurrentUser(roles={"admin"}), "ИТМО")
+    assert all("universities.name" in str(statement) for statement in db.statements[:2])
+
+
 def test_missing_scope_fails_closed_for_all_entities(monkeypatch):
     db = EmptyDb()
     monkeypatch.setattr(module, "list_universities", lambda _db, **kwargs: ([], 0))
