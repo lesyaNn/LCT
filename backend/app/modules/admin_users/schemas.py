@@ -5,6 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.schemas.validation import ContactEmail, NonBlankText
+
 
 Role = Literal["user", "manager", "admin"]
 
@@ -48,9 +50,9 @@ class UserBlock(BaseModel):
 
 
 class UserInvite(UserUpdate):
-    name: str = Field(min_length=2, max_length=256)
+    name: NonBlankText = Field(min_length=2, max_length=256)
     username: str = Field(min_length=2, max_length=128, pattern=r"^[A-Za-z0-9._@-]+$")
-    email: str = Field(min_length=5, max_length=256, pattern=r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+    email: ContactEmail = Field(min_length=5, max_length=256)
 
 
 class InviteResult(BaseModel):

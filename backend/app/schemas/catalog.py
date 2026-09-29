@@ -13,6 +13,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from app.schemas.validation import ContactEmail, ContactPhone, NonBlankText
+
 
 # --------------------------------------------------------------- direction
 
@@ -26,8 +28,8 @@ class DirectionShort(BaseModel):
 
 
 class DirectionBase(BaseModel):
-    code: str = Field(min_length=1, max_length=64, examples=["it-security"])
-    name: str = Field(min_length=1, max_length=512, examples=["Информационная безопасность"])
+    code: NonBlankText = Field(min_length=1, max_length=64, examples=["it-security"])
+    name: NonBlankText = Field(min_length=1, max_length=512, examples=["Информационная безопасность"])
 
 
 class DirectionCreate(DirectionBase):
@@ -35,8 +37,8 @@ class DirectionCreate(DirectionBase):
 
 
 class DirectionUpdate(BaseModel):
-    code: str | None = Field(default=None, min_length=1, max_length=64)
-    name: str | None = Field(default=None, min_length=1, max_length=512)
+    code: NonBlankText | None = Field(default=None, min_length=1, max_length=64)
+    name: NonBlankText | None = Field(default=None, min_length=1, max_length=512)
 
 
 class DirectionList(BaseModel):
@@ -72,7 +74,7 @@ class ProgramShort(BaseModel):
 
 class ProgramBase(BaseModel):
     direction_id: uuid.UUID
-    name: str = Field(min_length=1, max_length=512, examples=["Анализ данных"])
+    name: NonBlankText = Field(min_length=1, max_length=512, examples=["Анализ данных"])
     description: str = Field(default="", examples=["Программа по аналитике"])
 
 
@@ -82,7 +84,7 @@ class ProgramCreate(ProgramBase):
 
 class ProgramUpdate(BaseModel):
     direction_id: uuid.UUID | None = None
-    name: str | None = Field(default=None, min_length=1, max_length=512)
+    name: NonBlankText | None = Field(default=None, min_length=1, max_length=512)
     description: str | None = None
 
 
@@ -123,7 +125,7 @@ class ProductShort(BaseModel):
 class ProductBase(BaseModel):
     vendor_id: uuid.UUID
     program_id: uuid.UUID | None = Field(default=None, description="Программа продукта (иерархия ТЗ: направление <- программа <- продукт).")
-    name: str = Field(min_length=1, max_length=512, examples=["РЕД ОС"])
+    name: NonBlankText = Field(min_length=1, max_length=512, examples=["РЕД ОС"])
     version: str = Field(default="", max_length=128, examples=["8"])
 
 
@@ -134,7 +136,7 @@ class ProductCreate(ProductBase):
 class ProductUpdate(BaseModel):
     vendor_id: uuid.UUID | None = None
     program_id: uuid.UUID | None = None
-    name: str | None = Field(default=None, min_length=1, max_length=512)
+    name: NonBlankText | None = Field(default=None, min_length=1, max_length=512)
     version: str | None = Field(default=None, max_length=128)
 
 
@@ -173,13 +175,13 @@ class VendorShort(BaseModel):
 
 
 class VendorBase(BaseModel):
-    name: str = Field(min_length=1, max_length=512, examples=["РЕД СОФТ"])
+    name: NonBlankText = Field(min_length=1, max_length=512, examples=["РЕД СОФТ"])
 
 
 class VendorContactInput(BaseModel):
-    full_name: str = Field(min_length=1, max_length=512)
-    email: str = Field(min_length=1, max_length=512)
-    phone: str | None = Field(default=None, max_length=64)
+    full_name: NonBlankText = Field(min_length=1, max_length=512)
+    email: ContactEmail = Field(min_length=1, max_length=512)
+    phone: ContactPhone | None = Field(default=None, max_length=64)
     communication_method: str | None = Field(default=None, max_length=256)
 
 
@@ -188,7 +190,7 @@ class VendorCreate(VendorBase):
 
 
 class VendorUpdate(BaseModel):
-    name: str | None = Field(default=None, min_length=1, max_length=512)
+    name: NonBlankText | None = Field(default=None, min_length=1, max_length=512)
     contacts: list[VendorContactInput] | None = None
 
 

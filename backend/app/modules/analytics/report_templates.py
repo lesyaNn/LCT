@@ -21,6 +21,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
+from app.schemas.validation import NonBlankText
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
@@ -57,7 +58,7 @@ class ReportTemplateRead(BaseModel):
 class ReportTemplateCreate(BaseModel):
     """Save current form params as a template."""
 
-    name: str = Field(min_length=1, max_length=256)
+    name: NonBlankText = Field(min_length=1, max_length=256)
     format: ReportFormat
     filters: UnifiedFilter = Field(default_factory=UnifiedFilter)
     columns: list[str] | None = Field(default=None)

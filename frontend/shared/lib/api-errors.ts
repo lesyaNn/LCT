@@ -143,7 +143,7 @@ function validationItems(body: unknown): NormalizedFieldError[] {
     const field = fieldFromLocation(candidate.field ?? candidate.loc);
     if (!field) return [];
     const code = stringValue(candidate.code ?? candidate.type)?.toUpperCase();
-    const directMessage = stringValue(candidate.message);
+    const directMessage = stringValue(candidate.message)?.replace(/^Value error,\s*/i, '');
     const translatedMessage = translatedValidationMessage(candidate);
     return [{
       field,

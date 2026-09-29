@@ -22,6 +22,7 @@ from app.schemas.catalog import (
     VendorShort,
 )
 from app.schemas.licenses import LicenseShort
+from app.schemas.validation import ContactEmail, ContactPhone, NonBlankText
 from app.services.license_status import days_to_expiry as _days_to_expiry
 from app.services.license_status import derive_contract_status as _derive_contract_status
 from app.services.license_status import derive_license_status as _derive_license_status
@@ -165,17 +166,17 @@ class UniversityDetail(UniversityRead):
 
 
 class ResponsibleCreate(BaseModel):
-    full_name: str = Field(min_length=1, max_length=512)
-    email: str = Field(min_length=1, max_length=512)
-    phone: str | None = Field(default=None, max_length=64)
+    full_name: NonBlankText = Field(min_length=1, max_length=512)
+    email: ContactEmail = Field(min_length=1, max_length=512)
+    phone: ContactPhone | None = Field(default=None, max_length=64)
     role: str = Field(default="", max_length=256)
     keycloak_sub: str | None = Field(default=None, max_length=256)
 
 
 class ResponsibleUpdate(BaseModel):
-    full_name: str | None = Field(default=None, min_length=1, max_length=512)
-    email: str | None = Field(default=None, min_length=1, max_length=512)
-    phone: str | None = Field(default=None, max_length=64)
+    full_name: NonBlankText | None = Field(default=None, min_length=1, max_length=512)
+    email: ContactEmail | None = Field(default=None, min_length=1, max_length=512)
+    phone: ContactPhone | None = Field(default=None, max_length=64)
     role: str | None = Field(default=None, max_length=256)
     keycloak_sub: str | None = Field(default=None, max_length=256)
 
@@ -301,7 +302,7 @@ class VendorDetail(VendorRead):
 
 class ContractCreate(BaseModel):
     university_id: uuid.UUID
-    contract_number: str = Field(min_length=1, max_length=256)
+    contract_number: NonBlankText = Field(min_length=1, max_length=256)
     product_id: uuid.UUID | None = None
     signed_at: date
     expires_at: date | None = None
@@ -316,7 +317,7 @@ class ContractCreate(BaseModel):
 
 class ContractUpdate(BaseModel):
     university_id: uuid.UUID | None = None
-    contract_number: str | None = Field(default=None, min_length=1, max_length=256)
+    contract_number: NonBlankText | None = Field(default=None, min_length=1, max_length=256)
     product_id: uuid.UUID | None = None
     signed_at: date | None = None
     expires_at: date | None = None
@@ -372,7 +373,7 @@ class ContractDetail(ContractRead):
 class LicenseCreate(BaseModel):
     university_id: uuid.UUID
     product_id: uuid.UUID
-    license_number: str = Field(min_length=1, max_length=256)
+    license_number: NonBlankText = Field(min_length=1, max_length=256)
     contract_id: uuid.UUID | None = None
     program_id: uuid.UUID | None = None
     direction_id: uuid.UUID | None = None
@@ -389,7 +390,7 @@ class LicenseCreate(BaseModel):
 class LicenseUpdate(BaseModel):
     university_id: uuid.UUID | None = None
     product_id: uuid.UUID | None = None
-    license_number: str | None = Field(default=None, min_length=1, max_length=256)
+    license_number: NonBlankText | None = Field(default=None, min_length=1, max_length=256)
     contract_id: uuid.UUID | None = None
     program_id: uuid.UUID | None = None
     direction_id: uuid.UUID | None = None

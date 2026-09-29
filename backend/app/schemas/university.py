@@ -20,6 +20,7 @@ from app.schemas.common import (
     MeetingType,
 )
 from app.schemas.licenses import ContractShort, LicenseShort
+from app.schemas.validation import NonBlankText
 
 
 # ------------------------------------------------------- nested short DTOs
@@ -85,7 +86,7 @@ class WorkflowSummary(BaseModel):
 
 
 class UniversityBase(BaseModel):
-    name: str = Field(min_length=1, max_length=512, examples=["МГТУ им. Баумана"])
+    name: NonBlankText = Field(min_length=1, max_length=512, examples=["МГТУ им. Баумана"])
     city: str | None = Field(default=None, max_length=256, examples=["Москва"])
 
 
@@ -96,7 +97,7 @@ class UniversityCreate(UniversityBase):
 class UniversityUpdate(BaseModel):
     """All fields optional — partial update (PATCH)."""
 
-    name: str | None = Field(default=None, min_length=1, max_length=512)
+    name: NonBlankText | None = Field(default=None, min_length=1, max_length=512)
     city: str | None = Field(default=None, max_length=256)
 
 

@@ -12,6 +12,7 @@ from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+from app.schemas.validation import NonBlankText
 
 
 class InstanceCreate(BaseModel):
@@ -120,11 +121,11 @@ class WorkflowTaskRead(BaseModel):
 
 class WorkflowTaskCreate(BaseModel):
     stage_id: uuid.UUID
-    title: str = Field(min_length=1, max_length=512)
+    title: NonBlankText = Field(min_length=1, max_length=512)
 
 
 class WorkflowTaskUpdate(BaseModel):
-    title: str | None = Field(default=None, min_length=1, max_length=512)
+    title: NonBlankText | None = Field(default=None, min_length=1, max_length=512)
     status: Literal["open", "done"] | None = None
 
 

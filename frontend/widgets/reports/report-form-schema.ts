@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { REPORT_FORMATS, type ReportFormValues } from '@/shared/lib/reports-repository';
+import { optionalDateField } from '@/shared/lib/form-validation';
 
 /**
  * Form validation for the report parameters.
@@ -18,8 +19,8 @@ export const reportSchema = z
   // period. Entity filters stay in the UnifiedFilter contract (and the API)
   // but are not part of this form.
   .object({
-    dateFrom: z.string(),
-    dateTo: z.string(),
+    dateFrom: optionalDateField,
+    dateTo: optionalDateField,
     columnIds: z.array(z.string()).min(1, 'Выберите хотя бы одну колонку.'),
     format: z.enum(formatIds),
   })

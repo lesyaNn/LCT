@@ -12,19 +12,20 @@ import uuid
 from datetime import datetime
 
 from pydantic import BaseModel, Field
+from app.schemas.validation import NonBlankText
 
 
 # ---------------------------------------------------------------- templates
 
 
 class TemplateCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=512)
+    name: NonBlankText = Field(min_length=1, max_length=512)
     description: str | None = Field(default=None)
     is_active: bool = True
 
 
 class TemplateUpdate(BaseModel):
-    name: str | None = Field(default=None, min_length=1, max_length=512)
+    name: NonBlankText | None = Field(default=None, min_length=1, max_length=512)
     description: str | None = None
     is_active: bool | None = None
 
@@ -44,7 +45,7 @@ class TemplateRead(BaseModel):
 
 
 class StageCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=512)
+    name: NonBlankText = Field(min_length=1, max_length=512)
     description: str | None = Field(default=None)
     order_index: int | None = Field(
         default=None, ge=1, description="1-based position; omitted = append"
@@ -55,7 +56,7 @@ class StageCreate(BaseModel):
 
 
 class StageUpdate(BaseModel):
-    name: str | None = Field(default=None, min_length=1, max_length=512)
+    name: NonBlankText | None = Field(default=None, min_length=1, max_length=512)
     description: str | None = None
     order_index: int | None = Field(default=None, ge=1)
     is_required: bool | None = None
