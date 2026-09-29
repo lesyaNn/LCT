@@ -303,3 +303,22 @@
   .skeletonTitle,
   .skeletonChart { animation: none; }
 }
+.matrixWrap { display: flex; flex: 1; flex-direction: column; gap: var(--rtk-space-3); min-height: 0; }
+.matrixSummary, .matrixLegend { color: var(--rtk-color-text-secondary); font-size: 12px; }
+.matrixScroll { overflow-x: auto; overflow-y: auto; max-height: 480px; }
+.matrix { border-collapse: separate; border-spacing: 0; min-width: 680px; width: 100%; }
+.matrix th, .matrix td { border-bottom: 1px solid var(--rtk-color-border); padding: 9px 10px; text-align: center; white-space: nowrap; }
+.matrix thead th { background: var(--rtk-color-surface-elevated); color: var(--rtk-color-text-secondary); font-size: 11px; position: sticky; top: 0; z-index: 2; }
+.matrix tbody th { background: var(--rtk-color-surface-elevated); left: 0; max-width: 220px; position: sticky; text-align: left; z-index: 1; }
+.matrix tbody th a { color: var(--rtk-color-text-primary); display: block; font-size: 12px; overflow: hidden; text-decoration: none; text-overflow: ellipsis; }
+.matrix tbody th small { color: var(--rtk-color-text-tertiary); display: block; font-size: 10px; font-weight: 400; margin-top: 3px; }
+.matrixCell { align-items: center; border-radius: var(--rtk-radius-small); display: inline-flex; font-size: 12px; font-weight: 700; gap: 3px; min-width: 38px; justify-content: center; padding: 5px 6px; }
+.matrixCell:hover { background: var(--rtk-color-surface-hover); }
+.matrixHEALTHY, .matrixCOMPLETED { color: var(--rtk-color-success); }
+.matrixATTENTION { color: var(--rtk-color-warning); }
+.matrixCRITICAL { color: var(--rtk-color-danger); }
+.matrixNOT_STARTED, .matrixNOT_LINKED { color: var(--rtk-color-text-tertiary); }
+.matrixLegend { display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); }
+.matrixLegendItem { align-items: center; display: inline-flex; gap: 5px; }
+.matrixDot { font-size: 14px; font-weight: 700; }
+@media (max-width: 768px) { .matrixScroll { max-height: 420px; } .matrix { min-width: 620px; } }

@@ -15,6 +15,8 @@ import ArrowRight from '@atomaro/icons/24/navigation/ArrowRight';
 import { useAuth } from '@/shared/auth/AuthProvider';
 import { hasPermission, hasRole } from '@/shared/lib/access-control';
 import { formatDateTimeRu } from '@/shared/lib/formatters';
+import { getUniversityHealth } from '@/shared/lib/dashboard-repository';
+import { queryKeys } from '@/shared/lib/query-keys';
 import { normalizeApiError } from '@/shared/lib/api-errors';
 import {
   getWorkflowSelectorPrograms,
@@ -74,13 +76,13 @@ function parseTab(value: string | null): PassportTabId {
   return value && tabIds.has(value as PassportTabId) ? value as PassportTabId : 'overview';
 }
 
-function PassportHeader({ passport, onTabChange }: { passport: UniversityPassport; onTabChange: (tab: PassportTabId) => void }) {
+function PassportHeader({ passport, onTabChange, health }: { passport: UniversityPassport; onTabChange: (tab: PassportTabId) => void; health?: { score: number | null; level: string } | null }) {
   return (
     <header className={styles.header}>
       <div className={styles.headerMain}>
         <div className={styles.titleBlock}>
           <h1>{passport.name}</h1>
-          <p className={styles.city}>{passport.city}</p>
+          <p className={styles.city}>{passport.city}</p>{health ? <p className={styles.city}>Health Score: {health.score === null ? 'Недостаточно данных' : `${health.score} · ${health.level === 'stable' ? 'Стабильно' : health.level === 'attention' ? 'Требует внимания' : health.level === 'critical' ? 'Критично' : 'Недостаточно данных'}`}</p> : null}
         </div>
         <div className={styles.headerSide}>
           <div className={styles.headerActions} aria-label="Действия с вузом">
@@ -170,6 +172,7 @@ export function UniversityPassport({ id }: { id: string }) {
   const { user } = useAuth();
   const activeTab = parseTab(searchParams.get('tab'));
   const query = useQuery({ queryKey: universityPassportQueryKey(id), queryFn: () => getUniversityPassport(id, queryClient), staleTime: 30_000 });
+  const healthQuery = useQuery({ queryKey: queryKeys.universities.health(id), queryFn: () => getUniversityHealth(id), staleTime: 30_000 });
   const activeTabDefinition = useMemo(() => tabDefinitions.find((tab) => tab.id === activeTab) ?? tabDefinitions[0], [activeTab]);
 
   const selectTab = (tab: PassportTabId) => {
@@ -204,7 +207,7 @@ export function UniversityPassport({ id }: { id: string }) {
 
   return (
     <div className={styles.page}>
-      <PassportHeader passport={passport} onTabChange={selectTab} />
+      <PassportHeader passport={passport} onTabChange={selectTab} health={healthQuery.data} />
       <TabbedSurface tabs={!mobileLayout ? <Tabs items={tabDefinitions} activeId={activeTab} onChange={(id) => selectTab(id as PassportTabId)} label="Разделы паспорта вуза" prefix="passport-tab" /> : undefined}>
       {!mobileLayout ? <div className={styles.desktopPanel} id="passport-panel" role="tabpanel" aria-labelledby={`passport-tab-${activeTab}`}>{renderContent(activeTab)}</div> : null}
       {mobileLayout ? <div className={styles.mobileAccordion} aria-label="Разделы паспорта вуза">

@@ -30,6 +30,7 @@ from app.modules.workflow_attachments.router import router as workflow_attachmen
 from app.modules.workflow_instances.router import router as workflow_instances_router
 from app.modules.workflow_templates.router import router as workflow_templates_router
 from app.modules.workflow_transitions.router import router as workflow_transitions_router
+from app.modules.health_score.router import router as health_score_router
 
 v1 = APIRouter(prefix="/api/v1")
 v1.include_router(auth_router)
@@ -46,6 +47,7 @@ v1.include_router(workflow_templates_router)
 v1.include_router(workflow_instances_router)
 v1.include_router(workflow_transitions_router)
 v1.include_router(workflow_attachments_router)
+v1.include_router(health_score_router)
 # Templates and statistics BEFORE reports: GET /reports/templates and
 # POST /reports/statistics must win over the generic /{job_id} route.
 v1.include_router(report_templates_router)

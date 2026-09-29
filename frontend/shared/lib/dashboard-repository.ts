@@ -1,6 +1,6 @@
 import { apiFetch } from './api-client';
 import { ApiRequestError } from './api-errors';
-import { fromDataSource } from './data-source';
+import { fromDataSource, isMockDataSourceFor } from './data-source';
 import { queryKeys } from './query-keys';
 import { getExternalDashboardMetrics } from './external-integrations-repository';
 
@@ -52,7 +52,13 @@ export interface AttentionItem {
   overdueDays: number;
 }
 
+export type MatrixHealthState = 'HEALTHY' | 'ATTENTION' | 'CRITICAL' | 'NOT_STARTED' | 'COMPLETED' | 'NOT_LINKED';
+export interface DashboardMatrixCell { universityId: string; programId: string; state: MatrixHealthState; score: number | null; factors: string[]; milestone: string | null }
+export interface DashboardMatrixRow { id: string; name: string; city: string | null; score: number | null; level: 'stable' | 'attention' | 'critical' | 'no_data'; startedPrograms: number; totalPrograms: number }
+export interface DashboardMatrix { rows: DashboardMatrixRow[]; columns: Array<{ id: string; name: string; direction: string }>; cells: DashboardMatrixCell[] }
+
 export interface DashboardAnalytics {
+  matrix: DashboardMatrix;
   programStatuses: ProgramStatusItem[];
   launchDynamics: LaunchDynamicsItem[];
   attentionItems: AttentionItem[];
@@ -85,6 +91,8 @@ const dashboardOverviewMock: DashboardOverview = {
   lmsStudents: null,
   lmsSyncedAt: null,
 };
+
+type AnalyticsMatrixDto = { rows: Array<{ id: string; name: string; city: string | null; health_score: number | null; health_level: DashboardMatrixRow['level']; started_programs: number; total_programs: number }>; columns: Array<{ id: string; name: string; direction: string }>; cells: Array<{ university_id: string; program_id: string; health_state: MatrixHealthState; health_score: number | null; health_factors: string[]; next_milestone: string | null }> };
 
 type AnalyticsOverviewDto = {
   kpi: { universities: number; overdue_stages: number; expiring_licenses: number; active_programs: number; launched_programs: number };
@@ -147,6 +155,7 @@ const dashboardAnalyticsMock: DashboardAnalytics = {
     { status: 'archived', label: programStatusLabels.archived, count: 2, tone: 'dark' },
   ],
   launchDynamics: getRecentMonths(),
+  matrix: { rows: [], columns: [], cells: [] },
   attentionItems: [
     { id: 'attention-001', universityId: 'university-001', universityName: 'Московский технический университет связи и информатики', problemCode: 'LIC-EXP', problemLabel: 'Истекает лицензия', severity: 'red', overdueDays: 18 },
     { id: 'attention-002', universityId: 'university-002', universityName: 'Санкт-Петербургский политехнический университет', problemCode: 'WF-OVERDUE', problemLabel: 'Просрочен этап workflow', severity: 'orange', overdueDays: 12 },
@@ -154,10 +163,15 @@ const dashboardAnalyticsMock: DashboardAnalytics = {
   ],
 };
 
-function mapDashboardAnalytics(overview: AnalyticsOverviewDto): DashboardAnalytics {
+function mapDashboardMatrix(dto: AnalyticsMatrixDto): DashboardMatrix {
+  return { rows: dto.rows.map((row) => ({ id: row.id, name: row.name, city: row.city, score: row.health_score, level: row.health_level, startedPrograms: row.started_programs, totalPrograms: row.total_programs })), columns: dto.columns, cells: dto.cells.map((cell) => ({ universityId: cell.university_id, programId: cell.program_id, state: cell.health_state, score: cell.health_score, factors: cell.health_factors, milestone: cell.next_milestone })) };
+}
+
+function mapDashboardAnalytics(overview: AnalyticsOverviewDto, matrix: AnalyticsMatrixDto): DashboardAnalytics {
   const tones: Record<ProgramStatus, ProgramStatusItem['tone']> = { planned: 'neutral', active: 'brand', launched: 'success', archived: 'dark' };
   const monthFormatter = new Intl.DateTimeFormat('ru-RU', { month: 'short' });
   return {
+    matrix: mapDashboardMatrix(matrix),
     programStatuses: overview.program_statuses.filter((item): item is { status: ProgramStatus; count: number } => item.status in tones).map((item) => ({ status: item.status, label: programStatusLabels[item.status], count: item.count, tone: tones[item.status] })),
     launchDynamics: (overview.launch_dynamics ?? []).map((item) => { const date = new Date(`${item.month}-01T12:00:00`); return { monthKey: item.month, monthLabel: monthFormatter.format(date).replace('.', ''), actual: item.actual, planned: item.planned }; }),
     attentionItems: overview.overdue_items.filter((item) => Boolean(item.university_id)).slice(0, 5).map((item, index) => ({ id: item.id ?? `overdue-${index}`, universityId: item.university_id!, universityName: item.university, problemCode: item.type === 'stage' ? 'WF-OVERDUE' : 'TASK-OVERDUE', problemLabel: item.stage ?? item.task ?? 'Просрочено', severity: item.days_overdue > 14 ? 'red' : item.days_overdue > 7 ? 'orange' : 'yellow', overdueDays: item.days_overdue })),
@@ -171,12 +185,28 @@ export async function getDashboardData(filters: DashboardFilters = EMPTY_DASHBOA
     mock: () => ({ overview: dashboardOverviewMock, analytics: dashboardAnalyticsMock }),
     real: async () => {
       const query = analyticsParams(filters);
-      const [result, integration] = await Promise.all([
+      const [result, matrixResult, integration] = await Promise.all([
         apiFetch<AnalyticsOverviewDto>(`/api/v1/analytics/overview${query ? `?${query}` : ''}`),
+        apiFetch<AnalyticsMatrixDto>(`/api/v1/analytics/matrix${query ? `?${query}` : ''}`),
         query ? Promise.resolve(null) : getExternalDashboardMetrics().catch(() => null),
       ]);
       if (!result.ok) throw new ApiRequestError(result.status, result.body, 'Не удалось загрузить аналитику Dashboard.', result.error);
-      return { overview: { ...mapDashboardOverview(result.data), ...(integration ?? {}) }, analytics: mapDashboardAnalytics(result.data) };
+      if (!matrixResult.ok) throw new ApiRequestError(matrixResult.status, matrixResult.body, 'Не удалось загрузить матрицу Dashboard.', matrixResult.error);
+      return { overview: { ...mapDashboardOverview(result.data), ...(integration ?? {}) }, analytics: mapDashboardAnalytics(result.data, matrixResult.data) };
     },
   });
+}
+
+export interface UniversityHealth { university_id: string; score: number | null; level: 'stable' | 'attention' | 'critical' | 'no_data'; started_programs: number; total_programs: number; factors: Array<{ label: string }> }
+export async function getUniversityHealth(id: string): Promise<UniversityHealth | null> {
+  if (isMockDataSourceFor('passport')) return null;
+  const result = await apiFetch<UniversityHealth>(`/api/v1/universities/${encodeURIComponent(id)}/health-score`);
+  if (!result.ok) throw new ApiRequestError(result.status, result.body, 'Не удалось загрузить Health Score.', result.error);
+  return result.data;
+}
+
+export async function getDashboardMatrix(): Promise<DashboardMatrix> {
+  const result = await apiFetch<AnalyticsMatrixDto>('/api/v1/analytics/matrix');
+  if (!result.ok) throw new ApiRequestError(result.status, result.body, 'Не удалось загрузить Health Score вузов.', result.error);
+  return mapDashboardMatrix(result.data);
 }

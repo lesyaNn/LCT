@@ -1,5 +1,7 @@
 'use client';
 
+import { getDashboardMatrix, type DashboardMatrixRow } from '@/shared/lib/dashboard-repository';
+
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -336,7 +338,7 @@ function filterOptionsFromCatalogs(references?: CatalogReferenceData, stages: Un
   };
 }
 
-function UniversityCards({ items }: { items: UniversityListItem[] }) {
+function UniversityCards({ items, healthById }: { items: UniversityListItem[]; healthById: Map<string, DashboardMatrixRow> }) {
   return (
     <div className={styles.cards} aria-label="Список вузов в формате карточек">
       {items.map((item) => {
@@ -352,7 +354,7 @@ function UniversityCards({ items }: { items: UniversityListItem[] }) {
               {needsAttention && !hasWorkflow ? <AttentionIndicator active /> : null}
             </div>
             {hasWorkflow
-              ? <div className={styles.cardStage}>
+              ? <div className={styles.cardStage}>{healthById.get(item.id)?.score !== null && healthById.get(item.id)?.score !== undefined ? <span className={styles.cardMeta}>Health {healthById.get(item.id)?.score}</span> : null}
                   <span className={styles.cardStageLabel}>Текущий этап</span>
                   <div className={styles.cardStagePanel} data-tone={stageTone}>
                     <SemanticStatusBadge intent={stageTone} icon={needsAttention ? <Attention size={20} fill="currentColor" /> : undefined} variant="inline">{item.currentStage.name}</SemanticStatusBadge>
@@ -497,6 +499,8 @@ export function UniversitiesList() {
     staleTime: 5 * 60_000,
   });
   const stagesQuery = useQuery({ queryKey: universityStageOptionsQueryKey, queryFn: ({ signal }) => getUniversityStageOptions(signal), staleTime: 5 * 60_000 });
+  const healthQuery = useQuery({ queryKey: ['university-health-matrix'], queryFn: getDashboardMatrix, staleTime: 60_000 });
+  const healthById = useMemo(() => new Map((healthQuery.data?.rows ?? []).map((row) => [row.id, row])), [healthQuery.data]);
   const filterOptions = useMemo(() => filterOptionsFromCatalogs(catalogsQuery.data, stagesQuery.data), [catalogsQuery.data, stagesQuery.data]);
 
   const sorting: SortingState = state.sort ? [{ id: state.sort, desc: state.order === 'desc' }] : [];
@@ -558,7 +562,7 @@ export function UniversitiesList() {
       {query.isPending ? view === 'cards' ? <CardsSkeleton /> : <TableSkeleton rows={6} columns={7} label="Загрузка списка вузов" /> : !query.data ? <RouteErrorState onRetry={() => void query.refetch()} /> : query.data.total === 0 ? <EmptyState icon={<Search size={20} fill="currentColor" />} title={hasFilters ? 'По выбранным условиям ВУЗы не найдены' : 'Вузы пока не добавлены'} description={hasFilters ? 'Измените условия поиска или сбросьте фильтры.' : 'Когда появятся записи, они будут отображены в этом списке.'} primaryAction={hasFilters ? { label: 'Сбросить фильтры', onClick: resetFilters, variant: 'secondary' } : undefined} /> : (
         <>
           {query.isFetching ? <p className={styles.fetching} role="status">Обновляем список…</p> : null}
-          {view === 'cards' ? <UniversityCards items={query.data.items} /> : <TableShell><DesktopTable table={table} /></TableShell>}
+          {view === 'cards' ? <UniversityCards items={query.data.items} healthById={healthById} /> : <TableShell><DesktopTable table={table} /></TableShell>}
           <div className={styles.paginationSurface}><Pagination page={query.data.page} pageSize={query.data.pageSize} total={query.data.total} onPatch={goToState} /></div>
         </>
       )}

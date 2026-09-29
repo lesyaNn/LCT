@@ -20,6 +20,8 @@ import {
   type DashboardAnalytics,
   type LaunchDynamicsItem,
   type ProgramStatusItem,
+  type DashboardMatrix,
+  type MatrixHealthState,
 } from '@/shared/lib/dashboard-repository';
 import { EmptyState } from '@/shared/ui/empty-state';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
@@ -169,6 +171,21 @@ function LaunchDynamicsChart({ data }: { data: DashboardAnalytics['launchDynamic
   );
 }
 
+
+const matrixStateLabel: Record<MatrixHealthState, string> = { HEALTHY: 'Стабильно', ATTENTION: 'Требует внимания', CRITICAL: 'Критично', NOT_STARTED: 'Workflow не запущен', COMPLETED: 'Завершён', NOT_LINKED: 'Нет связи' };
+const matrixStateMark: Record<MatrixHealthState, string> = { HEALTHY: '●', ATTENTION: '●', CRITICAL: '●', NOT_STARTED: '○', COMPLETED: '✓', NOT_LINKED: '—' };
+
+function UniversityProgramMatrix({ matrix }: { matrix: DashboardMatrix }) {
+  const byCell = new Map(matrix.cells.map((cell) => [`${cell.universityId}:${cell.programId}`, cell]));
+  const counts = matrix.rows.reduce((acc, row) => { if (row.level === 'stable') acc.stable += 1; else if (row.level === 'attention') acc.attention += 1; else if (row.level === 'critical') acc.critical += 1; return acc; }, { stable: 0, attention: 0, critical: 0 });
+  if (!matrix.rows.length || !matrix.columns.length) return <EmptyChart />;
+  return <div className={styles.matrixWrap}>
+    <div className={styles.matrixSummary}>Стабильно: {counts.stable} · Требуют внимания: {counts.attention} · Критично: {counts.critical}</div>
+    <div className={styles.matrixScroll}><table className={styles.matrix}><thead><tr><th>ВУЗ</th>{matrix.columns.map((column) => <th key={column.id} title={column.direction}>{column.name}</th>)}</tr></thead><tbody>{matrix.rows.map((row) => <tr key={row.id}><th scope="row"><Link href={`/universities/${row.id}`}>{row.name}</Link><small>{row.score === null ? 'Недостаточно данных' : `Health ${row.score} · ${row.startedPrograms} из ${row.totalPrograms} запущено`}</small></th>{matrix.columns.map((column) => { const cell = byCell.get(`${row.id}:${column.id}`); if (!cell) return <td key={column.id}>—</td>; const label = `${row.name}, ${column.name}: ${matrixStateLabel[cell.state]}${cell.score === null ? '' : `, Health ${cell.score}`}`; const content = <span className={`${styles.matrixCell} ${styles[`matrix${cell.state}`]}`} aria-label={label} title={[label, cell.milestone, ...cell.factors].filter(Boolean).join(' · ')}>{matrixStateMark[cell.state]}{cell.score === null ? '' : ` ${cell.score}`}</span>; return <td key={column.id}>{cell.state === 'NOT_LINKED' ? content : <Link href={cell.state === 'NOT_STARTED' ? `/universities/${row.id}?tab=workflow&program=${column.id}` : `/universities/${row.id}?tab=workflow&program=${column.id}`}>{content}</Link>}</td>; })}</tr>)}</tbody></table></div>
+    <div className={styles.matrixLegend} aria-label="Легенда матрицы">{(['HEALTHY', 'ATTENTION', 'CRITICAL', 'NOT_STARTED', 'COMPLETED'] as MatrixHealthState[]).map((state) => <span key={state} className={styles.matrixLegendItem}><span className={`${styles.matrixDot} ${styles[`matrix${state}`]}`}>{matrixStateMark[state]}</span>{matrixStateLabel[state]}</span>)}</div>
+  </div>;
+}
+
 function AttentionList({ data }: { data: DashboardAnalytics['attentionItems'] }) {
   return (
     <ol className={styles.attentionList}>
@@ -209,6 +226,7 @@ function AnalyticsGrid({ data }: { data: DashboardAnalytics }) {
       <ChartCard title="Динамика запусков" description="Фактические и планируемые запуски за последние 12 месяцев." exportSlug="dynamics" exportTestId="chart-export-dynamics" canExport={hasLaunches}>
         {hasLaunches ? <LaunchDynamicsChart data={data.launchDynamics} /> : <EmptyChart />}
       </ChartCard>
+      <div className={styles.attentionWide}><ChartCard title="ВУЗы × программы" description="Состояние взаимодействий по доступным программам." exportSlug="university-program-matrix" exportTestId="chart-export-matrix" canExport={false}><UniversityProgramMatrix matrix={data.matrix} /></ChartCard></div>
       <div className={styles.attentionWide}><ChartCard title="Приоритетные задачи" description="Элементы, требующие первоочередного внимания." exportSlug="attention" exportTestId="chart-export-attention" canExport={false}>
         {data.attentionItems.length ? <AttentionList data={data.attentionItems} /> : <EmptyChart />}
       </ChartCard></div>

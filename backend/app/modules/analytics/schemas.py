@@ -67,6 +67,10 @@ class MatrixRow(BaseModel):
     id: UUID
     name: str
     city: str | None
+    health_score: int | None = Field(default=None, ge=0, le=100)
+    health_level: Literal["stable", "attention", "critical", "no_data"] = "no_data"
+    started_programs: int = 0
+    total_programs: int = 0
 
 
 class MatrixColumn(BaseModel):
@@ -79,6 +83,10 @@ class MatrixCell(BaseModel):
     university_id: UUID
     program_id: UUID
     status: Literal["not_used", "planned", "in_progress", "launched", "risk", "archived"]
+    health_state: Literal["HEALTHY", "ATTENTION", "CRITICAL", "NOT_STARTED", "COMPLETED", "NOT_LINKED"] = "NOT_LINKED"
+    health_score: int | None = Field(default=None, ge=0, le=100)
+    health_level: Literal["stable", "attention", "critical", "no_data"] = "no_data"
+    health_factors: list[str] = Field(default_factory=list)
     risk_level: Literal["none", "low", "high"] = "none"
     license_status: str | None = None
     workflow_progress: float | None = None

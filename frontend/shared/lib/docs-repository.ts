@@ -43,6 +43,7 @@ export const DOC_SECTION_DEFINITIONS: Array<{ id: string; title: string; topics:
     { slug: 'documents', title: 'Документы и лицензии' },
     { slug: 'reports', title: 'Отчёты' },
     { slug: 'history', title: 'История изменений' },
+    { slug: 'health-score', title: 'Health Score и матрица' },
   ] },
   { id: 'admin-guide', title: 'Для администратора', topics: [
     { slug: 'catalogs', title: 'Управление каталогами' },
