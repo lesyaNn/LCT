@@ -1,13 +1,14 @@
 """Pure aggregations over the loaded selection."""
 
 from collections import Counter, defaultdict
-from datetime import date
+from datetime import date, datetime
 
-from app.db.seed_workflow import STAGES_14
+from app.db.seed_workflow import STAGES_14, TEMPLATE_NAME
 from app.modules.analytics.repository import AnalyticsData
 from app.modules.analytics.schemas import Matrix, Overview
 from app.modules.workflow_instances.overdue import compute_overdue
 from app.services.license_status import derive_license_status
+from app.modules.health_score.operational import aggregate_health, calculate_workflow_health, health_level
 
 LEGEND = {
     "not_used": "Программа не ведётся в вузе",
@@ -18,6 +19,84 @@ LEGEND = {
     "archived": "Программа в архиве",
 }
 PROGRAM_STATUSES = ("planned", "active", "launched", "archived")
+
+
+def _month_key(value: date | datetime) -> str:
+    return value.strftime("%Y-%m")
+
+
+def _stage_funnel(data: AnalyticsData) -> list[dict]:
+    standard_template = next((item for item in data.templates if item.name == TEMPLATE_NAME), None)
+    if standard_template is None:
+        return []
+    template_stages = sorted(data.template_stages, key=lambda item: item.order_index)[:14]
+    instances = [item for item in data.instances if item.status != "archived" and item.template_id == standard_template.id]
+    stages_by_instance = grouped(data.stages, lambda item: item.instance_id)
+    buckets = {
+        stage.id: {"stage": stage.name, "template": standard_template.name,
+                   "order": stage.order_index, "reached": 0, "current": 0, "completed": 0}
+        for stage in template_stages
+    }
+    for instance in instances:
+        ordered = sorted(stages_by_instance[instance.id], key=lambda item: item.order_index)
+        if not ordered:
+            continue
+        current_index = next((index for index, item in enumerate(ordered) if item.id == instance.current_instance_stage_id), None)
+        reached_index = len(ordered) - 1 if instance.status == "completed" else current_index
+        for index, stage in enumerate(ordered):
+            if stage.order_index > 14:
+                continue
+            bucket = buckets.get(next((item.id for item in template_stages if item.order_index == stage.order_index), None))
+            if bucket is None:
+                continue
+            if reached_index is not None and index <= reached_index:
+                bucket["reached"] += 1
+            if current_index == index:
+                bucket["current"] += 1
+            if stage.completed_at is not None or stage.status == "completed":
+                bucket["completed"] += 1
+    return [{field: item[field] for field in ("stage", "template", "reached", "current", "completed")}
+            for item in sorted(buckets.values(), key=lambda value: value["order"])]
+
+
+def _monthly_events(data: AnalyticsData) -> list[dict]:
+    counts = Counter()
+    status_changes = Counter()
+    completed = Counter()
+    for item in (*data.instances, *data.transitions, *data.interaction_notes):
+        if item.created_at is not None:
+            counts[_month_key(item.created_at)] += 1
+    for item in data.transitions:
+        if item.created_at is not None and item.from_stage_id is not None:
+            status_changes[_month_key(item.created_at)] += 1
+    for item in data.meetings:
+        counts[_month_key(item.meeting_at)] += 1
+    for item in data.instances:
+        if item.status == "completed" and item.completed_at is not None:
+            completed[_month_key(item.completed_at)] += 1
+    months = sorted(set(counts) | set(status_changes) | set(completed))
+    return [{"month": month, "count": counts[month], "status_changes": status_changes[month], "completed": completed[month]} for month in months]
+
+
+def _top_universities(data: AnalyticsData) -> list[dict]:
+    names = {item.id: item.name for item in data.universities}
+    counts = Counter(item.university_id for item in (*data.meetings, *data.interaction_notes))
+    return [{"university_id": university_id, "university": names[university_id], "count": count}
+            for university_id, count in sorted(counts.items(), key=lambda pair: (-pair[1], names[pair[0]]))[:10]]
+
+
+def _responsible_workload(data: AnalyticsData) -> list[dict]:
+    stages_by_instance = grouped(data.stages, lambda item: item.instance_id)
+    responsible_names = {item.id: item.full_name for item in data.responsibles}
+    buckets: dict[object, dict] = {}
+    for instance in data.instances:
+        if instance.status == "archived":
+            continue
+        current = next((stage for stage in stages_by_instance[instance.id] if stage.id == instance.current_instance_stage_id), None)
+        responsible_id = (current.responsible_id if current and current.responsible_id is not None else instance.responsible_id)
+        bucket = buckets.setdefault(responsible_id, {"responsible_id": responsible_id, "responsible": responsible_names.get(responsible_id, "Без ответственного"), "in_progress": 0, "completed": 0})
+        bucket["completed" if instance.status == "completed" else "in_progress"] += 1
+    return sorted(buckets.values(), key=lambda item: (-(item["in_progress"] + item["completed"]), item["responsible"]))
 
 
 def grouped(items, key):
@@ -35,6 +114,8 @@ def overdue_items(data: AnalyticsData, today: date) -> list[dict]:
         for item in items:
             instance = instances.get(item.instance_id)
             if instance is None or item.completed_at is not None:
+                continue
+            if kind == "stage" and item.id != instance.current_instance_stage_id:
                 continue
             if item.status not in ({"pending", "current"} if kind == "stage" else {"open"}):
                 continue
@@ -82,6 +163,10 @@ def build_overview(data: AnalyticsData, *, today: date) -> Overview:
         "health_trend": [],
         "launch_dynamics": [{"month": f"{m // 12:04d}-{m % 12 + 1:02d}",
             "actual": launches[(m, "launched")], "planned": launches[(m, "planned")]} for m in launch_months],
+        "stage_funnel": _stage_funnel(data),
+        "monthly_events": _monthly_events(data),
+        "top_universities": _top_universities(data),
+        "responsible_workload": _responsible_workload(data),
     })
 
 
@@ -98,43 +183,78 @@ def cell_status(program_status, overdue):
 def build_matrix(data: AnalyticsData, *, today: date) -> Matrix:
     links = {(item.university_id, item.program_id): item for item in data.links}
     licenses = grouped(data.licenses, lambda item: (item.university_id, item.program_id))
-    active = {item.id: item for item in data.instances if item.status == "active"}
-    stages = grouped([item for item in data.stages if item.instance_id in active],
-        lambda item: active[item.instance_id].university_id)
-    overdue = Counter(item["university_id"] for item in overdue_items(data, today))
-    contexts = {}
-    for university in data.universities:
-        runtime = stages[university.id]
-        eligible = [item for item in runtime if item.status != "skipped"]
-        progress = (round(sum(item.status == "completed" for item in eligible) / len(eligible) * 100, 2) if eligible else None)
-        current = sorted([item for item in runtime if item.status == "current"],
-            key=lambda item: (item.due_date or date.max, str(item.id)))
-        milestone = None
-        if current:
-            item = current[0]
-            milestone = item.name
-            if item.due_date:
-                milestone += f" ({(item.due_date - today).days} дней)"
-        contexts[university.id] = progress, milestone
+    instances = {(item.university_id, item.program_id): item for item in data.instances if item.program_id is not None and item.status != "archived"}
+    stages = grouped(data.stages, lambda item: item.instance_id)
+    tasks = grouped(data.tasks, lambda item: item.instance_id)
     cells = []
+    row_health = {}
     for university in sorted(data.universities, key=lambda item: (item.name, str(item.id))):
+        scores = []
+        levels = []
+        started = 0
+        active_workflows = 0
+        total = sum(1 for link in data.existing_pairs if link[0] == university.id)
         for program in sorted(data.programs, key=lambda item: (item.name, str(item.id))):
             pair = university.id, program.id
             link = links.get(pair)
-            if link is None and pair in data.existing_pairs:
+            instance = instances.get(pair)
+            if link is None:
+                cells.append({"university_id": university.id, "program_id": program.id,
+                    "status": "not_used", "health_state": "NOT_LINKED", "health_score": None,
+                    "health_level": "no_data", "health_factors": [], "risk_level": "none",
+                    "license_status": None, "workflow_progress": None, "overdue_count": 0, "next_milestone": None,
+                    "stages_completed": 0, "stages_total": 0, "deadline": None, "overdue_days": 0})
                 continue
-            late = overdue[university.id] if link else 0
-            status, risk = cell_status(link.status if link else None, late)
-            license_status = None
-            if link and licenses[pair]:
-                license_status = min((derive_license_status(i.expires_at, today) for i in licenses[pair]),
-                    key=("expired", "expires_soon", "active").index)
-            progress, milestone = contexts[university.id] if link else (None, None)
-            cells.append({"university_id": university.id, "program_id": program.id,
-                "status": status, "risk_level": risk, "license_status": license_status,
-                "workflow_progress": progress, "overdue_count": late, "next_milestone": milestone})
-    return Matrix.model_validate({"rows": [{"id": i.id, "name": i.name, "city": i.city}
+            total = max(total, 1)
+            if instance is None:
+                cells.append({"university_id": university.id, "program_id": program.id,
+                    "status": "planned", "health_state": "NOT_STARTED", "health_score": None,
+                    "health_level": "no_data", "health_factors": [], "risk_level": "none",
+                    "license_status": None, "workflow_progress": None, "overdue_count": 0, "next_milestone": None,
+                    "stages_completed": 0, "stages_total": 0, "deadline": None, "overdue_days": 0})
+                continue
+            started += 1
+            if instance.status == "active":
+                active_workflows += 1
+            # The runtime pointer is authoritative. Current stages intentionally
+            # keep the ``pending`` status in the snapshot; lifecycle state is
+            # represented by ``current_instance_stage_id``.
+            current = next((stage for stage in stages[instance.id] if stage.id == instance.current_instance_stage_id), None)
+            health = calculate_workflow_health(instance=instance, stage=current, tasks=tasks[instance.id], licenses=licenses[pair], today=today)
+            scores.append(health.score or 0)
+            levels.append(health.level)
+            state = "COMPLETED" if health.completed else {"stable": "HEALTHY", "attention": "ATTENTION", "critical": "CRITICAL"}[health.level]
+            old_status = "launched" if link.status == "launched" else "in_progress" if link.status == "active" else link.status
+            late_count = sum(compute_overdue(t.deadline, t.completed_at, today)[0] for t in tasks[instance.id])
+            completed_stages = sum(1 for item in stages[instance.id] if item.completed_at is not None or item.status == "completed")
+            total_stages = len(stages[instance.id])
+            stage_due = current.due_date if current else None
+            stage_late, stage_days = compute_overdue(stage_due, current.completed_at if current else None, today)
+            cells.append({"university_id": university.id, "program_id": program.id, "status": old_status,
+                "health_state": state, "health_score": health.score, "health_level": health.level,
+                "workflow_instance_id": instance.id,
+                # Keep the overdue detail visible to downstream consumers. The
+                # scoring decision still comes exclusively from the domain model.
+                "health_factors": [f"{factor.label} ({factor.detail})" if factor.detail else factor.label for factor in health.factors], "risk_level": "high" if health.level == "critical" else "low" if health.level == "attention" else "none",
+                "license_status": next((status for status in ("expired", "expires_soon", "active") if status in [derive_license_status(getattr(item, "expires_at", None), today) for item in licenses[pair]]), None),
+                "workflow_progress": (completed_stages / total_stages * 100) if total_stages else None, "overdue_count": late_count,
+                "next_milestone": current.name if current else None,
+                "stages_completed": completed_stages, "stages_total": total_stages,
+                "deadline": stage_due, "overdue_days": stage_days if stage_late else 0})
+        score = aggregate_health(scores)
+        level = health_level(score)
+        if "critical" in levels:
+            level = "critical"
+            score = min(score, 59) if score is not None else score
+        elif "attention" in levels and level == "stable":
+            level = "attention"
+            score = min(score, 84) if score is not None else score
+        row_health[university.id] = (score, level, started, active_workflows, total)
+    return Matrix.model_validate({"rows": [{"id": i.id, "name": i.name, "city": i.city,
+        "health_score": row_health[i.id][0], "health_level": row_health[i.id][1],
+        "started_programs": row_health[i.id][2], "active_workflows": row_health[i.id][3], "total_programs": row_health[i.id][4]}
         for i in sorted(data.universities, key=lambda i: (i.name, str(i.id)))],
         "columns": [{"id": i.id, "name": i.name, "direction": i.direction.name}
-        for i in sorted(data.programs, key=lambda i: (i.name, str(i.id)))],
-        "cells": cells, "legend": LEGEND})
+        for i in sorted(data.programs, key=lambda i: (i.name, str(i.id)))], "cells": cells, "legend": {
+            "HEALTHY": "Стабильно", "ATTENTION": "Требует внимания", "CRITICAL": "Критично",
+            "NOT_STARTED": "Workflow не запущен", "COMPLETED": "Завершён", "NOT_LINKED": "Нет связи"}})

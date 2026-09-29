@@ -53,6 +53,34 @@ class LaunchPoint(BaseModel):
     planned: int = 0
 
 
+class StageFunnelBucket(BaseModel):
+    stage: str
+    template: str | None = None
+    reached: int = 0
+    current: int = 0
+    completed: int = 0
+
+
+class MonthlyEventBucket(BaseModel):
+    month: str
+    count: int = 0
+    status_changes: int = 0
+    completed: int = 0
+
+
+class UniversityInteractionBucket(BaseModel):
+    university_id: UUID
+    university: str
+    count: int = 0
+
+
+class ResponsibleWorkloadBucket(BaseModel):
+    responsible_id: UUID | None = None
+    responsible: str
+    in_progress: int = 0
+    completed: int = 0
+
+
 class Overview(BaseModel):
     kpi: KPI
     workflow_distribution: list[WorkflowBucket] = Field(default_factory=list)
@@ -61,12 +89,21 @@ class Overview(BaseModel):
     overdue_items: list[OverdueItem] = Field(default_factory=list)
     health_trend: list[TrendPoint] = Field(default_factory=list)
     launch_dynamics: list[LaunchPoint] = Field(default_factory=list)
+    stage_funnel: list[StageFunnelBucket] = Field(default_factory=list)
+    monthly_events: list[MonthlyEventBucket] = Field(default_factory=list)
+    top_universities: list[UniversityInteractionBucket] = Field(default_factory=list)
+    responsible_workload: list[ResponsibleWorkloadBucket] = Field(default_factory=list)
 
 
 class MatrixRow(BaseModel):
     id: UUID
     name: str
     city: str | None
+    health_score: int | None = Field(default=None, ge=0, le=100)
+    health_level: Literal["stable", "attention", "critical", "no_data"] = "no_data"
+    started_programs: int = 0
+    active_workflows: int = 0
+    total_programs: int = 0
 
 
 class MatrixColumn(BaseModel):
@@ -79,12 +116,21 @@ class MatrixCell(BaseModel):
     university_id: UUID
     program_id: UUID
     status: Literal["not_used", "planned", "in_progress", "launched", "risk", "archived"]
+    health_state: Literal["HEALTHY", "ATTENTION", "CRITICAL", "NOT_STARTED", "COMPLETED", "NOT_LINKED"] = "NOT_LINKED"
+    health_score: int | None = Field(default=None, ge=0, le=100)
+    health_level: Literal["stable", "attention", "critical", "no_data"] = "no_data"
+    health_factors: list[str] = Field(default_factory=list)
+    workflow_instance_id: UUID | None = None
     risk_level: Literal["none", "low", "high"] = "none"
     license_status: str | None = None
     workflow_progress: float | None = None
     overdue_count: int = 0
     next_milestone: str | None = None
     workflow_scope: Literal["university"] = "university"
+    stages_completed: int = 0
+    stages_total: int = 0
+    deadline: date | None = None
+    overdue_days: int = 0
 
 
 class Matrix(BaseModel):

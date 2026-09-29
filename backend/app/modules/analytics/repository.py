@@ -8,9 +8,11 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload, raiseload
 
-from app.models.catalog import ITProgram, License, University
-from app.models.interactions import UniversityProgram
-from app.models.workflow_instances import InstanceStage, WorkflowInstance, WorkflowTask
+from app.models.catalog import ITProgram, License, Responsible, University
+from app.models.interactions import InteractionNote, Meeting, UniversityProgram
+from app.models.workflow_instances import InstanceStage, WorkflowInstance, WorkflowStageTransition, WorkflowTask
+from app.models.workflow_templates import WorkflowStage, WorkflowTemplate
+from app.db.seed_workflow import TEMPLATE_NAME
 from app.modules.analytics.integration import Selection
 
 
@@ -24,6 +26,12 @@ class AnalyticsData:
     instances: list[Any] = field(default_factory=list)
     stages: list[Any] = field(default_factory=list)
     tasks: list[Any] = field(default_factory=list)
+    transitions: list[Any] = field(default_factory=list)
+    meetings: list[Any] = field(default_factory=list)
+    interaction_notes: list[Any] = field(default_factory=list)
+    responsibles: list[Any] = field(default_factory=list)
+    templates: list[Any] = field(default_factory=list)
+    template_stages: list[Any] = field(default_factory=list)
 
 
 def selected_rows(db, model, predicate, ids=None, options=()):
@@ -57,6 +65,20 @@ def load_data(db: Session, selection: Selection, *, today: date, filters: dict |
     instance_ids = [item.id for item in data.instances]
     data.stages = selected_rows(db, InstanceStage, InstanceStage.instance_id.in_(instance_ids)) if instance_ids else []
     data.tasks = selected_rows(db, WorkflowTask, WorkflowTask.instance_id.in_(instance_ids)) if instance_ids else []
+    data.transitions = selected_rows(db, WorkflowStageTransition, WorkflowStageTransition.instance_id.in_(instance_ids)) if instance_ids else []
+    data.meetings = selected_rows(db, Meeting, Meeting.university_id.in_(uni_ids))
+    data.interaction_notes = selected_rows(db, InteractionNote, InteractionNote.university_id.in_(uni_ids))
+    data.responsibles = list(db.scalars(select(Responsible)))
+    standard_template = db.scalar(
+        select(WorkflowTemplate)
+        .where(WorkflowTemplate.name == TEMPLATE_NAME, WorkflowTemplate.is_active.is_(True))
+        .options(raiseload("*"))
+    )
+    if standard_template is not None:
+        data.templates = [standard_template]
+        data.template_stages = selected_rows(
+            db, WorkflowStage, WorkflowStage.template_id == standard_template.id,
+        )
     data.scores = {}
     data.trend = []
     return data
