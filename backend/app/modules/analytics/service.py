@@ -3,7 +3,7 @@
 from collections import Counter, defaultdict
 from datetime import date, datetime
 
-from app.db.seed_workflow import STAGES_14
+from app.db.seed_workflow import STAGES_14, TEMPLATE_NAME
 from app.modules.analytics.repository import AnalyticsData
 from app.modules.analytics.schemas import Matrix, Overview
 from app.modules.workflow_instances.overdue import compute_overdue
@@ -26,20 +26,29 @@ def _month_key(value: date | datetime) -> str:
 
 
 def _stage_funnel(data: AnalyticsData) -> list[dict]:
-    instances = [item for item in data.instances if item.status != "archived"]
+    standard_template = next((item for item in data.templates if item.name == TEMPLATE_NAME), None)
+    if standard_template is None:
+        return []
+    template_stages = sorted(data.template_stages, key=lambda item: item.order_index)[:14]
+    instances = [item for item in data.instances if item.status != "archived" and item.template_id == standard_template.id]
     stages_by_instance = grouped(data.stages, lambda item: item.instance_id)
-    template_names = {item.id: item.name for item in data.templates}
-    buckets: dict[tuple, dict] = {}
+    buckets = {
+        stage.id: {"stage": stage.name, "template": standard_template.name,
+                   "order": stage.order_index, "reached": 0, "current": 0, "completed": 0}
+        for stage in template_stages
+    }
     for instance in instances:
         ordered = sorted(stages_by_instance[instance.id], key=lambda item: item.order_index)
         if not ordered:
             continue
         current_index = next((index for index, item in enumerate(ordered) if item.id == instance.current_instance_stage_id), None)
         reached_index = len(ordered) - 1 if instance.status == "completed" else current_index
-        template_name = template_names.get(instance.template_id)
         for index, stage in enumerate(ordered):
-            key = (instance.template_id, stage.order_index, stage.name)
-            bucket = buckets.setdefault(key, {"stage": stage.name, "template": template_name, "order": stage.order_index, "reached": 0, "current": 0, "completed": 0})
+            if stage.order_index > 14:
+                continue
+            bucket = buckets.get(next((item.id for item in template_stages if item.order_index == stage.order_index), None))
+            if bucket is None:
+                continue
             if reached_index is not None and index <= reached_index:
                 bucket["reached"] += 1
             if current_index == index:
@@ -47,7 +56,7 @@ def _stage_funnel(data: AnalyticsData) -> list[dict]:
             if stage.completed_at is not None or stage.status == "completed":
                 bucket["completed"] += 1
     return [{field: item[field] for field in ("stage", "template", "reached", "current", "completed")}
-            for item in sorted(buckets.values(), key=lambda value: (value["template"] or "", value["order"]))]
+            for item in sorted(buckets.values(), key=lambda value: value["order"])]
 
 
 def _monthly_events(data: AnalyticsData) -> list[dict]:

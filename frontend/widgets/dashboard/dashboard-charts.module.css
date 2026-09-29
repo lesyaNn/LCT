@@ -332,5 +332,5 @@
 .matrixCellText small { color: inherit; font-size: 10px; font-weight: 500; }
 .matrixTooltip { display: flex; flex-direction: column; gap: 5px; text-align: left; white-space: normal; }
 .matrixTooltip strong { color: var(--rtk-color-text-primary); }
-.funnelCanvas { height: 360px; min-width: 0; width: 100%; }
+.funnelCanvas { height: 520px; min-width: 0; width: 100%; }
 .topUniversitiesCanvas, .workloadCanvas { height: 270px; min-width: 0; width: 100%; }
