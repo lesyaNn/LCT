@@ -21,7 +21,6 @@ import {
   getUniversityPassport,
   isRealWorkflowMode,
   universityPassportQueryKey,
-  UNIVERSITY_PASSPORT_CAPABILITIES,
   workflowProgramsQueryKey,
   type UniversityPassport,
   type UniversityPassportEvent,
@@ -171,8 +170,6 @@ export function UniversityPassport({ id }: { id: string }) {
   const { user } = useAuth();
   const activeTab = parseTab(searchParams.get('tab'));
   const query = useQuery({ queryKey: universityPassportQueryKey(id), queryFn: () => getUniversityPassport(id, queryClient), staleTime: 30_000 });
-  const canReport = user?.role === 'admin' || user?.role === 'manager';
-  const canAdvance = canReport && UNIVERSITY_PASSPORT_CAPABILITIES.mutations;
   const activeTabDefinition = useMemo(() => tabDefinitions.find((tab) => tab.id === activeTab) ?? tabDefinitions[0], [activeTab]);
 
   const selectTab = (tab: PassportTabId) => {
@@ -200,7 +197,7 @@ export function UniversityPassport({ id }: { id: string }) {
     : tab === 'responsibles'
       ? <ResponsiblesSection id={id} canEdit={hasPermission(user, 'university.edit')} />
     : tab === 'workflow'
-      ? <UniversityWorkflow id={id} canAdvance={canAdvance} />
+      ? <UniversityWorkflow id={id} />
     : tab === 'history'
       ? <UniversityHistory id={id} />
     : <PlaceholderContent tab={tabDefinitions.find((definition) => definition.id === tab) ?? activeTabDefinition} />;

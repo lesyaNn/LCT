@@ -2,7 +2,7 @@
 
 import type { ComponentType } from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Attachment from '@atomaro/icons/24/action/Attachment';
 import Edit from '@atomaro/icons/24/editor/Edit';
@@ -24,11 +24,9 @@ import { queryKeys } from '@/shared/lib/query-keys';
 import { workflowAttachmentFromApi } from '@/shared/lib/workflow-attachments';
 import { buildMockWorkflowHistory, buildWorkflowHistory, countWorkflowStageResources, loadWorkflowHistory, workflowHistoryPresentation, type WorkflowHistoryEvent } from '@/shared/lib/workflow-history';
 import { getWorkflowSelectorPrograms, workflowProgramsQueryKey } from '@/shared/lib/universities-repository';
-import { getUniversityExternalData, universityExternalDataQueryKey } from '@/shared/lib/external-integrations-repository';
 import { normalizeApiError } from '@/shared/lib/api-errors';
 import { listUniversityWorkflowInstances, universityWorkflowInstancesQueryKey } from '@/shared/lib/workflow-creation-repository';
 import { Input, Select } from '@/shared/ui/rtk/form-controls';
-import { FilterField } from '@/shared/ui/rtk/filter-field';
 import { Avatar } from '@/shared/ui/rtk/avatar';
 import { Button } from '@/shared/ui/rtk/button';
 import { EmptyState } from '@/shared/ui/empty-state';
@@ -353,48 +351,7 @@ export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride 
   </div>;
 }
 
-function MockUniversityWorkflow({ id, canAdvance }: { id: string; canAdvance: boolean }) {
-  const pathname = usePathname();
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const programsQuery = useQuery({ queryKey: workflowProgramsQueryKey(id), queryFn: ({ signal }) => getWorkflowSelectorPrograms(id, signal), staleTime: 30_000 });
-  const externalQuery = useQuery({ queryKey: universityExternalDataQueryKey(id, 'website'), queryFn: () => getUniversityExternalData(id, 'website'), staleTime: 30_000 });
-  const programs = useMemo(() => {
-    const base = programsQuery.data ?? [];
-    const applications = externalQuery.data?.applications ?? [];
-    const result = new Map<string, { key: string; name: string; instanceId: string | null; externalIds: string[] }>();
-    for (const program of base) {
-      const nameKey = program.name.trim().toLocaleLowerCase('ru-RU');
-      if (!result.has(nameKey)) result.set(nameKey, { key: program.id, name: program.name, instanceId: null, externalIds: [] });
-    }
-    for (const application of applications) {
-      const nameKey = application.programName.trim().toLocaleLowerCase('ru-RU');
-      const program = result.get(nameKey) ?? { key: application.id, name: application.programName, instanceId: null, externalIds: [] };
-      program.externalIds.push(application.id);
-      if (application.workflowInstanceId) program.instanceId = application.workflowInstanceId;
-      result.set(nameKey, program);
-    }
-    return [...result.values()];
-  }, [programsQuery.data, externalQuery.data]);
-  const requestedProgram = searchParams.get('program');
-  const selected = programs.find((program) => program.key === requestedProgram || (requestedProgram && program.externalIds.includes(requestedProgram))) ?? programs[0];
-  const mockInstanceId = selected && requestedProgram && (selected.key === requestedProgram || selected.externalIds.includes(requestedProgram)) ? searchParams.get('workflow') ?? selected.instanceId : selected?.instanceId;
-  const selectProgram = (key: string) => {
-    const next = new URLSearchParams(searchParams.toString());
-    next.set('program', key);
-    next.delete('workflow');
-    router.replace(`${pathname}?${next.toString()}`, { scroll: false });
-  };
-  if (programsQuery.isPending || externalQuery.isPending) return <WorkflowSkeleton mode="embedded" />;
-  if (!programsQuery.data) return <RouteErrorState compact onRetry={() => void programsQuery.refetch()} />;
-  return <div className={styles.programWorkflow}>
-    {programs.length > 1 ? <FilterField className={styles.programSelector} label="Программа"><Select value={selected?.key ?? ''} onChange={(event) => selectProgram(event.target.value)}>{programs.map((program) => <option key={program.key} value={program.key}>{program.name}</option>)}</Select></FilterField> : selected ? <p className={styles.programName}>Программа: <strong>{selected.name}</strong></p> : null}
-    {mockInstanceId ? <WorkflowView key={mockInstanceId} instanceId={mockInstanceId} mode="embedded" canAdvance={canAdvance} /> : <EmptyState title="Workflow ещё не создан" description="Демонстрационные данные Workflow для выбранной программы отсутствуют." />}
-    {externalQuery.isError ? <p className={styles.externalHint}>Связь с заявками сайта сейчас недоступна; показаны программы ВУЗа.</p> : null}
-  </div>;
-}
-
-function RealUniversityWorkflow({ id }: { id: string; canAdvance: boolean }) {
+export function UniversityWorkflow({ id }: { id: string }) {
   const { user } = useAuth();
   const router = useRouter();
   const instancesQuery = useQuery({
@@ -407,7 +364,7 @@ function RealUniversityWorkflow({ id }: { id: string; canAdvance: boolean }) {
   const programsQuery = useQuery({ queryKey: workflowProgramsQueryKey(id), queryFn: ({ signal }) => getWorkflowSelectorPrograms(id, signal), staleTime: 30_000 });
   const instances = instancesQuery.data ?? [];
   const unstartedPrograms = (programsQuery.data ?? []).filter((program) => !instances.some((instance) => instance.program_id === program.id));
-  const canCreate = hasPermission(user, 'workflow.change_status') && hasRole(user, 'admin');
+  const canCreate = isRealWorkflowMode() && hasPermission(user, 'workflow.change_status') && hasRole(user, 'admin');
 
   if (instancesQuery.isPending || programsQuery.isPending) return <WorkflowSkeleton mode="embedded" />;
   if (!instancesQuery.data || !programsQuery.data) return <RouteErrorState compact onRetry={() => { void instancesQuery.refetch(); void programsQuery.refetch(); }} />;
@@ -434,9 +391,4 @@ function RealUniversityWorkflow({ id }: { id: string; canAdvance: boolean }) {
       />
     ) : null}
   </div>;
-}
-
-export function UniversityWorkflow({ id, canAdvance }: { id: string; canAdvance: boolean }) {
-  if (isRealWorkflowMode()) return <RealUniversityWorkflow id={id} canAdvance={canAdvance} />;
-  return <MockUniversityWorkflow id={id} canAdvance={canAdvance} />;
 }
