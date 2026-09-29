@@ -140,7 +140,9 @@ def build_matrix(data: AnalyticsData, *, today: date) -> Matrix:
             cells.append({"university_id": university.id, "program_id": program.id, "status": old_status,
                 "health_state": state, "health_score": health.score, "health_level": health.level,
                 "workflow_instance_id": instance.id,
-                "health_factors": [factor.label for factor in health.factors], "risk_level": "high" if health.level == "critical" else "low" if health.level == "attention" else "none",
+                # Keep the overdue detail visible to downstream consumers. The
+                # scoring decision still comes exclusively from the domain model.
+                "health_factors": [f"{factor.label} ({factor.detail})" if factor.detail else factor.label for factor in health.factors], "risk_level": "high" if health.level == "critical" else "low" if health.level == "attention" else "none",
                 "license_status": next((status for status in ("expired", "expires_soon", "active") if status in [derive_license_status(getattr(item, "expires_at", None), today) for item in licenses[pair]]), None),
                 "workflow_progress": None, "overdue_count": late_count,
                 "next_milestone": current.name if current else None})

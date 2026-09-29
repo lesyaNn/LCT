@@ -58,13 +58,13 @@ function isMobileLayout() {
 
 const tabDefinitions = [
   { id: 'overview', label: 'Обзор' },
+  { id: 'health', label: 'Health Score' },
   { id: 'products', label: 'Продукты' },
   { id: 'licenses', label: 'Лицензии' },
   { id: 'documents', label: 'Документы' },
   { id: 'meetings', label: 'Встречи' },
   { id: 'responsibles', label: 'Ответственные' },
   { id: 'workflow', label: 'Workflow' },
-  { id: 'health', label: 'Health Score' },
   { id: 'history', label: 'История' },
 ] as const;
 

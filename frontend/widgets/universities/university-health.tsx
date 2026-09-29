@@ -1,11 +1,14 @@
 'use client';
 
 import Link from 'next/link';
+import type { CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Checklist from '@atomaro/icons/24/action/Checklist';
+import Attention from '@atomaro/icons/24/action/Attention';
 import ErrorStroke from '@atomaro/icons/24/alert/ErrorStroke';
 import StatisticsBoard from '@atomaro/icons/24/business/StatisticsBoard';
 import TimeStroke from '@atomaro/icons/24/alert/TimeStroke';
+import CheckSmall from '@atomaro/icons/24/navigation/CheckSmall';
 import { getUniversityHealth, type MatrixHealthState, type UniversityHealthProgram } from '@/shared/lib/dashboard-repository';
 import { queryKeys } from '@/shared/lib/query-keys';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
@@ -44,12 +47,11 @@ export function UniversityHealth({ universityId }: { universityId: string }) {
   return <div className={styles.page}>
     <section className={styles.summary} aria-labelledby="health-title">
       <div className={styles.summaryMain}>
-        <div><p className={styles.eyebrow}>Текущее состояние взаимодействия</p><h2 id="health-title">Health Score</h2><p className={styles.score} data-level={health.level}>{health.score === null ? '—' : <>{health.score}<span> / 100</span></>}</p><strong className={styles.level} data-level={health.level}>{levelLabel[health.level]}</strong></div>
-        <p className={styles.intro}>Оценка показывает текущее состояние взаимодействия с ВУЗом: активные Workflow, сроки, задачи и связанные лицензии. Она не оценивает качество или рейтинг ВУЗа.</p>
+        <div className={styles.scoreBlock}><p className={styles.eyebrow}>Текущее состояние взаимодействия</p><h2 id="health-title">Health Score <span className={styles.info} title="Health Score показывает состояние взаимодействия и не является рейтингом ВУЗа." aria-label="Health Score не является рейтингом ВУЗа">i</span></h2><div className={styles.scoreRow}><div className={styles.scoreRing} data-level={health.level} style={{ '--score': `${health.score ?? 0}%` } as CSSProperties}><div><strong>{health.score === null ? '—' : health.score}</strong><span>/ 100</span></div></div><div><strong className={styles.level} data-level={health.level}>{health.level === 'critical' ? <ErrorStroke size={16} fill="currentColor" /> : health.level === 'attention' ? <Attention size={16} fill="currentColor" /> : <CheckSmall size={16} fill="currentColor" />}{levelLabel[health.level]}</strong><p className={styles.scoreHint}>По текущим Workflow, срокам, задачам и лицензиям</p></div></div></div>
       </div>
       <dl className={styles.summaryStats}><div><dt><Checklist size={18} fill="currentColor" />Workflow активны</dt><dd>{health.started_programs} из {health.total_programs}</dd></div><div><dt><TimeStroke size={18} fill="currentColor" />Требуют внимания</dt><dd data-tone="warning">{attention}</dd></div><div><dt><ErrorStroke size={18} fill="currentColor" />Критично</dt><dd data-tone="danger">{critical}</dd></div><div><dt><StatisticsBoard size={18} fill="currentColor" />Охват программ</dt><dd>{health.total_programs ? `${Math.round(health.started_programs / health.total_programs * 100)}%` : '—'}</dd></div></dl>
     </section>
-    <section className={styles.surface} aria-labelledby="health-why"><h3 id="health-why">Почему такая оценка</h3><div className={styles.factorColumns}><div><h4>Стабильно</h4><p className={styles.empty}>{health.factors.length ? 'Активные Workflow оцениваются по срокам и задачам.' : 'Критичных факторов не обнаружено.'}</p></div><div><h4>Требует внимания</h4>{health.factors.length ? <ul className={styles.factors}>{health.factors.map((factor) => <li key={factor.label}><span aria-hidden="true">!</span>{factor.label}</li>)}</ul> : <p className={styles.empty}>Нет активных проблем.</p>}</div></div></section>
+    <section className={styles.surface} aria-labelledby="health-why"><h3 id="health-why">Почему такая оценка</h3><div className={styles.factorColumns}><div><h4><CheckSmall size={16} fill="currentColor" /> Положительные факторы</h4><p className={styles.empty}>{health.factors.length ? 'Нарушения по срокам, задачам и лицензиям показаны справа.' : 'Активные Workflow без выявленных операционных проблем.'}</p></div><div><h4><Attention size={16} fill="currentColor" /> Требуют внимания</h4>{health.factors.length ? <ul className={styles.factors}>{health.factors.map((factor) => <li key={factor.label}><Attention size={16} fill="currentColor" />{factor.label}</li>)}</ul> : <p className={styles.empty}>Нет активных проблем.</p>}</div></div></section>
     <section className={styles.surface} aria-labelledby="health-coverage"><h3 id="health-coverage">Охват программ</h3><p className={styles.coverage}>{health.started_programs} из {health.total_programs} Workflow запущено. Незапущенные программы не снижают Health Score.</p></section>
     <div className={styles.chartGrid}><section className={styles.surface} aria-labelledby="health-states"><h3 id="health-states">Состояние программ</h3><StateChart programs={health.programs} /></section><section className={styles.surface} aria-labelledby="health-by-program"><h3 id="health-by-program">Health Score по программам</h3><ScoreChart programs={health.programs} /></section></div>
     <section className={styles.surface} aria-labelledby="health-programs"><h3 id="health-programs">По программам</h3>{health.programs.length ? <div className={styles.programs}>{health.programs.map((program) => {
