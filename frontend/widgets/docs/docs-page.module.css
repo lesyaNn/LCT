@@ -16,7 +16,7 @@
 .navSection summary::after { content: '⌄'; font-size: 16px; margin-left: auto; }
 .navSection[open] summary::after { transform: rotate(180deg); }
 .navSection summary:focus-visible { border-radius: var(--rtk-radius-small); outline: 2px solid var(--rtk-color-brand); }
-.navSection ul { display: flex; flex-direction: column; gap: 2px; list-style: none; margin: 0; padding: 0; }
+.navSection ul { display: flex; flex-direction: column; gap: 2px; list-style: none; margin: 0; padding: 0 0 0 var(--rtk-space-3); }
 .navSection li a { border-left: 2px solid transparent; border-radius: 0 var(--rtk-radius-small) var(--rtk-radius-small) 0; color: var(--rtk-color-text-primary); display: block; font-size: 13px; padding: var(--rtk-space-2) var(--rtk-space-3); text-decoration: none; }
 .navSection li a:hover, .navSection li a:focus-visible { background: var(--rtk-color-surface-hover); }
 .navSection li a.activeArticle { background: var(--rtk-color-brand-soft); border-left-color: var(--rtk-color-brand); color: var(--rtk-color-brand); font-weight: 650; }
