@@ -202,7 +202,6 @@ export function WorkflowCreateModal({ universityId, initialProgramId, onClose, o
             {activeProgramId && !productsQuery.isPending && !productOptions.length ? (
               <em>В направлении пока нет продуктов — продукт можно выбрать позже.</em>
             ) : null}
-            <em>Продукт выбирается на перспективу: на него планируется получить лицензию, наличие лицензии не требуется.</em>
           </label>
 
           <label className={styles.field}>

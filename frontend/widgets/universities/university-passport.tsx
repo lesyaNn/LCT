@@ -38,11 +38,10 @@ import { NotFoundState } from '@/shared/ui/not-found-state';
 import { ForbiddenState } from '@/shared/ui/access-state';
 import { MetricCardSkeleton, Skeleton, SkeletonGroup } from '@/shared/ui/skeleton';
 import { UniversityHistory } from './university-history';
-import { DocumentsSection, LicensesSection, MeetingsSection, ProductsSection, ProgramsSection, ResponsiblesSection } from './university-passport-sections';
+import { DocumentsSection, LicensesSection, MeetingsSection, ProductsSection, ResponsiblesSection } from './university-passport-sections';
 import { UniversityWorkflow } from './university-workflow';
 import { WorkflowCreateModal } from './workflow-create-modal';
 import { PassportWorkflowCard } from './passport-workflow-card';
-import { TeachersSection } from './university-education';
 import styles from './university-passport.module.css';
 
 const mobileLayoutQuery = '(max-width: 768px)';
@@ -59,7 +58,6 @@ function isMobileLayout() {
 
 const tabDefinitions = [
   { id: 'overview', label: 'Обзор' },
-  { id: 'programs', label: 'Программы' },
   { id: 'products', label: 'Продукты' },
   { id: 'licenses', label: 'Лицензии' },
   { id: 'documents', label: 'Документы' },
@@ -74,7 +72,6 @@ type PassportTabId = (typeof tabDefinitions)[number]['id'];
 const tabIds = new Set<PassportTabId>(tabDefinitions.map((tab) => tab.id));
 
 function parseTab(value: string | null): PassportTabId {
-  if (value === 'students' || value === 'teachers') return 'programs';
   return value && tabIds.has(value as PassportTabId) ? value as PassportTabId : 'overview';
 }
 
@@ -192,8 +189,6 @@ export function UniversityPassport({ id }: { id: string }) {
   const passport = query.data;
   const renderContent = (tab: PassportTabId) => tab === 'overview'
     ? <OverviewContent passport={passport} onTabChange={selectTab} />
-    : tab === 'programs'
-      ? <><ProgramsSection id={id} /><TeachersSection id={id} /></>
     : tab === 'products'
       ? <ProductsSection id={id} />
     : tab === 'licenses'

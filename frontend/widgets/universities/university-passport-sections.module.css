@@ -1,5 +1,4 @@
 .section { display: flex; flex-direction: column; gap: var(--rtk-space-4); min-width: 0; }
-.refreshStatus { min-height: 20px; }
 .emptySection { color: var(--rtk-color-text-secondary); margin: var(--rtk-space-5) 0; text-align: center; }
 .sectionToolbar { align-items: center; display: flex; gap: var(--rtk-space-4); justify-content: space-between; min-height: 36px; }
 .sectionToolbar h2 { font-size: 18px; letter-spacing: -.02em; margin: 0; }
@@ -10,16 +9,6 @@
 .filter select:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
 .primaryCell { display: block; font-size: 13px; font-weight: 650; line-height: 1.35; }
 .secondaryCell { color: var(--rtk-color-text-tertiary); display: block; font-size: 11px; margin-top: var(--rtk-space-1); }
-.actionLink { color: var(--rtk-color-brand); font-size: 12px; font-weight: 700; text-decoration: none; white-space: nowrap; }
-.actionLink:hover { color: var(--rtk-color-brand-hover); text-decoration: underline; }
-.actionLink:focus-visible { border-radius: var(--rtk-radius-small); outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
-.chips { display: flex; flex-wrap: wrap; gap: var(--rtk-space-1); max-width: 270px; }
-.chip, .chipMore { background: var(--rtk-color-surface-subtle); border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-secondary); display: inline-block; font-size: 11px; max-width: 180px; overflow: hidden; padding: 3px 6px; text-overflow: ellipsis; white-space: nowrap; }
-.chipMore { color: var(--rtk-color-brand); font-weight: 700; }
-.integrationControls { align-items: flex-end; display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); }
-.integrationMeta { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); }
-.integrationMeta time { color: var(--rtk-color-text-tertiary); font-size: 11px; white-space: nowrap; }
-.externalNotice { background: var(--rtk-color-surface-subtle); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-secondary); font-size: 12px; margin: 0; padding: var(--rtk-space-3); }
 .toastViewport { bottom: var(--rtk-space-5); max-width: min(420px, calc(100vw - 32px)); position: fixed; right: var(--rtk-space-5); z-index: 30; }
 .license { display: flex; flex-direction: column; gap: 2px; }
 .license strong { font-size: 12px; }
@@ -81,10 +70,9 @@
   .toolbarControls { margin-left: 0; }
   .toolbarControls,
   .filter { max-width: 100%; width: 100%; }
-  .integrationControls { align-items: stretch; flex-direction: column; width: 100%; }
   .filter { max-width: none; }
   .filter select { min-height: 48px; }
-  .actionLink, .iconAction, .inlineDetails summary { align-items: center; display: inline-flex; min-height: 44px; }
+  .iconAction, .inlineDetails summary { align-items: center; display: inline-flex; min-height: 44px; }
   .iconAction { min-width: 44px; }
   .meetingDetails summary { align-items: center; display: flex; min-height: 44px; }
   .responsiblesGrid { grid-template-columns: 1fr; }

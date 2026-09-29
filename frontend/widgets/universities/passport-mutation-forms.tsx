@@ -7,7 +7,6 @@ import { catalogQueryKeys, getCatalogReferenceData } from '@/shared/lib/catalogs
 import { queryKeys } from '@/shared/lib/query-keys';
 import {
   createUniversityMeeting,
-  attachUniversityProgram,
   attachUniversityProduct,
   updateUniversityMeeting,
   type UniversityMeetingInput,
@@ -27,19 +26,17 @@ function fieldError(errors: Record<string, string>, key: string) {
   return errors[key] ? <span className={styles.assignmentError} role="alert">{errors[key]}</span> : null;
 }
 
-function CatalogAssignmentForm({ universityId, existingIds, kind, onClose, onSaved }: { universityId: string; existingIds: string[]; kind: 'programs' | 'products'; onClose: () => void; onSaved: () => void }) {
+export function ProductAssignmentForm({ universityId, existingProductIds, onClose, onSaved }: { universityId: string; existingProductIds: string[]; onClose: () => void; onSaved: () => void }) {
   const queryClient = useQueryClient();
   const references = useQuery({ queryKey: catalogQueryKeys.references, queryFn: () => getCatalogReferenceData(), staleTime: 30_000 });
   const [selectedId, setSelectedId] = useState('');
   const [message, setMessage] = useState<string | null>(null);
-  const isProgram = kind === 'programs';
-  const noun = isProgram ? 'программу' : 'продукт';
-  const available = references.data?.[kind].filter((item) => !existingIds.includes(item.id)) ?? [];
+  const available = references.data?.products.filter((item) => !existingProductIds.includes(item.id)) ?? [];
   const save = useMutation({
-    mutationFn: () => isProgram ? attachUniversityProgram(universityId, selectedId) : attachUniversityProduct(universityId, selectedId),
+    mutationFn: () => attachUniversityProduct(universityId, selectedId),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: isProgram ? queryKeys.universities.programsAll : queryKeys.universities.productsAll }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.universities.productsAll }),
         queryClient.invalidateQueries({ queryKey: queryKeys.universities.passport(universityId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.universities.all }),
         queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview }),
@@ -49,23 +46,14 @@ function CatalogAssignmentForm({ universityId, existingIds, kind, onClose, onSav
     },
     onError: (cause) => setMessage(normalizeApiError(cause).message),
   });
-  return <Modal title={`Добавить ${noun} ВУЗу`} onClose={() => { if (!save.isPending) onClose(); }}><form className={styles.assignmentForm} onSubmit={(event) => { event.preventDefault(); if (!save.isPending && selectedId) save.mutate(); }}>
-    <label className={styles.filter}><span>{isProgram ? 'Программа' : 'Продукт'} из каталога</span><Select value={selectedId} disabled={references.isPending || references.isError} onChange={(event) => setSelectedId(event.target.value)}><option value="">Выберите {noun}</option>{available.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</Select></label>
+  return <Modal title="Добавить продукт ВУЗу" onClose={() => { if (!save.isPending) onClose(); }}><form className={styles.assignmentForm} onSubmit={(event) => { event.preventDefault(); if (!save.isPending && selectedId) save.mutate(); }}>
+    <label className={styles.filter}><span>Продукт из каталога</span><Select value={selectedId} disabled={references.isPending || references.isError} onChange={(event) => setSelectedId(event.target.value)}><option value="">Выберите продукт</option>{available.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</Select></label>
     {references.isError ? <p className={styles.assignmentError} role="alert">Не удалось загрузить каталог. <button type="button" onClick={() => void references.refetch()}>Повторить</button></p> : null}
     {references.isSuccess && !available.length ? <p>Все записи каталога уже закреплены за этим ВУЗом.</p> : null}
     {message ? <p className={styles.assignmentError} role="alert">{message}</p> : null}
     <div className={styles.assignmentActions}><Button type="button" variant="ghost" disabled={save.isPending} onClick={onClose}>Отмена</Button><Button type="submit" variant="primary" loading={save.isPending} disabled={!selectedId || save.isPending}>Добавить</Button></div>
   </form></Modal>;
 }
-
-export function ProgramAssignmentForm({ universityId, existingProgramIds, onClose, onSaved }: { universityId: string; existingProgramIds: string[]; onClose: () => void; onSaved: () => void }) {
-  return <CatalogAssignmentForm universityId={universityId} existingIds={existingProgramIds} kind="programs" onClose={onClose} onSaved={onSaved} />;
-}
-
-export function ProductAssignmentForm({ universityId, existingProductIds, onClose, onSaved }: { universityId: string; existingProductIds: string[]; onClose: () => void; onSaved: () => void }) {
-  return <CatalogAssignmentForm universityId={universityId} existingIds={existingProductIds} kind="products" onClose={onClose} onSaved={onSaved} />;
-}
-
 
 export function MeetingMutationForm({ universityId, meeting, onClose, onSaved }: { universityId: string; meeting: UniversityMeetingRow | null; onClose: () => void; onSaved: () => void }) {
   const queryClient = useQueryClient();
