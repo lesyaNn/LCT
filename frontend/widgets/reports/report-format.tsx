@@ -20,7 +20,7 @@ interface ReportFormatFieldProps {
 /** Export format picker, driven by the backend capability flags. */
 export function ReportFormatField({ control }: ReportFormatFieldProps) {
   return (
-    <section className={styles.formSection} aria-labelledby="report-format-heading">
+    <section className={styles.formatSection} aria-labelledby="report-format-heading">
       <div className={styles.sectionHeading}>
         <div>
           <h3 id="report-format-heading">Формат</h3>
