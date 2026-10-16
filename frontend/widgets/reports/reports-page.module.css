@@ -16,6 +16,9 @@
 .sectionHeading > svg { color: var(--rtk-color-brand); flex: 0 0 auto; }
 .formSurface form { display: flex; flex-direction: column; gap: var(--rtk-space-5); }
 .formSection, .columnSection { border-top: 1px solid var(--rtk-color-border); display: flex; flex-direction: column; gap: var(--rtk-space-3); padding-top: var(--rtk-space-5); }
+.formSection button[aria-pressed="true"], .columnPresets button[aria-pressed="true"] { background: var(--rtk-color-brand); border-color: var(--rtk-color-brand); color: var(--rtk-color-text-inverse); }
+.formSection button:hover:not(:disabled), .columnPresets button:hover:not(:disabled) { background: var(--rtk-color-brand-hover); border-color: var(--rtk-color-brand-hover); color: var(--rtk-color-text-inverse); }
+.formSection button:active:not(:disabled), .columnPresets button:active:not(:disabled) { border-color: var(--rtk-color-brand); }
 .columnSection .sectionHeading { align-items: flex-start; }
 .columnPresets { display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); }
 .columnPresets > button { min-width: 96px; }
