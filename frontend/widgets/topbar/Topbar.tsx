@@ -4,6 +4,7 @@ import { Breadcrumbs } from './Breadcrumbs';
 import { GlobalSearch } from './GlobalSearch';
 import type { AuthUser } from '@/shared/types/user';
 import { UserMenu } from './UserMenu';
+import { NotificationsButton } from './NotificationsButton';
 import { IconButton } from '@/shared/ui/rtk/icon-button';
 import styles from './topbar.module.css';
 
@@ -22,7 +23,7 @@ export function Topbar({ pathname, user, mobileOpen, onMenuOpen }: TopbarProps) 
         <Breadcrumbs pathname={pathname} />
       </div>
       <GlobalSearch user={user} />
-      <div className={styles.actions}><UserMenu /></div>
+      <div className={styles.actions}><NotificationsButton /><UserMenu /></div>
     </header>
   );
 }
