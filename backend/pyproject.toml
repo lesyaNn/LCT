@@ -24,7 +24,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest==9.0.3", "httpx==0.28.1", "ruff==0.15.13"]
+dev = ["pytest==9.0.3", "httpx==0.28.1", "ruff==0.15.13", "pypdf==6.10.0"]
 
 [tool.ruff]
 line-length = 100

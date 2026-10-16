@@ -48,7 +48,7 @@ ASSISTANT_MODEL=qwen3:4b
 ASSISTANT_EMBEDDING_MODEL=qwen3-embedding:0.6b
 ```
 
-Примените миграции обычным способом. Последняя миграция этой ветки: `000044_assistant_conversations`. Она создаёт только таблицы диалогов и ответов. Из каталога `backend`:
+Примените миграции обычным способом. Миграция помощника: `000044_assistant_conversations`. Она создаёт только таблицы диалогов и ответов. Из каталога `backend`:
 
 ```bash
 python -m scripts.assistant inspect

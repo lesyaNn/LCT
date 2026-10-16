@@ -25,6 +25,7 @@ from app.modules.catalog.router import router as catalog_router
 from app.modules.imports.router import router as imports_router
 from app.modules.integrations.router import router as integrations_router
 from app.modules.meetings.router import router as meetings_router
+from app.modules.meeting_agenda.router import router as meeting_agenda_router
 from app.modules.education.router import router as education_router
 from app.modules.teachers.router import router as teachers_router
 from app.modules.universities.passport_router import router as passport_router
@@ -45,6 +46,7 @@ v1.include_router(imports_router)
 v1.include_router(integrations_router)
 v1.include_router(passport_router)
 v1.include_router(meetings_router)
+v1.include_router(meeting_agenda_router)
 v1.include_router(education_router)
 v1.include_router(teachers_router)
 v1.include_router(catalog_router)
