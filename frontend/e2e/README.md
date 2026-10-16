@@ -1,55 +1,38 @@
-# Critical demo-flow smoke
+# Read-only CI smoke
 
-`auth-foundation.spec.ts` includes self-contained adapter checks and real
-Keycloak scenarios when the corresponding `E2E_ADMIN_*`, `E2E_MANAGER_*`,
-`E2E_CURATOR_*`, or `E2E_USER_*` username/password variables are present.
-Credential values stay in the local shell or CI secret store and are never
-committed.
+`smoke-read-only.spec.ts` checks the current CRM login and navigation: open the
+frontend, sign in through Keycloak as a dedicated manager, find a seeded
+university by its unique name, open its configured Workflow, and verify that
+the current stage and progress are visible. It does not create, update, or
+delete business data. The target must be a reachable, complete E2E stand with
+frontend, backend, and Keycloak. Use an isolated test account and fixture; do
+not point the workflow at a production or shared demo stand automatically.
 
-The suite contains one mutating desktop smoke test with ten ordered Playwright
-steps. It runs against a complete deployed stand because authentication,
-Workflow transitions, report jobs, downloads, and audit events cross the
-frontend boundary.
+| CI environment variable | SourceCraft secret | Required value |
+| --- | --- | --- |
+| `E2E_BASE_URL` | `e2e_base_url` | Frontend HTTP(S) origin reachable from the runner; never runner `localhost` for a remote stand. |
+| `E2E_MANAGER_USERNAME` | `e2e_manager_username` | Dedicated Keycloak manager with access to the fixture university and Workflow. |
+| `E2E_MANAGER_PASSWORD` | `e2e_manager_password` | Password for that test manager; keep only in a local shell or SourceCraft secrets. |
+| `E2E_UNIVERSITY_NAME` | `e2e_university_name` | Unique, stable university name visible to the manager. |
+| `E2E_WORKFLOW_INSTANCE_ID` | `e2e_workflow_instance_id` | UUID of an existing active Workflow belonging to that university, with a visible current stage. |
 
-## Required environment
+The SourceCraft PR trigger runs `frontend-quality` without E2E secrets.
+`frontend-e2e-smoke` is a separate manual workflow for the configured E2E stand.
+Create all five repository secrets before starting it. No secret is required
+for test discovery (`npm run test:e2e:smoke -- --list`). Missing values fail
+at test execution with the missing variable's name and no credential value.
 
-| Variable | Purpose |
-| --- | --- |
-| `E2E_BASE_URL` | Frontend origin. Defaults to `http://localhost:3000`. |
-| `E2E_MANAGER_USERNAME` | Username of the dedicated Keycloak manager. |
-| `E2E_MANAGER_PASSWORD` | Password of that manager. Keep it in a local shell or CI secret. |
-| `E2E_UNIVERSITY_ID` | Stable university fixture shown by `/universities`. |
-| `E2E_UNIVERSITY_NAME` | Accessible link name for that fixture. |
-| `E2E_WORKFLOW_INSTANCE_ID` | UUID of a write-capable Workflow instance. |
-| `E2E_WORKFLOW_PROGRAM_ID` | UUID of the selected university program linked to that Workflow. |
-| `E2E_EXPECTED_WORKFLOW_STAGE` | Current stage name after the fixture reset. |
-| `E2E_RUN_ID` | Optional stable run label used in created comments. SourceCraft uses `SOURCECRAFT_RUN_ID` automatically. |
-| `E2E_CRITICAL_ISOLATED` | Optional `1` on a disposable stand: create a unique program and Workflow before each run. Requires `E2E_ADMIN_USERNAME`, `E2E_ADMIN_PASSWORD`, and `E2E_API_URL`; static Workflow IDs and stage name are then unnecessary. |
-
-Do not commit credential values. SourceCraft reads them from repository
-secrets named `e2e_base_url`, `e2e_manager_username`,
-`e2e_manager_password`, `e2e_university_id`, `e2e_university_name`,
-`e2e_workflow_instance_id`, and `e2e_expected_workflow_stage`.
-
-On a shared stand, the configured fixture must be reset before every run (or a
-fresh instance ID must be supplied), because the scenario intentionally advances
-Workflow and adds a comment. The disposable-stand mode creates a unique fixture
-automatically and is repeatable without a reset. Playwright retries are disabled
-to avoid repeating mutations on shared stands.
-The report endpoint must return a terminal `ready` job with a downloadable
-XLSX URL, and the audit endpoint must expose the corresponding
-`WORKFLOW_TRANSITION` event.
-
-Run the complete stand first, export the variables, then execute:
+After starting a dedicated stand and exporting the five variables, run locally:
 
 ```bash
 cd frontend
 npm run test:e2e:smoke
 ```
 
-Artifacts are written to `test-results/` and `playwright-report/`. Five named
-checkpoint screenshots are attached on successful runs; failure screenshot,
-video, and trace are retained automatically.
+Artifacts are written to `test-results/` and `playwright-report/`.
+Other opt-in real E2E suites below have their own environment requirements;
+they are not part of this smoke command. `auth-foundation.spec.ts` also
+contains self-contained adapter checks and separate Keycloak scenarios.
 
 ## Comment attachments and Workflow history
 
@@ -151,8 +134,7 @@ Use a disposable realm/database for mutation tests. `E2E_WORKFLOW_ISOLATED=1`
 creates a unique program and Workflow on `E2E_WORKFLOW_UNIVERSITY_ID` before
 each `workflow-mutations-real.spec.ts` run; choose a university outside the
 manager/user scope. It requires `E2E_WORKFLOW_MUTATIONS=1`, `E2E_API_URL`,
-and admin credentials, but no pre-existing Workflow/program IDs. The
-`E2E_CRITICAL_ISOLATED=1` mode above similarly prepares the manager smoke.
+and admin credentials, but no pre-existing Workflow/program IDs.
 Configure the isolated Keycloak client redirect/web origin **and**
 `post.logout.redirect.uris` for the frontend origin; the shared dev realm
 must not be changed. `final-responsive-audit.spec.ts` needs the IDs of any

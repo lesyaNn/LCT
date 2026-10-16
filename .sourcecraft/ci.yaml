@@ -1,6 +1,6 @@
 on:
   pull_request:
-    - workflows: [frontend-quality, frontend-e2e-smoke]
+    - workflows: [frontend-quality]
       filter:
         source_branches: ["**"]
         target_branches: ["main", "develop"]
@@ -26,18 +26,18 @@ workflows:
               - npm run build
 
   frontend-e2e-smoke:
+    # Run manually after the dedicated E2E stand and its repository secrets are ready.
+    # Keeping this workflow out of the PR trigger lets quality checks run without E2E secrets.
     settings:
       max_cube_duration: 5m
     tasks:
-      - name: critical-demo-flow
+      - name: read-only-smoke
         env:
           E2E_BASE_URL: ${{ secrets.e2e_base_url }}
           E2E_MANAGER_USERNAME: ${{ secrets.e2e_manager_username }}
           E2E_MANAGER_PASSWORD: ${{ secrets.e2e_manager_password }}
-          E2E_UNIVERSITY_ID: ${{ secrets.e2e_university_id }}
           E2E_UNIVERSITY_NAME: ${{ secrets.e2e_university_name }}
           E2E_WORKFLOW_INSTANCE_ID: ${{ secrets.e2e_workflow_instance_id }}
-          E2E_EXPECTED_WORKFLOW_STAGE: ${{ secrets.e2e_expected_workflow_stage }}
         cubes:
           - name: playwright-smoke
             image: mcr.microsoft.com/playwright:v1.63.0-noble
