@@ -1,6 +1,7 @@
 'use client';
 
 import Checklist from '@atomaro/icons/24/action/Checklist';
+import { useState } from 'react';
 import { Controller, type Control } from 'react-hook-form';
 import { Button } from '@/shared/ui/rtk/button';
 import { FormError } from '@/shared/ui/rtk/form-field';
@@ -26,6 +27,7 @@ interface ReportColumnSelectorProps {
  * optional one instead of appearing as an undifferentiated list of 17.
  */
 export function ReportColumnSelector({ control, error }: ReportColumnSelectorProps) {
+  const [extraColumnsOpen, setExtraColumnsOpen] = useState(true);
   return (
     <div className={styles.columnSection}>
       <div className={styles.sectionHeading}>
@@ -74,7 +76,7 @@ export function ReportColumnSelector({ control, error }: ReportColumnSelectorPro
                     ))}
                 </div>
               </fieldset>
-              <details className={styles.extraColumns}>
+              <details className={styles.extraColumns} open={extraColumnsOpen} onToggle={(event) => setExtraColumnsOpen(event.currentTarget.open)}>
                 <summary>
                   <span>Дополнительные колонки</span>
                   <span>{field.value.filter((id) => !(TZ_REPORT_COLUMNS as readonly string[]).includes(id)).length} выбрано</span>
