@@ -70,6 +70,8 @@ class Conversations:
                 ).order_by(AssistantTurn.position.desc()).limit(self.config.assistant_history_turns)))
             return Prepared(row.id, row.revision,
                             tuple((turn.question, turn.answer) for turn in reversed(turns)), False)
+        except SQLAlchemyError:
+            raise BusinessException(ErrorCode.ASSISTANT_STORAGE_UNAVAILABLE) from None
         finally:
             # Release the read transaction/connection before any HTTP inference.
             self.db.rollback()
@@ -105,34 +107,42 @@ class Conversations:
             # SQLAlchemy exceptions can contain question/answer bind parameters.
             # Do not send those to the global exception logger.
             raise BusinessException(ErrorCode.ASSISTANT_STORAGE_UNAVAILABLE) from None
-        except Exception:
+        except BusinessException:
             self.db.rollback()
             raise
 
     def list(self, page: int, page_size: int) -> ConversationPage:
-        total = self.db.scalar(select(func.count()).select_from(AssistantConversation)
-                               .where(*self._scope())) or 0
-        rows = self.db.scalars(select(AssistantConversation).where(*self._scope())
-                               .order_by(AssistantConversation.updated_at.desc(),
-                                         AssistantConversation.id.desc())
-                               .offset((page - 1) * page_size).limit(page_size))
-        return ConversationPage(items=[ConversationOut.model_validate(row) for row in rows],
-                                total=total, page=page, page_size=page_size)
+        try:
+            total = self.db.scalar(select(func.count()).select_from(AssistantConversation)
+                                   .where(*self._scope())) or 0
+            rows = self.db.scalars(select(AssistantConversation).where(*self._scope())
+                                   .order_by(AssistantConversation.updated_at.desc(),
+                                             AssistantConversation.id.desc())
+                                   .offset((page - 1) * page_size).limit(page_size))
+            return ConversationPage(items=[ConversationOut.model_validate(row) for row in rows],
+                                    total=total, page=page, page_size=page_size)
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise BusinessException(ErrorCode.ASSISTANT_STORAGE_UNAVAILABLE) from None
 
     def history(self, conversation_id: uuid.UUID, page: int, page_size: int) -> TurnPage:
-        conversation = ConversationOut.model_validate(self.owned(conversation_id))
-        rows = self.db.scalars(select(AssistantTurn).where(
-            AssistantTurn.conversation_id == conversation_id
-        ).order_by(AssistantTurn.position).offset((page - 1) * page_size).limit(page_size))
-        return TurnPage(conversation=conversation, total=conversation.revision,
-                        page=page, page_size=page_size, items=[TurnOut(
-                            conversation_id=row.conversation_id, turn_id=row.id,
-                            revision=row.position, question=row.question, answer=row.answer,
-                            basis=row.basis, sources=row.sources,
-                            knowledge_version=row.knowledge_version,
-                            retrieval_mode=row.retrieval_mode, model=row.model,
-                            created_at=row.created_at,
-                        ) for row in rows])
+        try:
+            conversation = ConversationOut.model_validate(self.owned(conversation_id))
+            rows = self.db.scalars(select(AssistantTurn).where(
+                AssistantTurn.conversation_id == conversation_id
+            ).order_by(AssistantTurn.position).offset((page - 1) * page_size).limit(page_size))
+            return TurnPage(conversation=conversation, total=conversation.revision,
+                            page=page, page_size=page_size, items=[TurnOut(
+                                conversation_id=row.conversation_id, turn_id=row.id,
+                                revision=row.position, question=row.question, answer=row.answer,
+                                basis=row.basis, sources=row.sources,
+                                knowledge_version=row.knowledge_version,
+                                retrieval_mode=row.retrieval_mode, model=row.model,
+                                created_at=row.created_at,
+                            ) for row in rows])
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise BusinessException(ErrorCode.ASSISTANT_STORAGE_UNAVAILABLE) from None
 
     def remove(self, conversation_id: uuid.UUID) -> None:
         try:
@@ -144,6 +154,9 @@ class Conversations:
             if changed.rowcount != 1:
                 raise BusinessException(ErrorCode.NOT_FOUND)
             self.db.commit()
-        except Exception:
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise BusinessException(ErrorCode.ASSISTANT_STORAGE_UNAVAILABLE) from None
+        except BusinessException:
             self.db.rollback()
             raise
