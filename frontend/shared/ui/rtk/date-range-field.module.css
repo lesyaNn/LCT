@@ -1,5 +1,6 @@
 .root { display: flex; flex-direction: column; gap: var(--rtk-space-1); grid-column: 1 / -1; min-width: 0; }
 .wideSplit { container-type: inline-size; }
+.wideSplit > .label { display: none; }
 .label { color: var(--rtk-color-text-secondary); font-size: 11px; font-weight: 600; line-height: 14px; min-height: 14px; }
 .controls { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); min-width: 0; }
 .presets { display: flex; flex-wrap: wrap; gap: var(--rtk-space-1); min-width: 0; }
@@ -15,6 +16,17 @@
   .wideSplit .fields { display: grid; gap: var(--rtk-space-2); grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .wideSplit .fields label { align-items: stretch; flex-direction: column; }
   .wideSplit .fields input { width: 140px; }
+}
+@container (max-width: 859.98px) {
+  .wideSplit .controls { align-items: stretch; display: grid; grid-template-columns: minmax(0, 1fr); width: 100%; }
+  .wideSplit .presets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; }
+  .wideSplit .presets button { min-width: 0; width: 100%; }
+  .wideSplit .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  .wideSplit .fields label { align-items: stretch; flex-direction: column; }
+  .wideSplit .fields input { width: 100%; }
+}
+@container (max-width: 600px) {
+  .wideSplit .presets { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 768px) { .presets button { height: 48px; min-height: 48px; } .controls, .fields { width: 100%; } .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } .fields label { align-items: stretch; flex-direction: column; } .fields input { height: 48px; min-height: 48px; width: 100%; } }
 @media (max-width: 480px) { .wideSplit .fields { grid-template-columns: 1fr; } }

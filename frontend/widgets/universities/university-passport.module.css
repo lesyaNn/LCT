@@ -42,7 +42,7 @@
 .workflowCardLink { inset: 0; position: absolute; }
 .workflowCardLink:focus-visible { border-radius: var(--rtk-radius-small); outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
 .workflowItemTop { align-items: flex-start; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); justify-content: space-between; width: 100%; }
-.workflowItemStatus { align-items: center; display: flex; flex: 0 0 auto; gap: var(--rtk-space-2); position: relative; z-index: 2; }
+.workflowItemStatus { align-items: center; display: flex; flex: 0 0 auto; gap: var(--rtk-space-2); margin-left: auto; position: relative; z-index: 2; }
 .workflowItemTop strong { flex: 1 1 140px; min-width: 0; }
 .workflowItemTop strong, .workflowProgram { font-size: 15px; overflow-wrap: anywhere; }
 .workflowItem p { color: var(--rtk-color-text-secondary); font-size: 13px; margin: 0; }

@@ -117,6 +117,24 @@ function ReportParameters({ onCreated }: { onCreated: (job: ReportJob) => void }
 
   return (
     <div className={styles.reportsLayout}>
+      <section className={styles.periodSurface} aria-labelledby="report-period-heading">
+        <div className={styles.sectionHeading}>
+          <div className={styles.headingWithIcon}>
+            <Calendar size={18} fill="currentColor" aria-hidden="true" />
+            <div>
+              <h3 id="report-period-heading">Период</h3>
+              <p>Выберите готовый период или укажите даты.</p>
+            </div>
+          </div>
+        </div>
+        <ReportFilterFields
+          values={values}
+          errors={errors}
+          onPeriodChange={setPeriod}
+          onReset={clearFilters}
+          activeFilters={activeFilters}
+        />
+      </section>
       <div className={styles.formSurface}>
         <div className={styles.sectionHeading}>
           <div className={styles.headingWithIcon}>
@@ -126,24 +144,6 @@ function ReportParameters({ onCreated }: { onCreated: (job: ReportJob) => void }
         </div>
         {globalError ? <FormErrorBanner>{globalError}</FormErrorBanner> : null}
         <form onSubmit={(event) => void handleSubmit(submit)(event)} noValidate>
-          <section className={styles.formSection}>
-            <div className={styles.sectionHeading}>
-              <div className={styles.headingWithIcon}>
-                <Calendar size={18} fill="currentColor" aria-hidden="true" />
-                <div>
-                  <h3>Период</h3>
-                  <p>Выберите готовый период или укажите даты.</p>
-                </div>
-              </div>
-            </div>
-            <ReportFilterFields
-              values={values}
-              errors={errors}
-              onPeriodChange={setPeriod}
-              onReset={clearFilters}
-              activeFilters={activeFilters}
-            />
-          </section>
           <ReportColumnSelector control={control} error={errors.columnIds?.message} />
           <ReportFormatField control={control} />
           <div className={styles.formActions}>

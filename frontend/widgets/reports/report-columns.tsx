@@ -74,19 +74,24 @@ export function ReportColumnSelector({ control, error }: ReportColumnSelectorPro
                     ))}
                 </div>
               </fieldset>
-              <fieldset className={styles.columnFieldset}>
-                <legend className={styles.columnLegend}>Дополнительные колонки</legend>
-                <div className={styles.columnGrid}>
-                  {reportColumnDefinitions
-                    .filter((column) => !(TZ_REPORT_COLUMNS as readonly string[]).includes(column.id))
-                    .map((column) => (
-                      <label key={column.id}>
-                        <input type="checkbox" checked={field.value.includes(column.id)} onChange={() => toggle(column.id)} />
-                        <span>{column.label}</span>
-                      </label>
-                    ))}
-                </div>
-              </fieldset>
+              <details className={styles.extraColumns}>
+                <summary>
+                  <span>Дополнительные колонки</span>
+                  <span>{field.value.filter((id) => !(TZ_REPORT_COLUMNS as readonly string[]).includes(id)).length} выбрано</span>
+                </summary>
+                <fieldset className={styles.columnFieldset} aria-label="Дополнительные колонки">
+                  <div className={styles.columnGrid}>
+                    {reportColumnDefinitions
+                      .filter((column) => !(TZ_REPORT_COLUMNS as readonly string[]).includes(column.id))
+                      .map((column) => (
+                        <label key={column.id}>
+                          <input type="checkbox" checked={field.value.includes(column.id)} onChange={() => toggle(column.id)} />
+                          <span>{column.label}</span>
+                        </label>
+                      ))}
+                  </div>
+                </fieldset>
+              </details>
             </>
           );
         }}
