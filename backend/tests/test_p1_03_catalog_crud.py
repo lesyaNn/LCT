@@ -758,9 +758,15 @@ def test_responsible_http_crud(client):
     assert created["universities"] == []
     got = client.get(f"/api/v1/responsibles/{rid}").json()
     assert got["email"] == "a@ex.test"
-    patched = client.patch(f"/api/v1/responsibles/{rid}", json={"phone": "+7-000", "role": "dean"})
+    invalid = client.patch(f"/api/v1/responsibles/{rid}", json={"phone": "+7-000"})
+    assert invalid.status_code == 422
+    assert invalid.json()["error"]["details"]["field_errors"][0]["field"] == "phone"
+    patched = client.patch(
+        f"/api/v1/responsibles/{rid}",
+        json={"phone": "+7 (999) 123-45-67", "role": "dean"},
+    )
     assert patched.status_code == 200
-    assert patched.json()["phone"] == "+7-000"
+    assert patched.json()["phone"] == "+7 (999) 123-45-67"
     assert patched.json()["email"] == "a@ex.test"
     assert client.delete(f"/api/v1/responsibles/{rid}").status_code == 204
     assert client.get(f"/api/v1/responsibles/{rid}").status_code == 404
@@ -851,7 +857,21 @@ def test_list_query_count_bounded(client, engine, select_counter):
         select_counter["n"] = 0
         r = client.get(f"/api/v1/universities?responsible_id={r1['id']}")
         assert r.status_code == 200
+        assert r.json()["total"] == 1
+        assert r.json()["items"][0]["responsible"]["id"] == r1["id"]
         n_uni = select_counter["n"]
+
+        for _ in range(9):
+            extra = _uni(client)
+            linked = client.post(
+                f"/api/v1/universities/{extra['id']}/responsibles/{r1['id']}", json={}
+            )
+            assert linked.status_code in (200, 201), linked.text
+        select_counter["n"] = 0
+        many = client.get(f"/api/v1/universities?responsible_id={r1['id']}")
+        assert many.status_code == 200
+        assert many.json()["total"] == len(many.json()["items"]) == 10
+        n_uni_many = select_counter["n"]
 
         select_counter["n"] = 0
         r = client.get(f"/api/v1/programs?direction_id={d['id']}")
@@ -869,10 +889,12 @@ def test_list_query_count_bounded(client, engine, select_counter):
         n_detail = select_counter["n"]
 
     print(
-        f"\nSELECT counts: universities={n_uni} programs={n_prog} "
+        f"\nSELECT counts: universities(1)={n_uni} universities(10)={n_uni_many} programs={n_prog} "
         f"products={n_prod} uni_detail={n_detail}"
     )
-    assert n_uni <= 3, n_uni  # COUNT + page
+    # COUNT + page + eight page-wide presentation aggregates; no per-row SELECT.
+    assert n_uni <= 10, n_uni
+    assert n_uni_many == n_uni, (n_uni, n_uni_many)
     assert n_prog <= 3, n_prog  # COUNT + joined page
     assert n_prod <= 3, n_prod  # COUNT + joined page
     assert n_detail <= 3, n_detail  # row + links
@@ -901,6 +923,7 @@ def test_rbac_matrix_all_entities(auth_client, db):
         path = f"/api/v1/{entity}"
         assert c.get(path).status_code == 401, entity  # no token
         assert c.get(path, headers=_auth(c, ("guest",))).status_code == 403, entity
+        assert c.post(path, json=payload, headers=_auth(c, ("guest",))).status_code == 403, entity
         for roles in (("user",),):
             assert c.get(path, headers=_auth(c, roles)).status_code == 200, (entity, roles)
             assert c.post(path, json=payload, headers=_auth(c, roles)).status_code == 403, (
@@ -912,6 +935,9 @@ def test_rbac_matrix_all_entities(auth_client, db):
             # unique payloads: the second writer bumps the identifying field
             # after a 409 on the already-taken value.
             r = c.post(path, json=dict(payload), headers=_auth(c, roles))
+            if entity == "universities" and roles == ("manager",):
+                assert r.status_code == 403, (entity, roles, r.text)
+                continue
             if r.status_code == 409:
                 payload = _bump(payload)
                 r = c.post(path, json=payload, headers=_auth(c, roles))

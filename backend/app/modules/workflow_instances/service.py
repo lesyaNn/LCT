@@ -441,6 +441,11 @@ def create_instance(
                 actor_keycloak_sub=actor_sub or "",
             )
         )
+    if responsible_id is not None:
+        from app.modules.notifications.service import notify_assignment
+
+        notify_assignment(db, responsible_id, university_id, entity_type="workflow",
+                          entity_id=instance.id, event_key=f"workflow-assigned:{instance.id}:created")
     db.commit()  # header + snapshot + pointers + transition atomically
     if "audit_context" in db.info:
         # H3: instance creation is audited in a follow-up statement (the core
@@ -525,6 +530,11 @@ def set_instance_responsible(
             old_value={"responsible_id": str(old_responsible_id) if old_responsible_id else None},
             new_value={"responsible_id": str(responsible_id) if responsible_id else None},
         )
+    if responsible_id is not None and responsible_id != old_responsible_id:
+        from app.modules.notifications.service import notify_assignment
+
+        notify_assignment(db, responsible_id, instance.university_id, entity_type="workflow",
+                          entity_id=instance.id, event_key=f"workflow-assigned:{instance.id}:{uuid.uuid4()}")
     db.commit()
     return get_instance_detail(db, instance.id)
 
@@ -576,6 +586,8 @@ def set_instance_stage_responsible(
     previous = stage.responsible_id
     if previous == responsible_id:
         return get_instance_detail(db, instance_id)
+    effective_before = previous or instance.responsible_id
+    effective_after = responsible_id or instance.responsible_id
     stage.responsible_id = responsible_id
     if "audit_context" in db.info:
         from app.modules.audit.service import AuditService, context_for
@@ -587,6 +599,11 @@ def set_instance_stage_responsible(
             old_value={"stage_id": str(stage_id), "stage_name": stage.name, "stage_responsible_id": str(previous) if previous else None},
             new_value={"stage_id": str(stage_id), "stage_name": stage.name, "stage_responsible_id": str(responsible_id) if responsible_id else None},
         )
+    if effective_after is not None and effective_after != effective_before:
+        from app.modules.notifications.service import notify_assignment
+
+        notify_assignment(db, effective_after, instance.university_id, entity_type="workflow",
+                          entity_id=instance.id, event_key=f"stage-assigned:{stage.id}:{uuid.uuid4()}")
     db.commit()
     return get_instance_detail(db, instance_id)
 

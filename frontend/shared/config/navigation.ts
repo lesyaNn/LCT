@@ -19,6 +19,7 @@ export const navigationItems: NavigationItem[] = [
 
 export const routeLabels: Record<string, string> = {
   dashboard: 'Обзор',
+  notifications: 'Уведомления',
   universities: 'ВУЗы',
   workflows: 'Workflow',
   reports: 'Отчёты',

@@ -5,4 +5,4 @@
 .menuButton { display: none; }
 .separator { background: var(--rtk-color-border); height: 28px; width: 1px; }
 @media (max-width: 768px) { .topbar { padding: 0 var(--rtk-space-4); } .menuButton { display: inline-flex; min-height: 44px; min-width: 44px; } }
-@media (max-width: 390px) { .topbar { gap: var(--rtk-space-2); padding: 0 var(--rtk-space-3); } }
+@media (max-width: 390px) { .topbar { gap: var(--rtk-space-2); padding: 0 var(--rtk-space-3); } .separator { display: none; } }

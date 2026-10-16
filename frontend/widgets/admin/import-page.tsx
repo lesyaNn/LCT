@@ -214,6 +214,13 @@ export function ImportPage() {
   const [toast, setToast] = useState<{ intent: ToastIntent; title: string; message?: string } | null>(null);
 
   const jobsQuery = useQuery({ queryKey: importQueryKeys.jobs, queryFn: listImportJobs, staleTime: Infinity });
+  useEffect(() => {
+    const jobId = new URLSearchParams(window.location.search).get('job');
+    if (!jobId || !/^[0-9a-f-]{36}$/i.test(jobId)) return;
+    let active = true;
+    void getImportJob(jobId).then((job) => { if (active) setSelectedJob(job); }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
   const baseJobs = useMemo(() => jobsQuery.data ?? [], [jobsQuery.data]);
   const addJob = useCallback((job: ImportJob) => {
     queryClient.setQueryData<ImportJob[]>(importQueryKeys.jobs, (current = []) => [job, ...current.filter((item) => item.id !== job.id)]);

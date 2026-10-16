@@ -10,6 +10,7 @@ from app.schemas.errors import ErrorCode
 
 PUBLIC_ROLE_NAMES = frozenset({"user", "manager", "admin"})
 USER_PERMISSIONS = frozenset({
+    "assistant.use",
     "university.read", "catalog.read", "workflow.read",
     "workflow.change_status", "workflow.comment.create", "workflow.comment.update",
     "workflow.attachment.read", "workflow.attachment.create",

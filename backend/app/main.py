@@ -69,6 +69,7 @@ app = FastAPI(
     },
     lifespan=lifespan,
     openapi_tags=[
+        {"name": "Assistant", "description": "Помощник по документации и личные диалоги"},
         {"name": "Auth", "description": "Аутентификация через Keycloak"},
         {"name": "Universities", "description": "Каталог ВУЗов и паспорта"},
         {"name": "Workflow", "description": "Workflow engine: шаблоны, экземпляры, переходы"},
@@ -212,7 +213,10 @@ def custom_openapi():
                     "description": "Ошибка валидации запроса.",
                 })
             for status, response in operation.get("responses", {}).items():
-                if status not in {"400", "401", "403", "404", "409", "410", "413", "415", "422", "429", "500", "503"}:
+                if status not in {
+                    "400", "401", "403", "404", "409", "410", "413", "415", "422", "429",
+                    "500", "503", "504",
+                }:
                     continue
                 response.setdefault("content", {})["application/json"] = {
                     "schema": error_schema,

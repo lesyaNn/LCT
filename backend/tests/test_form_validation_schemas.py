@@ -27,14 +27,15 @@ def test_contact_phone_rejects_invalid_values(phone: str) -> None:
         VendorContactInput(full_name="Иван Иванов", email="ivan@example.com", phone=phone)
 
 
-def test_contact_fields_trim_and_accept_valid_values() -> None:
+@pytest.mark.parametrize("phone", ["+7 (999) 123-45-67", "8 (999) 123-45-67"])
+def test_contact_fields_trim_and_accept_valid_values(phone: str) -> None:
     value = ResponsibleCreate(
         full_name="  Иван Иванов  ",
         email="  ivan@example.com  ",
-        phone="  +7 (999) 123-45-67  ",
+        phone=f"  {phone}  ",
     )
     assert (value.full_name, value.email, value.phone) == (
-        "Иван Иванов", "ivan@example.com", "+7 (999) 123-45-67"
+        "Иван Иванов", "ivan@example.com", phone
     )
 
 

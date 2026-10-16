@@ -123,6 +123,9 @@ class SecurityHeadersMiddleware:
                 for name, value in SECURITY_HEADERS.items():
                     if name not in headers:
                         headers.append(name, value)
+                if scope.get("path", "").startswith("/api/v1/assistant"):
+                    headers["Cache-Control"] = "no-store, max-age=0"
+                    headers["Pragma"] = "no-cache"
             await send(message)
 
         try:

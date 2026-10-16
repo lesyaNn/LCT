@@ -179,6 +179,10 @@ def change_primary_responsible(
             old_value=old_value,
             new_value=new_value,
         )
+    from app.modules.notifications.service import notify_assignment
+
+    notify_assignment(db, data.responsible_id, university_id,
+                      event_key=f"primary-assigned:{university_id}:{data.responsible_id}:{uuid.uuid4()}")
     db.commit()
     db.refresh(selected)
     return UniversityResponsibleRead.model_validate(selected)
