@@ -51,11 +51,15 @@ export function ReportColumnSelector({ control, error }: ReportColumnSelectorPro
           return (
             <>
               <div className={styles.columnPresets} aria-label="Наборы колонок">
-                {reportColumnPresetNames.map((name) => (
-                  <Button key={name} variant="ghost" size="s" type="button" onClick={() => field.onChange([...reportColumnPresets[name]])}>
-                    {name}
-                  </Button>
-                ))}
+                {reportColumnPresetNames.map((name) => {
+                  const preset = reportColumnPresets[name];
+                  const selected = field.value.length === preset.length && preset.every((id) => field.value.includes(id));
+                  return (
+                    <Button key={name} variant={selected ? 'primary' : 'secondary'} size="s" type="button" aria-pressed={selected} onClick={() => field.onChange([...preset])}>
+                      {name}
+                    </Button>
+                  );
+                })}
               </div>
               <fieldset className={styles.columnFieldset}>
                 <legend className={styles.columnLegend}>Колонки по ТЗ</legend>

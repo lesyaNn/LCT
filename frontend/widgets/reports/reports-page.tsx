@@ -147,40 +147,23 @@ function ReportParameters({ onCreated }: { onCreated: (job: ReportJob) => void }
           <ReportColumnSelector control={control} error={errors.columnIds?.message} />
           <ReportFormatField control={control} />
           <div className={styles.formActions}>
-            <Button type="button" variant="secondary" size="m" onClick={() => setSaveTemplateOpen(true)}>
-              <FolderAdd size={16} fill="currentColor" aria-hidden="true" />Сохранить как шаблон
-            </Button>
             <Button type="submit" variant="primary" size="m" loading={createMutation.isPending} disabled={createMutation.isPending}>
               Сформировать отчёт
+            </Button>
+            <Button type="button" variant="secondary" size="m" onClick={() => setSaveTemplateOpen(true)}>
+              <FolderAdd size={16} fill="currentColor" aria-hidden="true" />Сохранить как шаблон
             </Button>
             <span className={styles.actionHint}>
               Отчёт формируется в фоне; значения формы сохраняются при ошибке.
             </span>
           </div>
         </form>
-        <div className={styles.resultSurface}>
-          <ReportPreviewTable
-            preview={previewQuery.data}
-            pending={previewQuery.isPending || previewQuery.isFetching}
-            error={previewQuery.isError ? previewQuery.error : null}
-            dirty={isDirty}
-            onRetry={() => void previewQuery.refetch()}
-          />
-          <ReportStatisticsPanel
-            statistics={statisticsQuery.data}
-            pending={statisticsQuery.isPending || statisticsQuery.isFetching}
-            error={statisticsQuery.isError ? statisticsQuery.error : null}
-            dirty
-            onRetry={() => void statisticsQuery.refetch()}
-          />
-        </div>
       </div>
       <div className={styles.sideColumn}>
         <ReportQueue />
         <ReportTemplatesSection
           currentValues={values}
           saveOpen={saveTemplateOpen}
-          onOpenSave={() => setSaveTemplateOpen(true)}
           onCloseSave={() => setSaveTemplateOpen(false)}
           onApply={(template: ReportTemplate) => {
             const next = reportFormFromTemplate(template);
@@ -189,6 +172,24 @@ function ReportParameters({ onCreated }: { onCreated: (job: ReportJob) => void }
             );
             setNotification({ intent: 'success', title: 'Шаблон применён', message: template.name });
           }}
+        />
+      </div>
+      <div className={styles.resultCard}>
+        <ReportPreviewTable
+          preview={previewQuery.data}
+          pending={previewQuery.isPending || previewQuery.isFetching}
+          error={previewQuery.isError ? previewQuery.error : null}
+          dirty={isDirty}
+          onRetry={() => void previewQuery.refetch()}
+        />
+      </div>
+      <div className={styles.resultCard}>
+        <ReportStatisticsPanel
+          statistics={statisticsQuery.data}
+          pending={statisticsQuery.isPending || statisticsQuery.isFetching}
+          error={statisticsQuery.isError ? statisticsQuery.error : null}
+          dirty
+          onRetry={() => void statisticsQuery.refetch()}
         />
       </div>
       {notification ? (

@@ -1,7 +1,8 @@
 'use client';
 
-import Folder from '@atomaro/icons/24/document/Folder';
-import FolderAdd from '@atomaro/icons/24/document/FolderAdd';
+import BookOpen from '@atomaro/icons/24/culture/BookOpen';
+import Trash from '@atomaro/icons/24/action/Trash';
+import Play from '@atomaro/icons/24/media/Play';
 import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/shared/ui/rtk/button';
@@ -24,12 +25,11 @@ interface ReportTemplatesSectionProps {
   currentValues: ReportFormSchema;
   onApply: (template: ReportTemplate) => void;
   saveOpen: boolean;
-  onOpenSave: () => void;
   onCloseSave: () => void;
 }
 
 /** Saved filter/column presets. */
-export function ReportTemplatesSection({ currentValues, onApply, saveOpen, onOpenSave, onCloseSave }: ReportTemplatesSectionProps) {
+export function ReportTemplatesSection({ currentValues, onApply, saveOpen, onCloseSave }: ReportTemplatesSectionProps) {
   const queryClient = useQueryClient();
   const nameRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState('');
@@ -69,35 +69,29 @@ export function ReportTemplatesSection({ currentValues, onApply, saveOpen, onOpe
     <section className={styles.templatesSurface} aria-labelledby="report-templates-heading">
       <div className={styles.templatesHeader}>
         <div className={styles.headingWithIcon}>
-          <Folder size={20} fill="currentColor" aria-hidden="true" />
+          <BookOpen size={20} fill="currentColor" aria-hidden="true" />
           <div>
             <h2 id="report-templates-heading">Шаблоны отчётов</h2>
             <p>Сохраните параметры и применяйте их повторно.</p>
           </div>
         </div>
-        <Button variant="ghost" size="s" type="button" onClick={onOpenSave}>
-          <FolderAdd size={16} fill="currentColor" aria-hidden="true" />Новый шаблон
-        </Button>
       </div>
       {templates.length ? (
         <div className={styles.templateList} aria-label="Сохранённые шаблоны">
           {templates.map((template) => (
             <div className={styles.templateItem} key={template.id}>
               <div className={styles.templateInfo}>
-                <Button variant="ghost" size="s" type="button" onClick={() => onApply(template)}>
-                  {template.name}
-                </Button>
+                <strong>{template.name}</strong>
                 <span className={styles.templateMeta}>{template.isShared ? 'Общий · ' : ''}{template.columns.length} колонок · {template.format.toUpperCase()}</span>
               </div>
-              <Button
-                variant="ghost"
-                size="s"
-                type="button"
-                aria-label={`Удалить шаблон ${template.name}`}
-                onClick={() => deleteMutation.mutate(template.id)}
-              >
-                ✕
-              </Button>
+              <div className={styles.templateRowActions}>
+                <Button variant="ghost" size="s" type="button" aria-label={`Применить шаблон ${template.name}`} onClick={() => onApply(template)}>
+                  <Play size={16} fill="currentColor" aria-hidden="true" />
+                </Button>
+                <Button variant="ghost" size="s" type="button" aria-label={`Удалить шаблон ${template.name}`} onClick={() => deleteMutation.mutate(template.id)}>
+                  <Trash size={16} fill="currentColor" aria-hidden="true" />
+                </Button>
+              </div>
             </div>
           ))}
         </div>
