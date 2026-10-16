@@ -52,6 +52,7 @@ CANON_TABLES = frozenset(
         "audit_outbox",
         "external_applications",
         "external_sync_states",
+        "notifications",
     }
 )
 
@@ -75,7 +76,7 @@ DEFERRED_TABLES = frozenset(
 # queue) при этом остаётся незамаунченным (см. test_legacy_reporting_stub).
 DEFERRED_API_PREFIXES = (
     "/dashboard", "/documents", "/users",
-    "/notifications", "/workflows", "/tasks",
+    "/workflows", "/tasks",
 )
 
 
@@ -133,6 +134,7 @@ def test_deferred_models_isolated_on_deferred_base():
 def test_mounted_routers_are_only_the_production_contract():
     allowed = (
         "/api/v1/auth",
+        "/api/v1/notifications",
         "/api/v1/admin/users",  # Keycloak-backed Admin API; legacy /users stays deferred.
         "/api/v1/import",
         "/api/v1/integrations",
@@ -161,7 +163,7 @@ def test_deferred_prefixes_absent_from_openapi_paths():
 
     Module list mirrors ``docs/DEFERRED_MODULES.md``: universities-CRUD,
     programs, workflow, documents,
-    dashboard, reporting, notifications. P5 mounted audit events and Stage 11
+    dashboard, reporting. P5 mounted audit events and Stage 11
     mounts the canonical /integrations API; old mock fallback is gone.
     """
     paths = _mounted_api_paths()

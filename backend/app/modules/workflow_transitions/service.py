@@ -218,6 +218,10 @@ def transition_instance(
         new_value={"audit_object_type": "workflow_transition",
                    "stage_id": _stage_ref(target), "stage_name": target.name},
     )
+    from app.modules.notifications.service import notify_stage_change
+
+    notify_stage_change(db, instance, current, target, rollback=False, reason="",
+                        event_key=f"workflow-transition:{instance.id}:{uuid.uuid4()}")
     db.commit()
     return get_instance_or_404(db, instance.id)
 
@@ -359,6 +363,10 @@ def rollback_instance(
         old_value={"stage_id": current.template_stage_id, "stage_name": current.name},
         new_value={"stage_id": target.template_stage_id, "stage_name": target.name, "comment": text, "rollback": True},
     )
+    from app.modules.notifications.service import notify_stage_change
+
+    notify_stage_change(db, instance, current, target, rollback=True, reason=text,
+                        event_key=f"workflow-rollback:{instance.id}:{uuid.uuid4()}")
     db.commit()
     return get_instance_or_404(db, instance.id)
 

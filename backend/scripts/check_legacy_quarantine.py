@@ -38,7 +38,6 @@ DEFERRED_PREFIXES = (
     "/documents",
     "/users",
     "/integrations",
-    "/notifications",
     "/workflows",
     "/tasks",
 )
