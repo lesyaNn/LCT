@@ -27,7 +27,13 @@ interface ReportColumnSelectorProps {
 export function ReportColumnSelector({ control, error }: ReportColumnSelectorProps) {
   return (
     <div className={styles.columnSection}>
-      {error ? <FormError id="report-columns-error">{error}</FormError> : null}
+      <div className={styles.sectionHeading}>
+        <div>
+          <h3>Колонки</h3>
+          <p>Выберите данные, которые войдут в отчёт.</p>
+        </div>
+        {error ? <FormError id="report-columns-error">{error}</FormError> : null}
+      </div>
       <Controller
         control={control}
         name="columnIds"
@@ -47,34 +53,32 @@ export function ReportColumnSelector({ control, error }: ReportColumnSelectorPro
                   </Button>
                 ))}
               </div>
-              <div className={styles.columnGroups}>
-                <fieldset className={styles.columnFieldset}>
-                  <legend className={styles.columnLegend}>Колонки по ТЗ</legend>
-                  <div className={styles.columnGrid}>
-                    {reportColumnDefinitions
-                      .filter((column) => (TZ_REPORT_COLUMNS as readonly string[]).includes(column.id))
-                      .map((column) => (
-                        <label key={column.id}>
-                          <input type="checkbox" checked={field.value.includes(column.id)} onChange={() => toggle(column.id)} />
-                          <span>{column.label}</span>
-                        </label>
-                      ))}
-                  </div>
-                </fieldset>
-                <fieldset className={styles.columnFieldset}>
-                  <legend className={styles.columnLegend}>Дополнительные колонки</legend>
-                  <div className={styles.columnGrid}>
-                    {reportColumnDefinitions
-                      .filter((column) => !(TZ_REPORT_COLUMNS as readonly string[]).includes(column.id))
-                      .map((column) => (
-                        <label key={column.id}>
-                          <input type="checkbox" checked={field.value.includes(column.id)} onChange={() => toggle(column.id)} />
-                          <span>{column.label}</span>
-                        </label>
-                      ))}
-                  </div>
-                </fieldset>
-              </div>
+              <fieldset className={styles.columnFieldset}>
+                <legend className={styles.columnLegend}>Колонки по ТЗ</legend>
+                <div className={styles.columnGrid}>
+                  {reportColumnDefinitions
+                    .filter((column) => (TZ_REPORT_COLUMNS as readonly string[]).includes(column.id))
+                    .map((column) => (
+                      <label key={column.id}>
+                        <input type="checkbox" checked={field.value.includes(column.id)} onChange={() => toggle(column.id)} />
+                        <span>{column.label}</span>
+                      </label>
+                    ))}
+                </div>
+              </fieldset>
+              <fieldset className={styles.columnFieldset}>
+                <legend className={styles.columnLegend}>Дополнительные колонки</legend>
+                <div className={styles.columnGrid}>
+                  {reportColumnDefinitions
+                    .filter((column) => !(TZ_REPORT_COLUMNS as readonly string[]).includes(column.id))
+                    .map((column) => (
+                      <label key={column.id}>
+                        <input type="checkbox" checked={field.value.includes(column.id)} onChange={() => toggle(column.id)} />
+                        <span>{column.label}</span>
+                      </label>
+                    ))}
+                </div>
+              </fieldset>
             </>
           );
         }}

@@ -1,6 +1,5 @@
 'use client';
 
-import Folder from '@atomaro/icons/24/document/Folder';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/shared/ui/rtk/button';
@@ -50,22 +49,20 @@ export function ReportTemplatesSection({ currentValues, onApply }: ReportTemplat
   });
 
   return (
-    <section className={styles.templatesSurface} aria-labelledby="report-templates-heading">
-      <div className={styles.cardHeading}>
-        <Folder size={20} fill="currentColor" aria-hidden="true" />
+    <section className={styles.formSection} aria-labelledby="report-templates-heading">
+      <div className={styles.sectionHeading}>
         <div>
-          <h2 id="report-templates-heading">Шаблоны отчётов</h2>
+          <h3 id="report-templates-heading">Шаблоны</h3>
           <p>Сохраните параметры и применяйте их повторно.</p>
         </div>
       </div>
       {templates.length ? (
-        <div className={styles.templateList} aria-label="Сохранённые шаблоны">
+        <div className={styles.columnPresets} aria-label="Сохранённые шаблоны">
           {templates.map((template) => (
-            <div className={styles.templateItem} key={template.id}>
+            <span key={template.id}>
               <Button variant="ghost" size="s" type="button" onClick={() => onApply(template)}>
-                {template.name}
+                {template.name}{template.isShared ? ' (общий)' : ''}
               </Button>
-              {template.isShared ? <span className={styles.muted}>Общий</span> : null}
               <Button
                 variant="ghost"
                 size="s"
@@ -75,7 +72,7 @@ export function ReportTemplatesSection({ currentValues, onApply }: ReportTemplat
               >
                 ✕
               </Button>
-            </div>
+            </span>
           ))}
         </div>
       ) : (

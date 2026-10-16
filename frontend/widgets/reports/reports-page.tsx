@@ -1,8 +1,6 @@
 'use client';
 
-import Checklist from '@atomaro/icons/24/action/Checklist';
-import Calendar from '@atomaro/icons/24/communication/Calendar';
-import DocumentText from '@atomaro/icons/24/document/DocumentText';
+import Filter from '@atomaro/icons/24/action/Filter';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   keepPreviousData,
@@ -114,64 +112,44 @@ function ReportParameters({ onCreated }: { onCreated: (job: ReportJob) => void }
   };
 
   return (
-    <div className={styles.page}>
-      <div className={styles.reportsLayout}>
-        <form className={styles.parameterForm} onSubmit={(event) => void handleSubmit(submit)(event)} noValidate>
-          <section className={styles.card} aria-labelledby="report-period-heading">
-            <div className={styles.cardHeading}>
-              <Calendar size={20} fill="currentColor" aria-hidden="true" />
-              <div>
-                <h2 id="report-period-heading">Период</h2>
-                <p>Выберите готовый период или укажите даты.</p>
-              </div>
-            </div>
-            <ReportFilterFields
-              values={values}
-              errors={errors}
-              onPeriodChange={setPeriod}
-              onReset={clearFilters}
-              activeFilters={activeFilters}
-            />
-          </section>
-          <section className={styles.card} aria-labelledby="report-columns-heading">
-            <div className={styles.cardHeading}>
-              <Checklist size={20} fill="currentColor" aria-hidden="true" />
-              <div>
-                <h2 id="report-columns-heading">Состав отчёта</h2>
-                <p>Выберите данные, которые войдут в отчёт.</p>
-              </div>
-            </div>
-            {globalError ? <FormErrorBanner>{globalError}</FormErrorBanner> : null}
-            <ReportColumnSelector control={control} error={errors.columnIds?.message} />
-            <div className={styles.actionsPanel}>
-              <ReportFormatField control={control} />
-              <div className={styles.formActions}>
-                <Button type="button" variant="ghost" size="s" onClick={() => document.getElementById('report-template-name')?.focus()}>
-                  Сохранить как шаблон
-                </Button>
-                <Button type="submit" variant="primary" size="m" loading={createMutation.isPending} disabled={createMutation.isPending}>
-                  Сформировать отчёт
-                </Button>
-                <span className={styles.actionHint}>Отчёт формируется в фоне; значения формы сохраняются при ошибке.</span>
-              </div>
-            </div>
-          </section>
-        </form>
-        <div className={styles.sideColumn}>
-          <ReportQueue />
-          <ReportTemplatesSection
-            currentValues={values}
-            onApply={(template: ReportTemplate) => {
-              const next = reportFormFromTemplate(template);
-              (Object.keys(next) as Array<keyof typeof next>).forEach((key) =>
-                setValue(key, next[key] as never, { shouldDirty: true, shouldValidate: true }),
-              );
-              setNotification({ intent: 'success', title: 'Шаблон применён', message: template.name });
-            }}
-          />
-        </div>
+    <div className={styles.formSurface}>
+      <div className={styles.sectionHeading}>
+        <div><h2>Параметры отчёта</h2></div>
+        <Filter size={20} fill="currentColor" aria-hidden="true" />
       </div>
-      <div className={styles.resultCard}>
+      {globalError ? <FormErrorBanner>{globalError}</FormErrorBanner> : null}
+      <form onSubmit={(event) => void handleSubmit(submit)(event)} noValidate>
+        <section className={styles.formSection}>
+          <ReportFilterFields
+            values={values}
+            errors={errors}
+            onPeriodChange={setPeriod}
+            onReset={clearFilters}
+            activeFilters={activeFilters}
+          />
+        </section>
+        <ReportColumnSelector control={control} error={errors.columnIds?.message} />
+        <ReportTemplatesSection
+          currentValues={values}
+          onApply={(template: ReportTemplate) => {
+            const next = reportFormFromTemplate(template);
+            (Object.keys(next) as Array<keyof typeof next>).forEach((key) =>
+              setValue(key, next[key] as never, { shouldDirty: true, shouldValidate: true }),
+            );
+            setNotification({ intent: 'success', title: 'Шаблон применён', message: template.name });
+          }}
+        />
+        <ReportFormatField control={control} />
+        <div className={styles.formActions}>
+          <Button type="submit" variant="primary" size="m" loading={createMutation.isPending} disabled={createMutation.isPending}>
+            Сформировать отчёт
+          </Button>
+          <span className={styles.actionHint}>
+            Отчёт формируется в фоне; значения формы сохраняются при ошибке.
+          </span>
+        </div>
+      </form>
+      <div className={styles.resultSurface}>
         <ReportPreviewTable
           preview={previewQuery.data}
           pending={previewQuery.isPending || previewQuery.isFetching}
@@ -179,8 +157,6 @@ function ReportParameters({ onCreated }: { onCreated: (job: ReportJob) => void }
           dirty={isDirty}
           onRetry={() => void previewQuery.refetch()}
         />
-      </div>
-      <div className={styles.resultCard}>
         <ReportStatisticsPanel
           statistics={statisticsQuery.data}
           pending={statisticsQuery.isPending || statisticsQuery.isFetching}
@@ -283,10 +259,10 @@ function ReportQueue() {
 
   return (
     <section className={styles.jobsSurface} aria-labelledby="report-jobs-heading">
-      <div className={styles.cardHeading}>
-        <DocumentText size={20} fill="currentColor" aria-hidden="true" />
+      <div className={styles.jobsHeader}>
         <div>
-          <h2 id="report-jobs-heading">Сформированные отчёты</h2>
+          <p className={styles.eyebrow}>Очередь формирования</p>
+          <h2 id="report-jobs-heading">Задачи отчётов</h2>
           <p>В очереди и во время формирования статус обновляется примерно каждые 3 секунды.</p>
         </div>
       </div>
@@ -311,15 +287,25 @@ function ReportQueue() {
 
 /* ------------------------------------------------------------------ page */
 
+/**
+ * Reports page, ordered as the ТЗ describes: period -> universities ->
+ * directions -> products -> responsibles -> columns -> current selection
+ * (preview + statistics) -> build -> format -> download.
+ */
 export function ReportsPage() {
   const queryClient = useQueryClient();
 
   return (
-    <ReportParameters
-      onCreated={(job) => {
-        queryClient.setQueryData<ReportJob[]>(reportQueryKeys.jobs, (current = []) => [job, ...current.filter((item) => item.id !== job.id)]);
-      }}
-    />
+    <div className={styles.page}>
+      <div className={styles.reportsLayout}>
+        <ReportParameters
+          onCreated={(job) => {
+            queryClient.setQueryData<ReportJob[]>(reportQueryKeys.jobs, (current = []) => [job, ...current.filter((item) => item.id !== job.id)]);
+          }}
+        />
+        <ReportQueue />
+      </div>
+    </div>
   );
 }
 
