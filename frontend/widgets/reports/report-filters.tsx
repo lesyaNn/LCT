@@ -37,6 +37,7 @@ export function ReportFilterFields({
       <DateRangeField
         label="Быстрый выбор и даты"
         presets
+        wideSplit
         from={values.dateFrom}
         to={values.dateTo}
         onFromChange={(dateFrom) => onPeriodChange(dateFrom, values.dateTo)}

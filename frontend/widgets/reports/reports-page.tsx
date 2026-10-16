@@ -160,19 +160,21 @@ function ReportParameters({ onCreated }: { onCreated: (job: ReportJob) => void }
         </form>
       </div>
       <div className={styles.sideColumn}>
-        <ReportQueue />
-        <ReportTemplatesSection
-          currentValues={values}
-          saveOpen={saveTemplateOpen}
-          onCloseSave={() => setSaveTemplateOpen(false)}
-          onApply={(template: ReportTemplate) => {
-            const next = reportFormFromTemplate(template);
-            (Object.keys(next) as Array<keyof typeof next>).forEach((key) =>
-              setValue(key, next[key] as never, { shouldDirty: true, shouldValidate: true }),
-            );
-            setNotification({ intent: 'success', title: 'Шаблон применён', message: template.name });
-          }}
-        />
+        <div className={styles.sideScroll} role="region" aria-label="Сформированные отчёты и шаблоны" tabIndex={0}>
+          <ReportQueue />
+          <ReportTemplatesSection
+            currentValues={values}
+            saveOpen={saveTemplateOpen}
+            onCloseSave={() => setSaveTemplateOpen(false)}
+            onApply={(template: ReportTemplate) => {
+              const next = reportFormFromTemplate(template);
+              (Object.keys(next) as Array<keyof typeof next>).forEach((key) =>
+                setValue(key, next[key] as never, { shouldDirty: true, shouldValidate: true }),
+              );
+              setNotification({ intent: 'success', title: 'Шаблон применён', message: template.name });
+            }}
+          />
+        </div>
       </div>
       <div className={styles.resultCard}>
         <ReportPreviewTable
