@@ -901,6 +901,7 @@ def test_rbac_matrix_all_entities(auth_client, db):
         path = f"/api/v1/{entity}"
         assert c.get(path).status_code == 401, entity  # no token
         assert c.get(path, headers=_auth(c, ("guest",))).status_code == 403, entity
+        assert c.post(path, json=payload, headers=_auth(c, ("guest",))).status_code == 403, entity
         for roles in (("user",),):
             assert c.get(path, headers=_auth(c, roles)).status_code == 200, (entity, roles)
             assert c.post(path, json=payload, headers=_auth(c, roles)).status_code == 403, (
@@ -912,6 +913,9 @@ def test_rbac_matrix_all_entities(auth_client, db):
             # unique payloads: the second writer bumps the identifying field
             # after a 409 on the already-taken value.
             r = c.post(path, json=dict(payload), headers=_auth(c, roles))
+            if entity == "universities" and roles == ("manager",):
+                assert r.status_code == 403, (entity, roles, r.text)
+                continue
             if r.status_code == 409:
                 payload = _bump(payload)
                 r = c.post(path, json=payload, headers=_auth(c, roles))

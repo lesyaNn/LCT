@@ -87,7 +87,7 @@ def _not_found(response):
 
 
 def test_university_collection_detail_and_mutation_matrix(context):
-    client, current, a, b, c, _, _ = context
+    client, current, a, b, c, _ = context
     path = "/api/v1/universities"
 
     response = client.get(path)
