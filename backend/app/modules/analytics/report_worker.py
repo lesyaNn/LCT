@@ -11,6 +11,9 @@ creates jobs (``202``) and never executes them — ``BackgroundTasks`` are
 banned for reports by the spec (they die with the API process,
 block the loop and have no retries).
 
+The same long-running worker records Health Score observations once per UTC
+day, independently of whether anyone opens a university passport.
+
 :meth:`generate_report_task` stays callable standalone (tests, one-off
 retries): it claims the job itself first. Every entry receives ONLY
 ``job_id`` — never a request-scoped DB session — and opens a FRESH
@@ -35,6 +38,7 @@ import logging
 import time
 
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 from sqlalchemy.orm import Session
@@ -283,24 +287,31 @@ def main(argv: list[str] | None = None) -> int:
         "--idle-sleep", type=float, default=2.0, help="idle sleep seconds"
     )
     args = parser.parse_args(argv)
+    last_health_snapshot_date = None
+    next_health_snapshot_retry = 0.0
     while True:
         try:
             run_audit_relay_once()
         except Exception:
             logger.exception("audit outbox relay iteration failed")
         try:
-            # Only report/import job execution here. The daily health-score
-            # snapshot that used to run in this block was removed together
-            # with the health_score entity (migration 000029); its import
-            # raised ModuleNotFoundError and, because it sat in front of
-            # run_worker_once(), it silently skipped a whole iteration of
-            # report processing.
             outcome = run_worker_once()
         except Exception:
             logger.exception("report worker iteration failed")
             outcome = "failed"
         if args.once:
             return 0
+        now = datetime.now(timezone.utc)
+        if last_health_snapshot_date != now.date() and time.monotonic() >= next_health_snapshot_retry:
+            try:
+                from app.modules.health_score.history import record_daily_observations
+
+                recorded = record_daily_observations(now)
+                last_health_snapshot_date = now.date()
+                logger.info("Daily Health Score observations saved: %s", recorded)
+            except Exception:
+                logger.exception("Daily Health Score observation failed; retrying in five minutes")
+                next_health_snapshot_retry = time.monotonic() + 300
         time.sleep(0 if outcome else args.idle_sleep)
     return 0
 

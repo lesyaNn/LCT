@@ -139,7 +139,8 @@ services:
   worker:
     # P4-06-01: dedicated background worker (no BackgroundTasks in the API).
     # Owns report/import execution: atomic claim (SKIP LOCKED) -> run ->
-    # ready, up to 3 attempts, then failed. Shares the backend image.
+    # ready, up to 3 attempts, then failed; also records daily Health Score.
+    # Shares the backend image.
     build: ./backend
     restart: unless-stopped
     networks: [rtk-net]

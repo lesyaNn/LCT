@@ -159,8 +159,7 @@ export async function getDashboardData(filters: DashboardFilters = EMPTY_DASHBOA
 }
 
 export interface UniversityHealthProgram { program_id: string; program_name: string; state: MatrixHealthState; score: number | null; workflow_instance_id: string | null; current_stage: string | null; factors: string[]; workflow_progress: number | null; stages_completed: number; stages_total: number; deadline: string | null; overdue_days: number }
-export interface UniversityHealthCalculation { base_score: number; penalties: Array<{ label: string; points: number; maximum?: number }>; critical_cap: number; attention_cap: number }
-export interface UniversityHealth { university_id: string; score: number | null; level: 'stable' | 'attention' | 'critical' | 'no_data'; started_programs: number; active_workflows: number; total_programs: number; attention_count: number; critical_count: number; factors: Array<{ label: string }>; positive_factors: Array<{ label: string }>; history: Array<{ date: string; score: number; level?: string }>; calculation?: UniversityHealthCalculation; programs: UniversityHealthProgram[] }
+export interface UniversityHealth { university_id: string; score: number | null; level: 'stable' | 'attention' | 'critical' | 'no_data'; started_programs: number; active_workflows: number; total_programs: number; attention_count: number; critical_count: number; factors: Array<{ label: string }>; positive_factors: Array<{ label: string }>; history: Array<{ date: string; score: number; level?: string }>; programs: UniversityHealthProgram[] }
 export async function getUniversityHealth(id: string): Promise<UniversityHealth | null> {
   const result = await apiFetch<UniversityHealth>(`/api/v1/universities/${encodeURIComponent(id)}/health-score`);
   if (!result.ok) throw new ApiRequestError(result.status, result.body, 'Не удалось загрузить Health Score.', result.error);

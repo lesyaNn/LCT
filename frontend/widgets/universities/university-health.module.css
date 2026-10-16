@@ -78,7 +78,7 @@
 .chevron { color: var(--rtk-color-text-tertiary); flex: 0 0 auto; }
 .coverageRow:hover .chevron, .rowLink:hover { color: var(--rtk-color-brand); }
 
-.tableCard { border-bottom: 1px solid var(--rtk-color-border); padding-bottom: var(--rtk-space-3); }
+.tableCard { padding-bottom: var(--rtk-space-3); }
 .tableCard h2 { margin-bottom: var(--rtk-space-3); }
 .tableDesktop { overflow-x: auto; }
 .table { composes: table from '../../shared/ui/rtk/data-table.module.css'; min-width: 800px; }
@@ -97,18 +97,11 @@
 .workflowProgress { align-items: center; display: flex; gap: var(--rtk-space-2); min-width: 0; }
 .workflowProgress [role='progressbar'] { max-width: 130px; min-width: 55px; }
 .stageCount { font-weight: 700; white-space: nowrap; }
+.workflowInactive { color: var(--rtk-color-text-secondary); font-size: 11px; white-space: nowrap; }
 .overdue { color: var(--rtk-color-danger); }
 .rowLink { align-items: center; color: var(--rtk-color-text-tertiary); display: inline-flex; justify-content: center; min-height: 24px; min-width: 24px; }
 .tableMobile { display: none; }
 .srOnly { clip: rect(0, 0, 0, 0); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
-
-.calculationIntro { color: var(--rtk-color-text-secondary); font-size: 12px; line-height: 1.5; margin: var(--rtk-space-3) 0 0; }
-.calculationRules { display: grid; gap: 0 var(--rtk-space-5); grid-template-columns: repeat(3, minmax(0, 1fr)); margin: var(--rtk-space-3) 0 0; }
-.calculationRules > div { align-items: baseline; border-top: 1px solid var(--rtk-color-border); display: flex; gap: var(--rtk-space-2); justify-content: space-between; min-width: 0; padding: var(--rtk-space-2) 0; }
-.calculationRules dt { color: var(--rtk-color-text-secondary); font-size: 12px; line-height: 1.4; }
-.calculationRules dd { flex: 0 0 auto; font-size: 13px; font-weight: 700; margin: 0; text-align: right; }
-.calculationRules small { color: var(--rtk-color-text-secondary); display: block; font-size: 10px; font-weight: 400; }
-.calculationNote { color: var(--rtk-color-text-secondary); font-size: 12px; line-height: 1.5; margin: var(--rtk-space-3) 0 0; }
 
 @media (max-width: 1100px) {
   .summaryBody { grid-template-columns: minmax(235px, 1.4fr) minmax(450px, 3fr); }
@@ -121,7 +114,6 @@
   .chart { height: 190px; min-height: 190px; }
 }
 @media (max-width: 850px) {
-  .calculationRules { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .summaryBody { grid-template-columns: 1fr; }
   .scoreBlock { margin-bottom: var(--rtk-space-4); }
   .metrics { border-top: 1px solid var(--rtk-color-border); padding-top: var(--rtk-space-3); }
@@ -131,7 +123,6 @@
   .workflowText { display: none; }
 }
 @media (max-width: 690px) {
-  .calculationRules { grid-template-columns: 1fr; }
   .page { margin: calc(-1 * var(--rtk-space-4)); }
   .metrics { gap: var(--rtk-space-3) 0; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .metric { min-height: 104px; }

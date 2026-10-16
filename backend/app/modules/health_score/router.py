@@ -1,4 +1,5 @@
 """Operational university Health Score endpoints backed by the analytics batch loader."""
+import logging
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
@@ -14,29 +15,15 @@ from app.models.health_score_observation import HealthScoreObservation
 from app.modules.analytics.integration import Selection
 from app.modules.analytics.repository import load_data
 from app.modules.analytics.service import build_matrix
-from app.modules.health_score.operational import BASE_SCORE, PENALTIES, TASK_PENALTY_CAP, UNIVERSITY_SCORE_CAPS
+from app.modules.health_score.history import record_observation
 
 router = APIRouter(prefix="/universities", tags=["Analytics"])
+logger = logging.getLogger(__name__)
 
 def _history(db: Session, university_id: UUID, score: int | None, level: str, now: datetime):
     """Record a real score when it changes, then return recent backend observations."""
     try:
-        latest = db.scalar(
-            select(HealthScoreObservation)
-            .where(HealthScoreObservation.university_id == university_id)
-            .order_by(HealthScoreObservation.calculated_at.desc())
-            .limit(1)
-        )
-        if score is not None and (
-            latest is None
-            or latest.score != score
-            or latest.level != level
-            or latest.calculated_at < now - timedelta(days=731)
-        ):
-            db.add(HealthScoreObservation(
-                university_id=university_id, score=score, level=level, calculated_at=now
-            ))
-            db.commit()
+        record_observation(db, university_id, score, level, now)
         observations = db.scalars(
             select(HealthScoreObservation)
             .where(
@@ -45,14 +32,12 @@ def _history(db: Session, university_id: UUID, score: int | None, level: str, no
             )
             .order_by(HealthScoreObservation.calculated_at.desc())
         ).all()
-        history = []
-        for item in reversed(observations):
-            if not history or (item.score, item.level) != (history[-1]["score"], history[-1]["level"]):
-                history.append({"date": item.calculated_at.isoformat(), "score": item.score, "level": item.level})
-        return history
+        return [
+            {"date": item.calculated_at.isoformat(), "score": item.score, "level": item.level}
+            for item in reversed(observations)
+        ]
     except SQLAlchemyError:
-        # Installations that have not applied the new migration can still show
-        # the current real backend score. No historical values are fabricated.
+        logger.exception("Failed to persist or load Health Score history for university %s", university_id)
         db.rollback()
         return [{"date": now.isoformat(), "score": score, "level": level}] if score is not None else []
 
@@ -103,18 +88,6 @@ def _health(university_id: UUID, db: Session, user: CurrentUser):
         "factors": [{"label": label} for label in dict.fromkeys(factors)],
         "positive_factors": [{"label": label} for label in dict.fromkeys(positive)],
         "history": history,
-        "calculation": {
-            "base_score": BASE_SCORE,
-            "penalties": [
-                {"label": "Просрочен текущий этап", "points": PENALTIES["workflow_overdue"]},
-                {"label": "Не назначен ответственный на текущий этап", "points": PENALTIES["responsible_missing"]},
-                {"label": "Просроченная задача", "points": PENALTIES["overdue_task"], "maximum": TASK_PENALTY_CAP},
-                {"label": "Просрочена лицензия", "points": PENALTIES["expired_license"]},
-                {"label": "Лицензия скоро истекает", "points": PENALTIES["license_expires_soon"]},
-            ],
-            "critical_cap": UNIVERSITY_SCORE_CAPS["critical"],
-            "attention_cap": UNIVERSITY_SCORE_CAPS["attention"],
-        },
         "programs": programs,
         "calculated_at": now,
     }

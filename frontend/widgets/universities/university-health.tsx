@@ -79,7 +79,7 @@ function workflowLabel(program: UniversityHealthProgram) {
 }
 
 function WorkflowProgress({ program }: { program: UniversityHealthProgram }) {
-  if (!program.workflow_instance_id) return <span className={styles.stageCount}>Workflow не запущен</span>;
+  if (!program.workflow_instance_id) return <span className={styles.workflowInactive}>Workflow не запущен</span>;
   return <div className={styles.workflowProgress}>
     {program.workflow_progress === null ? <span className={styles.muted}>—</span> : <Progress value={program.workflow_progress} label={`Пройдено этапов программы «${program.program_name}»`} />}
     <span className={styles.stageCount}>{program.stages_completed} из {program.stages_total}</span>
@@ -100,7 +100,7 @@ function HistoryChart({ history, currentScore }: { history: UniversityHealth['hi
   const change = last && previous ? last.score - previous.score : null;
   return <section className={`${styles.card} ${styles.historyCard}`} aria-labelledby="health-history">
     <div className={styles.cardHeader}>
-      <h2 id="health-history">Динамика Health Score <InfoHint content="Текущая оценка сохраняется на сервере при открытии вкладки. Новая точка появляется, когда балл или статус изменится. История доступна за 24 месяца." /></h2>
+      <h2 id="health-history">Динамика Health Score <InfoHint content="График показывает, как менялась оценка взаимодействия с вузом. Если пока видна одна точка, следующей сохранённой оценки для сравнения ещё нет." /></h2>
       <div className={styles.periods} role="group" aria-label="Период истории">{periods.map((item) => <button type="button" key={item} className={period === item ? styles.periodActive : styles.period} aria-pressed={period === item} onClick={() => setPeriod(item)}>{item} мес.</button>)}</div>
     </div>
     {points.length ? <div className={styles.chart} role="img" aria-label={`История Health Score: ${points.map((item) => `${item.label} — ${item.score}`).join(', ')}`}>
@@ -116,7 +116,7 @@ function HistoryChart({ history, currentScore }: { history: UniversityHealth['hi
         </AreaChart>
       </ResponsiveContainer>
     </div> : <p className={styles.chartEmpty}>{currentScore === null ? 'Оценка появится после запуска Workflow.' : 'История оценок пока пуста.'}</p>}
-    {points.length === 1 ? <p className={styles.snapshotCompare}>Текущая оценка показана на графике. Линия появится после изменения балла.</p> : change !== null ? <p className={styles.snapshotCompare}>Последнее изменение: {change > 0 ? `+${change}` : change} по сравнению с {formatHistoryDate(previous!.date)}</p> : null}
+    {change !== null && change !== 0 ? <p className={styles.snapshotCompare}>Последнее изменение: {change > 0 ? `+${change}` : change} по сравнению с {formatHistoryDate(previous!.date)}</p> : null}
   </section>;
 }
 
@@ -142,16 +142,6 @@ function ProgramTable({ programs, universityId }: { programs: UniversityHealthPr
   </section>;
 }
 
-function ScoreBreakdown({ health }: { health: UniversityHealth }) {
-  const calculation = health.calculation;
-  return <section className={`${styles.card} ${styles.breakdownCard}`} aria-labelledby="health-breakdown">
-    <h2 id="health-breakdown">Из чего складывается оценка <InfoHint content="Баллы и правила расчёта поступают из действующей модели Health Score." /></h2>
-    <p className={styles.calculationIntro}>Каждый запущенный Workflow {calculation ? `начинается со ${calculation.base_score} баллов` : 'получает базовую оценку'}. При проблемах баллы снижаются:</p>
-    {calculation ? <dl className={styles.calculationRules}>{calculation.penalties.map((rule) => <div key={rule.label}><dt>{rule.label}</dt><dd>−{rule.points}{rule.maximum ? <small> за задачу, не более −{rule.maximum}</small> : null}</dd></div>)}</dl> : null}
-    <p className={styles.calculationNote}>Итог по вузу — среднее оценок запущенных и завершённых Workflow. Незапущенные программы в среднее не входят. Завершённый Workflow получает {calculation ? `${calculation.base_score} баллов` : 'максимальную оценку'}.{calculation ? ` При критичной программе итог не выше ${calculation.critical_cap}; при предупреждении и отсутствии критичных программ — не выше ${calculation.attention_cap}, если среднее было стабильным.` : ''}</p>
-  </section>;
-}
-
 export function UniversityHealth({ universityId }: { universityId: string }) {
   const query = useQuery({ queryKey: queryKeys.universities.health(universityId), queryFn: () => getUniversityHealth(universityId), staleTime: 30_000 });
   if (query.isPending) return <div className={styles.loading}><Skeleton height={205} /><div className={styles.loadingPair}><Skeleton height={218} /><Skeleton height={218} /></div><Skeleton height={180} /></div>;
@@ -165,9 +155,8 @@ export function UniversityHealth({ universityId }: { universityId: string }) {
       <dl className={styles.metrics}><div className={styles.metric}><dt><IconSurface><Checklist size={19} /></IconSurface><span>Workflow активны</span></dt><dd>{health.active_workflows} из {health.total_programs}</dd></div><div className={styles.metric}><dt><IconSurface tone="warning"><AttentionStroke size={19} /></IconSurface><span>Требуют внимания</span></dt><dd>{health.attention_count}</dd></div><div className={styles.metric}><dt><IconSurface tone="danger"><ErrorStroke size={19} /></IconSurface><span>Критично</span></dt><dd>{health.critical_count}</dd></div><div className={styles.metric}><dt><IconSurface><StatisticsColumn size={19} /></IconSurface><span>Охват программ</span></dt><dd>{coverage === null ? '—' : `${coverage}%`}</dd>{coverage !== null ? <Progress value={coverage} label="Охват программ активными Workflow" /> : null}</div></dl>
       <aside className={styles.summaryInfo}><IconSurface><InformationStroke size={20} /></IconSurface><p>Оценка показывает текущее состояние взаимодействия с вузом: этапы Workflow, задачи, назначение ответственных и связанные лицензии. Она не отражает академический рейтинг вуза.</p></aside>
     </div></section>
-    <div className={styles.secondRow}><section className={`${styles.card} ${styles.reasonsCard}`} aria-labelledby="health-why"><h2 id="health-why">Почему такая оценка <InfoHint content="Причины и положительные факторы получены из текущего Health Score." /></h2><div className={styles.reasonColumns}><div className={styles.reasonColumn}><h3><IconSurface tone="success"><OkStroke size={18} /></IconSurface>Положительные факторы</h3>{health.positive_factors.length ? <ul>{health.positive_factors.map((factor, index) => <li key={`${factor.label}-${index}`}><OkStroke size={17} />{factor.label}</li>)}</ul> : <p className={styles.empty}>Положительные факторы не зафиксированы.</p>}</div><div className={styles.reasonColumn}><h3><IconSurface tone="warning"><AttentionStroke size={18} /></IconSurface>Факторы, требующие внимания</h3>{health.factors.length ? <ul>{health.factors.map((factor, index) => <li key={`${factor.label}-${index}`}><AttentionStroke size={17} />{factor.label}</li>)}</ul> : <p className={styles.empty}>Факторы риска не зафиксированы.</p>}</div></div></section><HistoryChart history={health.history} currentScore={health.score} /></div>
+    <div className={styles.secondRow}><section className={`${styles.card} ${styles.reasonsCard}`} aria-labelledby="health-why"><h2 id="health-why">Почему такая оценка <InfoHint content="Здесь видно, что сейчас поддерживает оценку и какие проблемы её снижают. Баллы по запущенным Workflow зависят от просрочек этапов и задач, назначения ответственных и сроков лицензий." /></h2><div className={styles.reasonColumns}><div className={styles.reasonColumn}><h3><IconSurface tone="success"><OkStroke size={18} /></IconSurface>Положительные факторы</h3>{health.positive_factors.length ? <ul>{health.positive_factors.map((factor, index) => <li key={`${factor.label}-${index}`}><OkStroke size={17} />{factor.label}</li>)}</ul> : <p className={styles.empty}>Положительные факторы не зафиксированы.</p>}</div><div className={styles.reasonColumn}><h3><IconSurface tone="warning"><AttentionStroke size={18} /></IconSurface>Факторы, требующие внимания</h3>{health.factors.length ? <ul>{health.factors.map((factor, index) => <li key={`${factor.label}-${index}`}><AttentionStroke size={17} />{factor.label}</li>)}</ul> : <p className={styles.empty}>Факторы риска не зафиксированы.</p>}</div></div></section><HistoryChart history={health.history} currentScore={health.score} /></div>
     <section className={`${styles.card} ${styles.coverageCard}`} aria-labelledby="health-coverage"><div className={styles.cardHeader}><h2 id="health-coverage">Охват программ <InfoHint content="Общий процент — доля программ с активным Workflow. Полоса в каждой строке показывает Health Score этой программы." /></h2><div className={styles.coverageSummary}><span>{health.active_workflows} из {health.total_programs} программ с активным процессом</span><span className={styles.coverageSummaryBar}>{coverage !== null ? <Progress value={coverage} label="Охват программ активными Workflow" /> : null}</span><strong>{coverage === null ? '—' : `${coverage}%`}</strong></div></div>{health.programs.length ? <div className={styles.coverageRows}>{health.programs.map((program) => <CoverageRow key={program.program_id} program={program} universityId={universityId} />)}</div> : <p className={styles.empty}>У вуза пока нет связанных программ.</p>}</section>
     <ProgramTable programs={health.programs} universityId={universityId} />
-    <ScoreBreakdown health={health} />
   </div>;
 }
