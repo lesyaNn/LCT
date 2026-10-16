@@ -57,7 +57,7 @@ def db():
             "instance_id CHAR(32) NOT NULL, template_stage_id CHAR(32), responsible_id CHAR(32), "
             "order_index INTEGER NOT NULL, name VARCHAR(512) NOT NULL, "
             "description TEXT, is_required BOOLEAN NOT NULL DEFAULT 1, "
-            "status VARCHAR(32) NOT NULL DEFAULT 'pending', due_date DATE, "
+            "status VARCHAR(32) NOT NULL DEFAULT 'pending', due_date DATE, started_at DATETIME, "
             "completed_at DATETIME, id CHAR(32) NOT NULL PRIMARY KEY, "
             "created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL, "
             "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL, "
