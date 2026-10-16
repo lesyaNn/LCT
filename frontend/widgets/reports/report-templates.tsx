@@ -66,7 +66,7 @@ export function ReportTemplatesSection({ currentValues, onApply, saveOpen, onClo
   };
 
   return (
-    <section className={styles.templatesSurface} aria-labelledby="report-templates-heading">
+    <section className={styles.templatesSurface} aria-labelledby="report-templates-heading" tabIndex={0}>
       <div className={styles.templatesHeader}>
         <div className={styles.headingWithIcon}>
           <BookOpen size={20} fill="currentColor" aria-hidden="true" />

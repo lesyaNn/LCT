@@ -160,7 +160,7 @@ function ReportParameters({ onCreated }: { onCreated: (job: ReportJob) => void }
         </form>
       </div>
       <div className={styles.sideColumn}>
-        <div className={styles.sideScroll} role="region" aria-label="Сформированные отчёты и шаблоны" tabIndex={0}>
+        <div className={styles.sideScroll}>
           <ReportQueue />
           <ReportTemplatesSection
             currentValues={values}
@@ -287,7 +287,7 @@ function ReportQueue() {
   };
 
   return (
-    <section className={styles.jobsSurface} aria-labelledby="report-jobs-heading">
+    <section className={styles.jobsSurface} aria-labelledby="report-jobs-heading" tabIndex={0}>
       <div className={styles.jobsHeader}>
         <DocumentText size={20} fill="currentColor" aria-hidden="true" />
         <div>
