@@ -24,7 +24,7 @@ import {
 import { listWorkflowTemplates, workflowTemplateListQueryKey } from '@/shared/lib/workflow-templates-repository';
 import { Button } from '@/shared/ui/rtk/button';
 import { FormErrorBanner } from '@/shared/ui/rtk/form-field';
-import { Select } from '@/shared/ui/rtk/form-controls';
+import { SearchableSelect } from '@/shared/ui/rtk/multiselect';
 import { Modal } from '@/shared/ui/rtk/modal';
 import { Skeleton, SkeletonGroup } from '@/shared/ui/skeleton';
 import styles from './workflow-transition-modal.module.css';
@@ -156,68 +156,29 @@ export function WorkflowCreateModal({ universityId, initialProgramId, onClose, o
             </FormErrorBanner>
           ) : null}
 
-          <label className={styles.field}>
-            <span>Направление</span>
-            <Select
-              value={activeDirectionId}
-              onChange={(event) => { setDirectionId(event.target.value); setProgramId(''); setProductId(''); }}
-            >
-              <option value="">Выберите направление</option>
-              {directionOptions.map((direction) => (
-                <option key={direction.id} value={direction.id}>
-                  {direction.name}
-                </option>
-              ))}
-            </Select>
+          <div className={styles.field}>
+            <SearchableSelect label="Направление" labelPlacement="outside" value={activeDirectionId} onChange={(value) => { setDirectionId(value); setProgramId(''); setProductId(''); }} options={directionOptions} placeholder="Выберите направление" />
             {!directionOptions.length && directionsQuery.isSuccess ? <em>Направления в каталоге отсутствуют.</em> : null}
-          </label>
+          </div>
 
-          <label className={styles.field}>
-            <span>Программа обучения</span>
-            <Select value={activeProgramId} disabled={!activeDirectionId} onChange={(event) => { setProgramId(event.target.value); setProductId(''); }}>
-              <option value="">Выберите программу</option>
-              {programOptions.map((program) => (
-                <option key={program.id} value={program.id}>
-                  {program.name}
-                </option>
-              ))}
-            </Select>
+          <div className={styles.field}>
+            <SearchableSelect label="Программа обучения" labelPlacement="outside" value={activeProgramId} disabled={!activeDirectionId} onChange={(value) => { setProgramId(value); setProductId(''); }} options={programOptions} placeholder="Выберите программу" />
             {activeDirectionId && catalogProgramsQuery.isPending ? <em>Загрузка программ…</em> : null}
-            {activeDirectionId && !catalogProgramsQuery.isPending && !programOptions.length ? (
-              <em>В этом направлении пока нет программ в каталоге.</em>
-            ) : null}
-          </label>
+            {activeDirectionId && !catalogProgramsQuery.isPending && !programOptions.length ? <em>В этом направлении пока нет программ в каталоге.</em> : null}
+          </div>
 
-          <label className={styles.field}>
-            <span>Продукт</span>
-            <Select value={activeProductId} disabled={!activeProgramId} onChange={(event) => setProductId(event.target.value)}>
-              <option value="">Выберите продукт (необязательно)</option>
-              {productOptions.map((product) => (
-                <option key={product.id} value={product.id}>
-                  {wizardProductLabel(product)}
-                </option>
-              ))}
-            </Select>
+          <div className={styles.field}>
+            <SearchableSelect label="Продукт" labelPlacement="outside" value={activeProductId} disabled={!activeProgramId} onChange={setProductId} options={productOptions.map((product) => ({ id: product.id, name: wizardProductLabel(product) }))} placeholder="Выберите продукт (необязательно)" />
             {!activeProgramId ? <em>Сначала выберите программу обучения.</em> : null}
             {activeProgramId && productsQuery.isPending ? <em>Загрузка продуктов…</em> : null}
-            {activeProgramId && !productsQuery.isPending && !productOptions.length ? (
-              <em>В направлении пока нет продуктов — продукт можно выбрать позже.</em>
-            ) : null}
-          </label>
+            {activeProgramId && !productsQuery.isPending && !productOptions.length ? <em>В направлении пока нет продуктов — продукт можно выбрать позже.</em> : null}
+          </div>
 
-          <label className={styles.field}>
-            <span>Шаблон Workflow</span>
-            <Select value={activeTemplateId} onChange={(event) => setTemplateId(event.target.value)}>
-              <option value="">Выберите шаблон</option>
-              {templateOptions.map((template) => (
-                <option key={template.id} value={template.id}>
-                  {template.name}
-                </option>
-              ))}
-            </Select>
+          <div className={styles.field}>
+            <SearchableSelect label="Шаблон Workflow" labelPlacement="outside" value={activeTemplateId} onChange={setTemplateId} options={templateOptions.map((template) => ({ id: template.id, name: template.name }))} placeholder="Выберите шаблон" />
             {templatesQuery.isError ? <em>Не удалось загрузить шаблоны.</em> : null}
             {templatesQuery.isSuccess && !templateOptions.length ? <em>Нет активного шаблона Workflow.</em> : null}
-          </label>
+          </div>
 
           {serverError ? <p role="alert" className={styles.error}>{serverError}</p> : null}
 

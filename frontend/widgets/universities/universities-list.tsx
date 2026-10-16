@@ -28,7 +28,7 @@ import type { ActiveFilterItem } from '@/shared/ui/rtk/active-filters';
 import { DateRangeField } from '@/shared/ui/rtk/date-range-field';
 import { Select } from '@/shared/ui/rtk/form-controls';
 import { EmptyState } from '@/shared/ui/empty-state';
-import { MultiSelect } from '@/shared/ui/rtk/multiselect';
+import { MultiSelect, SearchableSelect } from '@/shared/ui/rtk/multiselect';
 import { StatusBadge as SemanticStatusBadge } from '@/shared/ui/rtk/status-badge';
 import { TableShell } from '@/shared/ui/rtk/table-shell';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
@@ -280,16 +280,10 @@ function Filters({ state, options, catalogsLoading, catalogsUnavailable, searchI
     <section className={styles.filters} aria-label="Фильтры списка вузов">
       <SearchField label="Поиск по названию вуза" value={searchInput} onChange={setSearchInput} placeholder="Поиск по названию вуза" />
       <MultiSelect label="Вуз" labelPlacement="outside" options={options.universities} values={filters.universityIds} onChange={(values) => onPatch({ university: values, page: 1 })} searchable loading={catalogsLoading} disabled={catalogsUnavailable} />
-      <MultiSelect label="Программа" labelPlacement="outside" options={options.programs} values={filters.programIds} onChange={(values) => onPatch({ program: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
-      <MultiSelect label="Продукт" labelPlacement="outside" options={options.products} values={filters.productIds} onChange={(values) => onPatch({ product: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
-      <label className={styles.field}>
-        <span>Город</span>
-        <Select disabled={catalogsLoading || catalogsUnavailable} value={filters.city} onChange={(event) => onPatch({ city: event.target.value, page: 1 })}>
-          <option value="">Все города</option>
-          {options.cities.map((city) => <option key={city} value={city}>{city}</option>)}
-        </Select>
-      </label>
-      <MultiSelect label="Ответственный" labelPlacement="outside" options={options.responsibles.map((person) => ({ id: person.id, name: person.name, description: person.role }))} values={filters.responsibleIds} onChange={(values) => onPatch({ responsible: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
+      <MultiSelect label="Программа" labelPlacement="outside" options={options.programs} values={filters.programIds} searchable onChange={(values) => onPatch({ program: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
+      <MultiSelect label="Продукт" labelPlacement="outside" options={options.products} values={filters.productIds} searchable onChange={(values) => onPatch({ product: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
+      <SearchableSelect label="Город" labelPlacement="outside" disabled={catalogsLoading || catalogsUnavailable} value={filters.city} onChange={(city) => onPatch({ city, page: 1 })} options={options.cities.map((city) => ({ id: city, name: city }))} placeholder="Все города" />
+      <MultiSelect label="Ответственный" labelPlacement="outside" options={options.responsibles.map((person) => ({ id: person.id, name: person.name, description: person.role }))} values={filters.responsibleIds} searchable onChange={(values) => onPatch({ responsible: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
       <label className={styles.field} title={!UNIVERSITY_LIST_CAPABILITIES.filters.stage ? 'Фильтр по текущему этапу пока недоступен.' : undefined}>
         <span>Текущий этап</span>
         <Select disabled={!UNIVERSITY_LIST_CAPABILITIES.filters.stage} value={filters.workflowStageId} onChange={(event) => onPatch({ stage: event.target.value, page: 1 })}>

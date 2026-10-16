@@ -27,7 +27,8 @@ import { buildMockWorkflowHistory, buildWorkflowHistory, countWorkflowStageResou
 import { getWorkflowSelectorPrograms, workflowProgramsQueryKey } from '@/shared/lib/universities-repository';
 import { normalizeApiError } from '@/shared/lib/api-errors';
 import { listUniversityWorkflowInstances, universityWorkflowInstancesQueryKey } from '@/shared/lib/workflow-creation-repository';
-import { Input, Select } from '@/shared/ui/rtk/form-controls';
+import { Input } from '@/shared/ui/rtk/form-controls';
+import { SearchableSelect } from '@/shared/ui/rtk/multiselect';
 import { Avatar } from '@/shared/ui/rtk/avatar';
 import { Button } from '@/shared/ui/rtk/button';
 import { EmptyState } from '@/shared/ui/empty-state';
@@ -269,10 +270,7 @@ function WorkflowStageResponsibleField({ instanceId, workflow, stage, canManage,
     {stage.responsible ? <small className={styles.responsibleSource}>{stage.responsibleOverrideId ? 'Для этого этапа' : 'Как у всего Workflow'}</small> : null}
     {open ? <Modal title="Ответственный этого этапа" onClose={close}><div className={styles.editForm}>
       {confirmReplace ? <><p role="alert">Индивидуальные назначения {overriddenStages} этапов будут заменены выбранным ответственным.</p><div className={styles.editActions}><Button variant="ghost" size="s" type="button" onClick={() => setConfirmReplace(false)}>Назад</Button><Button variant="primary" size="s" type="button" loading={save.isPending} onClick={() => save.mutate()}>Назначить на весь Workflow</Button></div></> : <>
-        <label>Назначение<Select value={value} disabled={responsiblesQuery.isPending || save.isPending} onChange={(event) => setValue(event.target.value)}>
-          <option value="">{assignAll ? 'Не назначен' : `Как у всего Workflow — ${workflow.responsibleName ?? 'не назначен'}`}</option>
-          {options.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-        </Select></label>
+        <SearchableSelect label="Назначение" labelPlacement="outside" value={value} disabled={responsiblesQuery.isPending || save.isPending} onChange={setValue} options={[{ id: '', name: assignAll ? 'Не назначен' : `Как у всего Workflow — ${workflow.responsibleName ?? 'не назначен'}` }, ...options]} placeholder={assignAll ? 'Не назначен' : 'Как у всего Workflow'} />
         <label className={styles.assignAllOption}><input type="checkbox" checked={assignAll} disabled={save.isPending} onChange={(event) => { const checked = event.target.checked; setAssignAll(checked); setValue(checked ? stage.responsible?.id ?? '' : stage.responsibleOverrideId ?? ''); }} />Назначить на весь Workflow</label>
         {responsiblesQuery.isError ? <p role="alert">Не удалось загрузить ответственных вуза.</p> : null}
         <div className={styles.editActions}><Button variant="ghost" size="s" type="button" disabled={save.isPending} onClick={close}>Отмена</Button><Button variant="primary" size="s" type="button" loading={save.isPending} disabled={save.isPending || responsiblesQuery.isPending || unchanged || Boolean(value && !options.some((item) => item.id === value))} onClick={() => { if (assignAll && overriddenStages) setConfirmReplace(true); else save.mutate(); }}>Сохранить</Button></div>

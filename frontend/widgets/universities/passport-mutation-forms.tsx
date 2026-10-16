@@ -15,6 +15,7 @@ import {
 import { Button } from '@/shared/ui/rtk/button';
 import { Input, Select, TextArea } from '@/shared/ui/rtk/form-controls';
 import { Modal } from '@/shared/ui/rtk/modal';
+import { SearchableSelect } from '@/shared/ui/rtk/multiselect';
 import styles from './university-passport-sections.module.css';
 
 function localDateTime(iso?: string): string {
@@ -47,7 +48,7 @@ export function ProductAssignmentForm({ universityId, existingProductIds, onClos
     onError: (cause) => setMessage(normalizeApiError(cause).message),
   });
   return <Modal title="Добавить продукт ВУЗу" onClose={() => { if (!save.isPending) onClose(); }}><form className={styles.assignmentForm} onSubmit={(event) => { event.preventDefault(); if (!save.isPending && selectedId) save.mutate(); }}>
-    <label className={styles.filter}><span>Продукт из каталога</span><Select value={selectedId} disabled={references.isPending || references.isError} onChange={(event) => setSelectedId(event.target.value)}><option value="">Выберите продукт</option>{available.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</Select></label>
+    <SearchableSelect label="Продукт из каталога" labelPlacement="outside" value={selectedId} disabled={references.isPending || references.isError} onChange={setSelectedId} options={available} placeholder="Выберите продукт" />
     {references.isError ? <p className={styles.assignmentError} role="alert">Не удалось загрузить каталог. <button type="button" onClick={() => void references.refetch()}>Повторить</button></p> : null}
     {references.isSuccess && !available.length ? <p>Все записи каталога уже закреплены за этим ВУЗом.</p> : null}
     {message ? <p className={styles.assignmentError} role="alert">{message}</p> : null}

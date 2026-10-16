@@ -531,8 +531,10 @@ export async function realResetAdminUserPassword(id: string): Promise<{ status: 
   return { status: 'requested' };
 }
 
-export async function realListResponsibleCandidates(): Promise<ResponsibleCandidate[]> {
-  const data = unwrap(await apiFetch<unknown>('/api/v1/responsibles?page=1&page_size=100'), 'Не удалось загрузить список ответственных.');
+export async function realListResponsibleCandidates(search = ''): Promise<ResponsibleCandidate[]> {
+  const query = new URLSearchParams({ page: '1', page_size: '100' });
+  if (search.trim()) query.set('search', search.trim());
+  const data = unwrap(await apiFetch<unknown>(`/api/v1/responsibles?${query}`), 'Не удалось загрузить список ответственных.');
   const payload = isRecord(data) ? data : {};
   const rows = Array.isArray(data) ? data : Array.isArray(payload.items) ? payload.items : [];
   return rows.map((value): ResponsibleCandidate => {
@@ -551,6 +553,14 @@ export async function realAssignUniversityResponsible(input: ResponsibleAssignme
     method: 'PATCH',
     body: { responsible_id: input.responsibleId, reason: input.reason },
   }), 'Не удалось назначить ответственного ВУЗа.');
+}
+
+export async function realAddUniversityResponsible(universityId: string, responsibleId: string): Promise<void> {
+  unwrap(await apiFetch<unknown>(`/api/v1/universities/${encodeURIComponent(universityId)}/responsibles/${encodeURIComponent(responsibleId)}`, { method: 'POST' }), 'Не удалось добавить ответственного ВУЗа.');
+}
+
+export async function realRemoveUniversityResponsible(universityId: string, responsibleId: string): Promise<void> {
+  unwrap(await apiFetch<unknown>(`/api/v1/universities/${encodeURIComponent(universityId)}/responsibles/${encodeURIComponent(responsibleId)}`, { method: 'DELETE' }), 'Не удалось снять ответственного ВУЗа.');
 }
 
 // -------------------------------------------------------------- catalog CRUD
