@@ -14,6 +14,7 @@ export const queryKeys = {
     list: <T>(query: T) => ['universities', query] as const,
     passports: ['university-passport'] as const,
     passport: (id: string) => ['university-passport', id] as const,
+    healthFamily: ['university-health'] as const,
     health: (id: string) => ['university-health', id] as const,
     passportBundle: (id: string) => ['university-passport', id, 'bundle'] as const,
     workflow: (instanceId: string) => ['workflow', instanceId] as const,

@@ -255,6 +255,7 @@ function WorkflowStageResponsibleField({ instanceId, workflow, stage, canManage,
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: workflowQueryKey(instanceId) }),
         queryClient.invalidateQueries({ queryKey: universityWorkflowInstancesQueryKey(workflow.universityId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.universities.health(workflow.universityId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowHistory(instanceId) }),
       ]);
     },
@@ -292,6 +293,7 @@ function WorkflowDeadlineField({ instanceId, stage, canManage, onNotify }: { ins
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: workflowQueryKey(instanceId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowHistory(instanceId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.universities.healthFamily }),
       ]);
     },
     onError: (cause) => onNotify({ intent: 'error', title: 'Дедлайн не сохранён', message: normalizeApiError(cause).message }),

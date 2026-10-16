@@ -50,6 +50,7 @@ export function invalidateWorkflowRelatedQueries(queryClient: QueryClient, insta
     invalidations.push(
       queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowByProgramFamily(universityId) }),
       queryClient.invalidateQueries({ queryKey: universityPassportQueryKey(universityId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.universities.health(universityId) }),
       queryClient.invalidateQueries({ queryKey: universityHistoryFamilyQueryKey(universityId) }),
     );
   }
