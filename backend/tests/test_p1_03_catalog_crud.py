@@ -758,9 +758,15 @@ def test_responsible_http_crud(client):
     assert created["universities"] == []
     got = client.get(f"/api/v1/responsibles/{rid}").json()
     assert got["email"] == "a@ex.test"
-    patched = client.patch(f"/api/v1/responsibles/{rid}", json={"phone": "+7-000", "role": "dean"})
+    invalid = client.patch(f"/api/v1/responsibles/{rid}", json={"phone": "+7-000"})
+    assert invalid.status_code == 422
+    assert invalid.json()["error"]["details"]["field_errors"][0]["field"] == "phone"
+    patched = client.patch(
+        f"/api/v1/responsibles/{rid}",
+        json={"phone": "+7 (999) 123-45-67", "role": "dean"},
+    )
     assert patched.status_code == 200
-    assert patched.json()["phone"] == "+7-000"
+    assert patched.json()["phone"] == "+7 (999) 123-45-67"
     assert patched.json()["email"] == "a@ex.test"
     assert client.delete(f"/api/v1/responsibles/{rid}").status_code == 204
     assert client.get(f"/api/v1/responsibles/{rid}").status_code == 404
