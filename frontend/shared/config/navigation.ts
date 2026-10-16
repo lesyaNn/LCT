@@ -23,7 +23,6 @@ export const routeLabels: Record<string, string> = {
   universities: 'ВУЗы',
   workflows: 'Workflow',
   reports: 'Отчёты',
-  notifications: 'Уведомления',
   audit: 'Аудит',
   admin: 'Администрирование',
   users: 'Пользователи и права',

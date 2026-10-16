@@ -8,6 +8,7 @@ import { useAuth } from '@/shared/auth/AuthProvider';
 import { Sidebar } from '@/widgets/sidebar/Sidebar';
 import { Topbar } from '@/widgets/topbar/Topbar';
 import { NotificationsProvider } from '@/widgets/topbar/notifications-state';
+import { AssistantWidget } from '@/widgets/assistant/assistant-widget';
 import styles from './app-shell.module.css';
 
 export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -15,6 +16,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
   const { status, user, error, login, retry } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const wasMobileOpen = useRef(false);
 
   useEffect(() => {
@@ -51,10 +53,11 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
       <div className={styles.shell}>
         <Sidebar user={user} pathname={pathname} collapsed={collapsed} mobileOpen={mobileOpen} onToggleCollapse={() => setCollapsed((value) => !value)} onCloseMobile={() => setMobileOpen(false)} />
         <div className={styles.workspace}>
-          <Topbar user={user} pathname={pathname} mobileOpen={mobileOpen} onMenuOpen={() => setMobileOpen(true)} />
+          <Topbar user={user} pathname={pathname} mobileOpen={mobileOpen} onMenuOpen={() => setMobileOpen(true)} assistantOpen={assistantOpen} onOpenAssistant={() => setAssistantOpen(true)} />
           <main className={styles.content}>{forbidden ? <ForbiddenState /> : children}</main>
         </div>
       </div>
+      <AssistantWidget key={`${user.id}:${user.role}`} user={user} pathname={pathname} open={assistantOpen} onOpen={() => setAssistantOpen(true)} onClose={() => setAssistantOpen(false)} />
     </NotificationsProvider>
   );
 }
