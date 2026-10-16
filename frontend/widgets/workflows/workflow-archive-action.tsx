@@ -13,7 +13,7 @@ import { Button } from '@/shared/ui/rtk/button';
 import { IconButton } from '@/shared/ui/rtk/icon-button';
 import { Modal } from '@/shared/ui/rtk/modal';
 
-export function WorkflowArchiveAction({ instanceId, universityId, active }: { instanceId: string; universityId: string; active: boolean }) {
+export function WorkflowArchiveAction({ instanceId, universityId, active, label = 'Архивировать Workflow' }: { instanceId: string; universityId: string; active: boolean; label?: string }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -34,7 +34,7 @@ export function WorkflowArchiveAction({ instanceId, universityId, active }: { in
   });
   if (!active || !isRealWorkflowMode() || !hasPermission(user, 'workflow.change_status') || !hasRole(user, 'admin')) return null;
   return <>
-    <IconButton icon={<Trash size={18} fill="currentColor" />} label="Архивировать Workflow" size={18} intent="danger" onClick={() => { setError(null); setOpen(true); }} />
+    <IconButton icon={<Trash size={18} fill="currentColor" />} label={label} size={18} intent="danger" onClick={() => { setError(null); setOpen(true); }} />
     {open ? <Modal title="Архивировать Workflow?" onClose={() => { if (!archive.isPending) setOpen(false); }}><p>Процесс исчезнет из активных списков. История, комментарии и файлы сохранятся.</p>{error ? <p role="alert">{error}</p> : null}<div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}><Button type="button" variant="ghost" size="s" disabled={archive.isPending} onClick={() => setOpen(false)}>Отмена</Button><Button type="button" variant="danger" size="s" loading={archive.isPending} onClick={() => archive.mutate()}>Архивировать</Button></div></Modal> : null}
   </>;
 }

@@ -37,14 +37,13 @@
 .workflowCard,
 .timelineCard { composes: surface from '../../shared/ui/rtk/section-surface.module.css'; }
 .workflowCards { display: grid; gap: var(--rtk-space-3); grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); margin-top: var(--rtk-space-4); }
-.workflowItem { align-items: flex-start; border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); display: flex; flex-direction: column; gap: var(--rtk-space-3); min-width: 0; padding: calc(var(--rtk-space-4) + 8px) var(--rtk-space-4) var(--rtk-space-4); position: relative; }
+.workflowItem { align-items: flex-start; border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); display: flex; flex-direction: column; gap: var(--rtk-space-3); min-width: 0; padding: var(--rtk-space-4); position: relative; }
 .workflowItem:has(.workflowCardLink):hover { border-color: var(--rtk-color-brand); }
 .workflowCardLink { inset: 0; position: absolute; }
 .workflowCardLink:focus-visible { border-radius: var(--rtk-radius-small); outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
-.workflowItemDelete { position: absolute; right: var(--rtk-space-3); top: var(--rtk-space-3); z-index: 2; }
-.workflowItemDelete button { position: relative; }
 .workflowItemTop { align-items: flex-start; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); justify-content: space-between; width: 100%; }
-.workflowItemStatus { align-items: center; display: flex; gap: var(--rtk-space-2); }
+.workflowItemStatus { align-items: center; display: flex; flex: 0 0 auto; gap: var(--rtk-space-2); position: relative; z-index: 2; }
+.workflowItemTop strong { flex: 1 1 140px; min-width: 0; }
 .workflowItemTop strong, .workflowProgram { font-size: 15px; overflow-wrap: anywhere; }
 .workflowItem p { color: var(--rtk-color-text-secondary); font-size: 13px; margin: 0; }
 .workflowItem p b { color: var(--rtk-color-text-primary); }
