@@ -1,7 +1,7 @@
 .section { display: flex; flex-direction: column; gap: var(--rtk-space-4); min-width: 0; }
 .toolbar { display: flex; justify-content: flex-end; min-height: 36px; }
-.grid { align-items: start; display: grid; gap: var(--rtk-space-4); grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 300px)); }
-.card { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-medium); display: flex; flex-direction: column; gap: var(--rtk-space-3); min-width: 0; padding: var(--rtk-space-4); }
+.grid { display: grid; gap: var(--rtk-space-4); grid-auto-rows: 1fr; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 300px)); }
+.card { background: var(--rtk-color-surface); border-radius: var(--rtk-radius-medium); box-shadow: var(--rtk-shadow-elevation-1); display: flex; flex-direction: column; gap: var(--rtk-space-3); min-width: 0; padding: var(--rtk-space-4); }
 .cardHeader { align-items: flex-start; display: flex; gap: var(--rtk-space-3); min-width: 0; }
 .identity { flex: 1; min-width: 0; padding-top: var(--rtk-space-1); }
 .identity h3 { font-size: 14px; line-height: 1.3; margin: 0; overflow-wrap: anywhere; }
