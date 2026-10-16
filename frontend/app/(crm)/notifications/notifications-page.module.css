@@ -1,4 +1,4 @@
-.page { display: grid; gap: var(--rtk-space-6); max-width: 1120px; }
+.page { composes: surface from '../../../shared/ui/rtk/section-surface.module.css'; display: grid; gap: var(--rtk-space-5); max-width: 1120px; }
 .toolbar { align-items: end; display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); justify-content: space-between; }
 .toolbar nav { flex: 1 1 auto; }
 .toolbar button { flex: 0 0 auto; }

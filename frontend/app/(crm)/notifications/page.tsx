@@ -35,7 +35,7 @@ export default function NotificationsPage() {
   const hasItems = groups.some((group) => group.items.length > 0);
 
   return <div className={styles.page}>
-    <PageIntro title="Уведомления" description="События и изменения в CRM. Сейчас показаны демонстрационные уведомления." />
+    <PageIntro title="Уведомления" />
     <div className={styles.toolbar}>
       <Tabs
         items={[{ id: 'all', label: 'Все' }, { id: 'unread', label: `Непрочитанные${unreadCount ? ` (${unreadCount})` : ''}` }]}
