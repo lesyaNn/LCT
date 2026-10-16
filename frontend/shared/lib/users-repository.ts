@@ -179,20 +179,20 @@ export async function resetAdminUserPassword(id: string): Promise<{ status: 'req
 }
 
 export async function listResponsibleCandidates(search = ''): Promise<ResponsibleCandidate[]> {
-  return fromDataSource({ mock: () => mockListResponsibleCandidates().filter((item) => `${item.name} ${item.email}`.toLocaleLowerCase('ru-RU').includes(search.trim().toLocaleLowerCase('ru-RU'))), real: () => realListResponsibleCandidates(search) });
+  return fromDataSource({ domain: 'passport', mock: () => mockListResponsibleCandidates().filter((item) => `${item.name} ${item.email}`.toLocaleLowerCase('ru-RU').includes(search.trim().toLocaleLowerCase('ru-RU'))), real: () => realListResponsibleCandidates(search) });
 }
 
 export async function assignUniversityResponsible(input: ResponsibleAssignmentInput): Promise<void> {
   if (!input.universityId || !input.responsibleId) {
     throw new ApiRequestError(400, { code: 'RESPONSIBLE_REQUIRED' }, 'Выберите нового ответственного.');
   }
-  return fromDataSource({ mock: () => mockAssignUniversityResponsible(input), real: () => realAssignUniversityResponsible(input) });
+  return fromDataSource({ domain: 'passport', mock: () => mockAssignUniversityResponsible(input), real: () => realAssignUniversityResponsible(input) });
 }
 
 export async function addUniversityResponsible(universityId: string, responsibleId: string): Promise<void> {
-  return fromDataSource({ mock: () => { throw new ApiRequestError(501, { code: 'UNAVAILABLE' }, 'Добавление ответственного недоступно в деморежиме.'); }, real: () => realAddUniversityResponsible(universityId, responsibleId) });
+  return fromDataSource({ domain: 'passport', mock: () => { throw new ApiRequestError(501, { code: 'UNAVAILABLE' }, 'Добавление ответственного недоступно в деморежиме.'); }, real: () => realAddUniversityResponsible(universityId, responsibleId) });
 }
 
 export async function removeUniversityResponsible(universityId: string, responsibleId: string): Promise<void> {
-  return fromDataSource({ mock: () => { throw new ApiRequestError(501, { code: 'UNAVAILABLE' }, 'Снятие ответственного недоступно в деморежиме.'); }, real: () => realRemoveUniversityResponsible(universityId, responsibleId) });
+  return fromDataSource({ domain: 'passport', mock: () => { throw new ApiRequestError(501, { code: 'UNAVAILABLE' }, 'Снятие ответственного недоступно в деморежиме.'); }, real: () => realRemoveUniversityResponsible(universityId, responsibleId) });
 }
