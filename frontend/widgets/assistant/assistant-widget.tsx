@@ -155,7 +155,7 @@ export function AssistantWidget({ user, pathname, open, onOpen, onClose }: { use
         {restoring && <p className={styles.info} role="status">Загружаем диалог…</p>}
         {restoreError && <div className={styles.restoreError} role="alert"><span>Не удалось загрузить предыдущий диалог: {restoreError}</span><Button type="button" variant="ghost" size="s" onClick={retryRestore}>Повторить</Button></div>}
         {messages.map((message) => <Message key={message.id} message={message} user={user} onRetry={retry} sending={sending} />)}
-        {sending && <div className={styles.messageRow} role="status"><div className={styles.messageAvatar}><Image src={robot} alt="" width={43} height={43} /></div><div className={`${styles.bubble} ${styles.assistantBubble} ${styles.typing}`}>Помощник печатает<span className={styles.dots}>…</span></div></div>}
+        {sending && <div className={styles.messageRow} role="status"><div className={styles.messageAvatar}><Image src={robot} alt="" width={43} height={43} /></div><p className={styles.info}>Помощник печатает<span className={styles.dots}>…</span></p></div>}
       </div>
 
       <form className={styles.composer} onSubmit={submit}>

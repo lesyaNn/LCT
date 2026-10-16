@@ -53,7 +53,6 @@
 .composer { align-items: flex-end; background: var(--rtk-color-surface-elevated); display: flex; flex: 0 0 auto; gap: var(--rtk-space-2); padding: var(--rtk-space-3) var(--rtk-space-5) var(--rtk-space-5); }
 .input { border-radius: var(--rtk-radius-medium) !important; flex: 1 1 auto; max-height: 144px; min-height: 50px !important; min-width: 0; padding: 13px 14px !important; resize: none !important; }
 .sendButton { border-radius: var(--rtk-radius-medium) !important; flex: 0 0 50px; height: 50px; min-height: 50px !important; padding: 0 !important; }
-.typing { color: var(--rtk-color-text-secondary); }
 .dots { animation: pulse 1.2s ease-in-out infinite; }
 .messageError, .restoreError { color: var(--rtk-color-danger); display: flex; flex-direction: column; font-size: 12px; gap: var(--rtk-space-1); margin-top: var(--rtk-space-2); }
 .messageError button, .restoreError button { align-self: flex-start; color: var(--rtk-color-brand); padding-left: 0; }
