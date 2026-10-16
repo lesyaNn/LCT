@@ -4,6 +4,12 @@ export const queryKeys = {
     all: ['auth'] as const,
     me: ['auth', 'me'] as const,
   },
+  notifications: {
+    all: ['notifications'] as const,
+    user: (userId: string) => ['notifications', userId] as const,
+    count: (userId: string) => ['notifications', userId, 'count'] as const,
+    list: (userId: string, filter: string, limit: number, offset: number) => ['notifications', userId, 'list', filter, limit, offset] as const,
+  },
   dashboard: {
     overview: ['dashboard-overview'] as const,
     analytics: ['dashboard-analytics'] as const,

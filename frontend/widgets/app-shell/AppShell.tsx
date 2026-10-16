@@ -7,7 +7,6 @@ import { AuthError, AuthLoading, AuthRequired, ForbiddenState } from '@/shared/u
 import { useAuth } from '@/shared/auth/AuthProvider';
 import { Sidebar } from '@/widgets/sidebar/Sidebar';
 import { Topbar } from '@/widgets/topbar/Topbar';
-import { NotificationsProvider } from '@/widgets/topbar/notifications-state';
 import { AssistantWidget } from '@/widgets/assistant/assistant-widget';
 import styles from './app-shell.module.css';
 
@@ -49,7 +48,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
   const forbidden = !canAccessRoute(pathname, user);
 
   return (
-    <NotificationsProvider>
+    <>
       <div className={styles.shell}>
         <Sidebar user={user} pathname={pathname} collapsed={collapsed} mobileOpen={mobileOpen} onToggleCollapse={() => setCollapsed((value) => !value)} onCloseMobile={() => setMobileOpen(false)} />
         <div className={styles.workspace}>
@@ -58,6 +57,6 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
         </div>
       </div>
       <AssistantWidget key={`${user.id}:${user.role}`} user={user} pathname={pathname} open={assistantOpen} onOpen={() => setAssistantOpen(true)} onClose={() => setAssistantOpen(false)} />
-    </NotificationsProvider>
+    </>
   );
 }

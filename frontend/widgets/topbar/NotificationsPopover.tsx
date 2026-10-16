@@ -18,7 +18,7 @@ const icons: Record<NotificationType, React.ReactNode> = {
   comment: <Message size={24} fill="currentColor" />,
 };
 
-export function NotificationRow({ notification, variant = 'popover' }: { notification: NotificationItem; variant?: 'popover' | 'page' }) {
+export function NotificationRow({ notification, onOpen, variant = 'popover' }: { notification: NotificationItem; onOpen: (notification: NotificationItem) => void; variant?: 'popover' | 'page' }) {
   const content = <>
     <span className={styles.unreadSlot}>{notification.read ? null : <span className={styles.unreadDot} />}</span>
     <span className={`${styles.iconCircle} ${styles[notification.type]}`} aria-hidden="true">{icons[notification.type]}</span>
@@ -32,7 +32,7 @@ export function NotificationRow({ notification, variant = 'popover' }: { notific
   </>;
 
   return <li className={`${styles.item} ${notification.read ? '' : styles.unreadItem} ${variant === 'page' ? styles.pageItem : ''}`}>
-    {notification.target ? <Link className={styles.itemInner} href={notification.target}>{content}</Link> : <div className={styles.itemInner}>{content}</div>}
+    <button className={styles.itemInner} type="button" onClick={() => onOpen(notification)}>{content}</button>
   </li>;
 }
 
@@ -41,23 +41,30 @@ interface NotificationsPopoverProps {
   notifications: NotificationItem[];
   unreadCount: number;
   onMarkAllRead: () => void;
+  onOpenNotification: (notification: NotificationItem) => void;
+  onRetry: () => void;
   onClose: () => void;
   onToggle: ToggleEventHandler<HTMLDivElement>;
+  loading: boolean;
+  error: string;
+  markingAll: boolean;
 }
 
-export const NotificationsPopover = forwardRef<HTMLDivElement, NotificationsPopoverProps>(function NotificationsPopover({ id, notifications, unreadCount, onMarkAllRead, onClose, onToggle }, ref) {
+export const NotificationsPopover = forwardRef<HTMLDivElement, NotificationsPopoverProps>(function NotificationsPopover({ id, notifications, unreadCount, onMarkAllRead, onOpenNotification, onRetry, onClose, onToggle, loading, error, markingAll }, ref) {
   return <div id={id} ref={ref} popover="auto" tabIndex={-1} className={styles.panel} role="dialog" aria-labelledby={`${id}-title`} onToggle={onToggle}>
     <div className={styles.heading}>
       <div className={styles.headingTitle}>
         <h2 id={`${id}-title`}>Уведомления</h2>
         {unreadCount > 0 ? <span className={styles.headingBadge} aria-label={`Непрочитанных: ${unreadCount}`}>{unreadCount}</span> : null}
       </div>
-      <Button type="button" variant="ghost" size="s" className={styles.markAll} disabled={unreadCount === 0} onClick={onMarkAllRead}>Отметить все как прочитанные</Button>
+      <Button type="button" variant="ghost" size="s" className={styles.markAll} disabled={unreadCount === 0 || markingAll} onClick={onMarkAllRead}>Отметить все как прочитанные</Button>
     </div>
     <ul className={styles.list} aria-label="Список уведомлений">
-      {notifications.map((notification) => <NotificationRow key={notification.id} notification={notification} />)}
+      {notifications.map((notification) => <NotificationRow key={notification.id} notification={notification} onOpen={onOpenNotification} />)}
     </ul>
-    {notifications.length === 0 ? <p className={styles.empty}>Уведомлений пока нет</p> : null}
+    {loading && !notifications.length ? <p className={styles.empty} role="status">Загружаем уведомления…</p> : null}
+    {error ? <p className={styles.empty} role="alert">{error} <button className={styles.retry} type="button" onClick={onRetry}>Повторить</button></p> : null}
+    {!loading && !error && notifications.length === 0 ? <p className={styles.empty}>Уведомлений пока нет</p> : null}
     <Link className={styles.footer} href="/notifications" onClick={onClose}>
       <span>Все уведомления</span><Icon name="chevron-right" size={22} />
     </Link>
