@@ -1,5 +1,6 @@
 'use client';
 
+import Checklist from '@atomaro/icons/24/action/Checklist';
 import { Controller, type Control } from 'react-hook-form';
 import { Button } from '@/shared/ui/rtk/button';
 import { FormError } from '@/shared/ui/rtk/form-field';
@@ -28,9 +29,12 @@ export function ReportColumnSelector({ control, error }: ReportColumnSelectorPro
   return (
     <div className={styles.columnSection}>
       <div className={styles.sectionHeading}>
-        <div>
-          <h3>Колонки</h3>
-          <p>Выберите данные, которые войдут в отчёт.</p>
+        <div className={styles.headingWithIcon}>
+          <Checklist size={18} fill="currentColor" aria-hidden="true" />
+          <div>
+            <h3>Колонки</h3>
+            <p>Выберите данные, которые войдут в отчёт.</p>
+          </div>
         </div>
         {error ? <FormError id="report-columns-error">{error}</FormError> : null}
       </div>

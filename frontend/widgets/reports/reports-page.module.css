@@ -1,7 +1,11 @@
 .page { display: flex; flex-direction: column; gap: var(--rtk-space-5); min-width: 0; }
 .reportsLayout { align-items: start; display: grid; gap: var(--rtk-space-5); grid-template-columns: minmax(0, 1.75fr) minmax(340px, 1fr); min-width: 0; }
-.formSurface, .jobsSurface { background: var(--rtk-color-surface-elevated); border: 0; border-radius: var(--rtk-radius-medium); box-shadow: var(--rtk-shadow-elevation-1); min-width: 0; padding: clamp(var(--rtk-space-4), 2vw, var(--rtk-space-6)); }
+.sideColumn { display: flex; flex-direction: column; gap: var(--rtk-space-5); min-width: 0; }
+.formSurface, .jobsSurface, .templatesSurface { background: var(--rtk-color-surface-elevated); border: 0; border-radius: var(--rtk-radius-medium); box-shadow: var(--rtk-shadow-elevation-1); min-width: 0; padding: clamp(var(--rtk-space-4), 2vw, var(--rtk-space-6)); }
 .formSurface { display: flex; flex-direction: column; gap: var(--rtk-space-5); }
+.headingWithIcon { align-items: flex-start; display: flex; gap: var(--rtk-space-2); min-width: 0; }
+.headingWithIcon > svg { color: var(--rtk-color-brand); flex: 0 0 auto; }
+.headingWithIcon > div { min-width: 0; }
 .sectionHeading { align-items: flex-start; display: flex; gap: var(--rtk-space-3); justify-content: space-between; }
 .sectionHeading h2, .sectionHeading h3 { margin: 0; }
 .sectionHeading h2 { font-size: 19px; }
@@ -12,8 +16,21 @@
 .formSection, .columnSection { border-top: 1px solid var(--rtk-color-border); display: flex; flex-direction: column; gap: var(--rtk-space-3); padding-top: var(--rtk-space-5); }
 .columnSection .sectionHeading { align-items: flex-start; }
 .columnPresets { display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); }
-.templateActions { align-items: end; display: grid; gap: var(--rtk-space-3); grid-template-columns: minmax(0, 1fr) auto; }
-.templateActions > button { align-self: end; }
+.templatesSurface { display: flex; flex-direction: column; gap: var(--rtk-space-4); }
+.templatesHeader { align-items: flex-start; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); justify-content: space-between; }
+.templatesHeader h2 { font-size: 19px; margin: 0; }
+.templatesHeader p { color: var(--rtk-color-text-secondary); font-size: 12px; margin: var(--rtk-space-1) 0 0; }
+.templatesHeader > button { border-color: var(--rtk-color-brand); color: var(--rtk-color-brand); margin-left: auto; }
+.templateList { display: flex; flex-direction: column; }
+.templateItem { align-items: center; border-bottom: 1px solid var(--rtk-color-border); display: flex; gap: var(--rtk-space-2); min-width: 0; padding: var(--rtk-space-2) 0; }
+.templateItem:last-child { border-bottom: 0; }
+.templateInfo { display: flex; flex: 1 1 auto; flex-direction: column; min-width: 0; }
+.templateInfo > button { justify-content: flex-start; min-width: 0; padding-left: 0; text-align: left; white-space: normal; }
+.templateInfo > button span { overflow-wrap: anywhere; white-space: normal; }
+.templateMeta { color: var(--rtk-color-text-tertiary); font-size: 11px; }
+.templateItem > button { flex: 0 0 auto; }
+.saveTemplateForm { display: flex; flex-direction: column; gap: var(--rtk-space-4); }
+.saveTemplateActions { display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); justify-content: flex-end; }
 .columnFieldset { border: 0; margin: 0; padding: 0; }
 .columnLegend { color: var(--rtk-color-text-secondary); font-size: 11px; font-weight: 700; letter-spacing: .04em; padding: 0 0 var(--rtk-space-2); text-transform: uppercase; }
 .columnGrid { display: grid; gap: 1px var(--rtk-space-3); grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -26,7 +43,7 @@
 .radioGroup small { color: var(--rtk-color-text-tertiary); font-size: 10px; }
 .optionDisabled { color: var(--rtk-color-text-tertiary) !important; cursor: not-allowed !important; }
 .formActions { align-items: center; border-top: 1px solid var(--rtk-color-border); display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); padding-top: var(--rtk-space-5); }
-.actionHint { color: var(--rtk-color-text-tertiary); font-size: 11px; }
+.actionHint { color: var(--rtk-color-text-tertiary); flex-basis: 100%; font-size: 11px; }
 .toastViewport { bottom: var(--rtk-space-5); display: flex; justify-content: flex-end; pointer-events: none; position: fixed; right: var(--rtk-space-5); z-index: 80; }
 .toastViewport > * { pointer-events: auto; }
 .resultSurface { border-top: 1px solid var(--rtk-color-border); display: flex; flex-direction: column; gap: var(--rtk-space-5); padding-top: var(--rtk-space-5); }
@@ -49,11 +66,12 @@
 .statCaption { color: var(--rtk-color-text-secondary); font-size: 11px; margin: var(--rtk-space-2) 0 0; }
 .statEmpty { color: var(--rtk-color-text-tertiary); font-size: 12px; margin: 0; }
 .statTooltip { background: var(--rtk-color-surface-elevated); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); box-shadow: var(--rtk-shadow-elevation-2); display: flex; flex-direction: column; font-size: 11px; gap: 2px; max-width: 240px; padding: var(--rtk-space-2) var(--rtk-space-3); }
-.jobsSurface { display: flex; flex-direction: column; gap: var(--rtk-space-4); position: sticky; top: var(--rtk-space-4); }
+.jobsSurface { display: flex; flex-direction: column; gap: var(--rtk-space-4); }
 .jobsHeader { align-items: flex-start; display: flex; gap: var(--rtk-space-4); justify-content: space-between; }
+.jobsHeader > svg { color: var(--rtk-color-brand); flex: 0 0 auto; }
+.jobsHeader > div { min-width: 0; }
 .jobsHeader h2 { font-size: 19px; margin: 0; }
 .jobsHeader p { color: var(--rtk-color-text-secondary); font-size: 12px; margin: var(--rtk-space-1) 0 0; }
-.eyebrow { color: var(--rtk-color-brand); font-size: 11px; font-weight: 700; letter-spacing: .07em; margin: 0 0 var(--rtk-space-1); text-transform: uppercase; }
 .jobsCapability { align-items: flex-start; color: var(--rtk-color-text-tertiary); display: inline-flex; font-size: 11px; gap: var(--rtk-space-1); max-width: 220px; }
 .jobsCapability svg { flex: 0 0 auto; }
 .jobsListShell { background: transparent; border-radius: 0; box-shadow: none; overflow: visible; }
@@ -102,7 +120,7 @@
 .jobCardActions { display: flex; gap: var(--rtk-space-2); }
 .visuallyHidden { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
 @keyframes reportShimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
-@media (max-width: 1180px) { .reportsLayout { grid-template-columns: 1fr; } .jobsSurface { position: static; } }
-@media (max-width: 768px) { .formSurface, .jobsSurface { padding: var(--rtk-space-4); } .jobsHeader { flex-direction: column; } .jobsCapability { max-width: none; } .jobsSkeleton { gap: var(--rtk-space-3); min-width: 0; padding: var(--rtk-space-3); } .jobsSkeleton > div { border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); gap: var(--rtk-space-2); grid-template-columns: 1fr; padding: var(--rtk-space-4); } .jobsSkeleton span { border-radius: 999px; height: 14px; } .columnGrid label, .radioGroup label { min-height: 44px; } }
-@media (max-width: 560px) { .dateGrid, .filterGrid, .columnGrid, .statGrid { grid-template-columns: 1fr; } .filterGrid > *:first-child { grid-column: auto; } .templateActions { align-items: stretch; grid-template-columns: 1fr; } .formActions { align-items: stretch; flex-direction: column; } .formActions > button { width: 100%; } .actionHint { text-align: center; } .toastViewport { bottom: var(--rtk-space-3); left: var(--rtk-space-3); right: var(--rtk-space-3); } }
+@media (max-width: 1180px) { .reportsLayout { grid-template-columns: 1fr; } }
+@media (max-width: 768px) { .formSurface, .jobsSurface, .templatesSurface { padding: var(--rtk-space-4); } .jobsCapability { max-width: none; } .jobsSkeleton { gap: var(--rtk-space-3); min-width: 0; padding: var(--rtk-space-3); } .jobsSkeleton > div { border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); gap: var(--rtk-space-2); grid-template-columns: 1fr; padding: var(--rtk-space-4); } .jobsSkeleton span { border-radius: 999px; height: 14px; } .columnGrid label, .radioGroup label { min-height: 44px; } }
+@media (max-width: 560px) { .columnGrid, .statGrid { grid-template-columns: 1fr; } .formActions { align-items: stretch; flex-direction: column; } .formActions > button { width: 100%; } .actionHint { text-align: center; } .toastViewport { bottom: var(--rtk-space-3); left: var(--rtk-space-3); right: var(--rtk-space-3); } }
 @media (prefers-reduced-motion: reduce) { .jobsSkeleton span { animation: none; } }

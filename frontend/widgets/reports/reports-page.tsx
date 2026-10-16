@@ -1,6 +1,9 @@
 'use client';
 
 import Filter from '@atomaro/icons/24/action/Filter';
+import Calendar from '@atomaro/icons/24/communication/Calendar';
+import DocumentText from '@atomaro/icons/24/document/DocumentText';
+import FolderAdd from '@atomaro/icons/24/document/FolderAdd';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   keepPreviousData,
@@ -49,6 +52,7 @@ type Notification = { intent: ToastIntent; title: string; message?: string; key?
 function ReportParameters({ onCreated }: { onCreated: (job: ReportJob) => void }) {
   const [notification, setNotification] = useState<Notification | null>(null);
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const { control, handleSubmit, setValue, setError, setFocus, formState: { errors, isDirty }, clearErrors } = useForm<ReportFormSchema>({
     resolver: zodResolver(reportSchema),
     mode: 'onBlur',
@@ -112,25 +116,72 @@ function ReportParameters({ onCreated }: { onCreated: (job: ReportJob) => void }
   };
 
   return (
-    <div className={styles.formSurface}>
-      <div className={styles.sectionHeading}>
-        <div><h2>Параметры отчёта</h2></div>
-        <Filter size={20} fill="currentColor" aria-hidden="true" />
-      </div>
-      {globalError ? <FormErrorBanner>{globalError}</FormErrorBanner> : null}
-      <form onSubmit={(event) => void handleSubmit(submit)(event)} noValidate>
-        <section className={styles.formSection}>
-          <ReportFilterFields
-            values={values}
-            errors={errors}
-            onPeriodChange={setPeriod}
-            onReset={clearFilters}
-            activeFilters={activeFilters}
+    <div className={styles.reportsLayout}>
+      <div className={styles.formSurface}>
+        <div className={styles.sectionHeading}>
+          <div className={styles.headingWithIcon}>
+            <Filter size={20} fill="currentColor" aria-hidden="true" />
+            <h2>Параметры отчёта</h2>
+          </div>
+        </div>
+        {globalError ? <FormErrorBanner>{globalError}</FormErrorBanner> : null}
+        <form onSubmit={(event) => void handleSubmit(submit)(event)} noValidate>
+          <section className={styles.formSection}>
+            <div className={styles.sectionHeading}>
+              <div className={styles.headingWithIcon}>
+                <Calendar size={18} fill="currentColor" aria-hidden="true" />
+                <div>
+                  <h3>Период</h3>
+                  <p>Выберите готовый период или укажите даты.</p>
+                </div>
+              </div>
+            </div>
+            <ReportFilterFields
+              values={values}
+              errors={errors}
+              onPeriodChange={setPeriod}
+              onReset={clearFilters}
+              activeFilters={activeFilters}
+            />
+          </section>
+          <ReportColumnSelector control={control} error={errors.columnIds?.message} />
+          <ReportFormatField control={control} />
+          <div className={styles.formActions}>
+            <Button type="button" variant="secondary" size="m" onClick={() => setSaveTemplateOpen(true)}>
+              <FolderAdd size={16} fill="currentColor" aria-hidden="true" />Сохранить как шаблон
+            </Button>
+            <Button type="submit" variant="primary" size="m" loading={createMutation.isPending} disabled={createMutation.isPending}>
+              Сформировать отчёт
+            </Button>
+            <span className={styles.actionHint}>
+              Отчёт формируется в фоне; значения формы сохраняются при ошибке.
+            </span>
+          </div>
+        </form>
+        <div className={styles.resultSurface}>
+          <ReportPreviewTable
+            preview={previewQuery.data}
+            pending={previewQuery.isPending || previewQuery.isFetching}
+            error={previewQuery.isError ? previewQuery.error : null}
+            dirty={isDirty}
+            onRetry={() => void previewQuery.refetch()}
           />
-        </section>
-        <ReportColumnSelector control={control} error={errors.columnIds?.message} />
+          <ReportStatisticsPanel
+            statistics={statisticsQuery.data}
+            pending={statisticsQuery.isPending || statisticsQuery.isFetching}
+            error={statisticsQuery.isError ? statisticsQuery.error : null}
+            dirty
+            onRetry={() => void statisticsQuery.refetch()}
+          />
+        </div>
+      </div>
+      <div className={styles.sideColumn}>
+        <ReportQueue />
         <ReportTemplatesSection
           currentValues={values}
+          saveOpen={saveTemplateOpen}
+          onOpenSave={() => setSaveTemplateOpen(true)}
+          onCloseSave={() => setSaveTemplateOpen(false)}
           onApply={(template: ReportTemplate) => {
             const next = reportFormFromTemplate(template);
             (Object.keys(next) as Array<keyof typeof next>).forEach((key) =>
@@ -138,31 +189,6 @@ function ReportParameters({ onCreated }: { onCreated: (job: ReportJob) => void }
             );
             setNotification({ intent: 'success', title: 'Шаблон применён', message: template.name });
           }}
-        />
-        <ReportFormatField control={control} />
-        <div className={styles.formActions}>
-          <Button type="submit" variant="primary" size="m" loading={createMutation.isPending} disabled={createMutation.isPending}>
-            Сформировать отчёт
-          </Button>
-          <span className={styles.actionHint}>
-            Отчёт формируется в фоне; значения формы сохраняются при ошибке.
-          </span>
-        </div>
-      </form>
-      <div className={styles.resultSurface}>
-        <ReportPreviewTable
-          preview={previewQuery.data}
-          pending={previewQuery.isPending || previewQuery.isFetching}
-          error={previewQuery.isError ? previewQuery.error : null}
-          dirty={isDirty}
-          onRetry={() => void previewQuery.refetch()}
-        />
-        <ReportStatisticsPanel
-          statistics={statisticsQuery.data}
-          pending={statisticsQuery.isPending || statisticsQuery.isFetching}
-          error={statisticsQuery.isError ? statisticsQuery.error : null}
-          dirty
-          onRetry={() => void statisticsQuery.refetch()}
         />
       </div>
       {notification ? (
@@ -260,9 +286,9 @@ function ReportQueue() {
   return (
     <section className={styles.jobsSurface} aria-labelledby="report-jobs-heading">
       <div className={styles.jobsHeader}>
+        <DocumentText size={20} fill="currentColor" aria-hidden="true" />
         <div>
-          <p className={styles.eyebrow}>Очередь формирования</p>
-          <h2 id="report-jobs-heading">Задачи отчётов</h2>
+          <h2 id="report-jobs-heading">Сформированные отчёты</h2>
           <p>В очереди и во время формирования статус обновляется примерно каждые 3 секунды.</p>
         </div>
       </div>
@@ -287,24 +313,16 @@ function ReportQueue() {
 
 /* ------------------------------------------------------------------ page */
 
-/**
- * Reports page, ordered as the ТЗ describes: period -> universities ->
- * directions -> products -> responsibles -> columns -> current selection
- * (preview + statistics) -> build -> format -> download.
- */
 export function ReportsPage() {
   const queryClient = useQueryClient();
 
   return (
     <div className={styles.page}>
-      <div className={styles.reportsLayout}>
-        <ReportParameters
-          onCreated={(job) => {
-            queryClient.setQueryData<ReportJob[]>(reportQueryKeys.jobs, (current = []) => [job, ...current.filter((item) => item.id !== job.id)]);
-          }}
-        />
-        <ReportQueue />
-      </div>
+      <ReportParameters
+        onCreated={(job) => {
+          queryClient.setQueryData<ReportJob[]>(reportQueryKeys.jobs, (current = []) => [job, ...current.filter((item) => item.id !== job.id)]);
+        }}
+      />
     </div>
   );
 }
