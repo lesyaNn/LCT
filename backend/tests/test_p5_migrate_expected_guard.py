@@ -31,14 +31,19 @@ def _created_tables():
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "migrations"
     )
     found: set[str] = set()
-    dropped: set[str] = set()
     for name in sorted(os.listdir(migrations)):
         if not name.endswith(".up.sql"):
             continue
         text = open(os.path.join(migrations, name), encoding="utf-8").read()
-        found |= set(CREATE_RE.findall(text))
-        dropped |= set(DROP_RE.findall(text))
-    return (found - {"schema_migrations"}) - dropped
+        # Apply operations in order: 000036 recreates tables dropped in 000029.
+        operations = [(match.start(), True, match.group(1)) for match in CREATE_RE.finditer(text)]
+        operations += [(match.start(), False, match.group(1)) for match in DROP_RE.finditer(text)]
+        for _, created, table in sorted(operations):
+            if created:
+                found.add(table)
+            else:
+                found.discard(table)
+    return found - {"schema_migrations"}
 
 
 def test_expected_tables_matches_migrations():

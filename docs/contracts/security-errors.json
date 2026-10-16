@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0",
+  "version": "2.1.0",
   "base_api": "/api/v1",
   "schema": "backend/app/schemas/errors.py",
   "codes": [
@@ -24,6 +24,13 @@
     "REPORT_NOT_READY",
     "EXTERNAL_SOURCE_UNAVAILABLE",
     "EXTERNAL_SYNC_FAILED",
+    "ASSISTANT_DISABLED",
+    "ASSISTANT_UNAVAILABLE",
+    "ASSISTANT_TIMEOUT",
+    "ASSISTANT_BUSY",
+    "ASSISTANT_KNOWLEDGE_UNAVAILABLE",
+    "ASSISTANT_INVALID_RESPONSE",
+    "ASSISTANT_STORAGE_UNAVAILABLE",
     "RATE_LIMITED",
     "METHOD_NOT_ALLOWED",
     "HTTP_ERROR",
@@ -86,6 +93,13 @@
     "REPORT_NOT_READY": 400,
     "EXTERNAL_SOURCE_UNAVAILABLE": 503,
     "EXTERNAL_SYNC_FAILED": 500,
+    "ASSISTANT_DISABLED": 503,
+    "ASSISTANT_UNAVAILABLE": 503,
+    "ASSISTANT_TIMEOUT": 504,
+    "ASSISTANT_BUSY": 429,
+    "ASSISTANT_KNOWLEDGE_UNAVAILABLE": 503,
+    "ASSISTANT_INVALID_RESPONSE": 503,
+    "ASSISTANT_STORAGE_UNAVAILABLE": 503,
     "RATE_LIMITED": 429,
     "METHOD_NOT_ALLOWED": 405,
     "HTTP_ERROR": 500,
@@ -113,6 +127,13 @@
     "REPORT_NOT_READY": "Отчёт ещё формируется. Подождите немного.",
     "EXTERNAL_SOURCE_UNAVAILABLE": "Внешний источник данных временно недоступен.",
     "EXTERNAL_SYNC_FAILED": "Ошибка синхронизации с внешним источником.",
+    "ASSISTANT_DISABLED": "Помощник пока не включён.",
+    "ASSISTANT_UNAVAILABLE": "Модель помощника временно недоступна.",
+    "ASSISTANT_TIMEOUT": "Помощник не успел ответить. Попробуйте позже.",
+    "ASSISTANT_BUSY": "Помощник занят. Попробуйте через несколько секунд.",
+    "ASSISTANT_KNOWLEDGE_UNAVAILABLE": "Документация помощника недоступна.",
+    "ASSISTANT_INVALID_RESPONSE": "Помощник не смог подготовить проверяемый ответ.",
+    "ASSISTANT_STORAGE_UNAVAILABLE": "История помощника временно недоступна.",
     "RATE_LIMITED": "Слишком много запросов. Попробуйте позже.",
     "METHOD_NOT_ALLOWED": "Метод запроса не поддерживается для этого ресурса.",
     "HTTP_ERROR": "Не удалось обработать запрос.",
@@ -317,6 +338,62 @@
       "error": {
         "code": "HTTP_ERROR",
         "message": "Не удалось обработать запрос.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "ASSISTANT_DISABLED": {
+      "error": {
+        "code": "ASSISTANT_DISABLED",
+        "message": "Помощник пока не включён.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "ASSISTANT_UNAVAILABLE": {
+      "error": {
+        "code": "ASSISTANT_UNAVAILABLE",
+        "message": "Модель помощника временно недоступна.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "ASSISTANT_TIMEOUT": {
+      "error": {
+        "code": "ASSISTANT_TIMEOUT",
+        "message": "Помощник не успел ответить. Попробуйте позже.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "ASSISTANT_BUSY": {
+      "error": {
+        "code": "ASSISTANT_BUSY",
+        "message": "Помощник занят. Попробуйте через несколько секунд.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "ASSISTANT_KNOWLEDGE_UNAVAILABLE": {
+      "error": {
+        "code": "ASSISTANT_KNOWLEDGE_UNAVAILABLE",
+        "message": "Документация помощника недоступна.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "ASSISTANT_INVALID_RESPONSE": {
+      "error": {
+        "code": "ASSISTANT_INVALID_RESPONSE",
+        "message": "Помощник не смог подготовить проверяемый ответ.",
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "details": {}
+      }
+    },
+    "ASSISTANT_STORAGE_UNAVAILABLE": {
+      "error": {
+        "code": "ASSISTANT_STORAGE_UNAVAILABLE",
+        "message": "История помощника временно недоступна.",
         "request_id": "00000000-0000-4000-8000-000000000000",
         "details": {}
       }

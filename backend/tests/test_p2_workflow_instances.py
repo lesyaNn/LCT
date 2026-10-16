@@ -129,7 +129,7 @@ def test_migration_000012_pair_discoverable_and_latest():
     assert "000019_import_jobs" in versions
     # P4-06-01 retries: attempts counter for the worker claim loop.
     assert "000020_job_attempts" in versions
-    assert versions[-1] == "000040_vendor_level_contacts"
+    assert versions[-1] == "000043_assistant_conversations"
     assert versions.index("000011_workflow_templates") < versions.index("000012_workflow_instances")
     assert versions.index("000012_workflow_instances") < versions.index("000013_instance_stages")
     assert versions.index("000013_instance_stages") < versions.index(
@@ -336,7 +336,7 @@ def test_orm_constraints_and_indexes():
 
 
 def test_orm_instance_stage_columns_fk_constraints_indexes():
-    """Runtime snapshot metadata includes the nullable 000038 assignment."""
+    """Runtime metadata includes assignments (000038) and start time (000042)."""
     from sqlalchemy import CheckConstraint, UniqueConstraint
 
     from app.models.workflow_instances import InstanceStage  # noqa: F401
@@ -355,6 +355,7 @@ def test_orm_instance_stage_columns_fk_constraints_indexes():
         "is_required",
         "status",
         "due_date",
+        "started_at",
         "completed_at",
         "created_at",
         "updated_at",
@@ -365,6 +366,7 @@ def test_orm_instance_stage_columns_fk_constraints_indexes():
     assert cols["order_index"].nullable is False
     assert cols["name"].nullable is False
     assert cols["due_date"].nullable is True
+    assert cols["started_at"].nullable is True
     assert cols["completed_at"].nullable is True
     assert _fk_ondelete("instance_stages", "instance_id") == ("workflow_instances", "CASCADE")
     assert _fk_ondelete("instance_stages", "template_stage_id") == ("workflow_stages", "SET NULL")

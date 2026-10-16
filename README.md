@@ -239,6 +239,8 @@ docker compose down -v
 
 ## Документация
 
+Backend локального помощника, запуск Ollama и JSON контракт чата описаны в [ASSISTANT.md](docs/ASSISTANT.md).
+
 
 |Документ|Содержание|
 |:---|:---|
