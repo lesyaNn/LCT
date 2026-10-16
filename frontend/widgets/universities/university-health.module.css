@@ -1,6 +1,7 @@
 .page, .loading { display: flex; flex-direction: column; gap: var(--rtk-space-4); min-width: 0; }
-.page { background: var(--rtk-color-page); margin: calc(-1 * var(--rtk-space-5)); padding: var(--rtk-space-5); }
+.page { background: var(--rtk-color-surface-elevated); gap: 0; margin: calc(-1 * var(--rtk-space-5)); }
 .card { composes: surface from '../../shared/ui/rtk/section-surface.module.css'; }
+.page .card { background: transparent; border-radius: 0; box-shadow: none; }
 .card h2 { align-items: center; color: var(--rtk-color-text-primary); display: flex; flex-wrap: wrap; font-size: 19px; font-weight: 700; gap: var(--rtk-space-2); line-height: 1.25; margin: 0; }
 .cardHeader { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); justify-content: space-between; }
 .cardHeader p { color: var(--rtk-color-text-secondary); font-size: 12px; margin: 0; }
@@ -11,11 +12,11 @@
 .iconwarning { background: var(--atmr-warning-container-soft); color: var(--atmr-warning-on-container); }
 .icondanger { background: var(--atmr-error-container-soft); color: var(--atmr-error-on-container); }
 .iconsuccess { background: var(--atmr-success-container-soft); color: var(--atmr-success-on-container); }
-.empty, .muted, .noProgress { color: var(--rtk-color-text-secondary); font-size: 12px; line-height: 1.45; }
+.empty, .muted { color: var(--rtk-color-text-secondary); font-size: 12px; line-height: 1.45; }
 .empty { margin: var(--rtk-space-4) 0 0; }
 .loadingPair { display: grid; gap: var(--rtk-space-4); grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
-.summary { padding: var(--rtk-space-5) var(--rtk-space-6); }
+.summary { border-bottom: 1px solid var(--rtk-color-border); padding: var(--rtk-space-5); }
 .summary h2 { margin-bottom: var(--rtk-space-4); }
 .summaryBody { align-items: stretch; display: grid; grid-template-columns: minmax(235px, 1.65fr) minmax(480px, 3.7fr) minmax(220px, 1.55fr); min-width: 0; }
 .scoreBlock { align-items: center; display: flex; gap: var(--rtk-space-4); min-width: 0; padding-right: var(--rtk-space-4); }
@@ -37,8 +38,9 @@
 .summaryInfo { border-left: 1px solid var(--rtk-color-border); color: var(--rtk-color-text-secondary); display: flex; flex-direction: column; gap: var(--rtk-space-3); justify-content: center; min-width: 0; padding-left: var(--rtk-space-5); }
 .summaryInfo p { font-size: 12px; line-height: 1.5; margin: 0; }
 
-.secondRow { display: grid; gap: var(--rtk-space-4); grid-template-columns: repeat(2, minmax(0, 1fr)); min-width: 0; }
+.secondRow { border-bottom: 1px solid var(--rtk-color-border); display: grid; gap: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); min-width: 0; }
 .reasonsCard, .historyCard { min-height: 218px; }
+.reasonsCard { border-right: 1px solid var(--rtk-color-border); }
 .reasonColumns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: var(--rtk-space-4); }
 .reasonColumn { min-width: 0; padding-right: var(--rtk-space-4); }
 .reasonColumn + .reasonColumn { border-left: 1px solid var(--rtk-color-border); padding-left: var(--rtk-space-5); padding-right: 0; }
@@ -59,7 +61,7 @@
 .chartEmpty { align-items: center; color: var(--rtk-color-text-secondary); display: flex; flex: 1; font-size: 12px; margin: var(--rtk-space-4) 0 0; }
 .snapshotCompare { color: var(--rtk-color-text-secondary); font-size: 11px; margin: var(--rtk-space-1) 0 0; text-align: right; }
 
-.coverageCard { padding-bottom: var(--rtk-space-2); }
+.coverageCard { border-bottom: 1px solid var(--rtk-color-border); padding-bottom: var(--rtk-space-2); }
 .coverageSummary { align-items: center; display: grid; gap: var(--rtk-space-3); grid-template-columns: auto minmax(80px, 145px) auto; }
 .coverageSummary > span:first-child { color: var(--rtk-color-text-secondary); font-size: 12px; }
 .coverageSummary strong { font-size: 13px; }
@@ -76,7 +78,7 @@
 .chevron { color: var(--rtk-color-text-tertiary); flex: 0 0 auto; }
 .coverageRow:hover .chevron, .rowLink:hover { color: var(--rtk-color-brand); }
 
-.tableCard { padding-bottom: var(--rtk-space-3); }
+.tableCard { border-bottom: 1px solid var(--rtk-color-border); padding-bottom: var(--rtk-space-3); }
 .tableCard h2 { margin-bottom: var(--rtk-space-3); }
 .tableDesktop { overflow-x: auto; }
 .table { composes: table from '../../shared/ui/rtk/data-table.module.css'; min-width: 800px; }
@@ -118,6 +120,7 @@
 }
 @media (max-width: 1080px) {
   .secondRow { grid-template-columns: 1fr; }
+  .reasonsCard { border-bottom: 1px solid var(--rtk-color-border); border-right: 0; }
   .chart { height: 190px; min-height: 190px; }
 }
 @media (max-width: 850px) {
@@ -130,8 +133,7 @@
   .workflowText { display: none; }
 }
 @media (max-width: 690px) {
-  .page { margin: calc(-1 * var(--rtk-space-3)); padding: var(--rtk-space-3); }
-  .summary { padding: var(--rtk-space-4); }
+  .page { margin: calc(-1 * var(--rtk-space-3)); }
   .metrics { gap: var(--rtk-space-3) 0; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .metric { min-height: 104px; }
   .metric:nth-child(odd) { border-left: 0; }
@@ -159,6 +161,7 @@
   .historyCard .cardHeader { align-items: flex-start; flex-direction: column; }
 }
 @media (max-width: 400px) {
+  .summary { padding: var(--rtk-space-4); }
   .scoreRing { flex-basis: 108px; height: 108px; }
   .scoreRing strong { font-size: 34px; }
   .scoreIdentity > strong { font-size: 15px; }
