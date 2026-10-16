@@ -1,10 +1,8 @@
 """P1-03 catalog HTTP API (mounted under /api/v1).
 
 Thin routes: query params -> RBAC -> service -> DTO. No SQL and no business
-logic here. RBAC reuses the frozen permission names: ``university.read``
-for GET, ``university.edit`` for mutations (there are no separate
-create/update/delete permissions in the frozen model — manager and admin
-can write, manager/user can only read). Includes the read-only
+logic here. RBAC uses ``university.read`` for GET, ``university.create``
+for university creation, and ``university.edit`` for updates. Includes the read-only
 ``/catalog/overview`` import viewer.
 """
 
@@ -104,12 +102,12 @@ def _norm(search: str | None) -> str | None:
     status_code=201,
     tags=["Universities"],
     summary="Создать вуз",
-    description="Создаёт вуз с названием и городом. Требуются роли admin или manager.",
+    description="Создаёт вуз с названием и городом. Требуется право university.create.",
 )
 def create_university(
     data: UniversityCreate,
     db: Session = Depends(get_audit_db),
-    _user: CurrentUser = Depends(require_role("admin", "manager")),
+    _user: CurrentUser = Depends(require_permission("university.create")),
 ) -> UniversityDetail:
     return service.create_university(db, name=data.name, city=data.city)
 
