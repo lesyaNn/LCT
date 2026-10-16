@@ -52,7 +52,8 @@ LEGACY_SQL_HEAD = "000010_audit_identity"
 # (P2-09-01, 000015) + report_jobs (P4-06-01, 000018) + the materialized
 # health score projection (000022), audit outbox (000023), and external
 # application/sync snapshots (000027) + the product<->direction link
-# (000028, import sheet "Продукт_Направление").
+# (000028, import sheet "Продукт_Направление") and current Health Score
+# observations (000043).
 # 000019/000020 only ALTER report_jobs (no new tables); 000021 only ALTERs
 # audit_events (no new tables). Pinned by
 # tests/test_p5_migrate_expected_guard.py — keep in sync with
@@ -89,6 +90,7 @@ EXPECTED_TABLES = [
     "external_applications",
     "external_sync_states",
     "product_directions",
+    "health_score_observations",
     "report_templates",
 ]
 
