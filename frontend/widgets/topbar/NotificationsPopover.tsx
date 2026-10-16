@@ -11,11 +11,11 @@ import type { NotificationItem, NotificationType } from '@/shared/types/notifica
 import styles from './notifications.module.css';
 
 const icons: Record<NotificationType, React.ReactNode> = {
-  report: <DocumentText size={30} fill="currentColor" />,
-  workflow: <Icon name="workflow" size={31} />,
-  stage: <span className={styles.stageCheck}><CheckLarge size={19} fill="currentColor" /></span>,
-  license: <TimeStroke size={31} fill="currentColor" />,
-  comment: <Message size={30} fill="currentColor" />,
+  report: <DocumentText size={24} fill="currentColor" />,
+  workflow: <Icon name="workflow" size={25} />,
+  stage: <span className={styles.stageCheck}><CheckLarge size={15} fill="currentColor" /></span>,
+  license: <TimeStroke size={25} fill="currentColor" />,
+  comment: <Message size={24} fill="currentColor" />,
 };
 
 function NotificationRow({ notification }: { notification: NotificationItem }) {
@@ -31,7 +31,7 @@ function NotificationRow({ notification }: { notification: NotificationItem }) {
     </span>
   </>;
 
-  return <li className={styles.item}>
+  return <li className={`${styles.item} ${notification.read ? '' : styles.unreadItem}`}>
     {notification.target ? <Link className={styles.itemInner} href={notification.target}>{content}</Link> : <div className={styles.itemInner}>{content}</div>}
   </li>;
 }

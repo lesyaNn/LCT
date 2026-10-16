@@ -27,11 +27,11 @@ export function NotificationsButton() {
     const panel = panelRef.current;
     if (!trigger || !panel) return;
     const margin = 12;
-    const width = Math.min(680, window.innerWidth - margin * 2);
+    const width = Math.min(440, window.innerWidth - margin * 2);
     const right = Math.max(margin, Math.min(window.innerWidth - trigger.right, window.innerWidth - width - margin));
     panel.style.top = `${trigger.bottom + 8}px`;
     panel.style.right = `${right}px`;
-    panel.style.maxHeight = `${Math.max(140, window.innerHeight - trigger.bottom - 20)}px`;
+    panel.style.maxHeight = `${Math.max(140, Math.min(480, window.innerHeight - trigger.bottom - 20))}px`;
   }, []);
 
   useEffect(() => {
