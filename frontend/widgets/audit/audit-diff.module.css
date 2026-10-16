@@ -1,8 +1,12 @@
 .root { display: flex; flex-direction: column; gap: var(--rtk-space-4); }
 .note { background: var(--rtk-color-surface-subtle); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-secondary); font-size: 12px; margin: 0; padding: var(--rtk-space-3) var(--rtk-space-4); }
-.tableWrap { overflow-x: auto; }
-.tableWrap table { border-collapse: collapse; width: 100%; }
-.tableWrap th, .tableWrap td { border-bottom: 1px solid var(--rtk-color-border); font-size: 12px; padding: var(--rtk-space-2) var(--rtk-space-3); text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+.tableWrap { max-width: 100%; overflow-x: auto; }
+.tableWrap table { border-collapse: collapse; table-layout: fixed; min-width: 480px; width: 100%; }
+.tableWrap th, .tableWrap td { border-bottom: 1px solid var(--rtk-color-border); font-size: 12px; padding: var(--rtk-space-2) var(--rtk-space-3); text-align: left; vertical-align: top; }
+.tableWrap th:first-child { width: 26%; }
+.tableWrap thead th { white-space: nowrap; }
+.tableWrap tbody th { overflow-wrap: normal; }
+.tableWrap td { overflow-wrap: break-word; }
 .tableWrap th { color: var(--rtk-color-text-secondary); font-weight: 700; }
 .tableWrap tr:last-child th, .tableWrap tr:last-child td { border-bottom: 0; }
 .technical { border-top: 1px solid var(--rtk-color-border); margin: 0; padding-top: var(--rtk-space-3); }
@@ -11,10 +15,5 @@
 .technical div { display: grid; gap: var(--rtk-space-2); grid-template-columns: minmax(90px, 160px) minmax(0, 1fr); }
 .technical dt { color: var(--rtk-color-text-secondary); font-size: 11px; font-weight: 700; }
 .technical dd { font-size: 12px; margin: 0; overflow-wrap: anywhere; }
-.muted { color: var(--rtk-color-text-secondary); font-size: 13px; margin: 0; }
-@media (max-width: 560px) { .technical div { grid-template-columns: 1fr; gap: 0; } }
-.tableWrap th, .tableWrap td { border-bottom: 1px solid var(--rtk-color-border); font-size: 12px; padding: var(--rtk-space-2) var(--rtk-space-3); text-align: left; vertical-align: top; }
-.tableWrap th { color: var(--rtk-color-text-secondary); font-weight: 700; }
-.tableWrap tr:last-child th, .tableWrap tr:last-child td { border-bottom: 0; }
 .muted { color: var(--rtk-color-text-secondary); font-size: 13px; margin: 0; }
 @media (max-width: 560px) { .technical div { grid-template-columns: 1fr; gap: 0; } }

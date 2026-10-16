@@ -53,7 +53,7 @@ export function AuditDiff({ event, showTechnical = true }: { event: AuditDiffSou
         <div className={styles.tableWrap}>
           <table>
             <thead><tr><th scope="col">Поле</th><th scope="col">Было</th><th scope="col">Стало</th></tr></thead>
-            <tbody>{summary.changes.map((change) => <tr key={change.field}><th scope="row">{change.label}</th><td>{change.old}</td><td>{change.next}</td></tr>)}</tbody>
+            <tbody>{summary.changes.map((change) => <tr key={change.field}><th scope="row">{change.label}</th><td>{change.old || '—'}</td><td>{change.next || '—'}</td></tr>)}</tbody>
           </table>
         </div>
       ) : hasValues ? (

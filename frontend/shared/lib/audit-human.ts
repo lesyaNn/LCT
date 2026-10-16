@@ -382,8 +382,8 @@ function summarize(event: AuditEvent): AuditSummary {
         ? presentation.changes.map((row) => ({
           field: String(row.field ?? ''),
           label: String(row.label ?? row.field ?? ''),
-          old: String(row.old ?? '—'),
-          next: String(row.next ?? row.new ?? '—'),
+          old: String(row.old ?? '—').trim() || '—',
+          next: String((row.next === '' ? row.new : row.next) ?? row.new ?? '—').trim() || '—',
         }))
         : [];
       return {
@@ -406,12 +406,12 @@ function summarize(event: AuditEvent): AuditSummary {
   const base = { actorName: auditActorName(event), actorRole: event.role ?? null };
 
   if (action === 'WORKFLOW_TRANSITION') {
-    const fromStage = payloadName(oldObj, 'stage_name') ?? 'предыдущий этап';
-    const toStage = payloadName(newObj, 'stage_name') ?? 'следующий этап';
+    const fromStage = payloadName(oldObj, 'stage_name') ?? '—';
+    const toStage = payloadName(newObj, 'stage_name') ?? '—';
     const comment = payloadName(newObj, 'comment');
     const changes: AuditChangeRow[] = [{ field: 'stage_name', label: 'Этап', old: fromStage, next: toStage }];
     if (comment) changes.push({ field: 'comment', label: 'Комментарий', old: '—', next: comment });
-    return { ...base, title: `Перевёл${uni ? ` ${quote(uni)}` : ''} с этапа ${quote(fromStage)} на этап ${quote(toStage)}`, section: 'Workflow', objectName: uni ?? null, changes, note: null };
+    return { ...base, title: fromStage === '—' || toStage === '—' ? `Изменил этап Workflow${uni ? ` ${quote(uni)}` : ''}` : `Перевёл${uni ? ` ${quote(uni)}` : ''} с этапа ${quote(fromStage)} на этап ${quote(toStage)}`, section: 'Workflow', objectName: uni ?? null, changes, note: null };
   }
 
   if (action === 'ASSIGN_RESPONSIBLE') {
