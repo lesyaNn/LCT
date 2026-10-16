@@ -586,6 +586,8 @@ def set_instance_stage_responsible(
     previous = stage.responsible_id
     if previous == responsible_id:
         return get_instance_detail(db, instance_id)
+    effective_before = previous or instance.responsible_id
+    effective_after = responsible_id or instance.responsible_id
     stage.responsible_id = responsible_id
     if "audit_context" in db.info:
         from app.modules.audit.service import AuditService, context_for
@@ -597,10 +599,10 @@ def set_instance_stage_responsible(
             old_value={"stage_id": str(stage_id), "stage_name": stage.name, "stage_responsible_id": str(previous) if previous else None},
             new_value={"stage_id": str(stage_id), "stage_name": stage.name, "stage_responsible_id": str(responsible_id) if responsible_id else None},
         )
-    if responsible_id is not None:
+    if effective_after is not None and effective_after != effective_before:
         from app.modules.notifications.service import notify_assignment
 
-        notify_assignment(db, responsible_id, instance.university_id, entity_type="workflow",
+        notify_assignment(db, effective_after, instance.university_id, entity_type="workflow",
                           entity_id=instance.id, event_key=f"stage-assigned:{stage.id}:{uuid.uuid4()}")
     db.commit()
     return get_instance_detail(db, instance_id)

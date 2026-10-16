@@ -20,6 +20,7 @@ from app.core.security import CurrentUser
 from app.models.catalog import Contract, License, Responsible, University, UniversityResponsible
 from app.models.notification import Notification
 from app.models.workflow_instances import InstanceStage, WorkflowInstance, WorkflowTask
+from app.services.license_status import derive_contract_status
 
 EXPIRY_CHECKPOINTS = (30, 14, 7, 1)
 STAGE_CHECKPOINTS = (7, 2, 1)
@@ -190,6 +191,7 @@ def scan_due_notifications(db: Session, *, today: date | None = None) -> int:
             continue
         stages = db.scalars(select(InstanceStage).where(
             InstanceStage.instance_id == instance.id, InstanceStage.completed_at.is_(None),
+            InstanceStage.id == instance.current_instance_stage_id,
             InstanceStage.status.notin_(["completed", "skipped"]),
             InstanceStage.due_date.is_not(None),
         )).all()
@@ -238,6 +240,10 @@ def scan_due_notifications(db: Session, *, today: date | None = None) -> int:
         for item in db.scalars(select(model).where(model.expires_at.is_not(None),
                                                   model.expires_at >= day,
                                                   model.expires_at <= day + timedelta(days=30))):
+            if model is Contract and derive_contract_status(
+                item.status_raw, item.expires_at, today=day
+            ) != "active":
+                continue
             days = (item.expires_at - day).days
             if days == 0:
                 checkpoint = 0

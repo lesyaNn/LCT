@@ -17,6 +17,7 @@ from app.main import app
 from app.models.catalog import Contract, ITProduct, License, Responsible, University, UniversityResponsible, Vendor
 from app.models.notification import Notification
 from app.models.report_job import ReportJob
+from app.models.workflow_instances import InstanceStage
 from app.models.workflow_templates import WorkflowStage, WorkflowTemplate
 from app.modules.catalog import service as catalog_service
 from app.modules.notifications import service
@@ -188,6 +189,106 @@ def test_due_scan_idempotent_and_respects_scope(database):
     assert {"contract_expiry", "license_expiry"} <= {item.type for item in visible}
     denied = CurrentUser(id="user-a", roles={"user"}, university_ids=())
     assert service.list_for_user(db, denied)[1] == 0
+
+
+def test_contract_scan_skips_inactive_statuses_and_keeps_checkpoints_distinct(database):
+    db = database
+    uni = _university(db)
+    recipient = _responsible(db)
+    db.add(UniversityResponsible(university_id=uni.id, responsible_id=recipient.id,
+                                 is_primary=True))
+    contracts = [
+        Contract(university_id=uni.id, contract_number=f"Д-{uuid.uuid4().hex[:6]}",
+                 signed_at=date(2026, 1, 1), expires_at=date(2026, 10, 30),
+                 status_raw=status)
+        for status in ("draft", "terminated", "signed")
+    ]
+    db.add_all(contracts)
+    db.commit()
+
+    assert service.scan_due_notifications(db, today=date(2026, 10, 16)) == 1
+    assert service.scan_due_notifications(db, today=date(2026, 10, 16)) == 0
+    assert service.scan_due_notifications(db, today=date(2026, 10, 23)) == 1
+    rows = db.scalars(select(Notification).where(Notification.type == "contract_expiry")).all()
+    assert {row.entity_id for row in rows} == {str(contracts[2].id)}
+    assert {row.event_key for row in rows} == {
+        f"contract_expiry:{contracts[2].id}:2026-10-30:14",
+        f"contract_expiry:{contracts[2].id}:2026-10-30:7",
+    }
+
+
+def test_stage_scan_notifies_only_current_unfinished_stage(database):
+    db = database
+    uni = _university(db)
+    recipient = _responsible(db)
+    template = WorkflowTemplate(name="Сроки по этапам")
+    db.add(template)
+    db.flush()
+    db.add_all([
+        WorkflowStage(template_id=template.id, name=f"Этап {index}", order_index=index)
+        for index in (1, 2, 3)
+    ])
+    db.commit()
+    instance = instance_service.create_instance(db, university_id=uni.id,
+                                                template_id=template.id,
+                                                responsible_id=recipient.id)
+    current, future_soon, future_overdue = (
+        db.get(InstanceStage, stage.id) for stage in instance.stages
+    )
+    current.due_date = date(2026, 10, 18)
+    future_soon.due_date = date(2026, 10, 17)
+    future_overdue.due_date = date(2026, 10, 15)
+    db.commit()
+
+    assert service.scan_due_notifications(db, today=date(2026, 10, 16)) == 1
+    assert service.scan_due_notifications(db, today=date(2026, 10, 16)) == 0
+    current.due_date = date(2026, 10, 15)
+    db.commit()
+    assert service.scan_due_notifications(db, today=date(2026, 10, 16)) == 1
+    current.status = "completed"
+    current.completed_at = datetime(2026, 10, 16, tzinfo=timezone.utc)
+    db.commit()
+    assert service.scan_due_notifications(db, today=date(2026, 10, 17)) == 0
+    keys = db.scalars(select(Notification.event_key).where(
+        Notification.type.in_(["deadline_approaching", "overdue"])
+    )).all()
+    assert len(keys) == 2
+    assert all(str(current.id) in key for key in keys)
+
+
+def test_stage_assignment_notifies_only_new_effective_responsible(database):
+    db = database
+    uni = _university(db)
+    fallback = _responsible(db, "ivanov")
+    other = _responsible(db, "petrov")
+    db.add_all([
+        UniversityResponsible(university_id=uni.id, responsible_id=person.id)
+        for person in (fallback, other)
+    ])
+    template = WorkflowTemplate(name="Назначение этапа")
+    db.add(template)
+    db.flush()
+    db.add(WorkflowStage(template_id=template.id, name="Текущий", order_index=1))
+    db.commit()
+    instance = instance_service.create_instance(db, university_id=uni.id,
+                                                template_id=template.id,
+                                                responsible_id=fallback.id)
+    stage_id = instance.current_instance_stage_id
+
+    def recipients():
+        return db.scalars(select(Notification.recipient_user_id).where(
+            Notification.type == "assignment").order_by(Notification.created_at, Notification.id)
+        ).all()
+
+    assert recipients() == ["ivanov"]
+    instance_service.set_instance_stage_responsible(db, instance.id, stage_id, fallback.id)
+    assert recipients() == ["ivanov"]
+    instance_service.set_instance_stage_responsible(db, instance.id, stage_id, other.id)
+    assert recipients() == ["ivanov", "petrov"]
+    instance_service.set_instance_stage_responsible(db, instance.id, stage_id, other.id)
+    assert recipients() == ["ivanov", "petrov"]
+    instance_service.set_instance_stage_responsible(db, instance.id, stage_id, None)
+    assert recipients() == ["ivanov", "petrov", "ivanov"]
 
 
 def test_import_worker_delivers_error_to_initiator(database, monkeypatch, tmp_path):

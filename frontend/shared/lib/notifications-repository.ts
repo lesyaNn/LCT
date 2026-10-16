@@ -28,9 +28,8 @@ export const notificationsRepository = {
 export function notificationTarget(item: Notification): string {
   if (item.entity_type === 'workflow') return `/workflows/${encodeURIComponent(item.entity_id)}`;
   if (item.entity_type === 'university') return `/universities/${encodeURIComponent(item.entity_id)}`;
-  if (item.entity_type === 'contract' || item.entity_type === 'license') {
-    return item.university_id ? `/universities/${encodeURIComponent(item.university_id)}?tab=licenses` : '/universities';
-  }
+  if (item.entity_type === 'contract') return item.university_id ? `/universities/${encodeURIComponent(item.university_id)}?tab=documents` : '/universities';
+  if (item.entity_type === 'license') return item.university_id ? `/universities/${encodeURIComponent(item.university_id)}?tab=licenses` : '/universities';
   if (item.entity_type === 'import_job') return `/admin/import?job=${encodeURIComponent(item.entity_id)}`;
   return '/notifications';
 }
