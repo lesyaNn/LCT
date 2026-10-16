@@ -41,10 +41,11 @@
 .workflowItem:has(.workflowCardLink):hover { border-color: var(--rtk-color-brand); }
 .workflowCardLink { inset: 0; position: absolute; }
 .workflowCardLink:focus-visible { border-radius: var(--rtk-radius-small); outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
-.workflowItemTop { align-items: flex-start; display: flex; gap: var(--rtk-space-2); justify-content: space-between; width: 100%; }
+.workflowItemTop { align-items: flex-start; display: flex; gap: var(--rtk-space-1); width: 100%; }
 .workflowItemTop > button { flex: 0 0 auto; margin-left: auto; position: relative; z-index: 2; }
-.workflowItemStatus { align-items: center; display: flex; justify-content: flex-start; width: 100%; }
-.workflowItemTop strong { flex: 1 1 auto; min-width: 0; }
+.workflowItemStatus { align-items: center; display: flex; flex: 0 0 auto; margin-left: auto; }
+.workflowItemTop:has(> button) .workflowItemStatus { margin-left: 0; }
+.workflowItemTop strong { flex: 0 1 auto; min-width: 0; }
 .workflowItemTop strong, .workflowProgram { font-size: 15px; overflow-wrap: anywhere; }
 .workflowItem p { color: var(--rtk-color-text-secondary); font-size: 13px; margin: 0; }
 .workflowItem p b { color: var(--rtk-color-text-primary); }
