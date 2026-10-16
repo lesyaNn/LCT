@@ -51,18 +51,6 @@
 .meetingDetails summary { color: var(--rtk-color-brand); cursor: pointer; font-size: 12px; font-weight: 700; }
 .meetingDetails p { margin: var(--rtk-space-2) 0 0; }
 .meetingAuthor { color: var(--rtk-color-text-tertiary); display: block; font-size: 11px; margin-top: var(--rtk-space-3); }
-.responsiblesGrid { display: grid; gap: var(--rtk-space-4); grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.responsibleCard { align-items: flex-start; background: var(--rtk-color-surface); display: flex; gap: var(--rtk-space-3); min-width: 0; padding: var(--rtk-space-4) 0; }
-.responsibleInfo { display: flex; flex: 1; flex-direction: column; gap: var(--rtk-space-1); min-width: 0; }
-.responsibleInfo h3 { font-size: 14px; margin: 0; }
-.responsibleInfo p { color: var(--rtk-color-text-secondary); font-size: 12px; margin: 0 0 var(--rtk-space-2); }
-.responsibleInfo a { align-items: center; color: var(--rtk-color-brand); display: flex; font-size: 12px; gap: var(--rtk-space-2); line-height: 1.35; overflow-wrap: anywhere; text-decoration: none; }
-.responsibleInfo a:hover { text-decoration: underline; }
-.assignmentForm { display: flex; flex-direction: column; gap: var(--rtk-space-4); }
-.assignmentForm .filter { width: 100%; }
-.assignmentForm .filter input, .assignmentForm .filter textarea { width: 100%; }
-.assignmentIntro { color: var(--rtk-color-text-secondary); font-size: 13px; line-height: 1.45; margin: 0; }
-.assignmentError { color: var(--rtk-color-danger); font-size: 12px; margin: 0; }
 .assignmentActions { border-top: 1px solid var(--rtk-color-border); display: flex; gap: var(--rtk-space-2); justify-content: flex-end; padding-top: var(--rtk-space-4); }
 .assignmentActions button { min-width: 120px; }
 @media (max-width: 768px) {
@@ -75,7 +63,6 @@
   .iconAction, .inlineDetails summary { align-items: center; display: inline-flex; min-height: 44px; }
   .iconAction { min-width: 44px; }
   .meetingDetails summary { align-items: center; display: flex; min-height: 44px; }
-  .responsiblesGrid { grid-template-columns: 1fr; }
   .assignmentActions { flex-direction: column-reverse; }
   .assignmentActions button { width: 100%; }
   .meetingSurface { padding: var(--rtk-space-4); }
