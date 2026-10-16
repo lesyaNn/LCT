@@ -7,49 +7,11 @@ import { mockListAdminUsers } from '@/shared/mocks/api-adapter';
 import { getUniversities, type UniversityListQuery } from './universities-repository';
 import { userRoleLabels, type AdminUser } from './users-repository';
 import { realListAdminUsers } from './real-api-adapter';
+import { buildNetworkGraphData, GraphTooLargeError, MAX_GRAPH_NODES, type UniversityInput } from './network-graph-data';
+import type { NetworkGraphData } from './network-graph-data';
 import type { UserRole } from '@/shared/types/user';
 
-export type NetworkNodeKind = 'user' | 'university';
-
-export interface NetworkUserNode {
-  id: string;
-  kind: 'user';
-  label: string;
-  username: string;
-  email: string;
-  role: UserRole;
-  roleLabel: string;
-  /** Administrators implicitly see every university: no explicit edges. */
-  allAccess: boolean;
-  degree: number;
-}
-
-export interface NetworkUniversityNode {
-  id: string;
-  kind: 'university';
-  label: string;
-  city: string;
-  degree: number;
-}
-
-export type NetworkNode = NetworkUserNode | NetworkUniversityNode;
-
-export interface NetworkEdge {
-  id: string;
-  userId: string;
-  universityId: string;
-}
-
-export interface NetworkGraphData {
-  nodes: NetworkNode[];
-  edges: NetworkEdge[];
-  usersCount: number;
-  universitiesCount: number;
-  linksCount: number;
-  isolatedCount: number;
-  /** Non-admin viewers only get their own subgraph (RBAC: no user list). */
-  scope: 'full' | 'own';
-}
+export type { NetworkNodeKind, NetworkUserNode, NetworkUniversityNode, NetworkNode, NetworkEdge, NetworkGraphData } from './network-graph-data';
 
 export const networkGraphQueryKey = ['network-graph'] as const;
 
@@ -74,17 +36,12 @@ const EMPTY_UNIVERSITY_QUERY: UniversityListQuery = {
   pageSize: PAGE_SIZE,
 };
 
-interface UniversityInput {
-  id: string;
-  name: string;
-  city: string;
-}
-
 async function fetchAllUniversities(signal?: AbortSignal): Promise<UniversityInput[]> {
   const all: UniversityInput[] = [];
   let page = 1;
   for (;;) {
     const result = await getUniversities({ ...EMPTY_UNIVERSITY_QUERY, page }, signal);
+    if (result.total > MAX_GRAPH_NODES) throw new GraphTooLargeError();
     all.push(...result.items.map((item) => ({ id: item.id, name: item.name, city: item.city })));
     if (all.length >= result.total || result.items.length === 0) break;
     page += 1;
@@ -92,68 +49,11 @@ async function fetchAllUniversities(signal?: AbortSignal): Promise<UniversityInp
   return all;
 }
 
-function toUserNode(user: AdminUser, degree: number): NetworkUserNode {
-  return {
-    id: user.id,
-    kind: 'user',
-    label: user.name,
-    username: user.username,
-    email: user.email,
-    role: user.role,
-    roleLabel: userRoleLabels[user.role],
-    allAccess: user.scope.kind === 'all',
-    degree,
-  };
-}
-
 export function buildNetworkGraph(
   users: AdminUser[],
   universities: UniversityInput[],
 ): NetworkGraphData {
-  const universityIds = new Set(universities.map((item) => item.id));
-  const nodes: NetworkNode[] = [];
-  const edges: NetworkEdge[] = [];
-  const seenEdges = new Set<string>();
-  const degree = new Map<string, number>();
-  const bump = (id: string) => degree.set(id, (degree.get(id) ?? 0) + 1);
-
-  // Explicit scope assignments only: an "all" scope (admin) draws no edges,
-  // otherwise the graph would be a meaningless full mesh.
-  for (const user of users) {
-    if (user.scope.kind !== 'universities') continue;
-    for (const universityId of user.scope.universityIds) {
-      if (!universityIds.has(universityId)) continue;
-      const key = `${user.id}::${universityId}`;
-      if (seenEdges.has(key)) continue;
-      seenEdges.add(key);
-      edges.push({ id: key, userId: user.id, universityId });
-      bump(user.id);
-      bump(universityId);
-    }
-  }
-
-  for (const user of users) {
-    nodes.push(toUserNode(user, degree.get(user.id) ?? 0));
-  }
-  for (const university of universities) {
-    nodes.push({
-      id: university.id,
-      kind: 'university',
-      label: university.name,
-      city: university.city,
-      degree: degree.get(university.id) ?? 0,
-    });
-  }
-
-  return {
-    nodes,
-    edges,
-    usersCount: users.length,
-    universitiesCount: universities.length,
-    linksCount: edges.length,
-    isolatedCount: nodes.filter((node) => node.degree === 0 && !(node.kind === 'user' && node.allAccess)).length,
-    scope: 'full',
-  };
+  return buildNetworkGraphData(users, universities, userRoleLabels);
 }
 
 async function fetchAllAdminUsers(): Promise<AdminUser[]> {
@@ -161,6 +61,7 @@ async function fetchAllAdminUsers(): Promise<AdminUser[]> {
   let page = 1;
   for (;;) {
     const result = await realListAdminUsers({ search: '', role: 'all', page, pageSize: PAGE_SIZE });
+    if (result.total > MAX_GRAPH_NODES) throw new GraphTooLargeError();
     all.push(...result.items);
     if (all.length >= result.total || result.items.length === 0) break;
     page += 1;

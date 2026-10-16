@@ -14,14 +14,15 @@ import {
   type NetworkNode,
   type NetworkNodeKind,
 } from '@/shared/lib/network-repository';
+import { GraphScopeChangedError, GraphTooLargeError, graphScopeChange } from '@/shared/lib/network-graph-data';
 import {
   adminUsersQueryKeys,
+  getAdminUser,
   listUserScopeOptions,
   scopeLabel,
   updateAdminUser,
   USERS_API_CAPABILITIES,
 } from '@/shared/lib/users-repository';
-import type { UserRole } from '@/shared/types/user';
 import { PageIntro } from '@/shared/ui/page-intro';
 import { PageSkeleton } from '@/shared/ui/page-skeleton';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
@@ -178,17 +179,21 @@ export function NetworkGraph({ showIntro = true }: { showIntro?: boolean }) {
         />
       ) : null}
       {graphQuery.isPending ? <PageSkeleton cardCount={3} /> : null}
-      {graphQuery.isError && !graphQuery.data ? (
-        <RouteErrorState onRetry={() => void graphQuery.refetch()} />
+      {graphQuery.isError ? (
+        <RouteErrorState
+          onRetry={() => void graphQuery.refetch()}
+          title={graphQuery.error instanceof GraphTooLargeError ? 'Граф слишком большой' : undefined}
+          description={graphQuery.error instanceof GraphTooLargeError ? graphQuery.error.message : undefined}
+        />
       ) : null}
-      {graphQuery.data && graphQuery.data.nodes.length === 0 ? (
+      {!graphQuery.isError && graphQuery.data && graphQuery.data.nodes.length === 0 ? (
         <EmptyState
           title="Нет данных для графа"
           description="В системе пока нет сотрудников с доступом к вузам."
           presentation="large"
         />
       ) : null}
-      {graphQuery.data && graphQuery.data.nodes.length > 0 ? <NetworkCanvas data={graphQuery.data} /> : null}
+      {!graphQuery.isError && graphQuery.data && graphQuery.data.nodes.length > 0 ? <NetworkCanvas data={graphQuery.data} /> : null}
     </div>
   );
 }
@@ -942,8 +947,6 @@ function NetworkCanvas({ data }: { data: NetworkGraphData }) {
                             key={`${selectedNode.id}-${neighborId}`}
                             userId={selectedNode.id}
                             userName={selectedNode.label}
-                            role={selectedNode.role}
-                            linkedIds={selectedLinkedIds}
                             universityId={neighborId}
                             universityName={neighborNode.label}
                           />
@@ -966,7 +969,6 @@ function NetworkCanvas({ data }: { data: NetworkGraphData }) {
                 key={selectedNode.id}
                 userId={selectedNode.id}
                 userName={selectedNode.label}
-                role={selectedNode.role}
                 linkedIds={selectedLinkedIds}
               />
             ) : null}
@@ -977,10 +979,9 @@ function NetworkCanvas({ data }: { data: NetworkGraphData }) {
   );
 }
 
-function AssignUniversityBox({ userId, userName, role, linkedIds }: {
+function AssignUniversityBox({ userId, userName, linkedIds }: {
   userId: string;
   userName: string;
-  role: UserRole;
   linkedIds: string[];
 }) {
   const queryClient = useQueryClient();
@@ -999,8 +1000,10 @@ function AssignUniversityBox({ userId, userName, role, linkedIds }: {
   const scopeOptions = scopeOptionsQuery.data ?? [];
 
   const assignMutation = useMutation({
-    mutationFn: (universityIds: string[]) =>
-      updateAdminUser(userId, { role, scope: { kind: 'universities', universityIds } }),
+    mutationFn: async (universityId: string) => {
+      const current = await getAdminUser(userId);
+      return updateAdminUser(userId, graphScopeChange(current, universityId, 'add'));
+    },
     onSuccess: (updated) => {
       void queryClient.invalidateQueries({ queryKey: adminUsersQueryKeys.all });
       void queryClient.invalidateQueries({ queryKey: networkGraphQueryKey });
@@ -1011,7 +1014,10 @@ function AssignUniversityBox({ userId, userName, role, linkedIds }: {
       setToast({ intent: 'success', title: 'Вуз назначен', message: `${updated.name}: ${scopeLabel(updated.scope)}` });
     },
     onError: (cause) => {
-      setError(normalizeApiError(cause, { fallbackMessage: 'Не удалось назначить вуз.' }).message);
+      void queryClient.invalidateQueries({ queryKey: networkGraphQueryKey });
+      setError(cause instanceof GraphScopeChangedError
+        ? cause.message
+        : normalizeApiError(cause, { fallbackMessage: 'Не удалось назначить вуз.' }).message);
     },
   });
 
@@ -1028,7 +1034,7 @@ function AssignUniversityBox({ userId, userName, role, linkedIds }: {
       return;
     }
     setError(null);
-    assignMutation.mutate([...linkedIds, choice]);
+    assignMutation.mutate(choice);
   };
 
   return (
@@ -1104,11 +1110,9 @@ function AssignUniversityBox({ userId, userName, role, linkedIds }: {
   );
 }
 
-function UnlinkUniversityButton({ userId, userName, role, linkedIds, universityId, universityName }: {
+function UnlinkUniversityButton({ userId, userName, universityId, universityName }: {
   userId: string;
   userName: string;
-  role: UserRole;
-  linkedIds: string[];
   universityId: string;
   universityName: string;
 }) {
@@ -1118,8 +1122,10 @@ function UnlinkUniversityButton({ userId, userName, role, linkedIds, universityI
   const [toast, setToast] = useState<{ intent: ToastIntent; title: string; message?: string } | null>(null);
 
   const unlinkMutation = useMutation({
-    mutationFn: (universityIds: string[]) =>
-      updateAdminUser(userId, { role, scope: { kind: 'universities', universityIds } }),
+    mutationFn: async () => {
+      const current = await getAdminUser(userId);
+      return updateAdminUser(userId, graphScopeChange(current, universityId, 'remove'));
+    },
     onSuccess: (updated) => {
       void queryClient.invalidateQueries({ queryKey: adminUsersQueryKeys.all });
       void queryClient.invalidateQueries({ queryKey: networkGraphQueryKey });
@@ -1129,18 +1135,21 @@ function UnlinkUniversityButton({ userId, userName, role, linkedIds, universityI
       setToast({ intent: 'success', title: 'Доступ отозван', message: `${universityName} — ${updated.name}: ${scopeLabel(updated.scope)}` });
     },
     onError: (cause) => {
+      void queryClient.invalidateQueries({ queryKey: networkGraphQueryKey });
       setFailed(true);
       setToast({
         intent: 'error',
         title: 'Не удалось снять вуз',
-        message: normalizeApiError(cause, { fallbackMessage: 'Попробуйте ещё раз.' }).message,
+        message: cause instanceof GraphScopeChangedError
+          ? cause.message
+          : normalizeApiError(cause, { fallbackMessage: 'Попробуйте ещё раз.' }).message,
       });
     },
   });
 
   const confirm = (): void => {
     setFailed(false);
-    unlinkMutation.mutate(linkedIds.filter((id) => id !== universityId));
+    unlinkMutation.mutate();
   };
 
   if (armed) {
