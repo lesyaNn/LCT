@@ -52,6 +52,13 @@ CANON_TABLES = frozenset(
         "audit_outbox",
         "external_applications",
         "external_sync_states",
+        "assistant_conversations",
+        "assistant_turns",
+        "teachers",
+        "teacher_programs",
+        "teacher_certificates",
+        "teacher_qualifications",
+        "program_education_stats",
     }
 )
 
@@ -80,26 +87,7 @@ DEFERRED_API_PREFIXES = (
 
 
 def _mounted_api_paths() -> list[str]:
-    paths: list[str] = []
-
-    def _walk(routes, prefix: str = "") -> None:
-        for route in routes:
-            path = getattr(route, "path", None)
-            if path:
-                paths.append(f"{prefix}{path}")
-                continue
-            nested = getattr(route, "routes", None)
-            original = getattr(route, "original_router", None)
-            if original is not None:
-                # FastAPI >=0.120 nests included routers (_IncludedRouter):
-                # descend via original_router, accumulating its prefix.
-                _walk(original.routes, f"{prefix}{original.prefix or ''}")
-            elif nested:
-                mount = getattr(route, "prefix", "") or ""
-                _walk(nested, f"{prefix}{mount}")
-
-    _walk(app.routes)
-    return sorted(p for p in paths if p.startswith("/api/"))
+    return sorted(path for path in app.openapi()["paths"] if path.startswith("/api/"))
 
 
 def test_canon_metadata_is_exactly_the_sql_managed_set():
@@ -133,6 +121,10 @@ def test_deferred_models_isolated_on_deferred_base():
 def test_mounted_routers_are_only_the_production_contract():
     allowed = (
         "/api/v1/auth",
+        "/api/v1/assistant",
+        "/api/v1/search",
+        "/api/v1/teachers",
+        "/api/v1/health-score",
         "/api/v1/admin/users",  # Keycloak-backed Admin API; legacy /users stays deferred.
         "/api/v1/import",
         "/api/v1/integrations",

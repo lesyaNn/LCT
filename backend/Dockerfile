@@ -12,8 +12,8 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends fonts-dejavu-core \
   && rm -rf /var/lib/apt/lists/* \
   && useradd -r -u 10001 appuser \
-  && mkdir -p /app/storage /app/reports /tmp/rtk-imports \
-  && chown -R appuser:appuser /code /app/storage /app/reports /tmp/rtk-imports
+  && mkdir -p /app/storage /app/reports /app/assistant-index /tmp/rtk-imports \
+  && chown -R appuser:appuser /code /app/storage /app/reports /app/assistant-index /tmp/rtk-imports
 COPY pyproject.toml ./
 # Runtime deps are installed from pyproject (no second pin list here).
 RUN pip install --no-cache-dir .

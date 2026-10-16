@@ -11,6 +11,8 @@ unmounted; see ``docs/DEFERRED_MODULES.md`` for their reactivation requirements.
 
 from fastapi import APIRouter
 
+from app.modules.assistant.router import router as assistant_router
+
 from app.modules.search import router as search_router
 from app.modules.analytics.reports_router import router as reports_router
 from app.modules.analytics.stats_router import router as report_statistics_router
@@ -33,6 +35,7 @@ from app.modules.workflow_transitions.router import router as workflow_transitio
 from app.modules.health_score.router import router as health_score_router
 
 v1 = APIRouter(prefix="/api/v1")
+v1.include_router(assistant_router)
 v1.include_router(auth_router)
 v1.include_router(search_router)
 v1.include_router(admin_users_router)

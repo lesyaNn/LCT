@@ -3,7 +3,10 @@
 MINIMAL AUTH STAGE: auth does NOT depend on PostgreSQL/Redis/MinIO.
 Domain DB settings stay for the next stage but are unused at runtime.
 """
-from pydantic import model_validator
+from pathlib import Path
+from urllib.parse import urlsplit
+
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEV_BYPASS_ENVIRONMENTS = frozenset({"dev", "development", "local", "test", "testing"})
@@ -68,6 +71,35 @@ class Settings(BaseSettings):
     # --- Rate limiting (M10, heavy endpoints only) ---
     # 0 disables the limiter (tests); default 120 req/min per token/IP.
     rate_limit_per_minute: int = 120
+
+    # Documentation assistant. Models are downloaded explicitly, never by an API request.
+    assistant_enabled: bool = False
+    assistant_ollama_url: str = "http://localhost:11434"
+    assistant_model: str = Field(default="qwen3:4b", min_length=1, max_length=128)
+    assistant_embedding_model: str = Field(default="qwen3-embedding:0.6b", min_length=1,
+                                           max_length=128)
+    assistant_docs_root: str = str(
+        Path(__file__).resolve().parents[2] / "frontend" / "public" / "docs"
+    )
+    assistant_index_path: str = "var/assistant/index.json"
+    assistant_timeout_seconds: float = Field(default=60, ge=1, le=300)
+    assistant_rate_limit_per_minute: int = Field(default=10, ge=1, le=120)
+    assistant_max_concurrent: int = Field(default=2, ge=1, le=8)
+    assistant_history_turns: int = Field(default=3, ge=0, le=6)
+    assistant_max_turns: int = Field(default=100, ge=1, le=500)
+    assistant_retention_days: int = Field(default=30, ge=1, le=365)
+
+    @model_validator(mode="after")
+    def validate_assistant(self) -> "Settings":
+        target = urlsplit(self.assistant_ollama_url)
+        if (target.scheme not in {"http", "https"} or not target.hostname
+                or target.username or target.password or target.query or target.fragment
+                or target.path not in {"", "/"}):
+            raise ValueError("ASSISTANT_OLLAMA_URL must be an HTTP(S) origin")
+        for model in (self.assistant_model, self.assistant_embedding_model):
+            if not model.strip() or "cloud" in model.lower() or "://" in model:
+                raise ValueError("Assistant requires explicit local model names")
+        return self
 
     # --- Analytics reports (P4-06-01) ---
     # Filesystem root for generated xlsx/pdf/json reports. Mounted as a

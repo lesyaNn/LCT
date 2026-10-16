@@ -18,6 +18,7 @@ and external_sync_states (Stage 11, migration 000027), product_directions
 (import sheet "Продукт_Направление", migration 000028).
 """
 
+from app.models.assistant import AssistantConversation, AssistantTurn
 from app.models.catalog import (  # noqa: F401
     Contract,
     ITDirection,
@@ -65,6 +66,8 @@ from app.models.workflow_instances import (  # noqa: F401
 )
 
 __all__ = [
+    "AssistantConversation",
+    "AssistantTurn",
     "University",
     "ITDirection",
     "ITProgram",
