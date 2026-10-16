@@ -90,8 +90,14 @@ EXPECTED_TABLES = [
     "external_sync_states",
     "product_directions",
     "report_templates",
+    "teachers",
+    "teacher_programs",
+    "teacher_certificates",
+    "teacher_qualifications",
     "program_education_stats",
     "notifications",
+    "assistant_conversations",
+    "assistant_turns",
 ]
 
 VERSION_RE = re.compile(r"^(?P<ver>\d{6}_[a-z0-9_]+)\.(?P<dir>up|down)\.sql$")

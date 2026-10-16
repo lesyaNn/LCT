@@ -3,7 +3,8 @@
 Runtime-only description of SQL migrations ``000012_workflow_instances``,
 ``000013_instance_stages``, ``000014_transition_history_restrict`` and
 ``000038_instance_stage_responsible`` and ``000039_workflow_instance_archive`` (which
-are the schema source of truth), plus ``000042_instance_stage_started_at``:
+are the schema source of truth), plus ``000042_instance_stage_started_at``
+and ``000045_meeting_agenda``:
 types, nullability, FK, constraints and
 indexes mirror the ``*.up.sql`` exactly. Never drives DDL.
 
@@ -208,6 +209,14 @@ class WorkflowComment(UUIDPKMixin, TimestampMixin, Base):
     __table_args__ = (
         Index("ix_workflow_comments_instance_id", "instance_id"),
         Index("ix_workflow_comments_instance_created", "instance_id", "created_at"),
+        CheckConstraint(
+            "question_status IN ('none', 'open', 'resolved')",
+            name="ck_workflow_comments_question_status",
+        ),
+        Index(
+            "ix_workflow_comments_open_questions", "instance_id", "created_at", "id",
+            postgresql_where=text("question_status = 'open'"),
+        ),
     )
 
     instance_id: Mapped[uuid.UUID] = mapped_column(
@@ -230,6 +239,9 @@ class WorkflowComment(UUIDPKMixin, TimestampMixin, Base):
     author_keycloak_sub: Mapped[str] = mapped_column(String(256), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     is_internal: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    question_status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="none", server_default=text("'none'")
+    )
 
     instance: Mapped["WorkflowInstance"] = relationship(back_populates="comments")
     attachments: Mapped[list["WorkflowAttachment"]] = relationship(back_populates="comment")

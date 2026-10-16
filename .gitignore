@@ -28,3 +28,7 @@ yarn-error.log*
 /report_*.xlsx
 /CRM *.xlsx
 /Отчёт_CRM.xlsx
+
+# Локальные образцы и рендеры повестки встречи
+/output/pdf/meeting-agenda-*.pdf
+/tmp/pdfs/

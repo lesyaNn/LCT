@@ -11,6 +11,8 @@ unmounted; see ``docs/DEFERRED_MODULES.md`` for their reactivation requirements.
 
 from fastapi import APIRouter
 
+from app.modules.assistant.router import router as assistant_router
+
 from app.modules.search import router as search_router
 from app.modules.analytics.reports_router import router as reports_router
 from app.modules.analytics.stats_router import router as report_statistics_router
@@ -23,6 +25,7 @@ from app.modules.catalog.router import router as catalog_router
 from app.modules.imports.router import router as imports_router
 from app.modules.integrations.router import router as integrations_router
 from app.modules.meetings.router import router as meetings_router
+from app.modules.meeting_agenda.router import router as meeting_agenda_router
 from app.modules.education.router import router as education_router
 from app.modules.teachers.router import router as teachers_router
 from app.modules.universities.passport_router import router as passport_router
@@ -34,6 +37,7 @@ from app.modules.health_score.router import router as health_score_router
 from app.modules.notifications.router import router as notifications_router
 
 v1 = APIRouter(prefix="/api/v1")
+v1.include_router(assistant_router)
 v1.include_router(auth_router)
 v1.include_router(notifications_router)
 v1.include_router(search_router)
@@ -42,6 +46,7 @@ v1.include_router(imports_router)
 v1.include_router(integrations_router)
 v1.include_router(passport_router)
 v1.include_router(meetings_router)
+v1.include_router(meeting_agenda_router)
 v1.include_router(education_router)
 v1.include_router(teachers_router)
 v1.include_router(catalog_router)
