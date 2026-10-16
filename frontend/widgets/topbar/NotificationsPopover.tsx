@@ -18,7 +18,7 @@ const icons: Record<NotificationType, React.ReactNode> = {
   comment: <Message size={24} fill="currentColor" />,
 };
 
-function NotificationRow({ notification }: { notification: NotificationItem }) {
+export function NotificationRow({ notification, variant = 'popover' }: { notification: NotificationItem; variant?: 'popover' | 'page' }) {
   const content = <>
     <span className={styles.unreadSlot}>{notification.read ? null : <span className={styles.unreadDot} />}</span>
     <span className={`${styles.iconCircle} ${styles[notification.type]}`} aria-hidden="true">{icons[notification.type]}</span>
@@ -31,7 +31,7 @@ function NotificationRow({ notification }: { notification: NotificationItem }) {
     </span>
   </>;
 
-  return <li className={`${styles.item} ${notification.read ? '' : styles.unreadItem}`}>
+  return <li className={`${styles.item} ${notification.read ? '' : styles.unreadItem} ${variant === 'page' ? styles.pageItem : ''}`}>
     {notification.target ? <Link className={styles.itemInner} href={notification.target}>{content}</Link> : <div className={styles.itemInner}>{content}</div>}
   </li>;
 }
@@ -41,10 +41,11 @@ interface NotificationsPopoverProps {
   notifications: NotificationItem[];
   unreadCount: number;
   onMarkAllRead: () => void;
+  onClose: () => void;
   onToggle: ToggleEventHandler<HTMLDivElement>;
 }
 
-export const NotificationsPopover = forwardRef<HTMLDivElement, NotificationsPopoverProps>(function NotificationsPopover({ id, notifications, unreadCount, onMarkAllRead, onToggle }, ref) {
+export const NotificationsPopover = forwardRef<HTMLDivElement, NotificationsPopoverProps>(function NotificationsPopover({ id, notifications, unreadCount, onMarkAllRead, onClose, onToggle }, ref) {
   return <div id={id} ref={ref} popover="auto" tabIndex={-1} className={styles.panel} role="dialog" aria-labelledby={`${id}-title`} onToggle={onToggle}>
     <div className={styles.heading}>
       <div className={styles.headingTitle}>
@@ -57,8 +58,8 @@ export const NotificationsPopover = forwardRef<HTMLDivElement, NotificationsPopo
       {notifications.map((notification) => <NotificationRow key={notification.id} notification={notification} />)}
     </ul>
     {notifications.length === 0 ? <p className={styles.empty}>Уведомлений пока нет</p> : null}
-    <div className={styles.footer} aria-disabled="true" title="Раздел уведомлений пока недоступен">
+    <Link className={styles.footer} href="/notifications" onClick={onClose}>
       <span>Все уведомления</span><Icon name="chevron-right" size={22} />
-    </div>
+    </Link>
   </div>;
 });

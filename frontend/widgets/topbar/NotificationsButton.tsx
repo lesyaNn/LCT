@@ -1,25 +1,18 @@
 'use client';
 
-import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Icon } from '@/shared/ui/rtk/icon';
 import { IconButton } from '@/shared/ui/rtk/icon-button';
-import type { NotificationItem } from '@/shared/types/notification';
-import { createDemoNotifications } from './notification-demo';
 import { NotificationsPopover } from './NotificationsPopover';
+import { useNotifications } from './notifications-state';
 import styles from './notifications.module.css';
 
-// Relative demo timestamps are client-only so server and browser markup match.
-const subscribeToHydration = () => () => {};
-
 export function NotificationsButton() {
-  const hydrated = useSyncExternalStore(subscribeToHydration, () => true, () => false);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(createDemoNotifications);
+  const { notifications, unreadCount, markAllRead } = useNotifications();
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLSpanElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
-  const displayNotifications = hydrated ? notifications : [];
-  const unreadCount = displayNotifications.filter((item) => !item.read).length;
 
   // The native popover supplies light dismiss, Escape and top-layer rendering.
   const positionPanel = useCallback(() => {
@@ -60,7 +53,7 @@ export function NotificationsButton() {
     <NotificationsPopover
       id={panelId}
       ref={panelRef}
-      notifications={displayNotifications}
+      notifications={notifications}
       unreadCount={unreadCount}
       onToggle={(event) => {
         const isOpen = event.currentTarget.matches(':popover-open');
@@ -68,9 +61,10 @@ export function NotificationsButton() {
         if (isOpen) panelRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
       }}
       onMarkAllRead={() => {
-        setNotifications((items) => items.map((item) => item.read ? item : { ...item, read: true }));
+        markAllRead();
         requestAnimationFrame(() => panelRef.current?.focus());
       }}
+      onClose={() => panelRef.current?.hidePopover()}
     />
   </>;
 }
