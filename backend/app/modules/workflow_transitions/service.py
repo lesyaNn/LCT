@@ -484,6 +484,7 @@ def add_comment(
         # Explicit model default: the audit before_flush snapshot reads the
         # attribute before flush-time defaults fire, so None would leak in.
         is_internal=True,
+        question_status="open" if data.is_question else "none",
     )
     db.add(comment)
     db.commit()
@@ -511,6 +512,7 @@ def add_comment_with_files(
     comment = WorkflowComment(
         instance_id=instance_id, stage_id=data.stage_id,
         author_keycloak_sub=actor, content=content, is_internal=True,
+        question_status="open" if data.is_question else "none",
     )
     keys: list[str] = []
     try:

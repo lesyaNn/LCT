@@ -19,7 +19,7 @@ COPY pyproject.toml ./
 RUN pip install --no-cache-dir .
 
 FROM base AS test
-RUN pip install --no-cache-dir "pytest==9.0.3" "ruff==0.15.13" "httpx==0.28.1"
+RUN pip install --no-cache-dir ".[dev]"
 COPY scripts ./scripts
 COPY migrations ./migrations
 COPY app ./app

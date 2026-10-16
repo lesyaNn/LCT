@@ -52,6 +52,7 @@ WRITE = require_permission("workflow.change_status")
 def add_comment_with_attachments(
     instance_id: uuid.UUID,
     content: str = Form(..., min_length=1, max_length=10000),
+    is_question: bool = Form(False),
     stage_id: uuid.UUID | None = Form(None),
     files: list[UploadFile] = File(..., min_length=1, max_length=10),
     db: Session = Depends(get_audit_db),
@@ -62,7 +63,7 @@ def add_comment_with_attachments(
     instance_service.authorize_scope(user, instance)
     comment = service.add_comment_with_files(
         db, storage, instance_id,
-        WorkflowCommentCreate(content=content, stage_id=stage_id), files, user.id,
+        WorkflowCommentCreate(content=content, stage_id=stage_id, is_question=is_question), files, user.id,
     )
     return WorkflowCommentRead.model_validate(comment)
 

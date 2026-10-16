@@ -129,7 +129,7 @@ def test_migration_000012_pair_discoverable_and_latest():
     assert "000019_import_jobs" in versions
     # P4-06-01 retries: attempts counter for the worker claim loop.
     assert "000020_job_attempts" in versions
-    assert versions[-1] == "000040_vendor_level_contacts"
+    assert "000044_meeting_agenda" in versions
     assert versions.index("000011_workflow_templates") < versions.index("000012_workflow_instances")
     assert versions.index("000012_workflow_instances") < versions.index("000013_instance_stages")
     assert versions.index("000013_instance_stages") < versions.index(
@@ -240,6 +240,7 @@ def test_orm_children_columns():
         "author_keycloak_sub",
         "content",
         "is_internal",
+        "question_status",
         "created_at",
         "updated_at",
     }
@@ -355,6 +356,7 @@ def test_orm_instance_stage_columns_fk_constraints_indexes():
         "is_required",
         "status",
         "due_date",
+        "started_at",
         "completed_at",
         "created_at",
         "updated_at",

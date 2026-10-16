@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 from app.modules.workflow_attachments.schemas import AttachmentRead
@@ -51,6 +52,7 @@ class WorkflowCommentCreate(BaseModel):
     """New instance comment (P2-04-01)."""
 
     content: str = Field(min_length=1, max_length=10000)
+    is_question: bool = Field(default=False, description="Include in the meeting agenda until resolved.")
     stage_id: uuid.UUID | None = Field(
         default=None,
         description="Optional template-stage anchor of this instance's template.",
@@ -63,6 +65,10 @@ class WorkflowCommentUpdate(BaseModel):
     content: str = Field(min_length=1, max_length=10000)
 
 
+class WorkflowQuestionUpdate(BaseModel):
+    status: Literal["none", "open", "resolved"]
+
+
 class WorkflowCommentRead(BaseModel):
     """Stored instance comment (P2-04-01)."""
 
@@ -73,6 +79,7 @@ class WorkflowCommentRead(BaseModel):
     author_name: str | None = None
     content: str
     is_internal: bool = True
+    question_status: Literal["none", "open", "resolved"] = "none"
     created_at: datetime
     updated_at: datetime
     attachments: list[AttachmentRead] = Field(default_factory=list)
