@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/shared/auth/AuthProvider';
+import { hasPermission } from '@/shared/lib/access-control';
 import { normalizeApiError } from '@/shared/lib/api-errors';
 import { queryKeys } from '@/shared/lib/query-keys';
 import {
@@ -36,6 +38,8 @@ export function WorkflowCreateModal({ universityId, initialProgramId, onClose, o
   onCreated: (record: WorkflowInstanceApiRecord) => void;
 }) {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const canAttachProgram = hasPermission(user, 'university.edit');
   const [directionId, setDirectionId] = useState<string | null>(null);
   const [programId, setProgramId] = useState(initialProgramId ?? '');
   const [productId, setProductId] = useState('');
@@ -81,7 +85,7 @@ export function WorkflowCreateModal({ universityId, initialProgramId, onClose, o
     const universityIds = new Set(universityPrograms.map((program) => program.id));
     if (catalog.length) {
       const names = new Map(universityPrograms.map((program) => [program.id, program.name]));
-      return catalog.map((program) => ({
+      return catalog.filter((program) => canAttachProgram || universityIds.has(program.id)).map((program) => ({
         id: program.id,
         name: names.get(program.id) ?? program.name,
         linked: universityIds.has(program.id),
@@ -91,7 +95,7 @@ export function WorkflowCreateModal({ universityId, initialProgramId, onClose, o
     return universityPrograms
       .filter((program) => !directionName || program.direction === directionName)
       .map((program) => ({ id: program.id, name: program.name, linked: true }));
-  }, [catalogProgramsQuery.data, activeDirectionId, directionOptions, universityProgramsQuery.data]);
+  }, [catalogProgramsQuery.data, activeDirectionId, canAttachProgram, directionOptions, universityProgramsQuery.data]);
 
   const productOptions = useMemo(() => productsQuery.data ?? [], [productsQuery.data]);
   const templateOptions = useMemo(
@@ -164,7 +168,7 @@ export function WorkflowCreateModal({ universityId, initialProgramId, onClose, o
           <div className={styles.field}>
             <SearchableSelect label="Программа обучения" labelPlacement="outside" value={activeProgramId} disabled={!activeDirectionId} onChange={(value) => { setProgramId(value); setProductId(''); }} options={programOptions} placeholder="Выберите программу" />
             {activeDirectionId && catalogProgramsQuery.isPending ? <em>Загрузка программ…</em> : null}
-            {activeDirectionId && !catalogProgramsQuery.isPending && !programOptions.length ? <em>В этом направлении пока нет программ в каталоге.</em> : null}
+            {activeDirectionId && !catalogProgramsQuery.isPending && !programOptions.length ? <em>{canAttachProgram ? 'В этом направлении пока нет программ в каталоге.' : 'В этом направлении нет программ, привязанных к ВУЗу.'}</em> : null}
           </div>
 
           <div className={styles.field}>

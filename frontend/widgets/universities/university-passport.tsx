@@ -13,11 +13,12 @@ import Education from '@atomaro/icons/24/culture/Education';
 import Edit from '@atomaro/icons/24/editor/Edit';
 import ArrowRight from '@atomaro/icons/24/navigation/ArrowRight';
 import { useAuth } from '@/shared/auth/AuthProvider';
-import { hasPermission, hasRole } from '@/shared/lib/access-control';
+import { hasPermission } from '@/shared/lib/access-control';
 import { formatDateTimeRu } from '@/shared/lib/formatters';
 import { normalizeApiError } from '@/shared/lib/api-errors';
 import { getUniversityHealth } from '@/shared/lib/dashboard-repository';
 import { queryKeys } from '@/shared/lib/query-keys';
+import { healthLevelMeta } from '@/shared/lib/status-semantics';
 import {
   getWorkflowSelectorPrograms,
   getUniversityPassport,
@@ -107,7 +108,7 @@ function OverviewMetrics({ passport }: { passport: UniversityPassport }) {
       <div className={styles.sectionHeading}><h2 id="passport-metrics-title">Ключевые показатели</h2></div>
       <div className={styles.metricsGrid}>
         <MetricCard label="Активные программы" value={health?.active_workflows ?? '—'} icon={Book} />
-        <MetricCard label="Health Score" value={health?.score === null || health?.score === undefined ? '—' : `${health.score} / 100`} icon={StatisticsBoard} />
+        <MetricCard label="Health Score" value={health?.score === null || health?.score === undefined ? '—' : <><span style={{ color: `var(--rtk-color-${healthLevelMeta[health.level].intent}, var(--rtk-color-text-primary))` }}>{health.score}</span> / 100</>} icon={StatisticsBoard} />
         <MetricCard label="Лицензии" value={licensesTotal} icon={Education} indicators={[{ value: metrics.licenses.active, label: 'действуют', intent: 'success' }, { value: metrics.licenses.expiring, label: 'истекают', intent: 'warning' }, { value: metrics.licenses.overdue, label: 'просрочены', intent: 'danger' }]} />
         <MetricCard label="Документы" value={metrics.documents.limited ? `≥${metrics.documents.total}` : metrics.documents.total} icon={DocumentText} indicators={metrics.documents.limited ? undefined : [{ value: metrics.documents.signed, label: 'подписано', intent: 'success' }, { value: metrics.documents.overdue, label: 'просрочено', intent: 'danger' }]} />
       </div>
@@ -119,7 +120,7 @@ function WorkflowOverview({ passport }: { passport: UniversityPassport }) {
   const { user } = useAuth();
   const [launchProgramId, setLaunchProgramId] = useState<string | null>(null);
   const realWorkflow = isRealWorkflowMode();
-  const canCreate = realWorkflow && hasPermission(user, 'workflow.change_status') && hasRole(user, 'admin');
+  const canCreate = realWorkflow && hasPermission(user, 'workflow.change_status');
   const instancesQuery = useQuery({ queryKey: universityWorkflowInstancesQueryKey(passport.id), queryFn: ({ signal }) => listUniversityWorkflowInstances(passport.id, signal), enabled: realWorkflow, staleTime: 30_000 });
   const programsQuery = useQuery({ queryKey: workflowProgramsQueryKey(passport.id), queryFn: ({ signal }) => getWorkflowSelectorPrograms(passport.id, signal), enabled: realWorkflow, staleTime: 30_000 });
   const instances = instancesQuery.data ?? [];

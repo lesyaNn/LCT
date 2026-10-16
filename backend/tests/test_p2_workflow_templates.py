@@ -5,7 +5,7 @@ DB); the schema always comes from the canonical SQL migrations
 (``tests/db_helpers.py``). No SQLite, no ``create_all``.
 
 Coverage: schema tables/FK/cascade/UNIQUE/CHECK (+SQLSTATE), templates API
-(admin POST/list/detail/PATCH, 401/403/404, pagination, ordering, timestamps
+(workflow-role list, admin POST/detail/PATCH, 401/403/404, pagination, ordering, timestamps
 not client-settable, exclude_unset PATCH), stages API (append/insert
 first/middle/end, order shift, template isolation, PATCH incl. moves, 404s,
 position bounds, admin-only RBAC), reorder transaction rollback, seed of the
@@ -522,7 +522,7 @@ def test_failed_reorder_transaction_rolls_back(db):
 # ======================================================================= RBAC
 
 
-def test_templates_rbac_admin_only(auth_client):
+def test_templates_rbac_read_for_workflow_roles_admin_writes(auth_client):
     c = auth_client
     assert c.get("/api/v1/workflow/templates").status_code == 401
     assert c.post("/api/v1/workflow/templates", json={"name": "x"}).status_code == 401
@@ -530,7 +530,7 @@ def test_templates_rbac_admin_only(auth_client):
 
     assert c.get("/api/v1/workflow/templates", headers=_auth(c, ("guest",))).status_code == 403
     for roles in (("user",), ("manager",)):
-        assert c.get("/api/v1/workflow/templates", headers=_auth(c, roles)).status_code == 403, (
+        assert c.get("/api/v1/workflow/templates", headers=_auth(c, roles)).status_code == 200, (
             roles
         )
         r = c.post(

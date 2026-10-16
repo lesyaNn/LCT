@@ -2,9 +2,9 @@
 
 Thin routes: params -> RBAC -> service -> DTO. No SQL here.
 
-RBAC: templates are admin-only via the frozen mechanism
-(``require_role("admin")`` — no invented ``workflow.admin`` permission;
-admin holds ``*``, every other role gets 403).
+RBAC: template management is admin-only via the frozen mechanism
+(``require_role("admin")``); the read-only list is available to users with
+``workflow.read`` so they can choose an active template for a new instance.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ import uuid
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.core.permissions import require_role
+from app.core.permissions import require_permission, require_role
 from app.core.security import CurrentUser
 from app.modules.audit.service import get_audit_db
 from app.modules.workflow_templates import service
@@ -32,6 +32,7 @@ from app.schemas.common import PaginatedResponse
 router = APIRouter(prefix="/workflow", tags=["Workflow"])
 
 ADMIN = require_role("admin")
+READ = require_permission("workflow.read")
 
 
 # ---------------------------------------------------------------- templates
@@ -41,13 +42,13 @@ ADMIN = require_role("admin")
     "/templates",
     response_model=PaginatedResponse[TemplateRead],
     summary="Список шаблонов Workflow",
-    description="Возвращает постраничный список шаблонов workflow в стабильном порядке. Доступно только роли admin.",
+    description="Возвращает постраничный список шаблонов workflow для выбора при создании экземпляра. Требуется право workflow.read.",
 )
 def list_templates(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_audit_db),
-    _user: CurrentUser = Depends(ADMIN),
+    _user: CurrentUser = Depends(READ),
 ) -> PaginatedResponse[TemplateRead]:
     items, total = service.list_template_page(db, page=page, page_size=page_size)
     return PaginatedResponse(items=items, page=page, page_size=page_size, total=total)

@@ -15,7 +15,7 @@ import SkipStroke from '@atomaro/icons/24/alert/SkipStroke';
 import TimeStroke from '@atomaro/icons/24/alert/TimeStroke';
 import Task from '@atomaro/icons/24/communication/Task';
 import { useAuth } from '@/shared/auth/AuthProvider';
-import { hasPermission, hasRole } from '@/shared/lib/access-control';
+import { hasPermission } from '@/shared/lib/access-control';
 import type { WorkflowTransitionTarget } from '@/shared/lib/workflow-transition';
 import { formatDateRu, formatDateTimeRu, getRelativeDueDateRu } from '@/shared/lib/formatters';
 import { workflowStageStatusSemantics, type WorkflowStageIcon } from '@/shared/lib/status-semantics';
@@ -390,7 +390,7 @@ export function UniversityWorkflow({ id }: { id: string }) {
   const programsQuery = useQuery({ queryKey: workflowProgramsQueryKey(id), queryFn: ({ signal }) => getWorkflowSelectorPrograms(id, signal), staleTime: 30_000 });
   const instances = instancesQuery.data ?? [];
   const unstartedPrograms = (programsQuery.data ?? []).filter((program) => !instances.some((instance) => instance.program_id === program.id));
-  const canCreate = isRealWorkflowMode() && hasPermission(user, 'workflow.change_status') && hasRole(user, 'admin');
+  const canCreate = isRealWorkflowMode() && hasPermission(user, 'workflow.change_status');
 
   if (instancesQuery.isPending || programsQuery.isPending) return <WorkflowSkeleton mode="embedded" />;
   if (!instancesQuery.data || !programsQuery.data) return <RouteErrorState compact onRetry={() => { void instancesQuery.refetch(); void programsQuery.refetch(); }} />;

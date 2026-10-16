@@ -17,7 +17,7 @@ import OkStroke from '@atomaro/icons/24/alert/OkStroke';
 import ChevronRight from '@atomaro/icons/24/navigation/ChevronRight';
 import { getUniversityHealth, type MatrixHealthState, type UniversityHealth, type UniversityHealthProgram } from '@/shared/lib/dashboard-repository';
 import { queryKeys } from '@/shared/lib/query-keys';
-import type { SemanticIntent } from '@/shared/lib/status-semantics';
+import { healthLevelMeta, type SemanticIntent } from '@/shared/lib/status-semantics';
 import { Progress } from '@/shared/ui/rtk/progress';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { Tooltip } from '@/shared/ui/rtk/tooltip';
@@ -32,12 +32,6 @@ const stateMeta: Record<MatrixHealthState, { label: string; intent: SemanticInte
   NOT_STARTED: { label: 'Не запущено', intent: 'neutral' },
   COMPLETED: { label: 'Завершён', intent: 'success' },
   NOT_LINKED: { label: 'Не используется', intent: 'neutral' },
-};
-const levelMeta: Record<UniversityHealth['level'], { label: string; intent: SemanticIntent }> = {
-  stable: { label: 'Стабильно', intent: 'success' },
-  attention: { label: 'Требует внимания', intent: 'warning' },
-  critical: { label: 'Критично', intent: 'danger' },
-  no_data: { label: 'Недостаточно данных', intent: 'neutral' },
 };
 const periods = [6, 12, 24] as const;
 
@@ -151,7 +145,7 @@ export function UniversityHealth({ universityId }: { universityId: string }) {
   const coverage = health.total_programs ? Math.round(health.active_workflows / health.total_programs * 100) : null;
   return <div className={styles.page}>
     <section className={`${styles.card} ${styles.summary}`} aria-labelledby="health-title"><h2 id="health-title">Текущее состояние взаимодействия <InfoHint content="Текущая оценка взаимодействия с вузом по данным Workflow и связанных задач, этапов, ответственных и лицензий." /></h2><div className={styles.summaryBody}>
-      <div className={styles.scoreBlock}><div className={styles.scoreRing} data-level={health.level} style={{ '--score': `${health.score ?? 0}%` } as CSSProperties}><div><strong>{health.score ?? '—'}</strong><span>/ 100</span></div></div><div className={styles.scoreIdentity}><strong>Health Score</strong><StatusBadge intent={levelMeta[health.level].intent}>{levelMeta[health.level].label}</StatusBadge></div></div>
+      <div className={styles.scoreBlock}><div className={styles.scoreRing} data-level={health.level} style={{ '--score': `${health.score ?? 0}%` } as CSSProperties}><div><strong>{health.score ?? '—'}</strong><span>/ 100</span></div></div><div className={styles.scoreIdentity}><strong>Health Score</strong><StatusBadge intent={healthLevelMeta[health.level].intent}>{healthLevelMeta[health.level].label}</StatusBadge></div></div>
       <dl className={styles.metrics}><div className={styles.metric}><dt><IconSurface><Checklist size={19} /></IconSurface><span>Workflow активны</span></dt><dd>{health.active_workflows} из {health.total_programs}</dd></div><div className={styles.metric}><dt><IconSurface tone="warning"><AttentionStroke size={19} /></IconSurface><span>Требуют внимания</span></dt><dd>{health.attention_count}</dd></div><div className={styles.metric}><dt><IconSurface tone="danger"><ErrorStroke size={19} /></IconSurface><span>Критично</span></dt><dd>{health.critical_count}</dd></div><div className={styles.metric}><dt><IconSurface><StatisticsColumn size={19} /></IconSurface><span>Охват программ</span></dt><dd>{coverage === null ? '—' : `${coverage}%`}</dd>{coverage !== null ? <Progress value={coverage} label="Охват программ активными Workflow" /> : null}</div></dl>
       <aside className={styles.summaryInfo}><IconSurface><InformationStroke size={20} /></IconSurface><p>Оценка показывает текущее состояние взаимодействия с вузом: этапы Workflow, задачи, назначение ответственных и связанные лицензии. Она не отражает академический рейтинг вуза.</p></aside>
     </div></section>
