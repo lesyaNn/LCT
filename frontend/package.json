@@ -11,9 +11,7 @@
     "test:audit": "node scripts/run-audit-human-tests.mjs",
     "test:e2e:auth": "playwright test e2e/auth-foundation.spec.ts",
     "test:e2e:catalogs": "playwright test e2e/catalogs-real.spec.ts",
-    "test:e2e:universities": "playwright test e2e/universities-catalogs.spec.ts",
-    "test:e2e:passport": "playwright test e2e/university-passport-read.spec.ts",
-    "test:e2e:smoke": "playwright test e2e/critical-demo-flow.spec.ts",
+    "test:e2e:smoke": "playwright test e2e/smoke-read-only.spec.ts",
     "start": "next start"
   },
   "dependencies": {
