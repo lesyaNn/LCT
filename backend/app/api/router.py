@@ -31,9 +31,11 @@ from app.modules.workflow_instances.router import router as workflow_instances_r
 from app.modules.workflow_templates.router import router as workflow_templates_router
 from app.modules.workflow_transitions.router import router as workflow_transitions_router
 from app.modules.health_score.router import router as health_score_router
+from app.modules.notifications.router import router as notifications_router
 
 v1 = APIRouter(prefix="/api/v1")
 v1.include_router(auth_router)
+v1.include_router(notifications_router)
 v1.include_router(search_router)
 v1.include_router(admin_users_router)
 v1.include_router(imports_router)

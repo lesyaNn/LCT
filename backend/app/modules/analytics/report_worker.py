@@ -77,6 +77,18 @@ def run_audit_relay_once() -> int:
         db.close()
 
 
+def run_notification_scan_once() -> int:
+    """Project due dates into the same durable in-app inbox."""
+    from app.db.session import SessionLocal
+    from app.modules.notifications.service import scan_due_notifications
+
+    db = SessionLocal()
+    try:
+        return scan_due_notifications(db)
+    finally:
+        db.close()
+
+
 def build_worker_user(job: ReportJob) -> CurrentUser:
     """Rehydrate the minimal actor the dataset layer expects.
 
@@ -161,13 +173,22 @@ def run_import_job(db: Session, job: ReportJob) -> str:
         # Import files may contain personal data and database exceptions may
         # include cell values. Keep the public job error deliberately generic.
         logger.error("import worker failed id=%s type=%s", job.id, type(exc).__name__)
-        return jobs.requeue_or_fail(
+        outcome = jobs.requeue_or_fail(
             db, job, RuntimeError("Не удалось обработать импорт; проверьте файл и лист"),
         )
+        if outcome == "failed":
+            from app.modules.notifications.service import notify_import_result
+
+            notify_import_result(db, job, failed=True)
+            db.commit()
+        return outcome
     artifact = Path(jobs.job_file_path(job.id, "xlsx"))
     size = import_service.write_error_report(summary, artifact)
     job.result = summary
     db.add(job)
+    from app.modules.notifications.service import notify_import_result
+
+    notify_import_result(db, job)
     jobs.mark_ready(db, job, file_path=artifact, file_size=size)
     return "ready"
 
@@ -283,11 +304,19 @@ def main(argv: list[str] | None = None) -> int:
         "--idle-sleep", type=float, default=2.0, help="idle sleep seconds"
     )
     args = parser.parse_args(argv)
+    next_notification_scan = 0.0
     while True:
         try:
             run_audit_relay_once()
         except Exception:
             logger.exception("audit outbox relay iteration failed")
+        if time.monotonic() >= next_notification_scan:
+            try:
+                run_notification_scan_once()
+                next_notification_scan = time.monotonic() + 3600
+            except Exception:
+                logger.exception("notification deadline scan failed")
+                next_notification_scan = time.monotonic() + 60
         try:
             # Only report/import job execution here. The daily health-score
             # snapshot that used to run in this block was removed together
