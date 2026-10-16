@@ -767,7 +767,7 @@ def test_migration_chain_has_report_jobs_and_latest_head():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     versions = [v for v, _, _ in module._discover()]
-    assert versions[-1] == "000043_assistant_conversations"
+    assert versions[-1] == "000044_assistant_conversations"
     assert "000033_product_program" in versions
     assert len(versions) == 43
     assert "report_jobs" in module.EXPECTED_TABLES
