@@ -95,6 +95,7 @@ EXPECTED_TABLES = [
     "teacher_certificates",
     "teacher_qualifications",
     "program_education_stats",
+    "notifications",
     "assistant_conversations",
     "assistant_turns",
 ]
