@@ -43,9 +43,37 @@ from app.config import settings  # noqa: E402
 from app.db.seed_workflow import (  # noqa: E402
     STAGES_14,
     TEMPLATE_NAME,
-    seed_workflow_templates,
 )
 from app.models.workflow_templates import WorkflowStage, WorkflowTemplate  # noqa: E402
+
+
+def create_standard_template(session: Session) -> dict:
+    """Explicit creation only; the general legacy seed remains disabled."""
+    template = session.execute(
+        select(WorkflowTemplate).where(WorkflowTemplate.name == TEMPLATE_NAME)
+    ).scalar_one_or_none()
+    if template is None:
+        template = WorkflowTemplate(name=TEMPLATE_NAME, is_active=True)
+        session.add(template)
+        session.flush()
+    stages = {
+        stage.order_index: stage
+        for stage in session.scalars(
+            select(WorkflowStage).where(WorkflowStage.template_id == template.id)
+        )
+    }
+    for index, (name, required) in enumerate(STAGES_14, start=1):
+        stage = stages.get(index)
+        if stage is None:
+            session.add(WorkflowStage(
+                template_id=template.id, order_index=index, name=name,
+                is_required=required, is_active=True,
+            ))
+        else:
+            stage.name = name
+            stage.is_required = required
+    session.commit()
+    return {"workflow_templates": 1, "workflow_stages": len(STAGES_14)}
 
 
 def main() -> int:
@@ -54,7 +82,7 @@ def main() -> int:
     try:
         with Session(engine) as session:
             before = _snapshot(session)
-            stats = seed_workflow_templates(session)
+            stats = create_standard_template(session)
             after = _snapshot(session)
     finally:
         engine.dispose()

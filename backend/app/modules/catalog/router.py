@@ -1147,3 +1147,17 @@ def catalog_overview(
 ):
     size = limit if limit is not None else page_size
     return service.get_catalog_overview(db, user, page=page, size=size)
+
+
+@router.get("/contracts/{contract_id}/file/preview", summary="Предпросмотр файла договора")
+def preview_contract_file(
+    contract_id: uuid.UUID, offset: int = Query(default=0, ge=0, le=9900),
+    db: Session = Depends(get_audit_db), storage: StorageBackend = Depends(get_storage),
+    user: CurrentUser = Depends(READ),
+):
+    from app.modules.workflow_attachments.preview import preview_response
+    contract = contract_or_404(db, contract_id)
+    ensure_university_visible(contract.university_id, user)
+    if not contract.file_path:
+        raise HTTPException(404, "Contract file not found")
+    return preview_response(storage, contract.file_path, contract.file_name or "contract", offset)
