@@ -22,6 +22,7 @@ from app.schemas.catalog import (
     VendorShort,
 )
 from app.schemas.licenses import LicenseShort
+from app.schemas.location import CityLocation
 from app.schemas.validation import ContactEmail, ContactPhone, NonBlankText
 from app.services.license_status import days_to_expiry as _days_to_expiry
 from app.services.license_status import derive_contract_status as _derive_contract_status
@@ -100,7 +101,7 @@ class ResponsibleShort(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class UniversityRead(BaseModel):
+class UniversityRead(CityLocation):
     id: uuid.UUID
     name: str
     city: str | None = None

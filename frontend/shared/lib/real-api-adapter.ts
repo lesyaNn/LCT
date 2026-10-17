@@ -64,7 +64,7 @@ type ApiResponsible = { id: string; full_name: string; email: string; phone: str
 type ApiTimeline = { id: string; type: string; title: string; description: string | null; author: string; created_at: string };
 type ApiWorkflowSummary = { instance_id: string | null; template_name: string | null; current_stage: string | { code: string; name: string } | null; progress_percent: number; overdue_stages: number; next_due_date: string | null };
 type ApiPassport = {
-  university: { id: string; name: string; city: string | null };
+  university: { id: string; name: string; city: string | null; time_zone?: string | null };
   programs: ApiProgram[];
   products: ApiProduct[];
   licenses: ApiLicense[];
@@ -189,6 +189,7 @@ export async function realGetUniversityPassport(id: string, queryClient?: QueryC
     id: data.university.id,
     name: data.university.name,
     city: data.university.city ?? '—',
+    timeZone: data.university.time_zone ?? null,
     metrics: {
       activePrograms: data.programs.filter((item) => item.status === 'active' || item.status === 'launched').length,
       licenses: { active: data.licenses.filter((item) => item.status === 'active').length, expiring: data.licenses.filter((item) => item.status === 'expires_soon').length, overdue: data.licenses.filter((item) => item.status === 'expired').length },

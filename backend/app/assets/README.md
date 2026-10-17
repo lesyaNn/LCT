@@ -8,3 +8,8 @@ Regenerate from the repository root with the frontend's installed Sharp:
 ```sh
 node -e "require('./frontend/node_modules/sharp')('frontend/public/brand/rostelecom-horizontal.svg').resize({width:1800}).png().toFile('backend/app/assets/rostelecom-horizontal.png')"
 ```
+
+`city-time-zones.json` is a derived offline GeoNames city index. Source attribution,
+CC BY 4.0 license, source hashes and snapshot date are embedded in the file.
+Historical alternate names are excluded; names belonging to multiple zones map
+to null. Regeneration and API behavior: `docs/UNIVERSITY_TIME_CONTACTS.md`.

@@ -18,6 +18,8 @@ dependencies = [
   "httpx==0.28.1",
   "openpyxl==3.1.5",
   "xlrd==2.0.2",
+  "rarfile==4.2",
+  "pypdfium2==5.14.0",
   "xlwt==1.3.0",
   "reportlab==4.4.9",
   "python-dateutil==2.9.0.post0",
@@ -36,7 +38,7 @@ include = ["app*", "scripts*"]
 exclude = ["var*", "tests*", "alembic*", "migrations*"]
 
 [tool.setuptools.package-data]
-app = ["assets/*.png", "assets/*.md"]
+app = ["assets/*.png", "assets/*.md", "assets/*.json"]
 
 [tool.ruff]
 line-length = 100

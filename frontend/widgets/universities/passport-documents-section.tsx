@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { FilePreview } from '@/shared/ui/file-preview/file-preview';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Edit from '@atomaro/icons/24/editor/Edit';
 import { useAuth } from '@/shared/auth/AuthProvider';
@@ -18,6 +19,7 @@ import { Modal } from '@/shared/ui/rtk/modal';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { IconButton } from '@/shared/ui/rtk/icon-button';
+import { CopyButton } from '@/shared/ui/rtk/copy-button';
 import { Tooltip } from '@/shared/ui/rtk/tooltip';
 import styles from './university-passport-sections.module.css';
 
@@ -57,12 +59,12 @@ export function PassportDocumentsSection({ id }: { id: string }) {
   const getDocument = async (row: UniversityDocumentRow) => { try { downloadBlob(await downloadUniversityDocument(id, row.id), row.fileName); } catch (cause) { setError(normalizeApiError(cause).message); } };
   const removeFile = async (row: ContractCatalogItem) => { try { await deleteContractFile(row.id); await refreshContracts(); } catch (cause) { setError(normalizeApiError(cause).message); } };
   const contractColumns: PassportTableColumn<ContractCatalogItem>[] = [
-    { id: 'number', label: 'Номер', render: (row) => <strong className={styles.primaryCell}>{row.contractNumber}</strong> },
+    { id: 'number', label: 'Номер', render: (row) => <div className={styles.copyValue}><strong className={styles.primaryCell}>{row.contractNumber}</strong><CopyButton value={row.contractNumber} label={`Копировать номер договора ${row.contractNumber}`} /></div> },
     { id: 'status', label: 'Статус', render: (row) => <StatusBadge intent={row.status === 'terminated' || row.status === 'expired' ? 'danger' : row.status === 'draft' ? 'neutral' : 'success'}>{effectiveStatusNames[row.status] ?? row.status}</StatusBadge> },
     { id: 'signed', label: 'Подписан', render: (row) => formatDateRu(row.signedAt) },
     { id: 'expires', label: 'Действует до', render: (row) => row.expiresAt ? formatDateRu(row.expiresAt) : '—' },
     { id: 'product', label: 'ИТ-продукт', render: (row) => row.productName || '—' },
-    { id: 'file', label: 'Файл', render: (row) => row.fileName ? <button className={styles.fileNameButton} type="button" onClick={() => void getFile(row)}>{row.fileName}</button> : '—' },
+    { id: 'file', label: 'Файл', render: (row) => row.fileName ? <FilePreview path={`/api/v1/contracts/${row.id}/file/preview`} name={row.fileName} size={row.fileSize ?? undefined} version={row.updatedAt}><button className={styles.fileNameButton} type="button" onClick={() => void getFile(row)}>{row.fileName}</button></FilePreview> : '—' },
     ...(canEditContract ? [{ id: 'actions', label: 'Действия', render: (row: ContractCatalogItem) => <div className={styles.documentFormActions}><Tooltip content="Редактировать"><IconButton icon={<Edit size={18} fill="currentColor" />} label="Редактировать" onClick={() => openEdit(row)} /></Tooltip><Button variant="ghost" size="s" type="button" onClick={() => openFile(row)}>{row.fileName ? 'Заменить файл' : 'Прикрепить файл'}</Button>{row.fileName ? <Button variant="ghost" size="s" type="button" onClick={() => void removeFile(row)}>Удалить файл</Button> : null}</div> }] : []),
   ];
   const contractMobile: PassportMobileField<ContractCatalogItem>[] = contractColumns.filter((column) => column.id !== 'actions').map((column) => ({ label: column.label, render: column.render }));
@@ -70,7 +72,7 @@ export function PassportDocumentsSection({ id }: { id: string }) {
   const documentColumns: PassportTableColumn<UniversityDocumentRow>[] = [
     { id: 'name', label: 'Название', render: (row) => <strong className={styles.primaryCell}>{row.name}</strong> },
     { id: 'type', label: 'Тип', render: (row) => typeNames[row.type as UniversityDocumentType] ?? row.type },
-    { id: 'file', label: 'Файл', render: (row) => row.hasFile ? <button className={styles.fileNameButton} type="button" onClick={() => void getDocument(row)}>{row.fileName}</button> : '—' },
+    { id: 'file', label: 'Файл', render: (row) => row.hasFile ? <FilePreview path={`/api/v1/universities/${id}/passport/documents/${row.id}/preview`} name={row.fileName} size={row.fileSize}><button className={styles.fileNameButton} type="button" onClick={() => void getDocument(row)}>{row.fileName}</button></FilePreview> : '—' },
     { id: 'status', label: 'Статус', render: (row) => row.status === 'archived' ? 'В архиве' : row.status === 'signed' ? 'Подписан' : 'Черновик' },
     { id: 'created', label: 'Дата добавления', render: (row) => formatDateRu(row.uploadedAt) },
   ];

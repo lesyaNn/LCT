@@ -190,3 +190,17 @@ def delete_attachment(
         raise SecurityError(ErrorCode.FORBIDDEN)
     service.delete_attachment(db, storage, attachment=attachment)
     return None
+
+
+@router.get("/instances/{instance_id}/attachments/{attachment_id}/preview", summary="Предпросмотр вложения")
+def preview_attachment(
+    instance_id: uuid.UUID, attachment_id: uuid.UUID,
+    offset: int = Query(default=0, ge=0, le=9900),
+    db: Session = Depends(get_db), storage: StorageBackend = Depends(get_storage),
+    user: CurrentUser = Depends(READ),
+):
+    from app.modules.workflow_attachments.preview import preview_response
+    instance = service.get_instance_or_404(db, instance_id)
+    service.authorize_scope(user, instance)
+    attachment = service.get_bound_attachment(db, instance_id=instance.id, attachment_id=attachment_id)
+    return preview_response(storage, attachment.storage_key, attachment.original_filename, offset)
