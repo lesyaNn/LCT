@@ -15,6 +15,7 @@ export const navigationItems: NavigationItem[] = [
   { label: 'Импорт каталогов', href: '/admin/import', icon: 'admin', requiredPermission: 'import.write' },
   { label: 'Шаблоны Workflow', href: '/admin/workflow/templates', icon: 'workflow', requiredPermission: 'workflow_template.manage' },
   { label: 'Тестирование API', href: '/api-testing', icon: 'api', requiredPermission: 'admin.settings' },
+  { label: 'API', href: '/api', icon: 'api' },
   { label: 'Документация', href: '/docs', icon: 'docs' },
 ];
 
@@ -30,6 +31,7 @@ export const routeLabels: Record<string, string> = {
   'university-assignments': 'Пользователи и вузы',
   catalogs: 'Управление каталогами',
   docs: 'Документация',
+  api: 'API',
   'api-testing': 'Тестирование API',
 };
 

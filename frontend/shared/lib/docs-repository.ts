@@ -57,6 +57,7 @@ export const DOC_SECTION_DEFINITIONS: Array<{ id: string; title: string; topics:
     { slug: 'admin', title: 'Администратор' },
   ] },
   { id: 'help', title: 'Помощь', topics: [{ slug: 'faq', title: 'Частые вопросы' }] },
+  { id: 'api', title: 'API', topics: [{ slug: 'integration', title: 'Подключение и примеры' }] },
 ];
 
 const contentRoots = [
