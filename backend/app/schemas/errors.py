@@ -23,6 +23,7 @@ class ErrorCode(StrEnum):
     GONE = "GONE"
     VALIDATION_ERROR = "VALIDATION_ERROR"
     WORKFLOW_INVALID_TRANSITION = "WORKFLOW_INVALID_TRANSITION"
+    WORKFLOW_TASKS_INCOMPLETE = "WORKFLOW_TASKS_INCOMPLETE"
     WORKFLOW_INSTANCE_NOT_ACTIVE = "WORKFLOW_INSTANCE_NOT_ACTIVE"
     STAGE_ALREADY_COMPLETED = "STAGE_ALREADY_COMPLETED"
     FILE_TYPE_NOT_ALLOWED = "FILE_TYPE_NOT_ALLOWED"
@@ -58,6 +59,7 @@ ERROR_STATUS_MAP: dict[ErrorCode, int] = {
     ErrorCode.GONE: 410,
     ErrorCode.VALIDATION_ERROR: 422,
     ErrorCode.WORKFLOW_INVALID_TRANSITION: 400,
+    ErrorCode.WORKFLOW_TASKS_INCOMPLETE: 409,
     ErrorCode.WORKFLOW_INSTANCE_NOT_ACTIVE: 409,
     ErrorCode.STAGE_ALREADY_COMPLETED: 409,
     ErrorCode.FILE_TYPE_NOT_ALLOWED: 400,
@@ -96,6 +98,7 @@ ERROR_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.GONE: "Ресурс больше недоступен.",
     ErrorCode.VALIDATION_ERROR: "Проверьте правильность заполнения полей.",
     ErrorCode.WORKFLOW_INVALID_TRANSITION: "Нельзя перейти на этот этап.",
+    ErrorCode.WORKFLOW_TASKS_INCOMPLETE: "Нельзя завершить этап: есть невыполненные задачи.",
     ErrorCode.WORKFLOW_INSTANCE_NOT_ACTIVE: "Workflow неактивен. Переход невозможен.",
     ErrorCode.STAGE_ALREADY_COMPLETED: "Этап уже завершён.",
     ErrorCode.FILE_TYPE_NOT_ALLOWED: "Тип файла не поддерживается.",

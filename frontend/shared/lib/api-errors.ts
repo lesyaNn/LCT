@@ -4,6 +4,7 @@ export const GENERIC_ERROR_MESSAGE = 'Не удалось выполнить д�
 
 export const ERROR_MESSAGES = {
   WORKFLOW_INVALID_TRANSITION: 'Нельзя перейти на этот этап. Проверьте порядок этапов.',
+  WORKFLOW_TASKS_INCOMPLETE: 'Нельзя завершить этап: есть невыполненные задачи.',
   FILE_TYPE_NOT_ALLOWED: 'Тип файла не разрешён.',
   FILE_TOO_LARGE: 'Файл слишком большой. Максимальный размер — 50 MB.',
   DUPLICATE_ENTITY: 'Такая запись уже существует.',
@@ -11,6 +12,13 @@ export const ERROR_MESSAGES = {
   REPORT_FAILED: 'Не удалось сформировать отчёт. Попробуйте уменьшить период или изменить фильтры.',
   EXTERNAL_SOURCE_UNAVAILABLE: 'Внешний источник временно недоступен. Показаны доступные данные.',
 } as const;
+
+export function incompleteWorkflowTasksMessage(count: number): string {
+  if (!Number.isInteger(count) || count < 1) return ERROR_MESSAGES.WORKFLOW_TASKS_INCOMPLETE;
+  const form = new Intl.PluralRules('ru-RU').select(count);
+  const noun = form === 'one' ? 'невыполненная задача' : form === 'few' ? 'невыполненные задачи' : 'невыполненных задач';
+  return `Нельзя завершить этап: ${form === 'one' ? 'осталась' : 'осталось'} ${count} ${noun}.`;
+}
 
 export type BusinessErrorCode = keyof typeof ERROR_MESSAGES;
 export type NormalizedApiErrorKind = 'validation' | 'business' | 'permission' | 'authentication' | 'not-found' | 'network' | 'generic';
@@ -179,6 +187,7 @@ export function normalizeApiError(error: unknown, options: { defaultCode?: Busin
   if (status === 403) return { kind: 'permission', status, code, message: 'Нет прав.', fieldErrors: [], details };
   if (status === 404) return { kind: 'not-found', status, code, message: ERROR_MESSAGES.ENTITY_NOT_FOUND, fieldErrors: [], details };
   if (status === 0) return { kind: 'network', status, code, message: 'Не удалось связаться с сервером. Проверьте соединение.', fieldErrors: [], details };
+  if (code === 'WORKFLOW_TASKS_INCOMPLETE') return { kind: 'business', status, code, message: incompleteWorkflowTasksMessage(details.remaining_tasks as number), fieldErrors: [], details };
   if (code && code in ERROR_MESSAGES) return { kind: 'business', status, code, message: ERROR_MESSAGES[code as BusinessErrorCode], fieldErrors: [], details };
   const backendMessage = responseMessage(body);
   if (code && status < 500 && isSafeUserMessage(backendMessage)) return { kind: 'business', status, code, message: backendMessage, fieldErrors: [], details };

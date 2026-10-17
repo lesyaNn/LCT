@@ -58,13 +58,13 @@ export function ReportColumnSelector({ control, error }: ReportColumnSelectorPro
                   const selected = field.value.length === preset.length && preset.every((id) => field.value.includes(id));
                   return (
                     <Button key={name} variant={selected ? 'primary' : 'secondary'} size="s" type="button" aria-pressed={selected} onClick={() => field.onChange([...preset])}>
-                      {name}
+                      {name === 'По ТЗ' ? 'Основные' : name}
                     </Button>
                   );
                 })}
               </div>
               <fieldset className={styles.columnFieldset}>
-                <legend className={styles.columnLegend}>Колонки по ТЗ</legend>
+                <legend className={styles.columnLegend}>Основные</legend>
                 <div className={styles.columnGrid}>
                   {reportColumnDefinitions
                     .filter((column) => (TZ_REPORT_COLUMNS as readonly string[]).includes(column.id))

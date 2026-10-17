@@ -42,7 +42,7 @@ def instance(status="active", stage_status="current"):
 
 def test_task_create_is_scoped_to_current_stage(monkeypatch):
     running, current_stage = instance()
-    monkeypatch.setattr(service, "get_instance_or_404", lambda db, instance_id: running)
+    monkeypatch.setattr(service, "get_instance_or_404", lambda db, instance_id, **kwargs: running)
     db = TaskSession()
     task = service.create_task(db, running.id, current_stage, "  Проверить документы  ")
     assert task.title == "Проверить документы"
@@ -55,7 +55,7 @@ def test_task_create_is_scoped_to_current_stage(monkeypatch):
 
 def test_task_edits_stop_after_stage_completion(monkeypatch):
     running, current_stage = instance(stage_status="completed")
-    monkeypatch.setattr(service, "get_instance_or_404", lambda db, instance_id: running)
+    monkeypatch.setattr(service, "get_instance_or_404", lambda db, instance_id, **kwargs: running)
     task = WorkflowTask(id=uuid4(), instance_id=running.id, stage_id=current_stage,
                         title="Документы", description="", status="open")
     db = TaskSession(task)
@@ -68,7 +68,7 @@ def test_task_edits_stop_after_stage_completion(monkeypatch):
 
 def test_task_completion_and_reopen(monkeypatch):
     running, current_stage = instance()
-    monkeypatch.setattr(service, "get_instance_or_404", lambda db, instance_id: running)
+    monkeypatch.setattr(service, "get_instance_or_404", lambda db, instance_id, **kwargs: running)
     task = WorkflowTask(id=uuid4(), instance_id=running.id, stage_id=current_stage,
                         title="Документы", description="", status="open")
     db = TaskSession(task)

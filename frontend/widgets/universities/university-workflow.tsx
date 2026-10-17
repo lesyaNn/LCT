@@ -27,7 +27,7 @@ import { invalidateWorkflowRelatedQueries } from '@/shared/lib/workflow-cache';
 import { workflowAttachmentFromApi } from '@/shared/lib/workflow-attachments';
 import { buildMockWorkflowHistory, buildWorkflowHistory, countWorkflowStageResources, loadWorkflowHistory, workflowHistoryPresentation, type WorkflowHistoryEvent } from '@/shared/lib/workflow-history';
 import { getWorkflowSelectorPrograms, workflowProgramsQueryKey } from '@/shared/lib/universities-repository';
-import { normalizeApiError } from '@/shared/lib/api-errors';
+import { incompleteWorkflowTasksMessage, normalizeApiError } from '@/shared/lib/api-errors';
 import { listUniversityWorkflowInstances, universityWorkflowInstancesQueryKey } from '@/shared/lib/workflow-creation-repository';
 import { Input } from '@/shared/ui/rtk/form-controls';
 import { SearchableSelect } from '@/shared/ui/rtk/multiselect';
@@ -199,18 +199,35 @@ function StageActionPanel({ stage, stages, instanceId, universityId, userId, can
       onNotify({ intent: 'success', title: 'Workflow завершён', message: 'История и материалы сохранены.' });
       onTransitionSuccess();
     },
-    onError: (cause) => onNotify({ intent: 'error', title: 'Не удалось завершить Workflow', message: normalizeApiError(cause).message }),
+    onError: async (cause) => {
+      const error = normalizeApiError(cause);
+      onNotify({ intent: 'error', title: 'Не удалось завершить Workflow', message: error.message });
+      if (error.code === 'WORKFLOW_TASKS_INCOMPLETE') await Promise.all([
+        queryClient.invalidateQueries({ queryKey: workflowQueryKey(instanceId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowTasks(instanceId) }),
+      ]);
+    },
   });
   const isFinalStage = canManage && isRealWorkflowMode() && !stages.some((item) => item.orderIndex > stage.orderIndex);
   const actions = getStageActions(stage, canManage && !isFinalStage && (allowedTargets === undefined || allowedTargets.length > 0), canManage && (rollbackTargets === undefined || rollbackTargets.length > 0));
   const transitionAction = actions.find((action) => action.label.startsWith('Перевести'));
   const rollbackAction = actions.find((action) => action.label.startsWith('Вернуть'));
+  const incompleteTasks = stage.templateStageId ? Math.max(
+    0,
+    (stage.taskTotal ?? 0) - (stage.taskCompleted ?? 0),
+    stage.tasks.filter((task) => !task.completed).length,
+  ) : 0;
+  const blockIncomplete = () => {
+    if (!incompleteTasks) return false;
+    onNotify({ intent: 'error', title: 'Нельзя завершить этап', message: incompleteWorkflowTasksMessage(incompleteTasks) });
+    return true;
+  };
   if (!actions.length && !isFinalStage && !agendaAvailable && !transitionContext && !rollbackContext) return null;
-  return <div className={styles.stageAction} aria-label="Действия этапа"><div className={styles.stageActionButtons}>{actions.map((action) => {
+  return <div className={styles.stageAction} aria-label="Действия этапа"><div className={styles.stageActionButtons}>{isFinalStage ? <Button variant="primary" size="s" type="button" onClick={() => { if (!blockIncomplete()) setCompleteOpen(true); }}>Завершить Workflow</Button> : null}{actions.map((action) => {
     const openTransition = action === transitionAction;
     const openRollback = action === rollbackAction;
-    return <Button key={action.label} variant={action.variant} size="s" type="button" onClick={() => { onTransitionOpen(); if (openTransition) setTransitionContext({ currentStage: stage, stages }); if (openRollback) setRollbackContext({ currentStage: stage, stages }); }}>{action.label}</Button>;
-  })}{isFinalStage ? <Button variant="primary" size="s" type="button" onClick={() => setCompleteOpen(true)}>Завершить Workflow</Button> : null}{agendaAvailable ? <MeetingAgendaPdfAction instanceId={instanceId} stageId={stage.id} placement="workflow" /> : null}</div>{actions.length ? <span>Комментарий и подтверждение обязательны для перехода.</span> : null}{agendaAvailable ? <span>Отметьте вопросы в комментариях — они попадут в PDF.</span> : null}{completeOpen ? <Modal title="Завершить Workflow?" onClose={() => { if (!complete.isPending) setCompleteOpen(false); }}><div className={styles.confirmContent}><p>После завершения Workflow перейдёт в состояние «Завершён». История и материалы сохранятся.</p><div className={styles.stageActionButtons}><Button variant="ghost" size="s" type="button" disabled={complete.isPending} onClick={() => setCompleteOpen(false)}>Отмена</Button><Button variant="primary" size="s" type="button" loading={complete.isPending} disabled={complete.isPending} onClick={() => complete.mutate()}>Завершить Workflow</Button></div></div></Modal> : null}{transitionContext ? <WorkflowTransitionModal open instanceId={instanceId} universityId={universityId} currentStage={transitionContext.currentStage} stages={transitionContext.stages} allowedTargets={allowedTargets} userId={userId} onClose={() => { setTransitionContext(null); onTransitionClose(); }} onSuccess={() => { setTransitionContext(null); onTransitionSuccess(); }} onNotify={onNotify} /> : null}{rollbackContext ? <WorkflowRollbackModal open instanceId={instanceId} universityId={universityId} currentStage={rollbackContext.currentStage} stages={rollbackContext.stages} allowedTargets={rollbackTargets} userId={userId} onClose={() => { setRollbackContext(null); onTransitionClose(); }} onSuccess={() => { setRollbackContext(null); onTransitionSuccess(); }} onNotify={onNotify} /> : null}</div>;
+    return <Button key={action.label} variant={action.variant} size="s" type="button" onClick={() => { if (openTransition && blockIncomplete()) return; onTransitionOpen(); if (openTransition) setTransitionContext({ currentStage: stage, stages }); if (openRollback) setRollbackContext({ currentStage: stage, stages }); }}>{action.label}</Button>;
+  })}{agendaAvailable ? <MeetingAgendaPdfAction instanceId={instanceId} stageId={stage.id} placement="workflow" /> : null}</div>{actions.length ? <span>Комментарий и подтверждение обязательны для перехода.</span> : null}{agendaAvailable ? <span>Отметьте вопросы в комментариях — они попадут в PDF.</span> : null}{completeOpen ? <Modal title="Завершить Workflow?" onClose={() => { if (!complete.isPending) setCompleteOpen(false); }}><div className={styles.confirmContent}><p>После завершения Workflow перейдёт в состояние «Завершён». История и материалы сохранятся.</p><div className={styles.stageActionButtons}><Button variant="ghost" size="s" type="button" disabled={complete.isPending} onClick={() => setCompleteOpen(false)}>Отмена</Button><Button variant="primary" size="s" type="button" loading={complete.isPending} disabled={complete.isPending} onClick={() => complete.mutate()}>Завершить Workflow</Button></div></div></Modal> : null}{transitionContext ? <WorkflowTransitionModal open instanceId={instanceId} universityId={universityId} currentStage={transitionContext.currentStage} stages={transitionContext.stages} allowedTargets={allowedTargets} userId={userId} onClose={() => { setTransitionContext(null); onTransitionClose(); }} onSuccess={() => { setTransitionContext(null); onTransitionSuccess(); }} onNotify={onNotify} /> : null}{rollbackContext ? <WorkflowRollbackModal open instanceId={instanceId} universityId={universityId} currentStage={rollbackContext.currentStage} stages={rollbackContext.stages} allowedTargets={rollbackTargets} userId={userId} onClose={() => { setRollbackContext(null); onTransitionClose(); }} onSuccess={() => { setRollbackContext(null); onTransitionSuccess(); }} onNotify={onNotify} /> : null}</div>;
 }
 
 function CompletionSummary({ stage }: { stage: UniversityWorkflowStage }) {
@@ -308,9 +325,9 @@ function WorkflowStageResponsibleField({ instanceId, workflow, stage, canManage,
   });
   const close = () => { if (!save.isPending) { setOpen(false); setConfirmReplace(false); } };
   const unchanged = assignAll ? value === (workflow.responsibleId ?? '') && !overriddenStages : value === (stage.responsibleOverrideId ?? '');
+  const editable = canManage && hasPermission(user, 'university_responsible.manage');
   return <>
-    {stage.responsible ? <span className={styles.factValue}>{stage.responsible.name}</span> : null}
-    {canManage && hasPermission(user, 'university_responsible.manage') ? stage.responsible ? <Tooltip content="Редактировать ответственного этапа"><IconButton icon={<Edit size={18} fill="currentColor" />} label="Редактировать ответственного этапа" size={18} onClick={() => { setValue(stage.responsibleOverrideId ?? ''); setAssignAll(false); setConfirmReplace(false); setOpen(true); }} /></Tooltip> : <Button variant="ghost" size="s" type="button" onClick={() => { setValue(''); setAssignAll(false); setConfirmReplace(false); setOpen(true); }}>+ Ответственный</Button> : null}
+    {stage.responsible ? <span className={styles.responsibleIdentity}><span className={styles.factValue}>{stage.responsible.name}</span>{editable ? <span className={styles.responsibleEdit}><Tooltip content="Редактировать ответственного этапа"><IconButton icon={<Edit size={18} fill="currentColor" />} label="Редактировать ответственного этапа" size={18} onClick={() => { setValue(stage.responsibleOverrideId ?? ''); setAssignAll(false); setConfirmReplace(false); setOpen(true); }} /></Tooltip></span> : null}</span> : editable ? <Button variant="ghost" size="s" type="button" onClick={() => { setValue(''); setAssignAll(false); setConfirmReplace(false); setOpen(true); }}>+ Ответственный</Button> : null}
     {stage.responsible ? <small className={styles.responsibleSource}>{stage.responsibleOverrideId ? 'Для этого этапа' : 'Как у всего Workflow'}</small> : null}
     {open ? <Modal title="Ответственный этого этапа" onClose={close}><div className={styles.editForm}>
       {confirmReplace ? <><p role="alert">Индивидуальные назначения {overriddenStages} этапов будут заменены выбранным ответственным.</p><div className={styles.editActions}><Button variant="ghost" size="s" type="button" onClick={() => setConfirmReplace(false)}>Назад</Button><Button variant="primary" size="s" type="button" loading={save.isPending} onClick={() => save.mutate()}>Назначить на весь Workflow</Button></div></> : <>

@@ -44,9 +44,10 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.errors import BusinessException
 from app.core.exceptions import BadTransition, Conflict, NotFound
 from app.schemas.errors import ErrorCode
 from app.models.workflow_instances import (
@@ -54,6 +55,7 @@ from app.models.workflow_instances import (
     WorkflowComment,
     WorkflowInstance,
     WorkflowStageTransition,
+    WorkflowTask,
 )
 from app.models.workflow_templates import WorkflowStage
 from app.modules.audit.service import AuditAction, AuditService, context_for
@@ -159,6 +161,22 @@ def validate_transition(
     return current, target, between
 
 
+def _require_completed_stage_tasks(db: Session, instance_id: uuid.UUID, stage: InstanceStage) -> None:
+    """Read the current task statuses inside the locked transition transaction."""
+    if stage.template_stage_id is None:
+        return
+    remaining = db.scalar(select(func.count(WorkflowTask.id)).where(
+        WorkflowTask.instance_id == instance_id,
+        WorkflowTask.stage_id == stage.template_stage_id,
+        WorkflowTask.status != "done",
+    )) or 0
+    if remaining:
+        raise BusinessException(
+            ErrorCode.WORKFLOW_TASKS_INCOMPLETE,
+            details={"remaining_tasks": remaining},
+        )
+
+
 def transition_instance(
     db: Session,
     instance_id: uuid.UUID,
@@ -183,6 +201,7 @@ def transition_instance(
     current, target, between = validate_transition(
         instance, stages, target_instance_stage_id, comment
     )
+    _require_completed_stage_tasks(db, instance_id, current)
 
     now = utcnow()
     text = comment.strip()
@@ -246,6 +265,7 @@ def complete_instance(db: Session, instance_id: uuid.UUID, actor: str) -> Workfl
         raise NotFound("Workflow instance not found")
     stages = _ordered_stages(instance_id, db)
     current = validate_completion(instance, stages)
+    _require_completed_stage_tasks(db, instance_id, current)
     now = utcnow()
     current.status = "completed"
     current.completed_at = now

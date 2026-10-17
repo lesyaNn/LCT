@@ -137,8 +137,11 @@ def require_university_scope(user, university_id: uuid.UUID) -> None:
     ensure_university_access(university_id, user)
 
 
-def get_instance_or_404(db: Session, instance_id: uuid.UUID) -> WorkflowInstance:
-    instance = db.get(WorkflowInstance, instance_id)
+def get_instance_or_404(db: Session, instance_id: uuid.UUID, *, lock: bool = False) -> WorkflowInstance:
+    instance = (
+        db.get(WorkflowInstance, instance_id, with_for_update=True, populate_existing=True)
+        if lock else db.get(WorkflowInstance, instance_id)
+    )
     if instance is None:
         raise NotFound("Workflow instance not found")
     return instance
@@ -314,7 +317,7 @@ def _editable_task_stage(instance: WorkflowInstance, stage_id: uuid.UUID | None)
 
 
 def create_task(db: Session, instance_id: uuid.UUID, stage_id: uuid.UUID, title: str) -> WorkflowTask:
-    instance = get_instance_or_404(db, instance_id)
+    instance = get_instance_or_404(db, instance_id, lock=True)
     _editable_task_stage(instance, stage_id)
     cleaned = title.strip()
     if not cleaned:
@@ -329,7 +332,7 @@ def create_task(db: Session, instance_id: uuid.UUID, stage_id: uuid.UUID, title:
 
 def update_task(db: Session, instance_id: uuid.UUID, task_id: uuid.UUID,
                 *, title: str | None, status: str | None) -> WorkflowTask:
-    instance = get_instance_or_404(db, instance_id)
+    instance = get_instance_or_404(db, instance_id, lock=True)
     task = db.get(WorkflowTask, task_id)
     if task is None or task.instance_id != instance_id:
         raise NotFound("Задача не найдена")
@@ -348,7 +351,7 @@ def update_task(db: Session, instance_id: uuid.UUID, task_id: uuid.UUID,
 
 
 def delete_task(db: Session, instance_id: uuid.UUID, task_id: uuid.UUID) -> None:
-    instance = get_instance_or_404(db, instance_id)
+    instance = get_instance_or_404(db, instance_id, lock=True)
     task = db.get(WorkflowTask, task_id)
     if task is None or task.instance_id != instance_id:
         raise NotFound("Задача не найдена")
