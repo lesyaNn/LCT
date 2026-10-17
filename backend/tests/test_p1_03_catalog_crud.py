@@ -930,27 +930,39 @@ def test_rbac_matrix_all_entities(auth_client, db):
                 entity,
                 roles,
             )
-        for roles in (("manager",), ("admin",)):
-            assert c.get(path, headers=_auth(c, roles)).status_code == 200, (entity, roles)
-            # unique payloads: the second writer bumps the identifying field
-            # after a 409 on the already-taken value.
-            r = c.post(path, json=dict(payload), headers=_auth(c, roles))
-            if entity == "universities" and roles == ("manager",):
-                assert r.status_code == 403, (entity, roles, r.text)
-                continue
-            if r.status_code == 409:
-                payload = _bump(payload)
-                r = c.post(path, json=payload, headers=_auth(c, roles))
-            assert r.status_code == 201, (entity, roles, r.text)
+        manager = _auth(c, ("manager", "user"))
+        assert c.get(path, headers=manager).status_code == 200, entity
+        assert c.post(path, json=dict(payload), headers=manager).status_code == 403, entity
+        admin = _auth(c, ("admin",))
+        assert c.get(path, headers=admin).status_code == 200, entity
+        r = c.post(path, json=dict(payload), headers=admin)
+        assert r.status_code == 201, (entity, r.text)
 
 
-def _bump(payload: dict) -> dict:
-    out = dict(payload)
-    tag = _tag()
-    for key in ("name", "code", "email", "full_name"):
-        if key in out:
-            out[key] = f"{out[key]}-{tag}"
-    return out
+def test_manager_cannot_edit_catalog_or_access_import_api(auth_client, db):
+    c = auth_client
+    direction = ITDirection(code=f"RBAC-D-{_tag()}", name="Read only")
+    university = University(name=f"RBAC-U-{_tag()}")
+    db.add_all([direction, university])
+    db.commit()
+    manager = _auth(c, ("manager", "user"))
+
+    assert c.get("/api/v1/directions", headers=manager).status_code == 200
+    assert c.get("/api/v1/catalog/overview", headers=manager).status_code == 200
+    assert c.patch(f"/api/v1/directions/{direction.id}", json={"name": "Changed"}, headers=manager).status_code == 403
+    assert c.delete(f"/api/v1/directions/{direction.id}", headers=manager).status_code == 403
+    assert c.patch(f"/api/v1/universities/{university.id}", json={"city": "Changed"}, headers=manager).status_code == 403
+    assert c.delete(f"/api/v1/universities/{university.id}", headers=manager).status_code == 403
+
+    assert c.post("/api/v1/import/upload", files={"file": ("catalog.xlsx", b"invalid")}, headers=manager).status_code == 403
+    assert c.post("/api/v1/import/sheets/preview", json={"file_id": "test", "sheet": "ВУЗы"}, headers=manager).status_code == 403
+    assert c.post("/api/v1/import/execute", json={"file_id": "test", "sheet": "ВУЗы"}, headers=manager).status_code == 403
+    assert c.get("/api/v1/import/jobs", headers=manager).status_code == 403
+    job_id = uuid.uuid4()
+    assert c.get(f"/api/v1/import/jobs/{job_id}", headers=manager).status_code == 403
+    assert c.get(f"/api/v1/import/jobs/{job_id}/report", headers=manager).status_code == 403
+    assert c.get("/api/v1/import/jobs", headers=_auth(c, ("user",))).status_code == 200
+    assert c.get("/api/v1/import/jobs", headers=_auth(c, ("admin",))).status_code == 200
 
 
 def test_rbac_write_verbs_university(auth_client, db):
@@ -978,10 +990,7 @@ def test_rbac_write_verbs_university(auth_client, db):
     )
 
     manager = _auth(c, ("manager",))
-    assert (
-        c.patch(f"/api/v1/universities/{uid}", json={"city": "Y"}, headers=manager).status_code
-        == 404
-    )
+    assert c.patch(f"/api/v1/universities/{uid}", json={"city": "Y"}, headers=manager).status_code == 403
     assert c.post(
         f"/api/v1/universities/{uid}/responsibles/{r1.id}", json={}, headers=manager
     ).status_code == 404
@@ -989,7 +998,7 @@ def test_rbac_write_verbs_university(auth_client, db):
         c.delete(f"/api/v1/universities/{uid}/responsibles/{r1.id}", headers=manager).status_code
         == 404
     )
-    assert c.delete(f"/api/v1/universities/{uid}", headers=manager).status_code == 404
+    assert c.delete(f"/api/v1/universities/{uid}", headers=manager).status_code == 403
 
 
 # ================================================================ openapi

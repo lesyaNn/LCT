@@ -42,7 +42,7 @@ export function PassportDocumentsSection({ id }: { id: string }) {
   const [documentType, setDocumentType] = useState<UniversityDocumentType>('other');
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [error, setError] = useState('');
-  const canEditContract = canMutateCatalog(user?.role);
+  const canEditContract = canMutateCatalog(user);
   const canCreateDocument = hasPermission(user, 'university.edit');
   const contracts = useQuery({ queryKey: [...catalogQueryKeys.list('agreements', { type: 'agreements', agreementKind: 'contracts', universityId: id, search: '', page, pageSize: 20 })], queryFn: ({ signal }) => listCatalogItems({ type: 'agreements', agreementKind: 'contracts', universityId: id, search: '', page, pageSize: 20 }, signal), enabled: tab === 'contracts' });
   const documents = useQuery({ queryKey: [...universityDocumentsQueryKey(id), documentPage, '', 'all', 'all'], queryFn: ({ signal }) => getUniversityDocuments(id, documentPage, 20, '', 'all', 'all', signal), enabled: tab === 'documents' });
