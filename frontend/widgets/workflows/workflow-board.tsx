@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { DndContext, DragOverlay, KeyboardSensor, MouseSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { DndContext, DragOverlay, KeyboardSensor, MouseSensor, TouchSensor, pointerWithin, rectIntersection, useDraggable, useDroppable, useSensor, useSensors, type CollisionDetection, type DragEndEvent } from '@dnd-kit/core';
 import { useAuth } from '@/shared/auth/AuthProvider';
 import { hasPermission } from '@/shared/lib/access-control';
 import { normalizeApiError } from '@/shared/lib/api-errors';
@@ -18,6 +18,10 @@ import styles from './workflow-overview.module.css';
 
 type Column = { key: string; name: string; order: number; items: WorkflowOverviewItem[] };
 type PendingDrop = { item: WorkflowOverviewItem; targetStageId: string; allowedTargets?: WorkflowTransitionTarget[] };
+
+const columnCollisionDetection: CollisionDetection = (args) => args.pointerCoordinates
+  ? pointerWithin(args)
+  : rectIntersection(args);
 
 function transitionTargets(item: WorkflowOverviewItem, allowedTargets?: WorkflowTransitionTarget[]): Map<string, string> {
   if (item.status === 'completed') return new Map();
@@ -37,11 +41,12 @@ function DraggableWorkflowCard({ item, enabled }: { item: WorkflowOverviewItem; 
 }
 
 function WorkflowBoardColumn({ column, valid, active }: { column: Column; valid: boolean; active: boolean }) {
-  const { setNodeRef, isOver } = useDroppable({ id: column.key, disabled: !valid });
-  return <section ref={setNodeRef} className={[styles.column, valid ? styles.validColumn : '', isOver ? styles.overColumn : ''].join(' ')} data-testid={valid ? 'workflow-valid-drop-target' : undefined} aria-label={`${column.name}, процессов: ${column.items.length}`}>
+  const { setNodeRef, isOver } = useDroppable({ id: column.key });
+  const validDrop = isOver && valid;
+  return <section ref={setNodeRef} className={[styles.column, valid ? styles.validColumn : '', validDrop ? styles.overColumn : ''].join(' ')} data-testid={valid ? 'workflow-valid-drop-target' : undefined} aria-label={`${column.name}, процессов: ${column.items.length}`}>
     <header><h2>{column.name}</h2><StatusBadge intent="neutral" showIndicator={false}>{column.items.length}</StatusBadge></header>
     <div className={styles.columnCards}>{column.items.map((item) => <DraggableWorkflowCard item={item} enabled={active && item.status !== 'completed' && transitionTargets(item).size > 0} key={item.instanceId} />)}
-      {isOver ? <div className={styles.dropPlaceholder}>Перевести сюда</div> : null}
+      {validDrop ? <div className={styles.dropPlaceholder}>Перевести сюда</div> : null}
     </div>
   </section>;
 }
@@ -53,6 +58,8 @@ export function WorkflowBoard({ items }: { items: WorkflowOverviewItem[] }) {
   const canManage = hasPermission(user, 'workflow.change_status');
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingDrop | null>(null);
+  const [resolvingDrop, setResolvingDrop] = useState(false);
+  const dropInFlight = useRef(false);
   const [notification, setNotification] = useState<WorkflowTransitionNotification | null>(null);
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
@@ -71,31 +78,39 @@ export function WorkflowBoard({ items }: { items: WorkflowOverviewItem[] }) {
     return [...map.values()].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, 'ru'));
   }, [items]);
   const draggingItem = items.find((item) => item.instanceId === draggingId);
-  const validTargets = draggingItem && canManage ? transitionTargets(draggingItem) : new Map<string, string>();
+  const canDrag = canManage && !resolvingDrop && !pending;
+  const validTargets = draggingItem && canDrag ? transitionTargets(draggingItem) : new Map<string, string>();
   const finishDrag = async ({ active, over }: DragEndEvent) => {
     const item = items.find((candidate) => candidate.instanceId === String(active.id));
     setDraggingId(null);
-    if (!item || !over || !canManage) return;
+    if (!item || !over || !canDrag || String(over.id) === item.stageKey || dropInFlight.current) return;
+    dropInFlight.current = true;
+    setResolvingDrop(true);
+    const targetKey = String(over.id);
+    const wasLocallyAllowed = transitionTargets(item).has(targetKey);
     try {
       const allowedTargets = realWorkflow ? (await queryClient.fetchQuery({
         queryKey: queryKeys.universities.workflowAllowed(item.instanceId),
         queryFn: () => getWorkflowAllowedTransitions(item.instanceId),
         staleTime: 30_000,
       })).map((target) => ({ id: target.id, orderIndex: target.order_index, name: target.name })) : undefined;
-      const targetStageId = transitionTargets(item, allowedTargets).get(String(over.id));
+      const targetStageId = transitionTargets(item, allowedTargets).get(targetKey);
       if (targetStageId) setPending({ item, targetStageId, allowedTargets });
       else {
-        setNotification({ intent: 'error', title: 'Переход недоступен', message: 'Доступные этапы изменились. Обновите данные и попробуйте снова.' });
-        await queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowOverview });
+        setNotification({ intent: 'error', title: 'Переход недоступен', message: wasLocallyAllowed ? 'Доступные переходы изменились. Обновите данные и попробуйте снова.' : 'На выбранный этап нельзя перейти из текущего. Выберите доступную колонку.' });
+        if (wasLocallyAllowed) await queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowOverview });
       }
     } catch (cause) {
       setNotification({ intent: 'error', title: 'Не удалось проверить переход', message: normalizeApiError(cause).message });
+    } finally {
+      dropInFlight.current = false;
+      setResolvingDrop(false);
     }
   };
 
   return <>
-    <DndContext sensors={sensors} onDragStart={(event) => setDraggingId(String(event.active.id))} onDragEnd={(event) => { void finishDrag(event); }} onDragCancel={() => setDraggingId(null)}>
-      <div className={styles.boardScroll} aria-label="Доска Workflow"><div className={styles.board}>{columns.map((column) => <WorkflowBoardColumn column={column} valid={validTargets.has(column.key)} active={canManage} key={column.key} />)}</div></div>
+    <DndContext sensors={sensors} collisionDetection={columnCollisionDetection} onDragStart={(event) => setDraggingId(String(event.active.id))} onDragEnd={(event) => { void finishDrag(event); }} onDragCancel={() => setDraggingId(null)}>
+      <div className={styles.boardScroll} aria-label="Доска Workflow"><div className={styles.board}>{columns.map((column) => <WorkflowBoardColumn column={column} valid={validTargets.has(column.key)} active={canDrag} key={column.key} />)}</div></div>
       <DragOverlay>{draggingItem ? <div className={styles.dragOverlay} aria-hidden="true" inert><WorkflowCard item={draggingItem} /></div> : null}</DragOverlay>
     </DndContext>
     {pending ? <WorkflowTransitionModal open instanceId={pending.item.instanceId} universityId={pending.item.universityId} currentStage={pending.item.stage} stages={pending.item.workflow.stages} allowedTargets={pending.allowedTargets} initialTargetStageId={pending.targetStageId} userId={user?.id} onClose={() => setPending(null)} onSuccess={() => setPending(null)} onNotify={setNotification} /> : null}

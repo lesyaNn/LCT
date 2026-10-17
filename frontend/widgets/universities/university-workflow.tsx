@@ -273,7 +273,7 @@ function WorkflowStageDetails({ stage, stages, workflow, instanceId, universityI
   const hasFacts = Boolean(stage.deadline || stage.responsible || stage.startedAt || stage.completedAt);
   return (
     <section className={`${styles.detailPanel} ${styles[`detail-${stage.status}`]}`} aria-labelledby={headingId} id={idPrefix}>
-      <div className={styles.detailHeader}><div className={styles.detailTitle}><h2 id={headingId}>{stage.name}</h2>{canRename ? <StageRenameAction stage={stage} onSave={onRename} /> : null}</div><StatusBadge intent={semantics.intent} icon={<StageStatusIcon status={stage.status} />}>{semantics.label}</StatusBadge></div>
+      <div className={styles.detailHeader}><div className={styles.detailTitle}><h2 id={headingId} aria-label={stage.name}>{stage.name}{canRename ? <>{'\u00a0'}<StageRenameAction stage={stage} onSave={onRename} /></> : null}</h2></div><StatusBadge intent={semantics.intent} icon={<StageStatusIcon status={stage.status} />}>{semantics.label}</StatusBadge></div>
       <CompletionSummary stage={stage} />
       {!activeStage && stage.status !== 'completed' && stage.status !== 'skipped' ? <p className={styles.futureNotice}>Этап ещё не начат. Он станет доступен после завершения предыдущего.</p> : null}
       {hasFacts || editableStage ? <section className={styles.detailSection} aria-labelledby={`${idPrefix}-overview-title`}><div className={styles.detailSectionHeading}><h3 id={`${idPrefix}-overview-title`}><InformationStroke size={18} fill="currentColor" />Основная информация</h3></div><dl className={styles.detailFacts}>
