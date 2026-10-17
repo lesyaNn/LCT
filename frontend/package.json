@@ -11,6 +11,7 @@
     "test:audit": "node scripts/run-audit-human-tests.mjs",
     "test:network": "node --experimental-strip-types --test shared/lib/__tests__/network-graph.test.mjs",
     "test:service-api": "node --test shared/lib/__tests__/service-api.test.mjs",
+    "test:university-time": "node --test shared/lib/__tests__/university-local-time.test.mjs",
     "test:e2e:auth": "playwright test e2e/auth-foundation.spec.ts",
     "test:e2e:catalogs": "playwright test e2e/catalogs-real.spec.ts",
     "test:e2e:smoke": "playwright test e2e/smoke-read-only.spec.ts",

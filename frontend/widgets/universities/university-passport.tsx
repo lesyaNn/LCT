@@ -46,6 +46,7 @@ import { UniversityWorkflow } from './university-workflow';
 import { WorkflowCreateModal } from './workflow-create-modal';
 import { PassportWorkflowCard } from './passport-workflow-card';
 import { UniversityHealth } from './university-health';
+import { UniversityLocalClock } from './university-local-clock';
 import styles from './university-passport.module.css';
 
 const mobileLayoutQuery = '(max-width: 768px)';
@@ -87,6 +88,7 @@ function PassportHeader({ passport, onTabChange }: { passport: UniversityPasspor
         <div className={styles.titleBlock}>
           <h1>{passport.name}</h1>
           <p className={styles.city}>{passport.city}</p>
+          <UniversityLocalClock city={passport.city} timeZone={passport.timeZone} />
         </div>
         <div className={styles.headerSide}>
           <div className={styles.headerActions} aria-label="Действия с вузом">
@@ -204,7 +206,7 @@ export function UniversityPassport({ id }: { id: string }) {
     : tab === 'meetings'
       ? <MeetingsSection id={id} canAdd={hasPermission(user, 'university.edit')} />
     : tab === 'responsibles'
-      ? <ResponsiblesSection id={id} canEdit={hasPermission(user, 'university.edit')} />
+      ? <ResponsiblesSection id={id} city={passport.city} timeZone={passport.timeZone} canEdit={hasPermission(user, 'university.edit')} />
     : tab === 'workflow'
       ? <UniversityWorkflow id={id} />
     : tab === 'health'

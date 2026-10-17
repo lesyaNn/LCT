@@ -18,6 +18,7 @@ import { Modal } from '@/shared/ui/rtk/modal';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { IconButton } from '@/shared/ui/rtk/icon-button';
+import { CopyButton } from '@/shared/ui/rtk/copy-button';
 import { Tooltip } from '@/shared/ui/rtk/tooltip';
 import styles from './university-passport-sections.module.css';
 
@@ -57,7 +58,7 @@ export function PassportDocumentsSection({ id }: { id: string }) {
   const getDocument = async (row: UniversityDocumentRow) => { try { downloadBlob(await downloadUniversityDocument(id, row.id), row.fileName); } catch (cause) { setError(normalizeApiError(cause).message); } };
   const removeFile = async (row: ContractCatalogItem) => { try { await deleteContractFile(row.id); await refreshContracts(); } catch (cause) { setError(normalizeApiError(cause).message); } };
   const contractColumns: PassportTableColumn<ContractCatalogItem>[] = [
-    { id: 'number', label: 'Номер', render: (row) => <strong className={styles.primaryCell}>{row.contractNumber}</strong> },
+    { id: 'number', label: 'Номер', render: (row) => <div className={styles.copyValue}><strong className={styles.primaryCell}>{row.contractNumber}</strong><CopyButton value={row.contractNumber} label={`Копировать номер договора ${row.contractNumber}`} /></div> },
     { id: 'status', label: 'Статус', render: (row) => <StatusBadge intent={row.status === 'terminated' || row.status === 'expired' ? 'danger' : row.status === 'draft' ? 'neutral' : 'success'}>{effectiveStatusNames[row.status] ?? row.status}</StatusBadge> },
     { id: 'signed', label: 'Подписан', render: (row) => formatDateRu(row.signedAt) },
     { id: 'expires', label: 'Действует до', render: (row) => row.expiresAt ? formatDateRu(row.expiresAt) : '—' },

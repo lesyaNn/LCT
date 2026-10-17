@@ -328,6 +328,7 @@ export interface UniversityPassport {
   id: string;
   name: string;
   city: string;
+  timeZone?: string | null;
   metrics: UniversityPassportMetrics;
   workflow: UniversityPassportWorkflow;
   timeline: UniversityPassportEvent[];

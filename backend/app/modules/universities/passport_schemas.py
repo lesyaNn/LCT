@@ -4,6 +4,7 @@ import uuid
 from datetime import date, datetime
 
 from pydantic import BaseModel, Field
+from app.schemas.location import CityLocation
 
 from app.models.enums import (
     UniversityProductStatus,
@@ -141,7 +142,7 @@ class WorkflowSummary(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class UniversityBrief(BaseModel):
+class UniversityBrief(CityLocation):
     id: uuid.UUID
     name: str
     city: str | None = None
