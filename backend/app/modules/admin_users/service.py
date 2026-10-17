@@ -270,6 +270,7 @@ def update_user(db: Session, kc: KeycloakAdminClient, actor: CurrentUser,
         if added_ids:
             notification_service.notify_user_university_assignment(
                 db, recipient_user_id=user_id, university_ids=added_ids,
+                recipient_email=before.get("email"),
                 event_key=f"user-university-assigned:{scope_event.id}",
             )
     db.commit()

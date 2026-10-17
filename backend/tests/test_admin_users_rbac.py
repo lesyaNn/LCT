@@ -6,7 +6,7 @@ from copy import deepcopy
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -284,7 +284,7 @@ def test_scope_assignment_notification_diff(context, monkeypatch, old_names, new
     with Session(engine) as db:
         rows = db.scalars(select(Notification)).all()
         assert len(rows) == bool(expected_names)
-        assert db.scalar(select(func.count()).select_from(NotificationDelivery)) == 0
+        assert db.scalar(select(func.count()).select_from(NotificationDelivery)) == int(bool(expected_names))
         if rows:
             row = rows[0]
             assert row.recipient_user_id == USER_ID != actor.id
@@ -312,10 +312,88 @@ def test_scope_assignment_notification_diff(context, monkeypatch, old_names, new
             ids[name] for name in new_names
         )
         assert client.get("/api/v1/notifications/unread-count").json() == {"count": 1}
+        inbox = client.get("/api/v1/notifications")
+        assert inbox.status_code == 200
+        if len(expected_names) == 1:
+            target = ids[expected_names[0]]
+            assert inbox.json()["items"][0]["entity_type"] == "university"
+            assert inbox.json()["items"][0]["entity_id"] == target
+            assert client.get(f"/api/v1/universities/{target}").status_code == 200
+        else:
+            assert inbox.json()["items"][0]["entity_type"] == "universities"
+            assert client.get("/api/v1/universities").status_code == 200
 
 
-def test_scope_assignment_idempotent_repeat_and_readd(context):
+def test_scope_assignment_old_and_new_claims(context, monkeypatch):
+    client, kc, actor, engine = context
+    monkeypatch.setattr(settings, "email_notifications_enabled", True)
+    with Session(engine) as db:
+        university = University(name="Новый вуз")
+        db.add(university)
+        db.commit()
+        university_id = str(university.id)
+    response = client.patch(f"/api/v1/admin/users/{USER_ID}", json={
+        "role": "user", "scope": {"kind": "universities", "university_ids": [university_id]},
+    })
+    assert response.status_code == 200, response.text
+    assert USER_ID in kc.logged_out
+    actor.id, actor.roles, actor.university_ids = USER_ID, {"user"}, ()
+    assert client.get("/api/v1/notifications/unread-count").json() == {"count": 0}
+    assert client.get(f"/api/v1/universities/{university_id}").status_code == 404
+    actor.university_ids = (university_id,)
+    assert client.get("/api/v1/notifications/unread-count").json() == {"count": 1}
+    assert client.get(f"/api/v1/universities/{university_id}").status_code == 200
+
+
+@pytest.mark.parametrize("keycloak_email", [None, "bad-address", "first,second@example.test",
+                                               "user@example.test\r\nBcc:other@example.test"])
+def test_scope_assignment_missing_or_invalid_email_is_in_app_only(
+    context, monkeypatch, keycloak_email,
+):
     client, kc, _, engine = context
+    monkeypatch.setattr(settings, "email_notifications_enabled", True)
+    kc.records[USER_ID]["email"] = keycloak_email
+    with Session(engine) as db:
+        university = University(name="Новый вуз")
+        db.add(university)
+        db.add(Responsible(full_name="Резервный контакт", email="responsible@example.test",
+                           role="user", keycloak_sub=USER_ID))
+        db.commit()
+        university_id = str(university.id)
+    response = client.patch(f"/api/v1/admin/users/{USER_ID}", json={
+        "role": "user", "scope": {"kind": "universities", "university_ids": [university_id]},
+    })
+    assert response.status_code == 200, response.text
+    with Session(engine) as db:
+        assert db.scalar(select(func.count()).select_from(AuditEvent)) == 1
+        assert db.scalar(select(func.count()).select_from(Notification)) == 1
+        assert db.scalar(select(func.count()).select_from(NotificationDelivery)) == 0
+
+
+def test_scope_assignment_delivery_insert_failure_keeps_audit(context, monkeypatch):
+    client, _, _, engine = context
+    monkeypatch.setattr(settings, "email_notifications_enabled", True)
+    with Session(engine) as db:
+        university = University(name="Новый вуз")
+        db.add(university)
+        db.commit()
+        university_id = str(university.id)
+        db.execute(text("ALTER TABLE notification_deliveries "
+                        "ADD CONSTRAINT test_reject_enqueue CHECK (false)"))
+        db.commit()
+    response = client.patch(f"/api/v1/admin/users/{USER_ID}", json={
+        "role": "user", "scope": {"kind": "universities", "university_ids": [university_id]},
+    })
+    assert response.status_code == 200, response.text
+    with Session(engine) as db:
+        assert db.scalar(select(func.count()).select_from(AuditEvent)) == 1
+        assert db.scalar(select(func.count()).select_from(Notification)) == 1
+        assert db.scalar(select(func.count()).select_from(NotificationDelivery)) == 0
+
+
+def test_scope_assignment_idempotent_repeat_and_readd(context, monkeypatch):
+    client, kc, _, engine = context
+    monkeypatch.setattr(settings, "email_notifications_enabled", True)
     with Session(engine) as db:
         university = University(name="Альфа")
         db.add(university)
@@ -333,25 +411,27 @@ def test_scope_assignment_idempotent_repeat_and_readd(context):
     with Session(engine) as db:
         first_key = db.scalar(select(Notification.event_key))
         assert db.scalar(select(func.count()).select_from(Notification)) == 1
+        assert db.scalar(select(func.count()).select_from(NotificationDelivery)) == 1
     save([])
     save([university_id])
     with Session(engine) as db:
         rows = db.scalars(select(Notification)).all()
         assert len(rows) == 2
+        assert db.scalar(select(func.count()).select_from(NotificationDelivery)) == 2
         assert {row.event_key for row in rows} == {first_key, rows[1].event_key}
         assert rows[1].event_key != first_key
     assert kc.records[USER_ID]["attributes"]["university_ids"] == [university_id]
 
 
 def test_scope_assignment_email_delivery_uses_existing_worker(context, monkeypatch):
-    client, _, _, engine = context
+    client, kc, _, engine = context
     monkeypatch.setattr(settings, "email_notifications_enabled", True)
     with Session(engine) as db:
         university = University(name="Альфа")
         other = University(name="Бета")
         third = University(name="Гамма")
         db.add_all([university, other, third])
-        db.add(Responsible(full_name="Получатель", email="user@example.test",
+        db.add(Responsible(full_name="Получатель", email="responsible@example.test",
                            role="user", keycloak_sub=USER_ID))
         db.commit()
         university_id = str(university.id)
@@ -364,10 +444,12 @@ def test_scope_assignment_email_delivery_uses_existing_worker(context, monkeypat
         delivery = db.scalar(select(NotificationDelivery))
         assert delivery.recipient == "user@example.test"
         assert delivery.status == "pending"
+        kc.records[USER_ID]["email"] = "changed@example.test"
         sent = []
         assert email.run_email_delivery_once(db, sender=lambda *args: sent.append(args))
         assert db.get(NotificationDelivery, delivery.id).status == "sent"
         assert len(sent) == 1
+        assert sent[0][0] == "user@example.test"
         assert sent[0][1] == "Вам назначен новый ВУЗ"
         assert f"/universities/{university_id}" in sent[0][2]
     response = client.patch(f"/api/v1/admin/users/{USER_ID}", json={
@@ -380,6 +462,7 @@ def test_scope_assignment_email_delivery_uses_existing_worker(context, monkeypat
         assert db.scalar(select(func.count()).select_from(NotificationDelivery)) == 2
         assert email.run_email_delivery_once(db, sender=lambda *args: sent.append(args))
         assert len(sent) == 2
+        assert sent[1][0] == "changed@example.test"
         assert sent[1][1] == "Вам назначены новые ВУЗы"
         assert "/universities" in sent[1][2]
 
@@ -473,6 +556,8 @@ def test_keycloak_discarded_scope_is_not_reported_as_success(context):
     assert kc.records[USER_ID]["attributes"] == {}
     with Session(engine) as db:
         assert not db.scalars(select(AuditEvent).where(AuditEvent.action == "ADMIN_CONFIG")).all()
+        assert db.scalar(select(func.count()).select_from(Notification)) == 0
+        assert db.scalar(select(func.count()).select_from(NotificationDelivery)) == 0
 
 
 def test_keycloak_admin_errors_are_normalized(monkeypatch):

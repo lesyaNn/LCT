@@ -5,17 +5,23 @@ business event creates one notification; when enabled and a usable address is
 known, `publish()` enqueues one `notification_deliveries` row in the same
 transaction. SMTP is only called by the existing report/import worker after
 commit. The in-app inbox continues to work when SMTP is unavailable.
+An email enqueue database error is isolated with a savepoint so the business
+audit event and in-app notification can still commit.
 Reprocessing an event with the same key reuses its notification without changing
 its content. If email is currently enabled and the recipient now has one valid
 address, it may repair a missing email delivery; an existing delivery is reused.
 
 ## Address and preferences
 
-The recipient is identified by Keycloak `sub`. The local `responsibles` row
-linked by `keycloak_sub` supplies `responsibles.email`. The worker never queries
-Keycloak for an address. A user without a linked responsible or valid address
-keeps the in-app notification and gets no email delivery row. There is no
-existing notification preference store, so this version uses the global
+The recipient is identified by Keycloak `sub`. Existing events resolve email
+through the local `responsibles` row linked by `keycloak_sub`. For
+`user_university_assigned`, the admin-users operation supplies the target
+Keycloak user's email at publication time; a `Responsible` row is unnecessary
+and cannot override this address. Missing or invalid explicit email yields only
+the in-app notification, even when a linked `Responsible` exists. The worker
+never queries Keycloak for an address. Every queued delivery stores its
+recipient as a snapshot; later Keycloak email changes do not alter it. There is
+no existing notification preference store, so this version uses the global
 `EMAIL_NOTIFICATIONS_ENABLED` switch; it defaults to `false`. No user toggle is
 exposed yet.
 
@@ -50,9 +56,15 @@ does not require SMTP settings.
 
 Every event currently handled by `Notification Service` is eligible: assignment,
 workflow stage change and rollback, current stage/task deadline and overdue,
-contract and license expiry, and import errors. The existing scanner and its
-event deduplication rules are reused. The inbox's target routes are mirrored in
-plain-text emails; no tokens are added to links.
+contract and license expiry, import errors, and user university assignment. The
+existing scanner and its event deduplication rules are reused. The inbox's target
+routes are mirrored in plain-text emails; no tokens are added to links.
+
+When a user's role or university scope changes, Keycloak sessions are ended so
+the next login receives current claims. A previously issued access token can
+retain its old scope until its short expiry; the inbox and university routes
+continue to enforce that scope. After signing in again, the new notification and
+its university target are available under the new scope.
 
 The worker atomically claims one due row with `FOR UPDATE SKIP LOCKED`, commits
 a claim token and lease, then calls SMTP without an open database transaction.
