@@ -130,7 +130,7 @@ def test_migration_000012_pair_discoverable_and_latest():
     # P4-06-01 retries: attempts counter for the worker claim loop.
     assert "000020_job_attempts" in versions
     assert "000044_assistant_conversations" in versions
-    assert versions[-1] == "000046_workflow_meeting_drafts"
+    assert versions[-1] == "000047_health_score_observations"
     assert versions.index("000011_workflow_templates") < versions.index("000012_workflow_instances")
     assert versions.index("000012_workflow_instances") < versions.index("000013_instance_stages")
     assert versions.index("000013_instance_stages") < versions.index(

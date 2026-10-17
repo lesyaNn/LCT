@@ -53,7 +53,7 @@ LEGACY_SQL_HEAD = "000010_audit_identity"
 # health score projection (000022), audit outbox (000023), and external
 # application/sync snapshots (000027) + the product<->direction link
 # (000028, import sheet "Продукт_Направление") and current Health Score
-# observations (000043).
+# observations (000047).
 # 000019/000020 only ALTER report_jobs (no new tables); 000021 only ALTERs
 # audit_events (no new tables). Pinned by
 # tests/test_p5_migrate_expected_guard.py — keep in sync with
@@ -103,6 +103,11 @@ EXPECTED_TABLES = [
 ]
 
 VERSION_RE = re.compile(r"^(?P<ver>\d{6}_[a-z0-9_]+)\.(?P<dir>up|down)\.sql$")
+
+# The old main released Health Score alongside Notifications under number
+# 000043. Its SQL already ran on those databases; only its ledger name moves.
+HEALTH_SCORE_OLD_VERSION = "000043_health_score_observations"
+HEALTH_SCORE_VERSION = "000047_health_score_observations"
 
 # Adoption must not mark migrations added after the archived Alembic head:
 # the P1-only table set (000011+ workflow pipeline and 000015 health
@@ -157,6 +162,15 @@ def _discover() -> list[tuple[str, Path, Path]]:
         else:
             downs[m.group("ver")] = path
     versions = sorted(set(ups) | set(downs))
+    by_number: dict[str, str] = {}
+    for version in versions:
+        number = version[:6]
+        if number in by_number:
+            raise SystemExit(
+                f"[migrate] duplicate migration number {number}: "
+                f"{by_number[number]}, {version}"
+            )
+        by_number[number] = version
     missing = [v for v in versions if v not in ups or v not in downs]
     if missing:
         raise SystemExit(f"[migrate] missing up/down pair for: {missing}")
@@ -186,7 +200,36 @@ def _applied(conn) -> list[str]:
     _ensure_bookkeeping(conn)
     with conn.cursor() as cur:
         cur.execute("SELECT version FROM schema_migrations ORDER BY version")
-        return [r[0] for r in cur.fetchall()]
+        applied = [r[0] for r in cur.fetchall()]
+        if HEALTH_SCORE_OLD_VERSION in applied:
+            if HEALTH_SCORE_VERSION in applied:
+                raise SystemExit(
+                    "[migrate] both old and new Health Score migration identities "
+                    "are applied; inspect schema_migrations manually"
+                )
+            cur.execute(
+                "SELECT to_regclass('public.health_score_observations'), "
+                "to_regclass('public.ix_health_score_observations_univ_calculated')"
+            )
+            table, index = cur.fetchone()
+            if table is None or index is None:
+                raise SystemExit(
+                    "[migrate] old Health Score migration is recorded but its "
+                    "table or index is missing; refusing ledger rename"
+                )
+            cur.execute(
+                "UPDATE schema_migrations SET version = %s WHERE version = %s",
+                (HEALTH_SCORE_VERSION, HEALTH_SCORE_OLD_VERSION),
+            )
+            conn.commit()
+            applied.remove(HEALTH_SCORE_OLD_VERSION)
+            applied.append(HEALTH_SCORE_VERSION)
+            applied.sort()
+            print(
+                f"[migrate] recognized renamed migration "
+                f"{HEALTH_SCORE_OLD_VERSION} -> {HEALTH_SCORE_VERSION}"
+            )
+        return applied
 
 
 def cmd_status() -> int:

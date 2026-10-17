@@ -11,6 +11,8 @@ import importlib.util
 import os
 import re
 
+import pytest
+
 CREATE_RE = re.compile(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)", re.IGNORECASE)
 DROP_RE = re.compile(r"DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?(\w+)", re.IGNORECASE)
 
@@ -57,3 +59,19 @@ def test_expected_tables_matches_migrations():
 def test_no_duplicate_expected_tables():
     module = _load_migrate()
     assert len(module.EXPECTED_TABLES) == len(set(module.EXPECTED_TABLES))
+
+
+def test_migration_numbers_are_unique():
+    versions = [version for version, _, _ in _load_migrate()._discover()]
+    numbers = [version.split("_", 1)[0] for version in versions]
+    assert len(numbers) == len(set(numbers)), "duplicate migration number"
+
+
+def test_migrator_rejects_duplicate_number_before_sql(tmp_path, monkeypatch):
+    for name in ("000001_first", "000001_second"):
+        (tmp_path / f"{name}.up.sql").write_text("SELECT 1", encoding="utf-8")
+        (tmp_path / f"{name}.down.sql").write_text("SELECT 1", encoding="utf-8")
+    module = _load_migrate()
+    monkeypatch.setattr(module, "MIGRATIONS_DIR", tmp_path)
+    with pytest.raises(SystemExit, match="duplicate migration number 000001"):
+        module._discover()
