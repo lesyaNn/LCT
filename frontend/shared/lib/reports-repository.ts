@@ -486,13 +486,12 @@ export async function getReportPreview(
       previewLimit: limit,
     }),
     real: async () => {
-      const result = await apiFetch<ReportPreview>('/api/v1/reports/preview', {
+      const result = await apiFetch<ReportPreview>(`/api/v1/reports/preview?limit=${limit}`, {
         method: 'POST',
         body: {
           format: request.format,
           filters: reportFiltersPayload(request),
           columns: request.columns,
-          limit,
         },
       });
       return unwrap(result, 'Не удалось получить предпросмотр выборки.');

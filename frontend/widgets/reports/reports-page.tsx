@@ -4,6 +4,7 @@ import Filter from '@atomaro/icons/24/action/Filter';
 import Calendar from '@atomaro/icons/24/communication/Calendar';
 import DocumentText from '@atomaro/icons/24/document/DocumentText';
 import FolderAdd from '@atomaro/icons/24/document/FolderAdd';
+import PasswordShow from '@atomaro/icons/24/action/PasswordShow';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   keepPreviousData,
@@ -13,7 +14,6 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useDebouncedValue } from './use-debounced-value';
 import { useForm, useWatch } from 'react-hook-form';
 import { applyServerErrorsToForm, normalizeApiError } from '@/shared/lib/api-errors';
 import { Button } from '@/shared/ui/rtk/button';
@@ -33,14 +33,14 @@ import {
   retryReportJob,
   type ReportJob,
   type ReportJobStatus,
+  type ReportRequest,
   type ReportTemplate,
 } from '@/shared/lib/reports-repository';
 import { reportFields, reportSchema, type ReportFormSchema } from './report-form-schema';
 import { buildActiveFilters, ReportFilterFields } from './report-filters';
 import { ReportColumnSelector } from './report-columns';
 import { ReportFormatField } from './report-format';
-import { ReportPreviewTable } from './report-preview';
-import { ReportStatisticsPanel } from './report-statistics';
+import { ReportPreviewModal } from './report-preview-modal';
 import { ReportTemplatesSection } from './report-templates';
 import { ReportJobsPanel, isActiveJob } from './report-jobs';
 import styles from './reports-page.module.css';
@@ -53,7 +53,8 @@ function ReportParameters({ onCreated }: { onCreated: (job: ReportJob) => void }
   const [notification, setNotification] = useState<Notification | null>(null);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
-  const { control, handleSubmit, setValue, setError, setFocus, formState: { errors, isDirty }, clearErrors } = useForm<ReportFormSchema>({
+  const [previewRequest, setPreviewRequest] = useState<ReportRequest | null>(null);
+  const { control, handleSubmit, setValue, setError, setFocus, formState: { errors }, clearErrors } = useForm<ReportFormSchema>({
     resolver: zodResolver(reportSchema),
     mode: 'onBlur',
     defaultValues: EMPTY_REPORT_FORM,
@@ -61,40 +62,39 @@ function ReportParameters({ onCreated }: { onCreated: (job: ReportJob) => void }
   const values = useWatch({ control }) as ReportFormSchema;
 
   const createMutation = useMutation({
-    mutationFn: (input: ReportFormSchema) => createReportJob(reportRequestFromForm(input)),
+    mutationFn: createReportJob,
     onSuccess: (job) => {
       setGlobalError(null);
+      setPreviewRequest(null);
       setNotification({ intent: 'success', title: 'Задача отчёта создана', message: 'Отчёт появится в очереди и будет обновляться автоматически.' });
       onCreated(job);
     },
     onError: (cause) => {
       const normalized = normalizeApiError(cause, { fallbackMessage: 'Не удалось создать задачу отчёта.' });
-      const mapped = applyServerErrorsToForm(normalized, { fields: reportFields, setError, setFocus });
-      setGlobalError(mapped.hasUnknownFields || !mapped.applied ? normalized.message : null);
+      if (previewRequest) {
+        setGlobalError(normalized.message);
+      } else {
+        const mapped = applyServerErrorsToForm(normalized, { fields: reportFields, setError, setFocus });
+        setGlobalError(mapped.hasUnknownFields || !mapped.applied ? normalized.message : null);
+      }
       setNotification({ intent: 'error', title: 'Отчёт не создан', message: normalized.message });
     },
   });
 
-  // Live preview + statistics of the current selection (ТЗ steps 8 and the
-  // "same selection" rule). Debounced so typing a date does not fire a
-  // request per keystroke, and the previous data stays visible meanwhile.
-  const request = reportRequestFromForm(values);
-  const debouncedRequest = useDebouncedValue(request);
-  const selectionKey = JSON.stringify(debouncedRequest);
-
-  // Always on: the report covers the whole registry, so there is nothing to
-  // wait for and the page opens with a real preview.
+  // The modal freezes one validated request. Preview, statistics, and the
+  // eventual job use that same payload; stale rows never survive a new open.
+  const selectionKey = previewRequest ? JSON.stringify(previewRequest) : '';
   const previewQuery = useQuery({
     queryKey: [...reportQueryKeys.preview, selectionKey],
-    queryFn: () => getReportPreview(debouncedRequest),
-    placeholderData: keepPreviousData,
-    staleTime: 30_000,
+    queryFn: () => getReportPreview(previewRequest!, 20),
+    enabled: Boolean(previewRequest),
+    staleTime: 0,
   });
   const statisticsQuery = useQuery({
     queryKey: [...reportQueryKeys.statistics, selectionKey],
-    queryFn: () => getReportStatistics(debouncedRequest),
-    placeholderData: keepPreviousData,
-    staleTime: 30_000,
+    queryFn: () => getReportStatistics(previewRequest!),
+    enabled: Boolean(previewRequest),
+    staleTime: 0,
   });
 
   const setPeriod = (dateFrom: string, dateTo: string) => {
@@ -106,13 +106,18 @@ function ReportParameters({ onCreated }: { onCreated: (job: ReportJob) => void }
 
   const activeFilters = buildActiveFilters(values, setPeriod);
 
-  const submit = (input: ReportFormSchema) => {
+  const submit = (request: ReportRequest) => {
     setGlobalError(null);
-    if (!REPORTS_API_CAPABILITIES.formats[input.format]) {
-      setGlobalError(`Формат ${input.format.toUpperCase()} пока недоступен.`);
+    if (!REPORTS_API_CAPABILITIES.formats[request.format]) {
+      setGlobalError(`Формат ${request.format.toUpperCase()} пока недоступен.`);
       return;
     }
-    createMutation.mutate(input);
+    createMutation.mutate(request);
+  };
+
+  const openPreview = (input: ReportFormSchema) => {
+    setGlobalError(null);
+    setPreviewRequest(reportRequestFromForm(input));
   };
 
   return (
@@ -143,12 +148,15 @@ function ReportParameters({ onCreated }: { onCreated: (job: ReportJob) => void }
           </div>
         </div>
         {globalError ? <FormErrorBanner>{globalError}</FormErrorBanner> : null}
-        <form onSubmit={(event) => void handleSubmit(submit)(event)} noValidate>
+        <form onSubmit={(event) => void handleSubmit((input) => submit(reportRequestFromForm(input)))(event)} noValidate>
           <ReportColumnSelector control={control} error={errors.columnIds?.message} />
           <ReportFormatField control={control} />
           <div className={styles.formActions}>
             <Button type="submit" variant="primary" size="m" loading={createMutation.isPending} disabled={createMutation.isPending}>
               Сформировать отчёт
+            </Button>
+            <Button type="button" variant="orange" size="m" aria-haspopup="dialog" onClick={() => void handleSubmit(openPreview)()} disabled={createMutation.isPending}>
+              <PasswordShow size={16} fill="currentColor" aria-hidden="true" />Предпросмотр
             </Button>
             <Button type="button" variant="secondary" size="m" onClick={() => setSaveTemplateOpen(true)}>
               <FolderAdd size={16} fill="currentColor" aria-hidden="true" />Сохранить как шаблон
@@ -176,24 +184,23 @@ function ReportParameters({ onCreated }: { onCreated: (job: ReportJob) => void }
           />
         </div>
       </div>
-      <div className={styles.resultCard}>
-        <ReportPreviewTable
-          preview={previewQuery.data}
-          pending={previewQuery.isPending || previewQuery.isFetching}
-          error={previewQuery.isError ? previewQuery.error : null}
-          dirty={isDirty}
-          onRetry={() => void previewQuery.refetch()}
+      {previewRequest ? (
+        <ReportPreviewModal
+          request={previewRequest}
+          preview={previewQuery.isFetching ? undefined : previewQuery.data}
+          previewPending={previewQuery.isPending || previewQuery.isFetching}
+          previewError={previewQuery.isError ? previewQuery.error : null}
+          onRetryPreview={() => void previewQuery.refetch()}
+          statistics={statisticsQuery.isFetching ? undefined : statisticsQuery.data}
+          statisticsPending={statisticsQuery.isPending || statisticsQuery.isFetching}
+          statisticsError={statisticsQuery.isError ? statisticsQuery.error : null}
+          onRetryStatistics={() => void statisticsQuery.refetch()}
+          generating={createMutation.isPending}
+          generateError={globalError}
+          onGenerate={() => submit(previewRequest)}
+          onClose={() => setPreviewRequest(null)}
         />
-      </div>
-      <div className={styles.resultCard}>
-        <ReportStatisticsPanel
-          statistics={statisticsQuery.data}
-          pending={statisticsQuery.isPending || statisticsQuery.isFetching}
-          error={statisticsQuery.isError ? statisticsQuery.error : null}
-          dirty
-          onRetry={() => void statisticsQuery.refetch()}
-        />
-      </div>
+      ) : null}
       {notification ? (
         <div className={styles.toastViewport}>
           <Toast intent={notification.intent} title={notification.title} message={notification.message} onClose={() => setNotification(null)} />

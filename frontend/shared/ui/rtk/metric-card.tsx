@@ -16,11 +16,12 @@ interface MetricCardProps {
   icon?: ComponentType<{ fill?: string; size?: number }>;
   indicators?: MetricIndicator[];
   centered?: boolean;
+  compact?: boolean;
 }
 
-export function MetricCard({ label, value, icon: Icon, indicators, centered = false }: MetricCardProps) {
+export function MetricCard({ label, value, icon: Icon, indicators, centered = false, compact = false }: MetricCardProps) {
   return (
-    <article className={`${styles.card} ${centered ? styles.centered : ''}`}>
+    <article className={`${styles.card} ${centered ? styles.centered : ''} ${compact ? styles.compact : ''}`}>
       {centered ? null : <div className={styles.header}>{Icon ? <span className={styles.icon} aria-hidden="true"><Icon size={20} fill="currentColor" /></span> : null}<h3>{label}</h3></div>}
       <strong className={styles.value}>{value}</strong>
       {centered ? <span className={styles.centeredLabel}>{label}</span> : null}

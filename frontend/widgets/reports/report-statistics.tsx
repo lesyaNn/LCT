@@ -23,13 +23,12 @@ const formatCount = (value: number) => numberFormatter.format(value);
 
 interface ChartCardProps {
   title: string;
-  description: string;
   exportSlug: string;
   exportTestId: string;
   children: ReactNode;
 }
 
-function ChartCard({ title, description, exportSlug, exportTestId, children }: ChartCardProps) {
+function ChartCard({ title, exportSlug, exportTestId, children }: ChartCardProps) {
   const headingId = useId();
   const cardRef = useRef<HTMLElement>(null);
   return (
@@ -37,7 +36,6 @@ function ChartCard({ title, description, exportSlug, exportTestId, children }: C
       <header className={styles.statCardHeader}>
         <div>
           <h4 id={headingId}>{title}</h4>
-          <p>{description}</p>
         </div>
         <ChartExportMenu filenameSlug={exportSlug} targetRef={cardRef} testId={exportTestId} />
       </header>
@@ -79,12 +77,12 @@ function StatBarChart({ slice }: { slice: ReportStatSlice }) {
   return (
     <>
       <div className={styles.statChartViewport} data-chart-scroll role="region" aria-label={`Категории графика «${slice.title}»`} tabIndex={0}>
-        <div className={styles.statChart} style={{ height: Math.max(220, data.length * 44 + 32) }} role="img" aria-label={`${slice.title}. Всего: ${formatCount(slice.total)} ${unitWord}.`}>
+        <div className={styles.statChart} style={{ height: Math.max(180, data.length * 38 + 24) }} role="img" aria-label={`${slice.title}. Всего: ${formatCount(slice.total)} ${unitWord}.`}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
               <CartesianGrid stroke="var(--rtk-color-border)" strokeDasharray="3 3" horizontal={false} />
               <XAxis type="number" allowDecimals={false} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} />
-              <YAxis type="category" dataKey="label" width={160} tickFormatter={(value: string) => value.length > 22 ? `${value.slice(0, 21)}…` : value} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} interval={0} />
+              <YAxis type="category" dataKey="label" width={110} tickFormatter={(value: string) => value.length > 15 ? `${value.slice(0, 14)}…` : value} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} interval={0} />
               <Tooltip content={<BucketTooltip unit={slice.unit} />} cursor={{ fill: 'var(--rtk-color-surface-hover)' }} position={{ x: 8, y: 8 }} />
               <Bar dataKey="count" fill="var(--rtk-color-brand)" radius={[0, 4, 4, 0]} isAnimationActive={false} />
             </BarChart>
@@ -102,15 +100,19 @@ interface ReportStatisticsPanelProps {
   statistics?: ReportStatistics;
   pending: boolean;
   error: unknown;
-  dirty: boolean;
+  sameRowGrain: boolean;
   onRetry: () => void;
 }
 
-/** Charts of exactly the same selection the table and the export show. */
-export function ReportStatisticsPanel({ statistics, pending, error, dirty, onRetry }: ReportStatisticsPanelProps) {
-  if (!dirty && !pending && !statistics) {
-    return <EmptyState title="Статистика появится после выбора параметров" description="Графики строятся по той же выборке, что и таблица." headingLevel={3} />;
-  }
+const chartColumns: Record<string, string> = {
+  by_workflow_status: 'workflow_status',
+  by_direction: 'direction',
+  by_product: 'product',
+  by_responsible: 'responsible',
+};
+
+/** At most two charts, and only for dimensions present in the export columns. */
+export function ReportStatisticsPanel({ statistics, pending, error, sameRowGrain, onRetry }: ReportStatisticsPanelProps) {
   if (error) {
     return (
       <EmptyState
@@ -123,29 +125,22 @@ export function ReportStatisticsPanel({ statistics, pending, error, dirty, onRet
   }
   if (pending && !statistics) return <p className={styles.statEmpty}>Считаем статистику…</p>;
   if (!statistics) return null;
-  if (!statistics.slices.length || statistics.slices.every((slice) => !slice.buckets.length)) {
+  const slices = ['by_workflow_status', 'by_direction', 'by_product', 'by_responsible']
+    .flatMap((dimension) => statistics.slices.filter((slice) => slice.dimension === dimension))
+    .filter((slice) => statistics.columns.includes(chartColumns[slice.dimension]) && slice.buckets.length && (slice.unit === 'universities' || sameRowGrain))
+    .slice(0, 2);
+  if (!slices.length) {
+    if (statistics.universityCount > 0) return <p className={styles.statEmpty}>Для выбранного состава нет графиков с той же детализацией, что у файла.</p>;
     return <EmptyState title="Нет данных для выбранных условий" headingLevel={3} />;
   }
 
   return (
-    <section className={styles.statSurface} aria-label="Статистика по выбранной выборке">
-      <div className={styles.sectionHeading}>
-        <div>
-          <h3>Статистика</h3>
-          <p>
-            Вузов: {formatCount(statistics.universityCount)} · строк отчёта: {formatCount(statistics.rowCount)}
-          </p>
-        </div>
-        {pending ? <span className={styles.previewRefreshing}>Обновляем…</span> : null}
-      </div>
+    <div className={styles.statSurface} aria-label="Графики по выбранной выборке">
       <div className={styles.statGrid}>
-        {statistics.slices
-          .filter((slice) => slice.buckets.length)
-          .map((slice) => (
+        {slices.map((slice) => (
             <ChartCard
               key={slice.dimension}
               title={slice.title}
-              description={slice.unit === 'universities' ? 'Считаем вузы, а не строки отчёта.' : 'Считаем строки отчёта.'}
               exportSlug={slice.dimension}
               exportTestId={`chart-export-${slice.dimension}`}
             >
@@ -153,6 +148,7 @@ export function ReportStatisticsPanel({ statistics, pending, error, dirty, onRet
             </ChartCard>
           ))}
       </div>
-    </section>
+      {pending ? <span className={styles.previewRefreshing}>Обновляем…</span> : null}
+    </div>
   );
 }

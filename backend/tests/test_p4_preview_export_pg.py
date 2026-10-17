@@ -222,10 +222,10 @@ def test_preview_endpoint_returns_a_bounded_page(session, many_universities):
         "filters": {"date_from": "2026-09-01", "date_to": "2026-09-30"},
         "columns": ["university", "product"],
     }
-    response = client.post("/reports/preview", json=body)
+    response = client.post("/reports/preview?limit=20", json=body)
     assert response.status_code == 200, response.text
     payload = response.json()
-    assert len(payload["rows"]) <= payload["preview_limit"]
+    assert len(payload["rows"]) == payload["preview_limit"] == 20
     assert payload["total"] == UNIVERSITY_COUNT * 2
     assert payload["columns"] == ["university", "product"]
     assert all(not key.startswith("_") for row in payload["rows"] for key in row)

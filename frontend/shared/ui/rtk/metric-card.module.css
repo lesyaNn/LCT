@@ -14,3 +14,6 @@
 .centered { align-items: center; box-shadow: var(--rtk-shadow-elevation-2); justify-content: center; min-height: 112px; text-align: center; }
 .centered .value { font-size: 30px; margin-top: 0; }
 .centeredLabel { color: var(--rtk-color-text-secondary); font-size: 12px; }
+.card.compact { background: var(--rtk-color-surface-subtle); border-radius: var(--rtk-radius-small); box-shadow: none; gap: 2px; min-height: 76px; padding: var(--rtk-space-3); }
+.card.compact .value { color: var(--rtk-color-brand); font-size: 23px; }
+@media (max-width: 560px) { .card.compact { padding: var(--rtk-space-2); } .card.compact .value { font-size: 18px; } }

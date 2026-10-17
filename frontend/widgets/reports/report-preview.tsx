@@ -25,8 +25,6 @@ interface ReportPreviewTableProps {
   preview?: ReportPreview;
   pending: boolean;
   error: unknown;
-  /** True once the user has chosen any parameter. */
-  dirty: boolean;
   onRetry: () => void;
 }
 
@@ -37,19 +35,7 @@ interface ReportPreviewTableProps {
  * export size, so the user can tell that the report is larger than the page
  * they are looking at. The export itself is never built from these rows.
  */
-export function ReportPreviewTable({ preview, pending, error, dirty, onRetry }: ReportPreviewTableProps) {
-  const titleId = 'report-preview-heading';
-
-  if (!dirty && !pending && !preview) {
-    return (
-      <EmptyState
-        title="Выборка ещё не задана"
-        description="Укажите период или выберите вузы, направления, продукты и ответственных — здесь появится предпросмотр."
-        headingLevel={3}
-      />
-    );
-  }
-
+export function ReportPreviewTable({ preview, pending, error, onRetry }: ReportPreviewTableProps) {
   if (error) {
     return (
       <EmptyState
@@ -66,7 +52,7 @@ export function ReportPreviewTable({ preview, pending, error, dirty, onRetry }: 
     return (
       <EmptyState
         title="По выбранным параметрам ничего не найдено"
-        description="Проверьте период взаимодействия и фильтры: вуз попадает в отчёт, если у него было хотя бы одно взаимодействие внутри периода."
+        description="Измените период и откройте предпросмотр снова."
         headingLevel={3}
       />
     );
@@ -78,16 +64,13 @@ export function ReportPreviewTable({ preview, pending, error, dirty, onRetry }: 
   const truncated = preview.total > shown;
 
   return (
-    <section className={styles.previewSurface} aria-labelledby={titleId}>
-      <div className={styles.sectionHeading}>
-        <div>
-          <h3 id={titleId}>Предпросмотр выборки</h3>
-          <p>
-            {truncated
-              ? `Показаны первые ${shown} из ${preview.total} строк. В файл попадут все ${preview.total}.`
-              : `Всего строк: ${preview.total}.`}
-          </p>
-        </div>
+    <div className={styles.previewSurface}>
+      <div className={styles.previewTableMeta}>
+        <p>
+          {truncated
+            ? `Показаны первые ${shown} из ${preview.total} строк. В файл попадут все ${preview.total}.`
+            : `Всего строк: ${preview.total}.`}
+        </p>
         {pending ? <span className={styles.previewRefreshing}>Обновляем…</span> : null}
       </div>
       {truncated ? (
@@ -119,6 +102,6 @@ export function ReportPreviewTable({ preview, pending, error, dirty, onRetry }: 
           </table>
         </div>
       </TableShell>
-    </section>
+    </div>
   );
 }
