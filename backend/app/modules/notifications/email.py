@@ -38,6 +38,8 @@ def target_path(notification: Notification) -> str:
             return f"/workflows/{entity_id}"
         case "university":
             return f"/universities/{entity_id}"
+        case "universities":
+            return "/universities"
         case "contract":
             return f"/universities/{university_id}?tab=documents" if university_id else "/universities"
         case "license":

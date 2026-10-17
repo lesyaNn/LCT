@@ -124,6 +124,36 @@ def notify_assignment(db: Session, responsible_id: uuid.UUID, university_id: uui
     )
 
 
+def notify_user_university_assignment(
+    db: Session, *, recipient_user_id: str, university_ids: set[uuid.UUID], event_key: str,
+) -> bool:
+    """Notify the changed Keycloak user once for all universities added in a save."""
+    if not university_ids:
+        return False
+    universities = sorted(db.scalars(select(University).where(
+        University.id.in_(university_ids)
+    )).all(), key=lambda university: (university.name.casefold(), str(university.id)))
+    if len(universities) != len(university_ids):
+        raise ValueError("Assigned university is missing")
+    if len(universities) == 1:
+        university = universities[0]
+        return publish(
+            db, recipient_user_id=recipient_user_id, event_key=event_key,
+            type="user_university_assigned", priority="INFO",
+            title="Вам назначен новый ВУЗ",
+            message=f"Вам предоставлен доступ к ВУЗу {_school_label(university.name)}.",
+            entity_type="university", entity_id=university.id, university_id=university.id,
+        )
+    names = "\n".join(f"• {university.name}" for university in universities)
+    return publish(
+        db, recipient_user_id=recipient_user_id, event_key=event_key,
+        type="user_university_assigned", priority="INFO",
+        title="Вам назначены новые ВУЗы",
+        message=f"Вам предоставлен доступ к {len(universities)} ВУЗам:\n{names}",
+        entity_type="universities", entity_id=recipient_user_id,
+    )
+
+
 def notify_stage_change(db: Session, instance: WorkflowInstance, from_stage: InstanceStage,
                         to_stage: InstanceStage, *, rollback: bool, reason: str,
                         event_key: str) -> bool:
