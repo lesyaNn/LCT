@@ -23,6 +23,8 @@ from app.core.security import CurrentUser
 from app.modules.audit.service import get_audit_db
 from app.modules.audit.workflow_actor_names import workflow_actor_names
 from app.modules.workflow_instances import service as instance_service
+from app.modules.admin_users.keycloak_client import KeycloakAdminClient, get_keycloak_admin_client
+from app.modules.notifications.workflow_comments import notify_comment
 from app.modules.workflow_attachments.router import get_storage
 from app.modules.workflow_attachments.storage import StorageBackend
 from app.modules.workflow_instances.schemas import AllowedTransitionRead, InstanceDetail
@@ -58,6 +60,7 @@ def add_comment_with_attachments(
     db: Session = Depends(get_audit_db),
     storage: StorageBackend = Depends(get_storage),
     user: CurrentUser = Depends(WRITE),
+    kc: KeycloakAdminClient = Depends(get_keycloak_admin_client),
 ) -> WorkflowCommentRead:
     instance = service.get_instance_or_404(db, instance_id)
     instance_service.authorize_scope(user, instance)
@@ -65,6 +68,7 @@ def add_comment_with_attachments(
         db, storage, instance_id,
         WorkflowCommentCreate(content=content, stage_id=stage_id, is_question=is_question), files, user.id,
     )
+    notify_comment(db, kc, instance, comment, user)
     return WorkflowCommentRead.model_validate(comment)
 
 
@@ -206,10 +210,13 @@ def add_comment(
     data: WorkflowCommentCreate,
     db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(WRITE),
+    kc: KeycloakAdminClient = Depends(get_keycloak_admin_client),
 ) -> WorkflowCommentRead:
     instance = service.get_instance_or_404(db, instance_id)
     instance_service.authorize_scope(user, instance)
-    return service.add_comment(db, instance_id, data, user.id)
+    comment = service.add_comment(db, instance_id, data, user.id)
+    notify_comment(db, kc, instance, comment, user)
+    return comment
 
 
 @router.patch(
