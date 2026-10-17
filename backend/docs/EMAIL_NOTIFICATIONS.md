@@ -5,6 +5,9 @@ business event creates one notification; when enabled and a usable address is
 known, `publish()` enqueues one `notification_deliveries` row in the same
 transaction. SMTP is only called by the existing report/import worker after
 commit. The in-app inbox continues to work when SMTP is unavailable.
+Reprocessing an event with the same key reuses its notification without changing
+its content. If email is currently enabled and the recipient now has one valid
+address, it may repair a missing email delivery; an existing delivery is reused.
 
 ## Address and preferences
 
@@ -38,6 +41,10 @@ TLS uses the system CA trust store and certificate verification. Do not place
 credentials in Git. The worker stores fixed error categories such as `timeout`
 and `smtp_permanent`, never raw SMTP replies. Logs contain delivery and
 notification IDs but no recipient address or message body.
+When email is enabled, startup validates `SMTP_FROM_EMAIL` as exactly one
+mailbox. Outbound recipients use the same stricter check, while contact-field
+validation elsewhere in the CRM keeps its existing contract. Disabled email
+does not require SMTP settings.
 
 ## Delivery
 
@@ -47,12 +54,18 @@ contract and license expiry, and import errors. The existing scanner and its
 event deduplication rules are reused. The inbox's target routes are mirrored in
 plain-text emails; no tokens are added to links.
 
-The worker atomically claims one due row, commits a lease, then calls SMTP
-without an open database transaction. Temporary failures retry after 1, 5, 15,
+The worker atomically claims one due row with `FOR UPDATE SKIP LOCKED`, commits
+a claim token and lease, then calls SMTP without an open database transaction.
+A separate short database session renews the lease every 30 seconds while SMTP
+runs. Renewal and final status writes require the current claim token; an old
+worker cannot overwrite a reclaimed delivery. If renewal fails, the worker
+retries promptly and records a lost lease without changing the new owner's row.
+Temporary failures retry after 1, 5, 15,
 and 60 minutes. An unambiguous SMTP 5xx or invalid recipient fails immediately.
 After five attempts the row becomes `failed`. Expired leases are reclaimed;
 attempts exhausted during a crash become `failed` on the next worker cycle.
-SMTP does not offer an exactly-once acknowledgement across a process crash:
+Delivery semantics are **at-least-once**. SMTP does not offer an atomic
+acknowledgement with PostgreSQL across a process crash:
 if a worker dies after the server accepts a message but before recording `sent`,
 that message can be retried. The unique `(notification_id, channel)` constraint
 prevents duplicate outbox rows.

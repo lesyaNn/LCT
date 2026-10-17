@@ -6,6 +6,7 @@ import logging
 import smtplib
 import socket
 import ssl
+import threading
 import uuid
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
@@ -18,9 +19,10 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models.notification import Notification
 from app.models.notification_delivery import NotificationDelivery
-from app.schemas.validation import email as validate_email
+from app.modules.notifications.address import outbound_email
 
 logger = logging.getLogger("rtk")
+HEARTBEAT_INTERVAL_SECONDS = 30
 
 
 class PermanentEmailError(Exception):
@@ -61,13 +63,13 @@ def render_message(notification: Notification) -> tuple[str, str]:
 
 def send_email(recipient: str, subject: str, body: str) -> None:
     """Single mockable SMTP boundary; TLS certificate validation stays enabled."""
-    validate_email(recipient)
-    validate_email(settings.smtp_from_email)
+    recipient = outbound_email(recipient)
+    sender = outbound_email(settings.smtp_from_email)
     if any("\n" in value or "\r" in value for value in (subject, settings.smtp_from_name)):
         raise PermanentEmailError("invalid_header")
     message = EmailMessage()
     message["Subject"] = subject
-    message["From"] = formataddr((settings.smtp_from_name, settings.smtp_from_email))
+    message["From"] = formataddr((settings.smtp_from_name, sender))
     message["To"] = recipient
     message.set_content(body)
     context = ssl.create_default_context()
@@ -80,6 +82,10 @@ def send_email(recipient: str, subject: str, body: str) -> None:
         if settings.smtp_username:
             smtp.login(settings.smtp_username, settings.smtp_password.get_secret_value())
         smtp.send_message(message)
+
+
+def _lease_duration() -> timedelta:
+    return timedelta(seconds=max(150, settings.smtp_timeout_seconds * 2 + 30))
 
 
 def _claim(db: Session, now: datetime) -> tuple[uuid.UUID, uuid.UUID] | None:
@@ -104,10 +110,37 @@ def _claim(db: Session, now: datetime) -> tuple[uuid.UUID, uuid.UUID] | None:
     row.claim_token = token
     row.attempts += 1
     row.last_attempt_at = now
-    # A crashed worker is reclaimable; network timeout is capped at 60 s.
-    row.next_attempt_at = now + timedelta(seconds=max(150, settings.smtp_timeout_seconds * 2 + 30))
+    row.next_attempt_at = now + _lease_duration()
     db.commit()
     return row.id, token
+
+
+def _renew_lease(bind, delivery_id: uuid.UUID, token: uuid.UUID, now: datetime) -> bool:
+    """Renew only a live claim, in a short session independent of SMTP."""
+    with Session(bind=bind) as heartbeat_db:
+        result = heartbeat_db.execute(update(NotificationDelivery).where(
+            NotificationDelivery.id == delivery_id,
+            NotificationDelivery.status == "processing",
+            NotificationDelivery.claim_token == token,
+            NotificationDelivery.next_attempt_at > now,
+        ).values(next_attempt_at=now + _lease_duration()))
+        heartbeat_db.commit()
+        return result.rowcount == 1
+
+
+def _heartbeat(bind, delivery_id: uuid.UUID, token: uuid.UUID,
+               stop: threading.Event) -> None:
+    """Keep renewing while SMTP runs; retry transient DB errors promptly."""
+    interval = HEARTBEAT_INTERVAL_SECONDS
+    while not stop.wait(interval):
+        try:
+            if not _renew_lease(bind, delivery_id, token, datetime.now(timezone.utc)):
+                logger.warning("email delivery id=%s lease ownership lost", delivery_id)
+                return
+            interval = HEARTBEAT_INTERVAL_SECONDS
+        except Exception:
+            logger.exception("email delivery id=%s lease heartbeat failed", delivery_id)
+            interval = min(1, HEARTBEAT_INTERVAL_SECONDS)
 
 
 def _error_category(exc: Exception) -> tuple[str, bool]:
@@ -148,10 +181,20 @@ def run_email_delivery_once(db: Session, *, sender=send_email) -> bool:
     db.rollback()  # Never hold an open transaction across the network call.
     category = None
     permanent = False
+    stop = threading.Event()
+    heartbeat = threading.Thread(
+        target=_heartbeat, args=(db.get_bind(), delivery_id, token, stop), daemon=True,
+        name=f"email-lease-{delivery_id}",
+    )
+    heartbeat.start()
     try:
-        sender(recipient, subject, body)
-    except Exception as exc:
-        category, permanent = _error_category(exc)
+        try:
+            sender(recipient, subject, body)
+        except Exception as exc:
+            category, permanent = _error_category(exc)
+    finally:
+        stop.set()
+        heartbeat.join()
     now = datetime.now(timezone.utc)
     if category is None:
         changes = dict(status="sent", sent_at=now, last_error=None, claim_token=None)

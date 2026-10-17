@@ -2,21 +2,26 @@
 
 import os
 import smtplib
+import threading
+import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
+from pydantic import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401
-from app.config import settings
+from app.config import Settings, settings
 from app.models.catalog import Responsible, University
 from app.models.notification import Notification
 from app.models.notification_delivery import NotificationDelivery
 from app.modules.notifications import email, service
+from app.modules.notifications.address import outbound_email
 
 
 @pytest.fixture()
@@ -69,6 +74,50 @@ def test_smtp_error_is_categorized_without_raw_response():
     assert "secret" not in category
     assert email._error_category(TimeoutError(secret.decode())) == ("timeout", False)
     assert email._error_category(smtplib.SMTPResponseException(451, secret)) == ("smtp_temporary", False)
+
+
+@pytest.mark.parametrize("address", ["user@example.test", "first.last+tag@example.test"])
+def test_outbound_accepts_one_mailbox(address):
+    assert outbound_email(address) == address
+
+
+@pytest.mark.parametrize("address", [
+    "first,second@example.test", "bad-address", "", "user@example.test\r\nBcc:other@example.test",
+])
+def test_outbound_rejects_invalid_mailbox(address):
+    with pytest.raises(ValueError):
+        outbound_email(address)
+
+
+def test_sender_settings_validation():
+    assert Settings(_env_file=None, email_notifications_enabled=True,
+                    smtp_host="smtp.example.test", smtp_from_email="sender@example.test").smtp_from_email == "sender@example.test"
+    for address in ("bad-address", "first,second@example.test"):
+        with pytest.raises(ValidationError):
+            Settings(_env_file=None, email_notifications_enabled=True,
+                     smtp_host="smtp.example.test", smtp_from_email=address)
+    assert not Settings(_env_file=None, email_notifications_enabled=False,
+                        smtp_host="", smtp_from_email="").smtp_from_email
+
+
+def test_heartbeat_retries_db_error_then_stops_on_lost_owner(monkeypatch):
+    attempts = []
+    monkeypatch.setattr(email, "HEARTBEAT_INTERVAL_SECONDS", 0.01)
+
+    def renew(*_):
+        attempts.append(1)
+        if len(attempts) == 1:
+            raise ConnectionError("temporary database outage")
+        return False
+
+    monkeypatch.setattr(email, "_renew_lease", renew)
+    stop = threading.Event()
+    worker = threading.Thread(target=email._heartbeat,
+                              args=(None, uuid.uuid4(), uuid.uuid4(), stop))
+    worker.start()
+    worker.join(timeout=2)
+    assert not worker.is_alive()
+    assert len(attempts) == 2
 
 
 @pytest.mark.parametrize("security", ["starttls", "ssl"])
@@ -195,6 +244,35 @@ def test_invalid_local_address_keeps_in_app(database, monkeypatch):
     assert db.scalar(select(func.count()).select_from(NotificationDelivery)) == 0
 
 
+@pytest.mark.parametrize("mode,expected", [
+    ("repair", 1), ("existing", 1), ("disabled", 0), ("missing_recipient", 0),
+    ("invalid_recipient", 0),
+])
+def test_duplicate_event_repairs_only_missing_eligible_delivery(database, monkeypatch, mode, expected):
+    db = database
+    monkeypatch.setattr(settings, "email_notifications_enabled", mode == "existing")
+    if mode != "missing_recipient":
+        address = "first,second@example.test" if mode == "invalid_recipient" else "user@example.test"
+        db.add(Responsible(full_name="Ответственный", email=address,
+                           role="manager", keycloak_sub="user-a"))
+        db.flush()
+    event = dict(recipient_user_id="user-a", event_key="assignment:repair",
+                 type="assignment", priority="INFO", title="Original", message="Original",
+                 entity_type="university", entity_id=uuid.uuid4())
+    assert service.publish(db, **event)
+    db.commit()
+    monkeypatch.setattr(settings, "email_notifications_enabled", mode != "disabled")
+    assert not service.publish(db, **{**event, "title": "Changed", "message": "Changed"})
+    db.commit()
+    assert db.scalar(select(func.count()).select_from(Notification)) == 1
+    assert db.scalar(select(Notification.title)) == "Original"
+    assert db.scalar(select(func.count()).select_from(NotificationDelivery)) == expected
+    if expected:
+        assert not service.publish(db, **event)
+        db.commit()
+        assert db.scalar(select(func.count()).select_from(NotificationDelivery)) == 1
+
+
 def test_disabled_and_max_attempts(database, monkeypatch):
     monkeypatch.setattr(settings, "email_notifications_enabled", True)
     db = database
@@ -215,6 +293,25 @@ def test_disabled_and_max_attempts(database, monkeypatch):
     assert email.run_email_delivery_once(db, sender=lambda *_: (_ for _ in ()).throw(TimeoutError()))
     db.refresh(row)
     assert (row.status, row.attempts) == ("failed", 5)
+    assert not email.run_email_delivery_once(db, sender=lambda *_: pytest.fail("sixth SMTP attempt"))
+
+
+@pytest.mark.parametrize("prior_attempts,delay_seconds", [
+    (0, 60), (1, 300), (2, 900), (3, 3600),
+])
+def test_temporary_failure_retry_schedule(database, monkeypatch, prior_attempts, delay_seconds):
+    monkeypatch.setattr(settings, "email_notifications_enabled", True)
+    db = database
+    delivery_id = _pending_delivery(db)
+    row = db.get(NotificationDelivery, delivery_id)
+    row.attempts = prior_attempts
+    db.commit()
+    before = datetime.now(timezone.utc)
+    assert email.run_email_delivery_once(db, sender=lambda *_: (_ for _ in ()).throw(TimeoutError()))
+    db.refresh(row)
+    assert row.status == "pending"
+    assert row.attempts == prior_attempts + 1
+    assert delay_seconds <= (row.next_attempt_at - before).total_seconds() < delay_seconds + 10
 
 
 def test_pg_constraints_cascade_and_claim_lease(database, monkeypatch):
@@ -243,3 +340,140 @@ def test_pg_constraints_cascade_and_claim_lease(database, monkeypatch):
     db.execute(Notification.__table__.delete().where(Notification.id == notification_id))
     db.commit()
     assert db.scalar(select(func.count()).select_from(NotificationDelivery)) == 0
+
+
+def _pending_delivery(db):
+    db.add(Responsible(full_name="Ответственный", email="user@example.test",
+                       role="manager", keycloak_sub="user-a"))
+    db.flush()
+    assert _publish(db)
+    db.commit()
+    return db.scalar(select(NotificationDelivery.id))
+
+
+def test_parallel_claim_uses_independent_sessions(database, monkeypatch):
+    monkeypatch.setattr(settings, "email_notifications_enabled", True)
+    db = database
+    delivery_id = _pending_delivery(db)
+    barrier = threading.Barrier(2)
+    now = datetime.now(timezone.utc)
+
+    def worker():
+        with Session(db.bind) as session:
+            barrier.wait(timeout=5)
+            return email._claim(session, now)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [pool.submit(worker) for _ in range(2)]
+        claims = [future.result(timeout=10) for future in futures]
+    assert sum(claim is not None for claim in claims) == 1
+    assert next(claim for claim in claims if claim is not None)[0] == delivery_id
+
+
+def test_parallel_duplicate_event_repairs_once(database, monkeypatch):
+    db = database
+    db.add(Responsible(full_name="Ответственный", email="user@example.test",
+                       role="manager", keycloak_sub="user-a"))
+    db.flush()
+    monkeypatch.setattr(settings, "email_notifications_enabled", False)
+    event = dict(recipient_user_id="user-a", event_key="assignment:concurrent-repair",
+                 type="assignment", priority="INFO", title="Original", message="Original",
+                 entity_type="university", entity_id=uuid.uuid4())
+    assert service.publish(db, **event)
+    db.commit()
+    monkeypatch.setattr(settings, "email_notifications_enabled", True)
+    barrier = threading.Barrier(2)
+
+    def worker():
+        with Session(db.bind) as session:
+            barrier.wait(timeout=5)
+            created = service.publish(session, **event)
+            session.commit()
+            return created
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [pool.submit(worker) for _ in range(2)]
+        assert [future.result(timeout=10) for future in futures] == [False, False]
+    db.expire_all()
+    assert db.scalar(select(func.count()).select_from(Notification)) == 1
+    assert db.scalar(select(func.count()).select_from(NotificationDelivery)) == 1
+
+
+def test_active_expired_and_renewed_lease(database, monkeypatch):
+    monkeypatch.setattr(settings, "email_notifications_enabled", True)
+    db = database
+    delivery_id = _pending_delivery(db)
+    start = datetime.now(timezone.utc)
+    first = email._claim(db, start)
+    assert first and first[0] == delivery_id
+    with Session(db.bind) as other:
+        assert email._claim(other, start + timedelta(seconds=149)) is None
+    old_lease = db.scalar(select(NotificationDelivery.next_attempt_at))
+    assert email._renew_lease(db.bind, delivery_id, first[1], start + timedelta(seconds=100))
+    db.expire_all()
+    new_lease = db.scalar(select(NotificationDelivery.next_attempt_at))
+    assert new_lease > old_lease
+    with Session(db.bind) as other:
+        assert email._claim(other, start + timedelta(seconds=151)) is None
+        second = email._claim(other, start + timedelta(seconds=251))
+    assert second and second[0] == delivery_id and second[1] != first[1]
+    assert not email._renew_lease(db.bind, delivery_id, first[1], start + timedelta(seconds=251))
+
+
+def test_live_heartbeat_prevents_reclaim_after_initial_boundary(database, monkeypatch):
+    monkeypatch.setattr(settings, "email_notifications_enabled", True)
+    monkeypatch.setattr(email, "_lease_duration", lambda: timedelta(seconds=0.6))
+    monkeypatch.setattr(email, "HEARTBEAT_INTERVAL_SECONDS", 0.1)
+    db = database
+    _pending_delivery(db)
+    entered, release = threading.Event(), threading.Event()
+
+    def sender(*_):
+        entered.set()
+        assert release.wait(5)
+
+    def worker():
+        with Session(db.bind) as session:
+            return email.run_email_delivery_once(session, sender=sender)
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(worker)
+        assert entered.wait(5)
+        time.sleep(0.8)
+        with Session(db.bind) as other:
+            assert email._claim(other, datetime.now(timezone.utc)) is None
+        release.set()
+        assert future.result(timeout=5)
+    db.expire_all()
+    assert db.scalar(select(NotificationDelivery.status)) == "sent"
+
+
+def test_lost_owner_cannot_finalize_reclaimed_delivery(database, monkeypatch):
+    monkeypatch.setattr(settings, "email_notifications_enabled", True)
+    monkeypatch.setattr(email, "_lease_duration", lambda: timedelta(seconds=0.5))
+    monkeypatch.setattr(email, "HEARTBEAT_INTERVAL_SECONDS", 2)
+    db = database
+    delivery_id = _pending_delivery(db)
+    entered, release = threading.Event(), threading.Event()
+
+    def sender(*_):
+        entered.set()
+        assert release.wait(5)
+
+    def worker():
+        with Session(db.bind) as session:
+            return email.run_email_delivery_once(session, sender=sender)
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(worker)
+        assert entered.wait(5)
+        old_token = db.scalar(select(NotificationDelivery.claim_token))
+        time.sleep(0.65)
+        with Session(db.bind) as other:
+            second = email._claim(other, datetime.now(timezone.utc))
+        assert second and second[1] != old_token
+        release.set()
+        assert future.result(timeout=5)
+    db.expire_all()
+    row = db.get(NotificationDelivery, delivery_id)
+    assert row.status == "processing" and row.claim_token == second[1]

@@ -18,7 +18,7 @@ from app.models.catalog import Contract, License, Responsible, University, Unive
 from app.models.notification import Notification
 from app.models.notification_delivery import NotificationDelivery
 from app.models.workflow_instances import InstanceStage, WorkflowInstance, WorkflowTask
-from app.schemas.validation import email as validate_email
+from app.modules.notifications.address import outbound_email
 from app.services.license_status import derive_contract_status
 
 EXPIRY_CHECKPOINTS = (30, 14, 7, 1)
@@ -57,15 +57,21 @@ def publish(
     else:
         raise RuntimeError(f"Unsupported notification database: {dialect}")
     notification_id = db.execute(stmt.returning(Notification.id)).scalar_one_or_none()
+    created = notification_id is not None
     if notification_id is None:
-        return False
+        notification_id = db.scalar(select(Notification.id).where(
+            Notification.recipient_user_id == recipient_user_id,
+            Notification.event_key == event_key,
+        ))
+        if notification_id is None:
+            raise RuntimeError("Notification conflict without an existing row")
     if settings.email_notifications_enabled:
         # The linked CRM responsible is the local durable address source.
         address = db.scalar(select(Responsible.email).where(
             Responsible.keycloak_sub == recipient_user_id
         ))
         try:
-            address = validate_email(address) if address else None
+            address = outbound_email(address) if address else None
         except ValueError:
             address = None
         if address:
@@ -80,7 +86,7 @@ def publish(
             db.execute(delivery_stmt.on_conflict_do_nothing(
                 index_elements=["notification_id", "channel"]
             ))
-    return True
+    return created
 
 
 def recipient_for_responsible(db: Session, responsible_id: uuid.UUID | None) -> str | None:

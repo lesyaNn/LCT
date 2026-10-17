@@ -9,6 +9,8 @@ from urllib.parse import urlsplit
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.modules.notifications.address import outbound_email
+
 DEV_BYPASS_ENVIRONMENTS = frozenset({"dev", "development", "local", "test", "testing"})
 
 
@@ -52,6 +54,8 @@ class Settings(BaseSettings):
             raise ValueError("SMTP_SECURITY must be starttls or ssl")
         if self.email_notifications_enabled and (not self.smtp_host or not self.smtp_from_email):
             raise ValueError("SMTP_HOST and SMTP_FROM_EMAIL are required when email is enabled")
+        if self.email_notifications_enabled:
+            self.smtp_from_email = outbound_email(self.smtp_from_email)
         return self
 
     # --- Domain stage (NOT used by minimal auth stack) ---
