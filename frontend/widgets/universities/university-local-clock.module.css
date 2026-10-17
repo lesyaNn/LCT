@@ -1,7 +1,13 @@
-.clock { align-items: flex-start; color: var(--rtk-color-text-secondary); display: flex; gap: var(--rtk-space-2); max-width: 100%; padding-block: var(--rtk-space-2); }
-.clock > svg { flex: 0 0 auto; margin-top: 2px; }
-.caption { display: block; font-size: 12px; overflow-wrap: anywhere; }
-.reading { align-items: baseline; display: flex; flex-wrap: wrap; font-size: 12px; gap: var(--rtk-space-2); }
-.time { color: var(--rtk-color-text-primary); font-size: 18px; font-variant-numeric: tabular-nums; font-weight: 600; }
-.hint { color: var(--rtk-color-text-secondary); display: block; font-size: 12px; }
+.clock { align-items: flex-start; background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-medium); display: flex; gap: var(--rtk-space-3); max-width: 100%; min-width: 0; padding: var(--rtk-space-3) var(--rtk-space-4); width: fit-content; }
+.icon { align-items: center; background: var(--rtk-color-brand-soft); border-radius: 50%; color: var(--rtk-color-brand); display: inline-flex; flex: 0 0 28px; height: 28px; justify-content: center; }
+.content { display: flex; flex-direction: column; gap: var(--rtk-space-1); min-width: 0; }
+.caption { color: var(--rtk-color-text-secondary); font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+.reading { align-items: baseline; display: flex; flex-wrap: wrap; column-gap: var(--rtk-space-3); row-gap: 0; }
+.time { color: var(--rtk-color-text-primary); font-size: clamp(22px, 3vw, 26px); font-variant-numeric: tabular-nums; font-weight: 700; line-height: 1.2; white-space: nowrap; }
+.dateZone { color: var(--rtk-color-text-secondary); font-size: 12px; white-space: nowrap; }
+.availability { align-items: center; color: var(--rtk-color-text-secondary); display: flex; flex-wrap: wrap; font-size: 12px; gap: var(--rtk-space-3); line-height: 1.35; margin-top: var(--rtk-space-1); }
+.status { align-items: center; background: var(--rtk-color-brand-soft); border-radius: 999px; color: var(--rtk-color-brand); display: inline-flex; font-weight: 600; gap: 6px; padding: 4px 8px; white-space: nowrap; }
+.statusDot { background: currentColor; border-radius: 50%; flex: 0 0 6px; height: 6px; width: 6px; }
+.hours { border-left: 1px solid var(--rtk-color-border); padding-left: var(--rtk-space-2); }
 .unknown { color: var(--rtk-color-text-tertiary); display: block; font-size: 12px; padding-block: var(--rtk-space-2); }
+@media (max-width: 480px) { .availability { align-items: flex-start; flex-direction: column; gap: var(--rtk-space-1); } .hours { border-left: 0; padding-left: 0; } }

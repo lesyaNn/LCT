@@ -8,8 +8,8 @@
 .eyebrow { color: var(--rtk-color-brand); display: block; font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
 .programWorkflow { display: flex; flex-direction: column; gap: var(--rtk-space-4); min-width: 0; }
 .instancesHeader { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); justify-content: space-between; min-width: 0; }
+.instancesTitle { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); min-width: 0; }
 .instancesHeader h2 { font-size: 18px; letter-spacing: -.02em; margin: 0; }
-.instancesHeader p { color: var(--rtk-color-text-secondary); font-size: 12px; margin: var(--rtk-space-1) 0 0; }
 .instanceList { display: flex; flex-direction: column; gap: var(--rtk-space-2); list-style: none; margin: var(--rtk-space-4) 0 0; padding: 0; }
 .instanceItem { margin: 0; }
 .instanceItemActions { display: flex; justify-content: flex-end; margin-top: calc(var(--rtk-space-3) * -1); padding: 0 var(--rtk-space-2) var(--rtk-space-2); position: relative; }

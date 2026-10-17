@@ -54,28 +54,35 @@ async function copied(page: Page) {
   return page.evaluate(() => (window as unknown as { copiedValues: string[] }).copiedValues);
 }
 
-test('reader sees university clock, copies individual or complete contacts and contract number', async ({ page }, testInfo) => {
+test('reader sees university clock, copies contact methods and contract number', async ({ page }, testInfo) => {
   const checks = await session(page);
   await page.clock.install({ time: new Date('2026-10-17T16:30:00Z') });
   await page.goto(`/universities/${universityId}?tab=responsibles`);
   const clocks = page.getByRole('group', { name: 'Местное время вуза' });
-  await expect(clocks.first()).toContainText('18.10.2026');
-  await expect(clocks.first()).toContainText('UTC+10');
-  await expect(clocks.first().locator('time')).toHaveText(/^02:30:\d{2}$/);
-  const firstTime = await clocks.first().locator('time').textContent();
+  await expect(clocks).toHaveCount(1);
+  await expect(clocks).toContainText('18.10.2026');
+  await expect(clocks).toContainText('UTC+10');
+  await expect(clocks.locator('time')).toHaveText(/^02:30:\d{2}$/);
+  const firstTime = await clocks.locator('time').textContent();
   await page.clock.fastForward(2000);
-  await expect(clocks.first().locator('time')).not.toHaveText(firstTime!);
-  await expect(clocks.first()).toContainText('Сейчас вне 09:00-18:00');
+  await expect(clocks.locator('time')).not.toHaveText(firstTime!);
+  await expect(clocks).toContainText('Вне рабочего времени');
+  await expect(clocks).toContainText('Ориентир: 09:00–18:00');
   await expect(page.getByRole('button', { name: 'Добавить ответственного' })).toHaveCount(0);
-  for (const kind of ['телефон', 'email', 'контакт']) await page.getByRole('button', { name: `Копировать ${kind}: Анна Иванова`, exact: true }).click();
-  await expect.poll(() => copied(page)).toEqual([person.phone, person.email, `${person.full_name}\n${person.role}\n${person.email}\n${person.phone}`]);
+  await expect(page.getByRole('button', { name: 'Копировать контакт: Анна Иванова' })).toHaveCount(0);
+  await page.getByRole('link', { name: person.phone }).hover();
+  await page.getByRole('button', { name: 'Копировать телефон: Анна Иванова' }).click();
+  await page.getByRole('link', { name: person.email }).hover();
+  await page.getByRole('button', { name: 'Копировать email: Анна Иванова' }).click();
+  await expect.poll(() => copied(page)).toEqual([person.phone, person.email]);
   await expect(page.getByRole('link', { name: person.email })).toHaveAttribute('href', 'mailto:anna@example.org');
   await expect(page.getByRole('link', { name: person.phone })).toHaveAttribute('href', 'tel:+79001234567');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('article').filter({ hasText: 'Анна Иванова' }).scrollIntoViewIfNeeded();
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.getByRole('link', { name: person.phone }).hover();
   await page.getByRole('button', { name: 'Копировать телефон: Анна Иванова' }).click();
-  await expect.poll(() => copied(page)).toHaveLength(4);
+  await expect.poll(() => copied(page)).toHaveLength(3);
   await page.screenshot({ path: testInfo.outputPath('contacts-mobile.png'), fullPage: true });
   await page.goto(`/universities/${universityId}?tab=documents`);
   await page.getByRole('button', { name: 'Копировать номер договора ДГ-2026/001' }).click();
@@ -87,8 +94,9 @@ test('reader sees university clock, copies individual or complete contacts and c
 test('unknown city is explicit and clipboard refusal has an actionable error', async ({ page }) => {
   const checks = await session(page, null, true);
   await page.goto(`/universities/${universityId}?tab=responsibles`);
-  await expect(page.getByText('Местное время не определено').first()).toBeVisible();
+  await expect(page.getByText('Местное время не определено')).toBeVisible();
   await expect(page.getByRole('group', { name: 'Местное время вуза' })).toHaveCount(0);
+  await page.getByRole('link', { name: person.phone }).hover();
   await page.getByRole('button', { name: 'Копировать телефон: Анна Иванова' }).click();
   const error = page.getByRole('alert').filter({ hasText: 'Не удалось скопировать' });
   await expect(error).toBeVisible();

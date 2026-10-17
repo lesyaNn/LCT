@@ -13,15 +13,15 @@ import { EmptyState } from '@/shared/ui/empty-state';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { Button } from '@/shared/ui/rtk/button';
 import { Modal } from '@/shared/ui/rtk/modal';
+import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { Toast } from '@/shared/ui/rtk/toast';
 import { PassportTableSkeleton } from './passport-data-table';
 import { ResponsibleAssignmentDrawer } from './responsible-assignment-drawer';
 import { ResponsibleCard } from './responsible-card';
-import { UniversityLocalClock } from './university-local-clock';
 import { invalidateResponsibleQueries } from './responsible-queries';
 import styles from './university-responsibles-section.module.css';
 
-export function ResponsiblesSection({ id, canEdit, city = '', timeZone }: { id: string; canEdit: boolean; city?: string; timeZone?: string | null }) {
+export function ResponsiblesSection({ id, canEdit }: { id: string; canEdit: boolean }) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const canManage = hasPermission(user, 'university_responsible.manage') && !isMockDataSourceFor('passport');
@@ -41,9 +41,11 @@ export function ResponsiblesSection({ id, canEdit, city = '', timeZone }: { id: 
   const currentPrimary = query.data.find((person) => person.isPrimary);
 
   return <>
-    <section className={styles.section} aria-label="Ответственные">
-      <UniversityLocalClock city={city} timeZone={timeZone} />
-      {canManage || canEdit ? <div className={styles.toolbar}><Button variant="primary" size="s" type="button" onClick={() => setAssignmentOpen(true)}>Добавить ответственного</Button></div> : null}
+    <section className={styles.section} aria-labelledby="passport-responsibles-title">
+      <div className={styles.sectionHeader}>
+        <div className={styles.sectionTitle}><h2 id="passport-responsibles-title">Ответственные</h2><StatusBadge intent="neutral" showIndicator={false}>{query.data.length}</StatusBadge></div>
+        {canManage || canEdit ? <div className={styles.toolbar}><Button variant="primary" size="s" type="button" onClick={() => setAssignmentOpen(true)}>Добавить ответственного</Button></div> : null}
+      </div>
       {query.data.length ? <div className={styles.grid}>{query.data.map((person) => <ResponsibleCard key={person.id} person={person} onRemove={canManage ? () => { setError(null); setRemoveTarget(person); } : undefined} />)}</div> : <EmptyState icon={<Mail size={20} fill="currentColor" />} title="Ответственные не назначены" description="Контактные лица появятся здесь после назначения." headingLevel={3} />}
     </section>
     {assignmentOpen ? <ResponsibleAssignmentDrawer id={id} primaryId={currentPrimary?.id ?? ''} existingIds={query.data.map((person) => person.id)} allowAdd={canManage} allowPrimary={canEdit} onClose={() => setAssignmentOpen(false)} onSuccess={() => { setAssignmentOpen(false); setToast(true); }} /> : null}

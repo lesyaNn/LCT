@@ -1,5 +1,8 @@
 .section { display: flex; flex-direction: column; gap: var(--rtk-space-4); min-width: 0; }
-.toolbar { display: flex; justify-content: flex-end; min-height: 36px; }
+.sectionHeader { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); justify-content: space-between; min-width: 0; }
+.sectionTitle { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); min-width: 0; }
+.sectionTitle h2 { font-size: 18px; letter-spacing: -.02em; margin: 0; }
+.toolbar { display: flex; justify-content: flex-end; }
 .grid { display: grid; gap: var(--rtk-space-4); grid-auto-rows: 1fr; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 300px)); }
 .card { background: var(--rtk-color-surface); border-radius: var(--rtk-radius-medium); box-shadow: var(--rtk-shadow-elevation-1); display: flex; flex-direction: column; gap: var(--rtk-space-3); min-width: 0; padding: var(--rtk-space-4); }
 .cardHeader { align-items: flex-start; display: flex; gap: var(--rtk-space-3); min-width: 0; }
@@ -14,8 +17,10 @@
 .contacts a:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
 .contacts svg { flex: 0 0 auto; }
 .contactRow { align-items: center; display: flex; gap: var(--rtk-space-2); min-width: 0; }
-.contactRow a { flex: 1; }
-.copyButton { flex: 0 0 auto; }
+.contactRow a { flex: 1; min-width: 0; }
+.copyAction { flex: 0 0 32px; height: 32px; opacity: 0; pointer-events: none; transition: opacity 160ms ease; }
+.contactRow:hover .copyAction, .contactRow:focus-within .copyAction { opacity: 1; pointer-events: auto; }
+.contactRow .copyButton { height: 32px; width: 32px; }
 .assignmentForm { display: flex; flex-direction: column; gap: var(--rtk-space-4); }
 .assignmentIntro, .assignmentHint { color: var(--rtk-color-text-secondary); font-size: 13px; line-height: 1.45; margin: 0; }
 .primaryOption { align-items: flex-start; cursor: pointer; display: flex; gap: var(--rtk-space-3); }
@@ -31,6 +36,10 @@
 .actions button { min-width: 120px; }
 @media (max-width: 768px) {
   .cardHeader .removeButton { height: 44px; width: 44px; }
+  .copyAction { flex-basis: 44px; height: 44px; }
+  .contactRow .copyButton { height: 44px; width: 44px; }
   .actions { flex-direction: column-reverse; }
   .actions button { width: 100%; }
 }
+@media (hover: none) { .copyAction { opacity: 1; pointer-events: auto; } }
+@media (prefers-reduced-motion: reduce) { .copyAction { transition: none; } }

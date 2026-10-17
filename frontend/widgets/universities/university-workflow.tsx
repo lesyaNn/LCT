@@ -453,9 +453,8 @@ export function UniversityWorkflow({ id }: { id: string }) {
 
   return <div className={styles.programWorkflow}>
     <div className={styles.instancesHeader}>
-      <div>
-        <h2>Workflow вуза</h2>
-        <p>{instances.length ? `Всего: ${instances.length}` : 'Процессы появятся после создания первого Workflow.'}</p>
+      <div className={styles.instancesTitle}>
+        <h2>Workflow вуза</h2><StatusBadge intent="neutral" showIndicator={false}>{instances.length}</StatusBadge>
       </div>
       {canCreate ? <Button variant="primary" size="s" type="button" onClick={() => setCreateOpen(true)}>Создать Workflow</Button> : null}
     </div>

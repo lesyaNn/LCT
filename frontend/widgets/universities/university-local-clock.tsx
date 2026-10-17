@@ -36,10 +36,13 @@ export function UniversityLocalClock({ city, timeZone }: { city: string; timeZon
   const local = now === null ? null : localTimeAt(timeZone, now);
   if (!timeZone || (now !== null && !local)) return <span className={styles.unknown}>Местное время не определено</span>;
   return <div className={styles.clock} role="group" aria-label="Местное время вуза">
-    <Time size={18} fill="currentColor" />
-    <div><span className={styles.caption}>Местное время{city && city !== '—' ? `, ${city}` : ''}</span>
-      <div className={styles.reading}><time className={styles.time} dateTime={now === null ? undefined : new Date(now).toISOString()}>{local?.time ?? '--:--:--'}</time><span>{local ? `${local.date} · ${local.offset}` : timeZone}</span></div>
-      {local?.outsideDaytime ? <span className={styles.hint} title="Ориентир для звонков. Фактический график вуза может отличаться.">Сейчас вне 09:00-18:00</span> : null}
+    <span className={styles.icon} aria-hidden="true"><Time size={18} fill="currentColor" /></span>
+    <div className={styles.content}><span className={styles.caption}>Местное время{city && city !== '—' ? `, ${city}` : ''}</span>
+      <div className={styles.reading}><time className={styles.time} dateTime={now === null ? undefined : new Date(now).toISOString()}>{local?.time ?? '--:--:--'}</time><span className={styles.dateZone}>{local ? `${local.date} · ${local.offset}` : timeZone}</span></div>
+      {local ? <div className={styles.availability} title="Ориентир для звонков. Фактический график вуза может отличаться.">
+        <span className={styles.status}><span className={styles.statusDot} aria-hidden="true" />{local.outsideDaytime ? 'Вне рабочего времени' : 'Рабочее время'}</span>
+        <span className={styles.hours}>Ориентир: {local.daytimeHours}</span>
+      </div> : null}
     </div>
   </div>;
 }

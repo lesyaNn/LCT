@@ -1,3 +1,6 @@
+const daytimeStartHour = 9;
+const daytimeEndHour = 18;
+
 export function localTimeAt(timeZone: string | null | undefined, now: number) {
   if (!timeZone) return null;
   try {
@@ -11,13 +14,10 @@ export function localTimeAt(timeZone: string | null | undefined, now: number) {
       time: `${part('hour')}:${part('minute')}:${part('second')}`,
       date: `${part('day')}.${part('month')}.${part('year')}`,
       offset: part('timeZoneName').replace('GMT', 'UTC'),
-      outsideDaytime: hour < 9 || hour >= 18,
+      outsideDaytime: hour < daytimeStartHour || hour >= daytimeEndHour,
+      daytimeHours: `${String(daytimeStartHour).padStart(2, '0')}:00–${String(daytimeEndHour).padStart(2, '0')}:00`,
     };
   } catch {
     return null;
   }
-}
-
-export function contactText(person: { name: string; role?: string; email?: string; phone?: string }) {
-  return [person.name, person.role, person.email, person.phone].filter(value => value?.trim() && value.trim() !== '—').join('\n');
 }
