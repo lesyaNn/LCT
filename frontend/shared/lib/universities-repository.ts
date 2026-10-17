@@ -71,12 +71,12 @@ export type SortOrder = 'asc' | 'desc';
 export interface UniversityFilters {
   externalSource: 'lms' | 'website' | '';
   search: string;
-  city: string;
+  cities: string[];
   universityIds: string[];
   programIds: string[];
   productIds: string[];
   responsibleIds: string[];
-  workflowStageId: string;
+  workflowStageIds: string[];
   dateFrom: string;
   dateTo: string;
 }
@@ -246,12 +246,12 @@ async function getMockUniversities(params: UniversityListQuery): Promise<Paginat
   });
   let filtered = currentUniversities.filter((item) => {
     if (search && !item.name.toLocaleLowerCase('ru-RU').includes(search)) return false;
-    if (filters.city && item.city !== filters.city) return false;
+    if (filters.cities.length && !filters.cities.includes(item.city)) return false;
     if (filters.universityIds.length && !filters.universityIds.includes(item.id)) return false;
     if (filters.programIds.length && !filters.programIds.some((id) => item.programIds?.includes(id))) return false;
     if (filters.productIds.length && !filters.productIds.some((id) => item.productIds?.includes(id))) return false;
     if (filters.responsibleIds.length && (!item.responsible || !filters.responsibleIds.includes(item.responsible.id))) return false;
-    if (filters.workflowStageId && item.currentStage.id !== filters.workflowStageId) return false;
+    if (filters.workflowStageIds.length && !filters.workflowStageIds.includes(item.currentStage.id)) return false;
     const interactionDate = item.lastInteractionAt.slice(0, 10);
     if (filters.dateFrom && interactionDate < filters.dateFrom) return false;
     if (filters.dateTo && interactionDate > filters.dateTo) return false;

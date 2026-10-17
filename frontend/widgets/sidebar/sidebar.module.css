@@ -22,7 +22,6 @@
 .nav { display: flex; flex: 1 1 auto; flex-direction: column; gap: var(--rtk-space-1); margin-top: var(--rtk-space-6); min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .sectionLabel { color: var(--rtk-color-text-tertiary); font-size: 11px; font-weight: 700; letter-spacing: .06em; margin: 0 0 var(--rtk-space-2); padding: 0 var(--rtk-space-3); text-transform: uppercase; }
 .navItem { align-items: center; background: transparent; border: 0; border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-secondary); cursor: pointer; display: flex; gap: var(--rtk-space-3); min-height: 44px; overflow: hidden; padding: 0 var(--rtk-space-3); position: relative; text-decoration: none; transition: background-color 160ms ease, color 160ms ease; white-space: nowrap; width: 100%; }
-.apiNavItem { margin-top: auto; }
 .navItem > span:nth-child(2) { flex: 1; text-align: left; }
 .navItem:hover { background: var(--rtk-color-surface-hover); color: var(--rtk-color-text-primary); }
 .navItem.active { background: var(--rtk-color-brand-soft); color: var(--rtk-color-brand); font-weight: 700; }

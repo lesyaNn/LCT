@@ -27,7 +27,7 @@ import { SearchField } from '@/shared/ui/rtk/filter-field';
 import type { ActiveFilterItem } from '@/shared/ui/rtk/active-filters';
 import { DateRangeField } from '@/shared/ui/rtk/date-range-field';
 import { EmptyState } from '@/shared/ui/empty-state';
-import { MultiSelect, SearchableSelect } from '@/shared/ui/rtk/multiselect';
+import { MultiSelect } from '@/shared/ui/rtk/multiselect';
 import { StatusBadge as SemanticStatusBadge } from '@/shared/ui/rtk/status-badge';
 import { TableShell } from '@/shared/ui/rtk/table-shell';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
@@ -70,10 +70,12 @@ function normalizeFilters(filters: UniversityFilters): UniversityFilters {
   return {
     ...filters,
     search: filters.search.trim(),
+    cities: [...filters.cities].sort(),
     universityIds: [...filters.universityIds].sort(),
     programIds: [...filters.programIds].sort(),
     productIds: [...filters.productIds].sort(),
     responsibleIds: [...filters.responsibleIds].sort(),
+    workflowStageIds: [...filters.workflowStageIds].sort(),
   };
 }
 
@@ -94,13 +96,13 @@ function parseUrlState(searchParams: SearchParamsLike): UniversityUrlState {
   return {
       filters: normalizeFilters({
       search: searchParams.get('search') ?? '',
-      city: searchParams.get('city') ?? '',
+      cities: parseList('city'),
       externalSource: searchParams.get('external_source') === 'lms' || searchParams.get('external_source') === 'website' ? searchParams.get('external_source') as 'lms' | 'website' : '',
       universityIds: parseList('university'),
       programIds: parseList('program'),
       productIds: parseList('product'),
       responsibleIds: parseList('responsible'),
-      workflowStageId: searchParams.get('stage') ?? '',
+      workflowStageIds: parseList('stage'),
       dateFrom,
       dateTo,
       }),
@@ -116,13 +118,13 @@ function parseUrlState(searchParams: SearchParamsLike): UniversityUrlState {
 
 const EMPTY_FILTERS: UniversityFilters = {
   search: '',
-  city: '',
+  cities: [],
   externalSource: '',
   universityIds: [],
   programIds: [],
   productIds: [],
   responsibleIds: [],
-  workflowStageId: '',
+  workflowStageIds: [],
   dateFrom: '',
   dateTo: '',
 };
@@ -135,9 +137,9 @@ function filtersFromState(state: UniversityUrlState): UniversityFilters {
 
 function hasActiveFilters(filters: UniversityFilters): boolean {
   return Boolean(
-    filters.search || filters.city || filters.externalSource || filters.universityIds.length || filters.programIds.length ||
+    filters.search || filters.cities.length || filters.externalSource || filters.universityIds.length || filters.programIds.length ||
     filters.productIds.length || filters.responsibleIds.length ||
-    filters.workflowStageId || filters.dateFrom || filters.dateTo,
+    filters.workflowStageIds.length || filters.dateFrom || filters.dateTo,
   );
 }
 
@@ -146,17 +148,18 @@ function parseStoredFilters(value: string | null): UniversityFilters | null {
   try {
     const parsed = JSON.parse(value) as Partial<UniversityFilters>;
     if (!parsed || typeof parsed !== 'object') return null;
+    const { city: previousCity, workflowStageId: previousStage, ...current } = parsed as Partial<UniversityFilters> & { city?: unknown; workflowStageId?: unknown };
     const storedFilters: UniversityFilters = {
       ...EMPTY_FILTERS,
-      ...parsed,
+      ...current,
+      cities: Array.isArray(parsed.cities) ? parsed.cities.filter((item): item is string => typeof item === 'string') : typeof previousCity === 'string' && previousCity ? [previousCity] : [],
       universityIds: Array.isArray(parsed.universityIds) ? parsed.universityIds.filter((item): item is string => typeof item === 'string') : [],
       programIds: Array.isArray(parsed.programIds) ? parsed.programIds.filter((item): item is string => typeof item === 'string') : [],
       productIds: Array.isArray(parsed.productIds) ? parsed.productIds.filter((item): item is string => typeof item === 'string') : [],
       responsibleIds: Array.isArray(parsed.responsibleIds) ? parsed.responsibleIds.filter((item): item is string => typeof item === 'string') : [],
       search: typeof parsed.search === 'string' ? parsed.search : '',
-      city: typeof parsed.city === 'string' ? parsed.city : '',
       externalSource: parsed.externalSource === 'lms' || parsed.externalSource === 'website' ? parsed.externalSource : '',
-      workflowStageId: typeof parsed.workflowStageId === 'string' ? parsed.workflowStageId : '',
+      workflowStageIds: Array.isArray(parsed.workflowStageIds) ? parsed.workflowStageIds.filter((item): item is string => typeof item === 'string') : typeof previousStage === 'string' && previousStage ? [previousStage] : [],
       dateFrom: typeof parsed.dateFrom === 'string' ? parsed.dateFrom : '',
       dateTo: typeof parsed.dateTo === 'string' ? parsed.dateTo : '',
     };
@@ -172,13 +175,13 @@ function parseStoredFilters(value: string | null): UniversityFilters | null {
 function filtersPatch(filters: UniversityFilters): QueryPatch {
   return {
     search: filters.search || null,
-    city: filters.city || null,
+    city: filters.cities,
     external_source: filters.externalSource || null,
     university: filters.universityIds,
     program: filters.programIds,
     product: filters.productIds,
     responsible: filters.responsibleIds,
-    stage: filters.workflowStageId || null,
+    stage: filters.workflowStageIds,
     date_from: filters.dateFrom || null,
     date_to: filters.dateTo || null,
     page: 1,
@@ -281,9 +284,9 @@ function Filters({ state, options, catalogsLoading, catalogsUnavailable, searchI
       <MultiSelect label="Вуз" labelPlacement="outside" options={options.universities} values={filters.universityIds} onChange={(values) => onPatch({ university: values, page: 1 })} searchable loading={catalogsLoading} disabled={catalogsUnavailable} />
       <MultiSelect label="ИТ-программа" labelPlacement="outside" options={options.programs} values={filters.programIds} searchable onChange={(values) => onPatch({ program: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
       <MultiSelect label="ИТ-продукт" labelPlacement="outside" options={options.products} values={filters.productIds} searchable onChange={(values) => onPatch({ product: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
-      <SearchableSelect label="Город" labelPlacement="outside" disabled={catalogsLoading || catalogsUnavailable} value={filters.city} onChange={(city) => onPatch({ city, page: 1 })} options={options.cities.map((city) => ({ id: city, name: city }))} placeholder="Все города" />
+      <MultiSelect label="Город" labelPlacement="outside" disabled={catalogsLoading || catalogsUnavailable} values={filters.cities} onChange={(cities) => onPatch({ city: cities, page: 1 })} options={options.cities.map((city) => ({ id: city, name: city }))} searchable placeholder="Все города" />
       <MultiSelect label="Ответственный" labelPlacement="outside" options={options.responsibles.map((person) => ({ id: person.id, name: person.name, description: person.role }))} values={filters.responsibleIds} searchable onChange={(values) => onPatch({ responsible: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
-      <SearchableSelect label="Текущий этап" labelPlacement="outside" disabled={!UNIVERSITY_LIST_CAPABILITIES.filters.stage} value={filters.workflowStageId} onChange={(value) => onPatch({ stage: value, page: 1 })} options={[{ id: '', name: 'Все этапы' }, ...options.stages]} placeholder="Все этапы" />
+      <MultiSelect label="Текущий этап" labelPlacement="outside" disabled={!UNIVERSITY_LIST_CAPABILITIES.filters.stage} values={filters.workflowStageIds} onChange={(values) => onPatch({ stage: values, page: 1 })} options={options.stages} searchable placeholder="Все этапы" />
       <div className={styles.periodField}><DateRangeField presets label={UNIVERSITY_LIST_CAPABILITIES.dateMeaning === 'created-at' ? 'Период создания' : 'Период последнего взаимодействия'} from={filters.dateFrom} to={filters.dateTo} onFromChange={(value) => updateDateRange('date_from', value)} onToChange={(value) => updateDateRange('date_to', value)} onRangeChange={(dateFrom, dateTo) => onPatch({ date_from: dateFrom, date_to: dateTo, page: 1 })} /></div>
     </section>
   );
@@ -301,10 +304,10 @@ function universityActiveFilters(filters: UniversityFilters, options: University
   if (filters.universityIds.length) chips.push({ key: 'university', label: `Вуз: ${selectedNames(filters.universityIds, options.universities)}`, patch: { university: null, page: 1 } });
   if (filters.programIds.length) chips.push({ key: 'program', label: `ИТ-программа: ${selectedNames(filters.programIds, options.programs)}`, patch: { program: null, page: 1 } });
   if (filters.productIds.length) chips.push({ key: 'product', label: `ИТ-продукт: ${selectedNames(filters.productIds, options.products)}`, patch: { product: null, page: 1 } });
-  if (filters.city) chips.push({ key: 'city', label: `Город: ${filters.city}`, patch: { city: null, page: 1 } });
+  if (filters.cities.length) chips.push({ key: 'city', label: `Город: ${selectedNames(filters.cities, options.cities.map((city) => ({ id: city, name: city })))}`, patch: { city: null, page: 1 } });
   if (filters.externalSource) chips.push({ key: 'external_source', label: filters.externalSource === 'lms' ? 'Источник: LMS' : 'Источник: сайт', patch: { external_source: null, page: 1 } });
   if (filters.responsibleIds.length) chips.push({ key: 'responsible', label: `Ответственный: ${selectedNames(filters.responsibleIds, options.responsibles)}`, patch: { responsible: null, page: 1 } });
-  if (filters.workflowStageId) chips.push({ key: 'stage', label: `Этап: ${options.stages.find((item) => item.id === filters.workflowStageId)?.name ?? filters.workflowStageId}`, patch: { stage: null, page: 1 } });
+  if (filters.workflowStageIds.length) chips.push({ key: 'stage', label: `Этап: ${selectedNames(filters.workflowStageIds, options.stages)}`, patch: { stage: null, page: 1 } });
   if (filters.dateFrom || filters.dateTo) chips.push({ key: 'date', label: `Период: ${filters.dateFrom || '…'} — ${filters.dateTo || '…'}`, patch: { date_from: null, date_to: null, page: 1 } });
   return chips.map(({ key, label, patch }) => ({ id: key, label, onRemove: () => onPatch(patch) }));
 }
@@ -514,13 +517,13 @@ export function UniversitiesList() {
   const hasFilters = hasActiveFilters(state.filters);
   const activeFilterCount = [
     state.filters.search,
-    state.filters.city,
+    state.filters.cities.length,
     state.filters.externalSource,
     state.filters.universityIds.length,
     state.filters.programIds.length,
     state.filters.productIds.length,
     state.filters.responsibleIds.length,
-    state.filters.workflowStageId,
+    state.filters.workflowStageIds.length,
     state.filters.dateFrom || state.filters.dateTo,
   ].filter(Boolean).length;
   const resetFilters = () => {

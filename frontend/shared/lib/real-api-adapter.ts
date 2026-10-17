@@ -119,7 +119,7 @@ export function serializeUniversityListQuery(params: UniversityListQuery): URLSe
   const search = new URLSearchParams({ page: String(params.page), page_size: String(params.pageSize) });
   const filters: UniversityFilters = params.filters;
   if (filters.search.trim()) search.set('search', filters.search.trim());
-  if (filters.city) search.set('city', filters.city);
+  appendRepeated(search, 'city', filters.cities);
   if (filters.externalSource) search.set('external_source', filters.externalSource);
   appendRepeated(search, 'university_ids', filters.universityIds);
   appendRepeated(search, 'program_ids', filters.programIds);
@@ -127,7 +127,7 @@ export function serializeUniversityListQuery(params: UniversityListQuery): URLSe
   appendRepeated(search, 'responsible_ids', filters.responsibleIds);
   if (filters.dateFrom) search.set('date_from', filters.dateFrom);
   if (filters.dateTo) search.set('date_to', filters.dateTo);
-  if (filters.workflowStageId) search.set('workflow_stage', filters.workflowStageId);
+  appendRepeated(search, 'workflow_stage', filters.workflowStageIds);
   const supportedSort = 'name';
   search.set('sort_by', supportedSort);
   search.set('sort_order', params.order);
@@ -753,8 +753,8 @@ async function allReferencePages(
 function universityReferenceQuery(page: number): UniversityListQuery {
   return {
     filters: {
-      search: '', city: '', externalSource: '', universityIds: [], programIds: [], productIds: [],
-      responsibleIds: [], workflowStageId: '', dateFrom: '', dateTo: '',
+      search: '', cities: [], externalSource: '', universityIds: [], programIds: [], productIds: [],
+      responsibleIds: [], workflowStageIds: [], dateFrom: '', dateTo: '',
     },
     sort: 'name',
     order: 'asc',

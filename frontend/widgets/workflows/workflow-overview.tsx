@@ -15,9 +15,9 @@ import styles from './workflow-overview.module.css';
 
 type View = 'list' | 'board';
 const viewTabs = [{ id: 'list', label: 'Список' }, { id: 'board', label: 'Канбан' }] as const;
-type SelectionKey = 'university' | 'program' | 'responsible' | 'status' | 'stage';
+type SelectionKey = 'university' | 'city' | 'program' | 'responsible' | 'status' | 'stage';
 type Filters = { search: string } & Record<SelectionKey, string[]>;
-const initialFilters: Filters = { search: '', university: [], program: [], responsible: [], status: [], stage: [] };
+const initialFilters: Filters = { search: '', university: [], city: [], program: [], responsible: [], status: [], stage: [] };
 const statusOptions = [
   { id: 'in_progress', name: 'В работе' },
   { id: 'overdue', name: 'Просрочен' },
@@ -25,9 +25,10 @@ const statusOptions = [
 ];
 const selects = [
   { key: 'university', label: 'ВУЗ', all: 'Все ВУЗы' },
+  { key: 'city', label: 'Город', all: 'Все города' },
   { key: 'program', label: 'ИТ-программа', all: 'Все ИТ-программы' },
   { key: 'responsible', label: 'Ответственный за этап', all: 'Все сотрудники' },
-  { key: 'stage', label: 'Этап', all: 'Все этапы' },
+  { key: 'stage', label: 'Текущий этап', all: 'Все этапы' },
   { key: 'status', label: 'Статус', all: 'Все статусы' },
 ] as const;
 
@@ -35,10 +36,11 @@ function WorkflowList({ items }: { items: WorkflowOverviewItem[] }) {
   return <div className={styles.list}>{items.map((item) => <WorkflowCard item={item} key={item.instanceId} />)}</div>;
 }
 
-function options(items: WorkflowOverviewItem[], field: 'university' | 'program' | 'responsible' | 'stage') {
+function options(items: WorkflowOverviewItem[], field: 'university' | 'city' | 'program' | 'responsible' | 'stage') {
   const map = new Map<string, string>();
   for (const item of items) {
     const value = field === 'university' ? [item.universityId, item.universityName]
+      : field === 'city' ? [item.universityCity, item.universityCity]
       : field === 'program' ? [item.programName, item.programName]
         : field === 'responsible' ? [item.responsible?.id, item.responsible?.name]
           : [item.stageKey, item.stage.name];
@@ -57,6 +59,7 @@ export function WorkflowOverviewPage() {
     const search = filters.search.trim().toLocaleLowerCase('ru-RU');
     return (!search || `${item.universityName} ${item.programName ?? ''} ${item.stage.name} ${item.responsible?.name ?? ''}`.toLocaleLowerCase('ru-RU').includes(search))
       && (!filters.university.length || filters.university.includes(item.universityId))
+      && (!filters.city.length || (item.universityCity !== null && filters.city.includes(item.universityCity)))
       && (!filters.program.length || (item.programName !== null && filters.program.includes(item.programName)))
       && (!filters.responsible.length || (item.responsible !== null && filters.responsible.includes(item.responsible.id)))
       && (!filters.status.length || filters.status.includes(item.status))

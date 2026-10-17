@@ -20,13 +20,13 @@ const PAGE_SIZE = 100;
 const EMPTY_UNIVERSITY_QUERY: UniversityListQuery = {
   filters: {
     search: '',
-    city: '',
+    cities: [],
     externalSource: '',
     universityIds: [],
     programIds: [],
     productIds: [],
     responsibleIds: [],
-    workflowStageId: '',
+    workflowStageIds: [],
     dateFrom: '',
     dateTo: '',
   },

@@ -1,5 +1,6 @@
 .page { display: flex; flex-direction: column; gap: var(--rtk-space-5); min-width: 0; }
 .panel { display: flex; flex-direction: column; gap: var(--rtk-space-4); min-width: 0; }
+.usersContent.usersContent { padding: var(--rtk-space-3); }
 .localBreadcrumbs { display: none; }
 .localBreadcrumbs a { text-decoration: none; }
 .localBreadcrumbs a:hover { color: var(--rtk-color-brand); text-decoration: underline; }
@@ -44,8 +45,6 @@
 .field > span { color: var(--rtk-color-text-secondary); font-size: 12px; font-weight: 650; }
 .controlTooltip > span, .controlTooltip > span > span { display: flex; width: 100%; }
 .roleSelectRow { min-width: 0; position: relative; width: 100%; }
-.roleSelectRow .roleIcon { color: var(--rtk-color-text-secondary); display: flex; left: var(--rtk-space-3); pointer-events: none; position: absolute; top: 50%; transform: translateY(-50%); z-index: 1; }
-.roleSelectRow [data-testid="role-select"] { padding-left: 42px; }
 .roleSelectRow [data-testid="role-select"] small { color: var(--rtk-color-text-primary); font-size: 12px; }
 .scopeEditor { display: flex; flex-direction: column; gap: var(--rtk-space-2); min-width: 0; }
 .scopeEditor > div { min-width: 0; }

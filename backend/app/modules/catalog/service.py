@@ -70,7 +70,7 @@ def list_university_page(
     page: int,
     page_size: int,
     search: str | None,
-    city: str | None,
+    city: str | list[str] | None,
     responsible_id=None,
     sort_by: str = "name",
     sort_order: str = "asc",
@@ -79,7 +79,7 @@ def list_university_page(
     user=None,
     health_status: str | None = None,
     external_source: str | None = None,
-    workflow_stage: str | None = None,
+    workflow_stage: str | list[str] | None = None,
 ):
     """List universities with presentation aggregates (batched, no N+1)."""
     rows, total = repo.list_universities(

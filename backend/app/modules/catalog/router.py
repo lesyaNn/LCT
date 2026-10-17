@@ -123,7 +123,7 @@ def list_universities(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     search: str | None = Query(default=None, description="Case-insensitive match on name/city"),
-    city: str | None = Query(default=None, description="Exact city filter"),
+    city: list[str] | None = Query(default=None, description="Repeatable exact city filter"),
     responsible_id: uuid.UUID | None = Query(
         default=None, description="Only universities linked to this responsible"
     ),
@@ -135,7 +135,7 @@ def list_universities(
     sort_by: UniversitySortBy = Query(default="name"),
     sort_order: SortOrder = Query(default="asc"),
     external_source: Literal["website"] | None = Query(default=None),
-    workflow_stage: str | None = Query(default=None, description="Current stage name of the latest Workflow"),
+    workflow_stage: list[str] | None = Query(default=None, description="Repeatable current stage name filter for the latest Workflow"),
     unified: UnifiedFilter = Depends(get_unified_filter),
     db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(READ),

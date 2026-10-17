@@ -17,6 +17,7 @@ export interface WorkflowOverviewItem {
   instanceId: string;
   universityId: string;
   universityName: string;
+  universityCity: string | null;
   programName: string | null;
   programKey: string | null;
   responsible: UniversityResponsible | null;
@@ -39,8 +40,8 @@ export function workflowStageKey(workflow: UniversityWorkflow, stage: University
 }
 
 const emptyFilters = {
-  search: '', city: '', externalSource: '' as const, universityIds: [], programIds: [], productIds: [], responsibleIds: [],
-  workflowStageId: '', dateFrom: '', dateTo: '',
+  search: '', cities: [], externalSource: '' as const, universityIds: [], programIds: [], productIds: [], responsibleIds: [],
+  workflowStageIds: [], dateFrom: '', dateTo: '',
 };
 
 async function universityInstances(university: UniversityListItem): Promise<WorkflowOverviewItem[]> {
@@ -66,6 +67,7 @@ async function universityInstances(university: UniversityListItem): Promise<Work
       instanceId,
       universityId: university.id,
       universityName: university.name,
+      universityCity: university.city,
       programName: program.name,
       programKey: program.key,
       responsible: stage.responsible,
@@ -93,6 +95,7 @@ export async function getWorkflowOverview(): Promise<WorkflowOverview> {
         instanceId: record.id,
         universityId: record.university_id,
         universityName: record.university_name ?? record.university_id,
+        universityCity: record.university_city ?? null,
         programName: record.program_name ?? null,
         programKey: record.program_id ?? null,
         responsible: stage.responsible,

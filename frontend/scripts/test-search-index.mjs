@@ -58,10 +58,9 @@ for (const path of ['/admin/catalogs', '/admin/import']) {
   assert.ok(canAccessRoute(path, admin));
 }
 assert.ok(titles('приглашение', admin).includes('Пригласить пользователя'));
-if (navigationItems.some((item) => item.href === '/api-testing')) {
-  assert.ok(titles('api', admin).includes('Тестирование API'));
-}
-assert.equal(titles('api', regular).length, 0);
+assert.ok(!navigationItems.some((item) => item.href === '/api-testing'));
+assert.ok(titles('api', admin).includes('API'));
+assert.ok(titles('api', regular).includes('API'));
 assert.ok(!titles('приглашение', regular).includes('Пользователи и права'));
 assert.ok(!titles('аудит', regular).includes('Аудит'));
 console.log('Search aliases, ranking, residual terms and permissions: passed');

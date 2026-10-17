@@ -168,3 +168,40 @@ def test_current_stage_filter_applies_before_pagination(db):
     )
     assert total == 0
     assert items == []
+
+
+def test_multiple_cities_and_stages_filter_before_pagination(db):
+    ids = _seed(db)
+    second = WorkflowInstance(
+        university_id=ids["empty"], template_id=uuid.uuid4(), status="active",
+    )
+    db.add(second)
+    db.flush()
+    stage = InstanceStage(
+        instance_id=second.id, order_index=1, name="Запуск", status="current",
+    )
+    db.add(stage)
+    db.flush()
+    second.current_instance_stage_id = stage.id
+    db.commit()
+
+    first_page, total = catalog_service.list_university_page(
+        db, page=1, page_size=1, search=None, city=["Москва", "Казань"],
+        responsible_id=None, sort_by="name", sort_order="asc",
+        workflow_stage=["Согласование программы", "Запуск"],
+    )
+    second_page, second_total = catalog_service.list_university_page(
+        db, page=2, page_size=1, search=None, city=["Москва", "Казань"],
+        responsible_id=None, sort_by="name", sort_order="asc",
+        workflow_stage=["Согласование программы", "Запуск"],
+    )
+    assert total == second_total == 2
+    assert {first_page[0].id, second_page[0].id} == {ids["full"], ids["empty"]}
+
+    only_kazan, total = catalog_service.list_university_page(
+        db, page=1, page_size=1, search=None, city=["Казань"],
+        responsible_id=None, sort_by="name", sort_order="asc",
+        workflow_stage=["Согласование программы", "Запуск"],
+    )
+    assert total == 1
+    assert [item.id for item in only_kazan] == [ids["empty"]]
