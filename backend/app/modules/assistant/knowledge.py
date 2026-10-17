@@ -28,10 +28,21 @@ from app.schemas.errors import ErrorCode
 logger = logging.getLogger("rtk.assistant")
 
 ARTICLES = {
-    **{f"user-guide/{slug}.md": None for slug in (
-        "getting-started", "overview", "universities", "passport", "programs-products",
-        "workflow", "comments-files", "documents", "reports", "history",
-    )},
+    **{
+        f"user-guide/{slug}.md": None
+        for slug in (
+            "getting-started",
+            "overview",
+            "universities",
+            "passport",
+            "programs-products",
+            "workflow",
+            "comments-files",
+            "documents",
+            "reports",
+            "history",
+        )
+    },
     "help/faq.md": None,
     "help/health-score.md": None,
     "roles/user.md": None,
@@ -43,17 +54,49 @@ ARTICLES = {
     "admin-guide/workflow-templates.md": "workflow_template.manage",
 }
 STOP_WORDS = {
-    "как", "где", "что", "это", "или", "для", "при", "мне", "меня", "нужно", "хочу",
-    "можно", "почему", "когда", "какой", "какие", "есть", "про", "пожалуйста", "чем",
-    "этом", "эту", "если", "через", "после", "перед", "чтобы", "должен", "будет",
-    "сделать", "узнать", "подскажи", "расскажи",
+    "как",
+    "где",
+    "что",
+    "это",
+    "или",
+    "для",
+    "при",
+    "мне",
+    "меня",
+    "нужно",
+    "хочу",
+    "можно",
+    "почему",
+    "когда",
+    "какой",
+    "какие",
+    "есть",
+    "про",
+    "пожалуйста",
+    "чем",
+    "этом",
+    "эту",
+    "если",
+    "через",
+    "после",
+    "перед",
+    "чтобы",
+    "должен",
+    "будет",
+    "сделать",
+    "узнать",
+    "подскажи",
+    "расскажи",
 }
 
 
 def tokens(value: str) -> list[str]:
     words = re.findall(r"[a-zа-яё0-9]+", value.lower().replace("ё", "е"))
-    return [word[:6] if re.search("[а-я]", word) else word
-            for word in words if len(word) >= 3 and word not in STOP_WORDS]
+    return [
+        word[:6] if re.search("[а-я]", word) else word
+        for word in words
+        if len(word) >= 3 and word not in STOP_WORDS
+    ]
 
 
 def expand_query(query: str) -> str:
@@ -63,8 +106,53 @@ def expand_query(query: str) -> str:
         (r"выгруз|экспорт", "отчёт скачать экспорт"),
         (r"доступ|авториз|войти|вход", "вход доступ пользователь права"),
     )
-    return query + " " + " ".join(words for pattern, words in groups
-                                  if re.search(pattern, query, re.IGNORECASE))
+    return (
+        query
+        + " "
+        + " ".join(words for pattern, words in groups if re.search(pattern, query, re.IGNORECASE))
+    )
+
+
+def direct_faq(snapshot: "Snapshot", question: str, role: str) -> "Chunk | None":
+    """High-confidence published FAQ match, not a generated/cross-user cache.
+
+    New wording and ambiguous questions still go through retrieval + the LLM.
+    This fast path avoids spending CPU on an answer already written verbatim.
+    """
+
+    def normalized(value):
+        aliases = {"скачат": "получить", "взять": "получить", "получи": "получить"}
+        return {
+            aliases.get(word, word)
+            for word in tokens(expand_query(value))
+            if word not in {"уже", "готовы", "сформи"}
+        }
+
+    query = normalized(question)
+    if not query:
+        return None
+    candidates = []
+    for chunk in snapshot.visible(role):
+        if chunk.article_id != "help/faq":
+            continue
+        heading = re.match(r"^#{1,6}\s+([^\n]+)", chunk.text)
+        if not heading:
+            continue
+        terms = normalized(heading[1])
+        overlap = len(query & terms)
+        score = overlap / max(1, len(query | terms))
+        if overlap >= 2 and score >= 0.70 and faq_text(chunk):
+            candidates.append((score, chunk))
+    candidates.sort(key=lambda item: (-item[0], item[1].id))
+    if not candidates or len(candidates) > 1 and candidates[0][0] - candidates[1][0] < 0.18:
+        return None
+    return candidates[0][1]
+
+
+def faq_text(chunk: "Chunk") -> str:
+    text = re.sub(r"^#{1,6}[^\n]+\n+", "", chunk.text).strip()
+    text = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text)
+    return re.sub(r"[*`]", "", text)
 
 
 @dataclass(frozen=True)
@@ -89,8 +177,11 @@ class Snapshot:
 
     def visible(self, role: str) -> list[Chunk]:
         permissions = ROLE_PERMISSIONS.get(role, frozenset())
-        return [chunk for chunk in self.chunks
-                if chunk.permission is None or chunk.permission in permissions]
+        return [
+            chunk
+            for chunk in self.chunks
+            if chunk.permission is None or chunk.permission in permissions
+        ]
 
 
 def _sections(body: str, size: int = 1200) -> list[str]:
@@ -154,7 +245,7 @@ class KnowledgeBase:
                         if ":" in line:
                             name, value = line.split(":", 1)
                             metadata[name.strip()] = value.strip().strip("\"'")
-                    source = source[match.end():]
+                    source = source[match.end() :]
                 section = metadata.get("section", relative.split("/")[0])
                 slug = metadata.get("slug", Path(relative).stem)
                 if not re.fullmatch(r"[a-z-]+/[a-z-]+", f"{section}/{slug}"):
@@ -167,11 +258,16 @@ class KnowledgeBase:
                 documents += 1
                 for position, piece in enumerate(pieces):
                     identifier = hashlib.sha256(f"{relative}:{position}".encode()).hexdigest()[:16]
-                    chunks.append(Chunk(
-                        identifier, article_id, title,
-                        f"/docs?article={quote(article_id, safe='')}",
-                        piece, ARTICLES[relative],
-                    ))
+                    chunks.append(
+                        Chunk(
+                            identifier,
+                            article_id,
+                            title,
+                            f"/docs?article={quote(article_id, safe='')}",
+                            piece,
+                            ARTICLES[relative],
+                        )
+                    )
             version = digest.hexdigest()
             embeddings = self._read_embeddings(version, chunks)
             self._snapshot = Snapshot(version, documents, tuple(chunks), embeddings)
@@ -210,7 +306,7 @@ class KnowledgeBase:
             raise BusinessException(ErrorCode.ASSISTANT_KNOWLEDGE_UNAVAILABLE)
         vectors = {}
         for start in range(0, len(snapshot.chunks), 8):
-            batch = snapshot.chunks[start:start + 8]
+            batch = snapshot.chunks[start : start + 8]
             values = provider.embed([f"{chunk.title}\n{chunk.text}" for chunk in batch])
             vectors.update((chunk.id, vector) for chunk, vector in zip(batch, values, strict=True))
         payload = {"version": snapshot.version, "model": self.embedding_model, "vectors": vectors}
@@ -231,8 +327,7 @@ class KnowledgeBase:
 
 def lexical_ranking(query: str, chunks: list[Chunk]) -> list[tuple[Chunk, float]]:
     terms = set(tokens(expand_query(query)))
-    documents = [Counter(tokens(f"{chunk.title} {chunk.title}\n{chunk.text}"))
-                 for chunk in chunks]
+    documents = [Counter(tokens(f"{chunk.title} {chunk.title}\n{chunk.text}")) for chunk in chunks]
     average = sum(sum(doc.values()) for doc in documents) / max(len(documents), 1)
     ranked = []
     for chunk, document in zip(chunks, documents, strict=True):
@@ -244,8 +339,8 @@ def lexical_ranking(query: str, chunks: list[Chunk]) -> list[tuple[Chunk, float]
                 continue
             containing = sum(term in doc for doc in documents)
             idf = math.log(1 + (len(documents) - containing + 0.5) / (containing + 0.5))
-            score += idf * frequency * 2.2 / (
-                frequency + 1.2 * (0.25 + 0.75 * length / max(average, 1))
+            score += (
+                idf * frequency * 2.2 / (frequency + 1.2 * (0.25 + 0.75 * length / max(average, 1)))
             )
         if score >= 0.5:
             ranked.append((chunk, score))
@@ -261,10 +356,14 @@ def retrieve(
     mode = "lexical"
     if snapshot.embeddings and chunks:
         try:
-            query_vector = provider.embed([
-                ("Instruct: Retrieve CRM documentation relevant to the user's question.\n"
-                 f"Query: {query}")
-            ])[0]
+            query_vector = provider.embed(
+                [
+                    (
+                        "Instruct: Retrieve CRM documentation relevant to the user's question.\n"
+                        f"Query: {query}"
+                    )
+                ]
+            )[0]
             semantic = []
             for chunk in chunks:
                 vector = snapshot.embeddings[chunk.id]
@@ -286,7 +385,7 @@ def retrieve(
             continue
         result.append(chunk)
         article_counts[chunk.article_id] += 1
-        if len(result) == 4:
+        if len(result) == 3:
             break
     return result, mode
 
@@ -297,5 +396,6 @@ def _knowledge(root: str, index_path: str, embedding_model: str) -> KnowledgeBas
 
 
 def get_knowledge(config: Settings) -> KnowledgeBase:
-    return _knowledge(config.assistant_docs_root, config.assistant_index_path,
-                      config.assistant_embedding_model)
+    return _knowledge(
+        config.assistant_docs_root, config.assistant_index_path, config.assistant_embedding_model
+    )

@@ -66,6 +66,7 @@ class Settings(BaseSettings):
     db_pool_size: int = 5
     db_max_overflow: int = 10
     db_pool_timeout: int = 30
+    db_connect_timeout_seconds: int = Field(default=5, ge=1, le=30)
     db_statement_timeout_ms: int = 30000
     # KeyDB (wire-совместим с Redis, тот же RESP-протокол и redis-py клиент).
     # Схема URL остаётся ``redis://`` — это схема протокола, а не вендора.
@@ -99,16 +100,18 @@ class Settings(BaseSettings):
     # Documentation assistant. Models are downloaded explicitly, never by an API request.
     assistant_enabled: bool = False
     assistant_ollama_url: str = "http://localhost:11434"
-    assistant_model: str = Field(default="qwen3:4b", min_length=1, max_length=128)
+    assistant_model: str = Field(default="qwen3:1.7b", min_length=1, max_length=128)
     assistant_embedding_model: str = Field(default="qwen3-embedding:0.6b", min_length=1,
                                            max_length=128)
     assistant_docs_root: str = str(
         Path(__file__).resolve().parents[2] / "frontend" / "public" / "docs"
     )
     assistant_index_path: str = "var/assistant/index.json"
-    assistant_timeout_seconds: float = Field(default=60, ge=1, le=300)
+    assistant_timeout_seconds: float = Field(default=120, ge=1, le=300)
+    assistant_context_tokens: int = Field(default=4096, ge=2048, le=16384)
+    assistant_answer_tokens: int = Field(default=256, ge=128, le=1024)
     assistant_rate_limit_per_minute: int = Field(default=10, ge=1, le=120)
-    assistant_max_concurrent: int = Field(default=2, ge=1, le=8)
+    assistant_max_concurrent: int = Field(default=1, ge=1, le=8)
     assistant_history_turns: int = Field(default=3, ge=0, le=6)
     assistant_max_turns: int = Field(default=100, ge=1, le=500)
     assistant_retention_days: int = Field(default=30, ge=1, le=365)
