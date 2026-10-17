@@ -45,8 +45,11 @@ def test_json_history_is_durable_paginated_and_deleted_with_children(pg, knowled
     with Session(pg) as db:
         assistant, repository = make_chat(db, knowledge)
         first = assistant.chat(ChatIn(message="Как вернуть этап?"), "user", repository)
-        second = assistant.chat(ChatIn(message="А причина обязательна?",
-                                       conversation_id=first.conversation_id), "user", repository)
+        second = assistant.chat(
+            ChatIn(message="А причина обязательна?", conversation_id=first.conversation_id),
+            "user",
+            repository,
+        )
         assert second.revision == 2
     with Session(pg) as db:
         repository = Conversations(db, "alice", "user", Settings())
@@ -69,8 +72,9 @@ def test_other_subject_or_changed_role_cannot_access_history(pg, knowledge, subj
         assert stranger.list(1, 20).total == 0
         for operation in (
             lambda: stranger.history(first.conversation_id, 1, 20),
-            lambda: stranger.prepare(ChatIn(message="Продолжить",
-                                            conversation_id=first.conversation_id)),
+            lambda: stranger.prepare(
+                ChatIn(message="Продолжить", conversation_id=first.conversation_id)
+            ),
             lambda: stranger.remove(first.conversation_id),
         ):
             with pytest.raises(BusinessException) as raised:
@@ -107,8 +111,9 @@ def test_failed_model_leaves_no_partial_conversation(pg, knowledge):
         provider.chat.side_effect = BusinessException(ErrorCode.ASSISTANT_TIMEOUT)
         assistant = Assistant(config, knowledge, provider)
         with pytest.raises(BusinessException):
-            assistant.chat(ChatIn(message="Вернуть этап"), "user",
-                           Conversations(db, "alice", "user", config))
+            assistant.chat(
+                ChatIn(message="Вернуть этап"), "user", Conversations(db, "alice", "user", config)
+            )
         assert db.scalar(select(func.count()).select_from(AssistantConversation)) == 0
         assert db.scalar(select(func.count()).select_from(AssistantTurn)) == 0
 

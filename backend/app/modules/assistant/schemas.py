@@ -8,8 +8,18 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 Basis = Literal["documentation", "inference", "insufficient"]
 Page = Literal[
-    "dashboard", "universities", "university", "workflows", "workflow", "reports",
-    "audit", "catalogs", "import", "users", "workflow_templates", "docs",
+    "dashboard",
+    "universities",
+    "university",
+    "workflows",
+    "workflow",
+    "reports",
+    "audit",
+    "catalogs",
+    "import",
+    "users",
+    "workflow_templates",
+    "docs",
 ]
 
 
@@ -90,7 +100,9 @@ class TurnPage(BaseModel):
 class StatusOut(BaseModel):
     enabled: bool
     ready: bool
-    reason: Literal["disabled", "knowledge_missing", "model_unavailable", "ready"]
+    reason: Literal[
+        "disabled", "knowledge_missing", "model_unavailable", "storage_unavailable", "ready"
+    ]
     model: str
     retrieval_mode: Literal["lexical", "hybrid"]
     document_count: int

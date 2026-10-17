@@ -2,6 +2,8 @@
 
 import json
 import math
+import threading
+import weakref
 
 import httpx
 from pydantic import ValidationError
@@ -18,18 +20,33 @@ class Ollama:
     def __init__(self, config: Settings, transport: httpx.BaseTransport | None = None):
         self.config = config
         self.transport = transport
+        self._client = None
+        self._client_lock = threading.Lock()
+
+    def client(self) -> httpx.Client:
+        """Reuse a thread-safe pool, with no user credentials in its state."""
+        with self._client_lock:
+            if self._client is None or self._client.is_closed:
+                self._client = httpx.Client(
+                    base_url=self.config.assistant_ollama_url,
+                    trust_env=False,
+                    follow_redirects=False,
+                    transport=self.transport,
+                    limits=httpx.Limits(max_connections=8, max_keepalive_connections=4),
+                )
+                weakref.finalize(self, self._client.close)
+            return self._client
 
     def _request(
         self, method: str, path: str, body: dict | None = None, timeout: float | None = None
     ) -> dict:
         try:
-            with httpx.Client(
-                base_url=self.config.assistant_ollama_url,
+            with self.client().stream(
+                method,
+                path,
+                json=body,
                 timeout=httpx.Timeout(timeout or self.config.assistant_timeout_seconds, connect=5),
-                trust_env=False,
-                follow_redirects=False,
-                transport=self.transport,
-            ) as client, client.stream(method, path, json=body) as response:
+            ) as response:
                 response.raise_for_status()
                 payload = bytearray()
                 for chunk in response.iter_bytes():
@@ -50,19 +67,49 @@ class Ollama:
         models = payload.get("models")
         if not isinstance(models, list):
             raise BusinessException(ErrorCode.ASSISTANT_UNAVAILABLE)
-        return {row["name"] for row in models
-                if isinstance(row, dict) and isinstance(row.get("name"), str)}
+        return {
+            row["name"]
+            for row in models
+            if isinstance(row, dict) and isinstance(row.get("name"), str)
+        }
 
-    def chat(self, messages: list[dict[str, str]]) -> ModelAnswer:
-        payload = self._request("POST", "/api/chat", {
-            "model": self.config.assistant_model,
-            "messages": messages,
-            "stream": False,
-            "think": False,
-            "format": ModelAnswer.model_json_schema(),
-            "keep_alive": "5m",
-            "options": {"temperature": 0.2, "num_ctx": 8192, "num_predict": 700},
-        })
+    def pull(self, model: str) -> None:
+        """Operator-only bootstrap. Never called by an HTTP chat request."""
+        payload = self._request(
+            "POST", "/api/pull", {"model": model, "stream": False}, timeout=3600
+        )
+        if payload.get("status") != "success":
+            raise BusinessException(ErrorCode.ASSISTANT_UNAVAILABLE)
+
+    def chat(
+        self, messages: list[dict[str, str]], *, source_ids: list[str] | None = None
+    ) -> ModelAnswer:
+        schema = ModelAnswer.model_json_schema()
+        # llama.cpp's grammar compiler rejects huge bounded repetitions
+        # (char{1,4000}). Keep limits in Pydantic and num_predict, not grammar.
+        schema["properties"]["answer"].pop("maxLength", None)
+        schema["properties"]["answer"].pop("minLength", None)
+        if source_ids:
+            # Constrained decoding can only cite the supplied fragments, not
+            # invent a look-alike identifier. Still validate again in service.
+            schema["properties"]["source_ids"]["items"]["enum"] = source_ids
+        payload = self._request(
+            "POST",
+            "/api/chat",
+            {
+                "model": self.config.assistant_model,
+                "messages": messages,
+                "stream": False,
+                "think": False,
+                "format": schema,
+                "keep_alive": "5m",
+                "options": {
+                    "temperature": 0,
+                    "num_ctx": self.config.assistant_context_tokens,
+                    "num_predict": self.config.assistant_answer_tokens,
+                },
+            },
+        )
         try:
             if payload.get("done") is not True or payload.get("done_reason") == "length":
                 raise ValueError("Incomplete generation")
@@ -74,12 +121,16 @@ class Ollama:
             raise BusinessException(ErrorCode.ASSISTANT_INVALID_RESPONSE) from None
 
     def embed(self, texts: list[str]) -> list[list[float]]:
-        payload = self._request("POST", "/api/embed", {
-            "model": self.config.assistant_embedding_model,
-            "input": texts,
-            "truncate": False,
-            "keep_alive": "5m",
-        })
+        payload = self._request(
+            "POST",
+            "/api/embed",
+            {
+                "model": self.config.assistant_embedding_model,
+                "input": texts,
+                "truncate": False,
+                "keep_alive": "5m",
+            },
+        )
         try:
             vectors = payload["embeddings"]
             if not isinstance(vectors, list) or len(vectors) != len(texts):

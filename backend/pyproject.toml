@@ -26,6 +26,14 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest==9.0.3", "httpx==0.28.1", "ruff==0.15.13", "pypdf==6.10.0"]
 
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*", "scripts*"]
+exclude = ["var*", "tests*", "alembic*", "migrations*"]
+
 [tool.ruff]
 line-length = 100
 
