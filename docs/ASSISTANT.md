@@ -73,6 +73,8 @@ python -m scripts.assistant check
 
 ## Контракт для frontend
 
+Быстрые кнопки, десять согласованных ответов и новый каталог вопросов описаны в [ASSISTANT_QUICK_REPLIES.md](ASSISTANT_QUICK_REPLIES.md). Они работают без вызова модели и сохраняются в обычную историю.
+
 Все методы требуют обычный Bearer JWT Keycloak и право `assistant.use`. Оно входит в роли `user`, `manager`, `admin`. Base URL: `/api/v1/assistant`. Все ответы, включая ошибки, имеют `Cache-Control: no-store`.
 
 | Метод | Путь | Результат |

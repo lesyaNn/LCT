@@ -47,6 +47,16 @@ class Source(BaseModel):
     excerpt: str
 
 
+class QuickReplyOption(BaseModel):
+    id: str
+    question: str
+
+
+class QuickReplyCatalog(BaseModel):
+    version: str
+    items: list[QuickReplyOption]
+
+
 class ModelAnswer(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

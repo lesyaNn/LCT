@@ -63,6 +63,55 @@ def test_json_history_is_durable_paginated_and_deleted_with_children(pg, knowled
         assert repository.list(1, 20).total == 0
 
 
+def test_predefined_answers_persist_without_model_and_keep_owner_revision_guards(pg):
+    provider, knowledge = Mock(), Mock()
+    config = Settings(assistant_enabled=True)
+    assistant = Assistant(config, knowledge, provider)
+    with Session(pg) as db:
+        repository = Conversations(db, "alice", "user", config)
+        first = assistant.chat(ChatIn(message="Как скачать отчёт?"), "user", repository)
+        second = assistant.chat(
+            ChatIn(
+                message="Что означает статус?",
+                conversation_id=first.conversation_id,
+                expected_revision=1,
+            ),
+            "user",
+            repository,
+        )
+        assert second.revision == 2 and second.sources == []
+        assert second.basis == "insufficient" and second.model is None
+    with Session(pg) as db:
+        repository = Conversations(db, "alice", "user", config)
+        turns = repository.history(first.conversation_id, 1, 20)
+        assert turns.total == 2
+        assert [turn.question for turn in turns.items] == [
+            "Как скачать отчёт?",
+            "Что означает статус?",
+        ]
+        assert all(turn.model is None for turn in turns.items)
+        assert turns.items[0].sources[0].url == "/docs?article=help%2Ffaq"
+        assert "Уточните" in turns.items[1].answer
+        for store, revision, code in (
+            (Conversations(db, "bob", "user", config), 2, ErrorCode.NOT_FOUND),
+            (repository, 1, ErrorCode.CONFLICT),
+        ):
+            with pytest.raises(BusinessException) as error:
+                assistant.chat(
+                    ChatIn(
+                        message="Ответ не подходит",
+                        conversation_id=first.conversation_id,
+                        expected_revision=revision,
+                    ),
+                    "user",
+                    store,
+                )
+            assert error.value.code == code
+        assert repository.history(first.conversation_id, 1, 20).total == 2
+    assert provider.mock_calls == []
+    assert knowledge.mock_calls == []
+
+
 @pytest.mark.parametrize("subject,role", [("bob", "user"), ("bob", "admin"), ("alice", "manager")])
 def test_other_subject_or_changed_role_cannot_access_history(pg, knowledge, subject, role):
     with Session(pg) as db:
