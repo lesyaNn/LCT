@@ -10,11 +10,6 @@ export function CopyButton({ value, label, className }: { value: string; label: 
   const [pending, setPending] = useState(false);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
-  useEffect(() => {
-    if (!feedback) return;
-    const timeout = setTimeout(() => setFeedback(null), 4000);
-    return () => clearTimeout(timeout);
-  }, [feedback]);
   async function copy() {
     setPending(true);
     setFeedback(null);
