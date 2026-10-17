@@ -132,6 +132,7 @@ def generate_report_file(
         output_path,
         user=user,
         generated_at=generated_at,
+        group_by=request.group_by,
     )
 
 
@@ -148,9 +149,12 @@ def build_job_payload(request: ReportRequest, user: Any) -> dict[str, Any]:
 
     policy = get_data_scope(user)
     scope = None if policy.is_all else tuple(sorted(str(v) for v in policy.university_ids))
+    filters_payload = request.filters.model_dump(mode="json")
+    if request.group_by:
+        filters_payload["_group_by"] = request.group_by
     return {
         "format": request.format.value,
-        "filters": request.filters.model_dump(mode="json"),
+        "filters": filters_payload,
         "columns": request.resolved_columns,
         "actor": {
             "sub": getattr(user, "id", ""),

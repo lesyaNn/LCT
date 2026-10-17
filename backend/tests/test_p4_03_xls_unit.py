@@ -44,6 +44,17 @@ def _cell(book, sheet_name, row: int, col: int):
     return book.sheet_by_name(sheet_name).cell(row, col)
 
 
+def test_selected_grouping_adds_summary_sheet(tmp_path, monkeypatch):
+    from app.modules.analytics.stats import ReportStatsService, StatBucket, StatSlice
+
+    summary = StatSlice("by_university", "Распределение строк по вузам", "rows", 2, (StatBucket("МГУ", 2),))
+    monkeypatch.setattr(ReportStatsService, "group_slice", staticmethod(lambda *args, **kwargs: summary))
+    _, book = _read(tmp_path, [{"university": "МГУ"}], ["university"], group_by="university")
+    assert book.sheet_names() == ["Отчёт", "Фильтры", "Группировка"]
+    assert book.sheet_by_name("Группировка").cell_value(2, 0) == "МГУ"
+    assert book.sheet_by_name("Группировка").cell_value(2, 1) == 2
+
+
 # ------------------------------------------------------------- basic structure
 
 

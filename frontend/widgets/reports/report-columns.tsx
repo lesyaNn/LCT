@@ -9,8 +9,10 @@ import {
   reportColumnDefinitions,
   reportColumnPresetNames,
   reportColumnPresets,
+  REPORT_GROUP_OPTIONS,
   TZ_REPORT_COLUMNS,
 } from '@/shared/lib/reports-repository';
+import { MultiSelect } from '@/shared/ui/rtk/multiselect';
 import type { ReportFormSchema } from './report-form-schema';
 import styles from './reports-page.module.css';
 
@@ -30,6 +32,7 @@ export function ReportColumnSelector({ control, error }: ReportColumnSelectorPro
   const [extraColumnsOpen, setExtraColumnsOpen] = useState(true);
   return (
     <div className={styles.columnSection}>
+      <Controller control={control} name="groupBy" render={({ field }) => <MultiSelect label="Группировка" labelPlacement="outside" options={REPORT_GROUP_OPTIONS} values={field.value ? [field.value] : []} onChange={(selected) => field.onChange(selected[0] ?? '')} selectionMode="single" placeholder="Без группировки" />} />
       <div className={styles.sectionHeading}>
         <div className={styles.headingWithIcon}>
           <Checklist size={18} fill="currentColor" aria-hidden="true" />

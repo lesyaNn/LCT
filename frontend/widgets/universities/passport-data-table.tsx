@@ -6,6 +6,7 @@ import SortUp from '@atomaro/icons/24/editor/SortUp';
 import { EmptyState } from '@/shared/ui/empty-state';
 import { Button } from '@/shared/ui/rtk/button';
 import { TableShell } from '@/shared/ui/rtk/table-shell';
+import tableStyles from '@/shared/ui/rtk/data-table.module.css';
 import { TableSkeleton } from '@/shared/ui/skeleton';
 import { useMemo, useState, type ReactNode } from 'react';
 import styles from './passport-data-table.module.css';
@@ -97,7 +98,7 @@ export function PassportDataTable<T extends { id: string }>({ rows, columns, mob
               {columns.map((column) => {
                 const active = sortId === column.id;
                 return (
-                  <th key={column.id} scope="col" aria-sort={active ? direction === 'asc' ? 'ascending' : 'descending' : 'none'}>
+                  <th key={column.id} scope="col" className={column.id === 'actions' ? tableStyles.actionColumn : undefined} aria-sort={active ? direction === 'asc' ? 'ascending' : 'descending' : 'none'}>
                     {column.sortable ? (
                       <button className={styles.sortButton} type="button" onClick={() => handleSort(column)} aria-label={`${column.label}: сортировать ${active && direction === 'asc' ? 'по убыванию' : 'по возрастанию'}`}>
                         <span>{column.label}</span><SortIcon direction={active ? direction : null} />
@@ -108,7 +109,7 @@ export function PassportDataTable<T extends { id: string }>({ rows, columns, mob
               })}
             </tr>
           </thead>
-          {visibleGroups.map((group) => <tbody key={group.label ?? 'all'}>{group.label ? <tr className={styles.groupRow} key={`group-${group.label}`}><th colSpan={columns.length} scope="rowgroup"><span>{group.label}</span><span className={styles.groupCount}>{group.rows.length}</span></th></tr> : null}{group.rows.map((row) => <tr key={row.id}>{columns.map((column) => <td key={column.id}>{column.render(row)}</td>)}</tr>)}</tbody>)}
+          {visibleGroups.map((group) => <tbody key={group.label ?? 'all'}>{group.label ? <tr className={styles.groupRow} key={`group-${group.label}`}><th colSpan={columns.length} scope="rowgroup"><span>{group.label}</span><span className={styles.groupCount}>{group.rows.length}</span></th></tr> : null}{group.rows.map((row) => <tr key={row.id}>{columns.map((column) => <td key={column.id} className={column.id === 'actions' ? tableStyles.actionColumn : undefined}>{column.render(row)}</td>)}</tr>)}</tbody>)}
         </table>
       </div>
       <div className={styles.mobileCards}>

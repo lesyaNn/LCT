@@ -16,11 +16,12 @@ from app.main import app
 from app.models.catalog import University
 from app.models.notification import Notification
 from app.models.notification_delivery import NotificationDelivery
-from app.models.workflow_instances import WorkflowComment, WorkflowInstance
+from app.models.workflow_instances import InstanceStage, WorkflowComment, WorkflowInstance
 from app.models.workflow_templates import WorkflowStage, WorkflowTemplate
 from app.modules.admin_users.keycloak_client import get_keycloak_admin_client
 from app.modules.notifications import service as notification_service
 from app.modules.notifications.workflow_comments import _preview, _recipients, notify_comment
+from app.modules.notifications.workflow_status import notify_status
 from app.modules.workflow_attachments.router import get_storage
 from app.modules.workflow_attachments.storage import LocalStorageBackend
 from app.modules.workflow_transitions import service as transition_service
@@ -54,6 +55,7 @@ def context(monkeypatch):
         db.add_all([
             WorkflowStage(template_id=template.id, name="Первый", order_index=1),
             WorkflowStage(template_id=template.id, name="Второй", order_index=2),
+            WorkflowStage(template_id=template.id, name="Третий", order_index=3),
         ])
         instance = WorkflowInstance(university_id=university.id, template_id=template.id, status="active")
         db.add(instance)
@@ -190,3 +192,110 @@ def test_attachment_comment_and_publication_failure(context, tmp_path, monkeypat
                 Notification.event_key == f"workflow_comment_added:{saved.json()['id']}")).all()
     finally:
         app.dependency_overrides.pop(get_storage, None)
+
+
+def _prepare_stages(engine, instance_id):
+    with Session(engine) as db:
+        instance = db.get(WorkflowInstance, instance_id)
+        stages = list(db.scalars(select(WorkflowStage).where(
+            WorkflowStage.template_id == instance.template_id).order_by(WorkflowStage.order_index)))
+        snapshots = [InstanceStage(instance_id=instance_id, template_stage_id=stage.id,
+                                   order_index=index, name=stage.name, is_required=True,
+                                   status="pending") for index, stage in enumerate(stages, start=1)]
+        db.add_all(snapshots)
+        db.flush()
+        instance.current_instance_stage_id = snapshots[0].id
+        instance.current_stage_id = stages[0].id
+        db.commit()
+        return [row.id for row in snapshots]
+
+
+def _status_rows(engine, event_type):
+    with Session(engine) as db:
+        return list(db.scalars(select(Notification).where(Notification.type == event_type)).all())
+
+
+def test_status_routes_fanout_email_rollback_and_final_completion(context):
+    client, engine, kc, actor, university_id, instance_id, recipients, outsider, admin = context
+    stages = _prepare_stages(engine, instance_id)
+    with Session(engine) as db:
+        assert db.get(WorkflowInstance, instance_id).responsible_id is None
+
+    def move(route, target, comment):
+        response = client.post(f"/api/v1/workflow/instances/{instance_id}/{route}",
+                               json={"target_instance_stage_id": str(target), "comment": comment})
+        assert response.status_code == 200, response.text
+
+    move("transition", stages[1], "Переход с комментарием")
+    rows = _status_rows(engine, "workflow_stage_completed")
+    assert {row.recipient_user_id for row in rows} == set(recipients)
+    assert not {actor.id, outsider, admin} & {row.recipient_user_id for row in rows}
+    assert all(row.title == "Этап Workflow завершён" and "Первый" in row.message
+               and "Второй" in row.message and "Тестовый ВУЗ" in row.message for row in rows)
+    assert not _status_rows(engine, "workflow_completed")
+    with Session(engine) as db:
+        deliveries = db.scalars(select(NotificationDelivery).where(
+            NotificationDelivery.notification_id.in_([row.id for row in rows]))).all()
+        assert [delivery.recipient for delivery in deliveries] == ["b@example.test"]
+        notify_status(db, kc, db.get(WorkflowInstance, instance_id), actor,
+                      event_type="workflow_stage_completed",
+                      operation_id=uuid.UUID(rows[0].event_key.rsplit(":", 1)[1]),
+                      from_stage_name="Первый", to_stage_name="Второй")
+    assert len(_status_rows(engine, "workflow_stage_completed")) == 3
+
+    move("transition", stages[2], "Ещё один переход")
+    move("rollback", stages[1], "Нужно уточнить условия")
+    rollback = _status_rows(engine, "workflow_rollback")
+    assert {row.recipient_user_id for row in rollback} == set(recipients)
+    assert all(row.title == "Workflow возвращён на предыдущий этап"
+               and "Второй" in row.message and "Нужно уточнить условия" in row.message
+               and "Автор Тестовый" in row.message for row in rollback)
+    move("transition", stages[2], "Повторный переход")
+    response = client.post(f"/api/v1/workflow/instances/{instance_id}/complete")
+    assert response.status_code == 200, response.text
+    completed = _status_rows(engine, "workflow_completed")
+    assert {row.recipient_user_id for row in completed} == set(recipients)
+    assert all(row.title == "Workflow завершён" and "Тестовый Workflow" in row.message
+               and row.entity_id == str(instance_id) for row in completed)
+    assert len(_status_rows(engine, "workflow_stage_completed")) == 9
+    assert not _status_rows(engine, "workflow_comment_added")
+
+
+def test_failed_status_actions_and_keycloak_failure_after_commit(context, monkeypatch):
+    client, engine, kc, _, _, instance_id, _, _, _ = context
+    stages = _prepare_stages(engine, instance_id)
+    failed = client.post(f"/api/v1/workflow/instances/{instance_id}/transition",
+                         json={"target_instance_stage_id": str(stages[0]), "comment": "Нельзя"})
+    assert failed.status_code >= 400
+    failed = client.post(f"/api/v1/workflow/instances/{instance_id}/rollback",
+                         json={"target_instance_stage_id": str(stages[1]), "comment": "Нельзя"})
+    assert failed.status_code >= 400
+    assert not _status_rows(engine, "workflow_stage_completed")
+    assert not _status_rows(engine, "workflow_rollback")
+
+    def fail_users(**_):
+        raise RuntimeError("Keycloak unavailable")
+
+    original_users = kc.users
+    monkeypatch.setattr(kc, "users", fail_users)
+    response = client.post(f"/api/v1/workflow/instances/{instance_id}/transition",
+                           json={"target_instance_stage_id": str(stages[1]),
+                                 "comment": "Операция завершится"})
+    assert response.status_code == 200, response.text
+    with Session(engine) as db:
+        assert db.get(WorkflowInstance, instance_id).current_instance_stage_id == stages[1]
+    assert not _status_rows(engine, "workflow_stage_completed")
+
+    monkeypatch.setattr(kc, "users", original_users)
+
+    def fail_publish(*_args, **_kwargs):
+        raise RuntimeError("Notification publication unavailable")
+
+    monkeypatch.setattr(notification_service, "publish", fail_publish)
+    response = client.post(f"/api/v1/workflow/instances/{instance_id}/rollback",
+                           json={"target_instance_stage_id": str(stages[0]),
+                                 "comment": "Откат при сбое уведомлений"})
+    assert response.status_code == 200, response.text
+    with Session(engine) as db:
+        assert db.get(WorkflowInstance, instance_id).current_instance_stage_id == stages[0]
+    assert not _status_rows(engine, "workflow_rollback")

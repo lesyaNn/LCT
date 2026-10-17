@@ -190,6 +190,20 @@ def _gen(tmp_path: Path, columns, rows: list[dict], **kw):
     return result
 
 
+def test_selected_grouping_appears_in_pdf(tmp_path, monkeypatch):
+    from app.modules.analytics.stats import ReportStatsService, StatBucket, StatSlice
+
+    if find_dejavu_font_files()[0] is None:
+        pytest.skip("PDF font is not installed on this host")
+
+    summary = StatSlice("by_university", "Распределение строк по вузам", "rows", 1, (StatBucket("МГУ", 1),))
+    monkeypatch.setattr(ReportStatsService, "group_slice", staticmethod(lambda *args, **kwargs: summary))
+    result = _gen(tmp_path, ["university"], [{"university": "МГУ"}], group_by="university")
+    text = extract_pdf_text(result.path.read_bytes())
+    assert "Распределение строк по вузам" in text
+    assert "МГУ" in text
+
+
 # ------------------------------------------------------- PDF text extraction
 # (stdlib only: decode embedded ToUnicode CMaps, then content Tj strings —
 # proves Cyrillic is really embedded/renderable, not just "file generated").

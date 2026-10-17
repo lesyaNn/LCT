@@ -63,6 +63,7 @@ from app.modules.analytics.cells import (
 )
 from app.modules.analytics.columns import COLUMN_REGISTRY, resolve_columns
 from app.modules.analytics.dataset import ReportDatasetService
+from app.modules.analytics.stats import ReportStatsService
 from app.modules.analytics.filters import UnifiedFilter
 
 __all__ = [
@@ -300,6 +301,7 @@ def generate_xlsx_report(
     user: Any | None = None,
     generated_at: datetime | None = None,
     batch_size: int = 1000,
+    group_by: str | None = None,
 ) -> GeneratedReport:
     """Generate the frozen XLSX workbook from the report dataset.
 
@@ -411,6 +413,18 @@ def generate_xlsx_report(
         audit.column_dimensions["A"].width = 20
         audit.column_dimensions["B"].width = 60
 
+        if group_by:
+            summary = ReportStatsService.group_slice(db, filters, group_by, columns=resolved, user=user)
+            group_sheet = wb.create_sheet("Группировка")
+            group_sheet.append([summary.title])
+            group_sheet.append(["Группа", "Вузов" if summary.unit == "universities" else "Строк"])
+            for bucket in summary.buckets:
+                group_sheet.append([bucket.label, bucket.count])
+            group_sheet.column_dimensions["A"].width = 42
+            group_sheet.column_dimensions["B"].width = 16
+            for cell in group_sheet[2]:
+                cell.font = HEADER_FONT
+                cell.fill = HEADER_FILL
         wb.save(tmp_path)
         tmp_path.replace(final_path)
     except Exception:

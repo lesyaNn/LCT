@@ -718,7 +718,8 @@ function referenceItems(
   value: unknown,
   names: readonly string[] = ['name'],
   descriptions: readonly string[] = [],
-): Array<{ id: string; name: string; description?: string }> {
+  parentKey?: string,
+): Array<{ id: string; name: string; description?: string; parentId?: string }> {
   const payload = isRecord(value) ? value : {};
   const rows = Array.isArray(value) ? value : Array.isArray(payload.items) ? payload.items : [];
   return rows.flatMap((value) => {
@@ -726,7 +727,8 @@ function referenceItems(
     const id = stringValue(item.id);
     const name = names.map((key) => stringValue(item[key])).find(Boolean) ?? '';
     const description = descriptions.map((key) => stringValue(item[key])).find(Boolean);
-    return id && name ? [{ id, name, ...(description ? { description } : {}) }] : [];
+    const parentId = parentKey ? stringValue(item[parentKey]) : undefined;
+    return id && name ? [{ id, name, ...(description ? { description } : {}), ...(parentId ? { parentId } : {}) }] : [];
   });
 }
 
@@ -787,9 +789,9 @@ export async function realGetCatalogReferenceData(signal?: AbortSignal): Promise
   return {
     vendors: referenceItems(vendors),
     universities: referenceItems(universities, ['name'], ['city']),
-    products: referenceItems(products, ['name'], ['vendor_name', 'version']),
+    products: referenceItems(products, ['name'], ['vendor_name', 'version'], 'program_id'),
     directions: referenceItems(directions, ['name'], ['code']),
-    programs: referenceItems(programs, ['name'], ['direction_name']),
+    programs: referenceItems(programs, ['name'], ['direction_name'], 'direction_id'),
     responsibles: referenceItems(responsibles, ['full_name', 'name'], ['role', 'email']),
     contracts: referenceItems(contracts, ['contract_number'], ['university_name']),
   };

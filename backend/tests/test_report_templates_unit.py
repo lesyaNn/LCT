@@ -96,3 +96,15 @@ def test_validation_and_404():
     assert bad.status_code == 422
     assert client.delete("/reports/templates/00000000-0000-4000-8000-000000000000").status_code == 404
     assert client.delete("/reports/templates/not-a-uuid").status_code == 404
+
+
+def test_template_restores_grouping_and_entity_filters():
+    client = _client(_user(), _session_factory())
+    created = client.post(
+        "/reports/templates",
+        json={"name": "По программам", "format": "xlsx", "group_by": "program", "filters": {"program_ids": ["00000000-0000-4000-8000-000000000001"]}, "columns": ["university", "program"]},
+    )
+    assert created.status_code == 201, created.text
+    saved = client.get("/reports/templates").json()[0]
+    assert saved["group_by"] == "program"
+    assert saved["filters"]["program_ids"] == ["00000000-0000-4000-8000-000000000001"]

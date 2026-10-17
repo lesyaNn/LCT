@@ -25,6 +25,8 @@ from app.modules.audit.workflow_actor_names import workflow_actor_names
 from app.modules.workflow_instances import service as instance_service
 from app.modules.admin_users.keycloak_client import KeycloakAdminClient, get_keycloak_admin_client
 from app.modules.notifications.workflow_comments import notify_comment
+from app.modules.notifications.workflow_status import notify_status
+from app.models.workflow_instances import InstanceStage
 from app.modules.workflow_attachments.router import get_storage
 from app.modules.workflow_attachments.storage import StorageBackend
 from app.modules.workflow_instances.schemas import AllowedTransitionRead, InstanceDetail
@@ -83,16 +85,24 @@ def transition_instance(
     data: TransitionRequest,
     db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(WRITE),
+    kc: KeycloakAdminClient = Depends(get_keycloak_admin_client),
 ) -> InstanceDetail:
     existing = service.get_instance_or_404(db, instance_id)
     instance_service.authorize_scope(user, existing)
+    current = db.get(InstanceStage, existing.current_instance_stage_id)
+    target = db.get(InstanceStage, data.target_instance_stage_id)
+    operation_id = uuid.uuid4()
     instance = service.transition_instance(
         db,
         instance_id,
         data.target_instance_stage_id,
         data.comment,
         user.id,
+        operation_id=operation_id,
     )
+    notify_status(db, kc, instance, user, event_type="workflow_stage_completed",
+                  operation_id=operation_id, from_stage_name=current.name,
+                  to_stage_name=target.name)
     return instance_service.get_instance_detail(db, instance.id)
 
 
@@ -106,10 +116,14 @@ def complete_instance(
     instance_id: uuid.UUID,
     db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(WRITE),
+    kc: KeycloakAdminClient = Depends(get_keycloak_admin_client),
 ) -> InstanceDetail:
     existing = service.get_instance_or_404(db, instance_id)
     instance_service.authorize_scope(user, existing)
-    instance = service.complete_instance(db, instance_id, user.id)
+    operation_id = uuid.uuid4()
+    instance = service.complete_instance(db, instance_id, user.id, operation_id=operation_id)
+    notify_status(db, kc, instance, user, event_type="workflow_completed",
+                  operation_id=operation_id)
     return instance_service.get_instance_detail(db, instance.id)
 
 
@@ -144,16 +158,22 @@ def rollback_instance(
     data: TransitionRequest,
     db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(WRITE),
+    kc: KeycloakAdminClient = Depends(get_keycloak_admin_client),
 ) -> InstanceDetail:
     existing = service.get_instance_or_404(db, instance_id)
     instance_service.authorize_scope(user, existing)
+    target = db.get(InstanceStage, data.target_instance_stage_id)
+    operation_id = uuid.uuid4()
     instance = service.rollback_instance(
         db,
         instance_id,
         data.target_instance_stage_id,
         data.comment,
         user.id,
+        operation_id=operation_id,
     )
+    notify_status(db, kc, instance, user, event_type="workflow_rollback",
+                  operation_id=operation_id, to_stage_name=target.name, reason=data.comment)
     return instance_service.get_instance_detail(db, instance.id)
 
 

@@ -7,19 +7,31 @@ import { type UniversityWorkflowStageStatus } from './universities-repository';
 import { mockCreateReportJob, mockGetReportJob, mockListReportJobs } from '@/shared/mocks/api-adapter';
 
 export type ReportFormat = 'xls' | 'xlsx' | 'pdf' | 'json';
+export const REPORT_GROUP_IDS = ['university', 'direction', 'program', 'product', 'responsible', 'workflow_status'] as const;
+export type ReportGroupBy = (typeof REPORT_GROUP_IDS)[number];
+
+export const REPORT_GROUP_OPTIONS: Array<{ id: ReportGroupBy; name: string }> = [
+  { id: 'university', name: 'ВУЗы' },
+  { id: 'direction', name: 'ИТ-направления' },
+  { id: 'program', name: 'ИТ-программы' },
+  { id: 'product', name: 'ИТ-продукты' },
+  { id: 'responsible', name: 'Ответственные' },
+  { id: 'workflow_status', name: 'Статус работы' },
+];
 
 export type ReportPeriodPreset = PeriodPreset | null;
 export type ReportJobStatus = 'queued' | 'building' | 'ready' | 'failed';
 
-/**
- * The report page builds a report over the whole registry, so the form only
- * carries the period. ``ReportRequest`` below still speaks the full
- * UnifiedFilter shape (entity filters are part of the API contract and are
- * accepted by the backend) — it just sends empty dimensions.
- */
 export interface ReportFormValues {
   dateFrom: string;
   dateTo: string;
+  universityIds: string[];
+  directionIds: string[];
+  programIds: string[];
+  productIds: string[];
+  responsibleIds: string[];
+  workflowStatuses: UniversityWorkflowStageStatus[];
+  groupBy: ReportGroupBy | '';
   columnIds: string[];
   format: ReportFormat;
 }
@@ -33,6 +45,7 @@ export interface ReportRequest {
   product_ids: string[];
   responsible_ids: string[];
   workflow_statuses: UniversityWorkflowStageStatus[];
+  group_by: ReportGroupBy | null;
   columns: string[];
   format: ReportFormat;
 }
@@ -54,6 +67,7 @@ export interface ReportTemplate {
     workflow_statuses: UniversityWorkflowStageStatus[];
   };
   columns: string[];
+  groupBy?: ReportGroupBy | null;
 }
 
 export interface ReportJob {
@@ -183,6 +197,13 @@ function asReportFormat(value: unknown): ReportFormat {
 export const EMPTY_REPORT_FORM: ReportFormValues = {
   dateFrom: '',
   dateTo: '',
+  universityIds: [],
+  directionIds: [],
+  programIds: [],
+  productIds: [],
+  responsibleIds: [],
+  workflowStatuses: [],
+  groupBy: '',
   columnIds: DEFAULT_REPORT_COLUMNS,
   format: 'xlsx',
 };
@@ -213,14 +234,13 @@ export function reportRequestFromForm(values: ReportFormValues): ReportRequest {
   return {
     date_from: values.dateFrom,
     date_to: values.dateTo,
-    // Empty lists mean "this dimension is not filtered" in UnifiedFilter,
-    // which is exactly the intended "report over everything".
-    university_ids: [],
-    direction_ids: [],
-    program_ids: [],
-    product_ids: [],
-    responsible_ids: [],
-    workflow_statuses: [],
+    university_ids: values.universityIds,
+    direction_ids: values.directionIds,
+    program_ids: values.programIds,
+    product_ids: values.productIds,
+    responsible_ids: values.responsibleIds,
+    workflow_statuses: values.workflowStatuses,
+    group_by: values.groupBy || null,
     columns: values.columnIds,
     format: values.format,
   };
@@ -232,11 +252,16 @@ export function reportFormFromTemplate(tpl: ReportTemplate): ReportFormValues {
   const columnIds = tpl.columns
     .map((column) => (column === 'software' ? 'product' : column))
     .filter((column) => known.has(column));
-  // Templates saved with entity filters are still valid reports: the entity
-  // dimensions are dropped, the period and columns are kept.
   return {
     dateFrom: tpl.filters.date_from ?? '',
     dateTo: tpl.filters.date_to ?? '',
+    universityIds: tpl.filters.university_ids ?? [],
+    directionIds: tpl.filters.direction_ids ?? [],
+    programIds: tpl.filters.program_ids ?? [],
+    productIds: tpl.filters.product_ids ?? [],
+    responsibleIds: tpl.filters.responsible_ids ?? [],
+    workflowStatuses: tpl.filters.workflow_statuses ?? [],
+    groupBy: tpl.groupBy ?? '',
     columnIds: columnIds.length ? columnIds : [...DEFAULT_REPORT_COLUMNS],
     format: tpl.format,
   };
@@ -322,7 +347,7 @@ function unwrap<T>(result: Awaited<ReturnType<typeof apiFetch<T>>>, message: str
 async function createRealReportJob(request: ReportRequest): Promise<ReportJob> {
   const result = await apiFetch<unknown>('/api/v1/reports', {
     method: 'POST',
-    body: { format: request.format, filters: reportFiltersPayload(request), columns: request.columns },
+    body: { format: request.format, filters: reportFiltersPayload(request), columns: request.columns, group_by: request.group_by },
   });
   return { ...adaptReportJob(unwrap(result, 'Не удалось создать задачу отчёта.')), format: request.format, request };
 }
@@ -369,6 +394,7 @@ function adaptReportTemplate(raw: unknown): ReportTemplate {
     ownerSub: stringValue(item.owner_sub ?? item.ownerSub) ?? '',
     isShared: item.is_shared === true || item.isShared === true,
     format: asReportFormat(item.format),
+    groupBy: REPORT_GROUP_IDS.find((id) => id === (item.group_by ?? filters._group_by)) ?? null,
     filters: {
       date_from: stringValue(filters.date_from ?? filters.dateFrom) ?? '',
       date_to: stringValue(filters.date_to ?? filters.dateTo) ?? '',
@@ -404,6 +430,7 @@ export async function createReportTemplate(name: string, request: ReportRequest,
         ownerSub: 'mock-user',
         isShared: false,
         format: request.format,
+        groupBy: request.group_by,
         filters: {
           date_from: request.date_from,
           date_to: request.date_to,
@@ -425,6 +452,7 @@ export async function createReportTemplate(name: string, request: ReportRequest,
         body: {
           name,
           format: request.format,
+          group_by: request.group_by,
           filters: {
             date_from: request.date_from || null,
             date_to: request.date_to || null,
@@ -492,6 +520,7 @@ export async function getReportPreview(
           format: request.format,
           filters: reportFiltersPayload(request),
           columns: request.columns,
+          group_by: request.group_by,
         },
       });
       return unwrap(result, 'Не удалось получить предпросмотр выборки.');
@@ -520,6 +549,7 @@ export interface ReportStatistics {
   rowCount: number;
   columns: string[];
   slices: ReportStatSlice[];
+  grouped?: ReportStatSlice | null;
 }
 
 /**
@@ -530,7 +560,7 @@ export interface ReportStatistics {
  */
 export async function getReportStatistics(request: ReportRequest): Promise<ReportStatistics> {
   return fromDataSource({
-    mock: async () => ({ universityCount: 0, rowCount: 0, columns: request.columns, slices: [] }),
+    mock: async (): Promise<ReportStatistics> => ({ universityCount: 0, rowCount: 0, columns: request.columns, slices: [], grouped: null }),
     real: async () => {
       const result = await apiFetch<{
         university_count: number;
@@ -543,9 +573,10 @@ export async function getReportStatistics(request: ReportRequest): Promise<Repor
           total: number;
           buckets: Array<{ label: string; count: number }>;
         }>;
+        grouped?: { dimension: string; title: string; unit: 'rows' | 'universities'; total: number; buckets: Array<{ label: string; count: number }> } | null;
       }>('/api/v1/reports/statistics', {
         method: 'POST',
-        body: { filters: reportFiltersPayload(request), columns: request.columns },
+        body: { filters: reportFiltersPayload(request), columns: request.columns, group_by: request.group_by },
       });
       const data = unwrap(result, 'Не удалось получить статистику по выборке.');
       return {
@@ -559,6 +590,7 @@ export async function getReportStatistics(request: ReportRequest): Promise<Repor
           total: slice.total,
           buckets: slice.buckets,
         })),
+        grouped: data.grouped ?? null,
       };
     },
   });

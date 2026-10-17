@@ -95,6 +95,18 @@ def test_build_job_payload_default_columns_and_global_scope():
     assert payload["actor"]["university_ids"] is None
 
 
+def test_grouping_is_validated_and_frozen_with_the_job():
+    request = ReportRequest(format="xlsx", group_by="program", columns=["university", "program"])
+    payload = build_job_payload(request, _admin())
+    assert payload["filters"]["_group_by"] == "program"
+    assert ReportRequest(format="xlsx", filters=payload["filters"], group_by=payload["filters"]["_group_by"]).group_by == "program"
+    from pydantic import ValidationError
+    import pytest
+
+    with pytest.raises(ValidationError):
+        ReportRequest(format="xlsx", group_by="unknown")
+
+
 def test_build_job_payload_identical_shape_for_all_formats():
     for fmt in ("xlsx", "pdf", "json"):
         payload = build_job_payload(ReportRequest(format=fmt), _admin())
@@ -168,6 +180,18 @@ def test_generate_report_file_dispatches_per_format(tmp_path):
     finally:
         monkey.undo()
     assert calls == ["xlsx", "pdf", "json"]
+
+
+def test_generate_report_file_passes_grouping_to_existing_generator(tmp_path, monkeypatch):
+    seen = []
+
+    def generate(db, filters, columns, output_path, **kwargs):
+        seen.append(kwargs["group_by"])
+        return object()
+
+    monkeypatch.setitem(FORMAT_GENERATORS, ReportFormat.XLSX, generate)
+    generate_report_file(object(), ReportRequest(format="xlsx", group_by="direction"), tmp_path / "grouped.xlsx")
+    assert seen == ["direction"]
 
 
 def test_supported_formats_router_matches_service():

@@ -18,7 +18,7 @@
 .nameButton { background: transparent; border: 0; color: inherit; cursor: pointer; font: inherit; font-weight: 700; padding: 0; text-align: left; }
 .nameButton:not(:disabled):hover { color: var(--rtk-color-brand); text-decoration: underline; }
 .nameButton:disabled { cursor: default; }
-.rowActions { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-1); justify-content: flex-end; }
+.rowActions { align-items: center; display: flex; flex-wrap: nowrap; gap: var(--rtk-space-1); justify-content: flex-start; }
 .mobileList { display: none; }
 .catalogCard { border-bottom: 1px solid var(--rtk-color-border); display: flex; flex-direction: column; gap: var(--rtk-space-3); padding: var(--rtk-space-4); }
 .catalogCard:last-child { border-bottom: 0; }
@@ -46,6 +46,7 @@
 @media (max-width: 900px) {
   .desktopTable { display: none; }
   .mobileList { display: block; }
+  .rowActions { flex-wrap: wrap; justify-content: flex-end; }
 }
 
 @media (max-width: 600px) {

@@ -412,7 +412,6 @@ export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride 
   const notify = (item: WorkflowTransitionNotification) => {
     const id = Date.now() + Math.random();
     setNotifications((current) => [...current, { ...item, id }].slice(-5));
-    window.setTimeout(() => setNotifications((current) => current.filter((entry) => entry.id !== id)), 5000);
   };
   const resourceCounts = useMemo(() => historyQuery.data ? countWorkflowStageResources(historyQuery.data) : null, [historyQuery.data]);
   const stages = useMemo(() => query.data?.stages.map((stage) => realWorkflow ? {

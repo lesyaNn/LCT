@@ -61,6 +61,7 @@ from app.modules.analytics import xlsx as _xlsx
 from app.modules.analytics.columns import COLUMN_REGISTRY, resolve_columns
 from app.modules.analytics.dataset import ReportDatasetService
 from app.modules.analytics.filters import UnifiedFilter
+from app.modules.analytics.stats import ReportStatsService
 
 __all__ = [
     "FONT_BOLD",
@@ -484,6 +485,7 @@ def generate_pdf_report(
     *,
     user: Any | None = None,
     generated_at: datetime | None = None,
+    group_by: str | None = None,
 ) -> _xlsx.GeneratedReport:
     """Generate the frozen PDF report from the report dataset.
 
@@ -570,13 +572,28 @@ def generate_pdf_report(
         avg_progress = kpi.avg_workflow_progress
         kpi_lines = (
             f"Количество ВУЗов: {university_count}",
-            f"Количество строк (лицензий): {kpi.row_count}",
+            f"Строк в отчёте: {kpi.row_count}",
             f"Средний прогресс workflow, %: "
             f"{avg_progress if avg_progress is not None else '—'}",
             f"Просроченные задачи: {kpi.overdue_total}",
         )
         for line in kpi_lines:
             story.append(Paragraph(_xml_escape(line), body_style))
+
+        if group_by:
+            summary = ReportStatsService.group_slice(db, filters, group_by, columns=resolved, user=user)
+            story.append(Paragraph(_xml_escape(summary.title), heading_style))
+            group_rows = [[
+                Paragraph("Группа", cell_header_style),
+                Paragraph("Вузов" if summary.unit == "universities" else "Строк", cell_header_style),
+            ], *[[Paragraph(_xml_escape(bucket.label), cell_style), bucket.count] for bucket in summary.buckets]]
+            group_table = LongTable(group_rows, colWidths=[(page[0] - 2 * margin) * .8, (page[0] - 2 * margin) * .2], repeatRows=1)
+            group_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#4472C4")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("GRID", (0, 0), (-1, -1), .5, colors.HexColor("#BFBFBF")),
+            ]))
+            story.append(group_table)
 
         story.append(Paragraph("Данные", heading_style))
         header = [

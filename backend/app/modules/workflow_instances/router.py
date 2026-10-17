@@ -22,6 +22,8 @@ from app.schemas.errors import ErrorCode
 from app.core.security import CurrentUser
 from app.db.session import get_db
 from app.modules.audit.service import get_audit_db
+from app.modules.admin_users.keycloak_client import KeycloakAdminClient, get_keycloak_admin_client
+from app.modules.notifications.workflow_tasks import notify_task
 from app.modules.workflow_instances import service
 from app.modules.workflow_instances.schemas import (
     InstanceCreate,
@@ -271,10 +273,15 @@ def create_workflow_task(
     data: WorkflowTaskCreate,
     db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(WRITE),
+    kc: KeycloakAdminClient = Depends(get_keycloak_admin_client),
 ) -> WorkflowTaskRead:
     instance = service.get_instance_or_404(db, instance_id)
     service.authorize_scope(user, instance)
-    return WorkflowTaskRead.model_validate(service.create_task(db, instance_id, data.stage_id, data.title))
+    task = service.create_task(db, instance_id, data.stage_id, data.title)
+    result = WorkflowTaskRead.model_validate(task)
+    notify_task(db, kc, instance, task, user, event_type="workflow_task_added",
+                operation_id=task.id)
+    return result
 
 
 @router.patch(
@@ -289,10 +296,18 @@ def update_workflow_task(
     data: WorkflowTaskUpdate,
     db: Session = Depends(get_audit_db),
     user: CurrentUser = Depends(WRITE),
+    kc: KeycloakAdminClient = Depends(get_keycloak_admin_client),
 ) -> WorkflowTaskRead:
     instance = service.get_instance_or_404(db, instance_id)
     service.authorize_scope(user, instance)
-    return WorkflowTaskRead.model_validate(service.update_task(db, instance_id, task_id, title=data.title, status=data.status))
+    task, completed_now = service.update_task(
+        db, instance_id, task_id, title=data.title, status=data.status,
+    )
+    result = WorkflowTaskRead.model_validate(task)
+    if completed_now:
+        notify_task(db, kc, instance, task, user, event_type="workflow_task_completed",
+                    operation_id=uuid.uuid4())
+    return result
 
 
 @router.delete(

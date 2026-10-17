@@ -7,7 +7,7 @@ shares one validation path.
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, BeforeValidator, Field
 
@@ -19,7 +19,9 @@ from app.modules.analytics.columns import (
 from app.modules.analytics.filters import UnifiedFilter
 from app.schemas.common import ReportFormat
 
-__all__ = ["ReportFormat", "ReportRequest"]
+__all__ = ["ReportFormat", "ReportGroupBy", "ReportRequest"]
+
+ReportGroupBy = Literal["university", "direction", "program", "product", "responsible", "workflow_status"]
 
 
 def _validate_columns(value: list[str] | None) -> list[str] | None:
@@ -69,6 +71,7 @@ class ReportRequest(BaseModel):
         "duplicates are deduped preserving order; unknown keys are 422; "
         "[] is 422 (at least one column required).",
     )
+    group_by: ReportGroupBy | None = Field(default=None, description="Optional summary breakdown; detail rows remain unchanged.")
 
     @property
     def resolved_columns(self) -> list[str]:

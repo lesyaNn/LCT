@@ -141,10 +141,10 @@ def test_assignment_transition_rollback_and_import_error(database):
     first, second = instance.stages
     transition_service.transition_instance(db, instance.id, second.id, "Встреча прошла", "actor")
     transition_service.rollback_instance(db, instance.id, first.id, "Нужно уточнить условия", "actor")
-    types = set(db.scalars(select(Notification.type)).all())
-    assert {"workflow_stage_changed", "workflow_rollback"} <= types
-    rollback = db.scalar(select(Notification).where(Notification.type == "workflow_rollback"))
-    assert "Нужно уточнить условия" in rollback.message
+    # These low-level service calls have no Keycloak recipient context. The
+    # HTTP routes publish status notifications after the business commit.
+    assert not db.scalars(select(Notification).where(
+        Notification.type.in_(["workflow_stage_completed", "workflow_rollback"]))).all()
     job = SimpleNamespace(id=uuid.uuid4(), actor_sub="user-a",
                           result={"total_rows": 120, "inserted": 114, "updated": 0, "errors_total": 6})
     assert service.notify_import_result(db, job)

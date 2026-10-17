@@ -25,12 +25,14 @@ from app.core.security import CurrentUser
 from app.modules.analytics.columns import DEFAULT_COLUMNS
 from app.modules.analytics.filters import UnifiedFilter
 from app.modules.analytics.report_request import ColumnsField
+from app.modules.analytics.report_request import ReportGroupBy
 from app.modules.analytics.report_service import REPORTS_READ_PERMISSION
 from app.modules.analytics.stats import (
     DIMENSION_TITLES,
     STAT_DIMENSIONS,
     ReportStats,
     ReportStatsService,
+    StatSlice,
 )
 from app.modules.audit.service import get_audit_db
 from app.schemas.common import ErrorResponse
@@ -69,13 +71,14 @@ class ReportStatsResponse(BaseModel):
         description="Effective output columns, so a client can label a bucket."
     )
     slices: list[StatSliceRead]
+    grouped: StatSliceRead | None = None
 
     @property
     def dimensions(self) -> list[str]:
         return list(STAT_DIMENSIONS)
 
 
-def stats_response(stats: ReportStats, columns: list[str]) -> ReportStatsResponse:
+def stats_response(stats: ReportStats, columns: list[str], grouped: StatSlice | None = None) -> ReportStatsResponse:
     """Map the service result to the API shape (one place, no duplication)."""
     return ReportStatsResponse(
         university_count=stats.university_count,
@@ -91,6 +94,7 @@ def stats_response(stats: ReportStats, columns: list[str]) -> ReportStatsRespons
             )
             for item in stats.slices
         ],
+        grouped=StatSliceRead(dimension=grouped.dimension, title=grouped.title, unit=grouped.unit, total=grouped.total, buckets=[StatBucketRead(label=b.label, count=b.count) for b in grouped.buckets]) if grouped else None,
     )
 
 
@@ -106,6 +110,7 @@ class StatisticsRequest(BaseModel):
         description="Optional column selection, echoed back for labelling. "
         "The aggregation itself always uses the full registry.",
     )
+    group_by: ReportGroupBy | None = None
 
     @property
     def resolved_columns(self) -> list[str]:
@@ -138,8 +143,9 @@ def report_statistics(
     """
     try:
         stats = ReportStatsService.build(db, request.filters, user=user)
+        grouped = ReportStatsService.group_slice(db, request.filters, request.group_by, columns=request.resolved_columns, user=user) if request.group_by else None
     except BusinessException:
         raise
     except ValueError as exc:
         raise BusinessException(ErrorCode.VALIDATION_ERROR) from exc
-    return stats_response(stats, request.resolved_columns)
+    return stats_response(stats, request.resolved_columns, grouped)

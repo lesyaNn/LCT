@@ -70,3 +70,20 @@ test('unknown backend types keep their text with a neutral existing icon', () =>
     createdAt: item.created_at, read: false, target: undefined,
   });
 });
+
+test('Workflow status events use existing icons and workflow target', () => {
+  for (const [type, icon] of [
+    ['workflow_stage_completed', 'stage'],
+    ['workflow_rollback', 'workflow'],
+    ['workflow_completed', 'workflow'],
+  ]) {
+    const item = {
+      id: 'notification-1', type, title: 'Событие', message: 'Описание',
+      created_at: '2026-10-17T10:00:00Z', is_read: false,
+      entity_type: 'workflow', entity_id: 'instance-1', university_id: null,
+    };
+    const shown = repositoryExports.notificationPresentation(item);
+    assert.equal(shown.type, icon);
+    assert.equal(shown.target, '/workflows/instance-1');
+  }
+});

@@ -183,6 +183,8 @@ def transition_instance(
     target_instance_stage_id: uuid.UUID,
     comment: str,
     actor: str,
+    *,
+    operation_id: uuid.UUID | None = None,
 ) -> WorkflowInstance:
     """Move the current pointer forward atomically (P2-03-01).
 
@@ -218,6 +220,7 @@ def transition_instance(
     ensure_workflow_meeting(db, instance, target, actor)
     db.add(
         WorkflowStageTransition(
+            id=operation_id or uuid.uuid4(),
             instance_id=instance.id,
             from_stage_id=current.template_stage_id,
             to_stage_id=target.template_stage_id,
@@ -239,10 +242,6 @@ def transition_instance(
         new_value={"audit_object_type": "workflow_transition",
                    "stage_id": _stage_ref(target), "stage_name": target.name},
     )
-    from app.modules.notifications.service import notify_stage_change
-
-    notify_stage_change(db, instance, current, target, rollback=False, reason="",
-                        event_key=f"workflow-transition:{instance.id}:{uuid.uuid4()}")
     db.commit()
     return get_instance_or_404(db, instance.id)
 
@@ -256,7 +255,8 @@ def validate_completion(instance: WorkflowInstance, stages: list[InstanceStage])
     return current
 
 
-def complete_instance(db: Session, instance_id: uuid.UUID, actor: str) -> WorkflowInstance:
+def complete_instance(db: Session, instance_id: uuid.UUID, actor: str, *,
+                      operation_id: uuid.UUID | None = None) -> WorkflowInstance:
     """Close the final runtime stage and instance in one transaction."""
     instance = db.execute(
         select(WorkflowInstance).where(WorkflowInstance.id == instance_id).with_for_update()
@@ -271,13 +271,15 @@ def complete_instance(db: Session, instance_id: uuid.UUID, actor: str) -> Workfl
     current.completed_at = now
     instance.status = "completed"
     instance.completed_at = now
-    AuditService(db).log_event(
+    audit_event = AuditService(db).log_event(
         context=context_for(db, actor), action="UPDATE",
         entity_type="workflow_instance", entity_id=instance.id,
         university_id=instance.university_id,
         old_value={"status": "active"},
         new_value={"status": "completed", "stage_id": str(current.template_stage_id) if current.template_stage_id else None},
     )
+    if operation_id is not None:
+        audit_event.id = operation_id
     db.commit()
     return get_instance_or_404(db, instance.id)
 
@@ -338,6 +340,8 @@ def rollback_instance(
     target_instance_stage_id: uuid.UUID,
     comment: str,
     actor: str,
+    *,
+    operation_id: uuid.UUID | None = None,
 ) -> WorkflowInstance:
     """Step the current pointer back to a previous stage atomically.
 
@@ -370,6 +374,7 @@ def rollback_instance(
     ensure_workflow_meeting(db, instance, target, actor)
     db.add(
         WorkflowStageTransition(
+            id=operation_id or uuid.uuid4(),
             instance_id=instance.id,
             from_stage_id=current.template_stage_id,
             to_stage_id=target.template_stage_id,
@@ -386,10 +391,6 @@ def rollback_instance(
         old_value={"stage_id": current.template_stage_id, "stage_name": current.name},
         new_value={"stage_id": target.template_stage_id, "stage_name": target.name, "comment": text, "rollback": True},
     )
-    from app.modules.notifications.service import notify_stage_change
-
-    notify_stage_change(db, instance, current, target, rollback=True, reason=text,
-                        event_key=f"workflow-rollback:{instance.id}:{uuid.uuid4()}")
     db.commit()
     return get_instance_or_404(db, instance.id)
 

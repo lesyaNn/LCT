@@ -117,6 +117,7 @@ interface ReportStatisticsPanelProps {
   pending: boolean;
   error: unknown;
   sameRowGrain: boolean;
+  groupBy?: string | null;
   onRetry: () => void;
 }
 
@@ -128,7 +129,7 @@ const chartColumns: Record<string, string> = {
 };
 
 /** Only dimensions selected for export, and only at a compatible row grain. */
-export function ReportStatisticsPanel({ statistics, pending, error, sameRowGrain, onRetry }: ReportStatisticsPanelProps) {
+export function ReportStatisticsPanel({ statistics, pending, error, sameRowGrain, groupBy, onRetry }: ReportStatisticsPanelProps) {
   if (error) {
     return (
       <EmptyState
@@ -141,9 +142,10 @@ export function ReportStatisticsPanel({ statistics, pending, error, sameRowGrain
   }
   if (pending && !statistics) return <p className={styles.statEmpty}>Считаем статистику…</p>;
   if (!statistics) return null;
-  const slices = ['by_workflow_status', 'by_direction', 'by_product', 'by_responsible']
+  const slices = [...(groupBy && statistics.grouped ? [statistics.grouped] : []), ...['by_workflow_status', 'by_direction', 'by_product', 'by_responsible']
     .flatMap((dimension) => statistics.slices.filter((slice) => slice.dimension === dimension))
-    .filter((slice) => statistics.columns.includes(chartColumns[slice.dimension]) && slice.buckets.length && (slice.unit === 'universities' || sameRowGrain))
+    .filter((slice) => slice.dimension !== statistics.grouped?.dimension)]
+    .filter((slice) => slice.buckets.length && (slice === statistics.grouped || (statistics.columns.includes(chartColumns[slice.dimension]) && (slice.unit === 'universities' || sameRowGrain))))
     .slice(0, 4);
   if (!slices.length) {
     if (statistics.universityCount > 0) return <p className={styles.statEmpty}>Для выбранного состава нет графиков с той же детализацией, что у файла.</p>;

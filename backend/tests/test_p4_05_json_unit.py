@@ -125,6 +125,16 @@ def _gen(tmp_path: Path, columns, rows: list[dict], **kw):
     return result, json.loads(out.read_text(encoding="utf-8"))
 
 
+def test_selected_grouping_is_exported_with_the_rows(tmp_path, monkeypatch):
+    from app.modules.analytics.stats import ReportStatsService, StatBucket, StatSlice
+
+    summary = StatSlice("by_university", "Распределение строк по вузам", "rows", 2, (StatBucket("МГУ", 2),))
+    monkeypatch.setattr(ReportStatsService, "group_slice", staticmethod(lambda *args, **kwargs: summary))
+    _, doc = _gen(tmp_path, ["university"], [{"university": "МГУ"}], group_by="university")
+    assert list(doc) == ["metadata", "filters", "columns", "rows", "groups", "totals"]
+    assert doc["groups"]["buckets"] == [{"label": "МГУ", "count": 2}]
+
+
 # ------------------------------------------------------------- serialization
 
 

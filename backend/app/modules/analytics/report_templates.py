@@ -32,6 +32,7 @@ from app.core.security import CurrentUser
 from app.models.report_template import ReportTemplate
 from app.modules.analytics.columns import resolve_columns
 from app.modules.analytics.filters import UnifiedFilter
+from app.modules.analytics.report_request import ReportGroupBy
 from app.modules.audit.service import get_audit_db
 from app.schemas.common import ReportFormat
 from app.schemas.errors import ErrorCode
@@ -53,6 +54,7 @@ class ReportTemplateRead(BaseModel):
     format: ReportFormat
     filters: dict[str, Any]
     columns: list[str]
+    group_by: ReportGroupBy | None = None
 
 
 class ReportTemplateCreate(BaseModel):
@@ -61,6 +63,7 @@ class ReportTemplateCreate(BaseModel):
     name: NonBlankText = Field(min_length=1, max_length=256)
     format: ReportFormat
     filters: UnifiedFilter = Field(default_factory=UnifiedFilter)
+    group_by: ReportGroupBy | None = Field(default=None)
     columns: list[str] | None = Field(default=None)
     is_shared: bool = Field(default=False)
 
@@ -70,14 +73,17 @@ def _is_admin(user: CurrentUser) -> bool:
 
 
 def _read_model(tpl: ReportTemplate) -> ReportTemplateRead:
+    filters = dict(tpl.filters or {})
+    group_by = filters.pop("_group_by", None)
     return ReportTemplateRead(
         id=tpl.id,
         name=tpl.name,
         owner_sub=tpl.owner_sub,
         is_shared=bool(tpl.is_shared),
         format=ReportFormat(tpl.format),
-        filters=dict(tpl.filters or {}),
+        filters=filters,
         columns=list(tpl.columns or []),
+        group_by=group_by,
     )
 
 
@@ -105,7 +111,7 @@ def create_template(
         owner_sub=user.id or "",
         is_shared=bool(body.is_shared),
         format=body.format.value,
-        filters=body.filters.model_dump(mode="json"),
+        filters={**body.filters.model_dump(mode="json"), **({"_group_by": body.group_by} if body.group_by else {})},
         columns=resolved,
     )
     if not tpl.name:
