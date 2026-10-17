@@ -15,8 +15,17 @@ from app.core.security import CurrentUser
 from app.db.session import get_db
 from app.modules.assistant.knowledge import get_knowledge
 from app.modules.assistant.provider import Ollama
+from app.modules.assistant.quick_replies import QUICK_REPLIES, QUICK_REPLY_VERSION
 from app.modules.assistant.repository import Conversations
-from app.modules.assistant.schemas import ChatIn, ChatOut, ConversationPage, StatusOut, TurnPage
+from app.modules.assistant.schemas import (
+    ChatIn,
+    ChatOut,
+    ConversationPage,
+    StatusOut,
+    TurnPage,
+    QuickReplyCatalog,
+    QuickReplyOption,
+)
 from app.modules.assistant.service import Assistant
 from app.schemas.errors import ErrorCode, ErrorResponse
 
@@ -35,6 +44,19 @@ def get_assistant() -> Assistant:
 
 
 Engine = Annotated[Assistant, Depends(get_assistant)]
+
+
+@router.get("/quick-replies", response_model=QuickReplyCatalog, summary="Быстрые вопросы помощника")
+def quick_replies(user: User) -> QuickReplyCatalog:
+    """Согласованные вопросы для кнопок. Не обращается к модели, индексу или базе.
+
+    Для ответа отправьте question обычным POST /assistant/chat. Проверки прав,
+    включения помощника, ограничения частоты и приватной истории сохраняются.
+    """
+    return QuickReplyCatalog(
+        version=QUICK_REPLY_VERSION,
+        items=[QuickReplyOption(id=reply.id, question=reply.question) for reply in QUICK_REPLIES],
+    )
 
 
 @router.get("/status", response_model=StatusOut, summary="Готовность помощника")
