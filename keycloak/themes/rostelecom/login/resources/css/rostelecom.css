@@ -346,8 +346,11 @@ html.login-pf,
 }
 
 .rtk-demo-login { border-top: 1px solid #e8e4ef; margin-top: 18px; padding-top: 16px; }
-.rtk-demo-login h2 { color: var(--rtk-ink); font-size: 14px; font-weight: 700; line-height: 1.3; margin: 0; }
+.rtk-demo-button { background: var(--rtk-color-brand-secondary); border: 0; border-radius: 12px; color: #fff; cursor: pointer; font-size: 17px; font-weight: 700; min-height: 54px; width: 100%; }
+.rtk-demo-button:hover { background: color-mix(in srgb, var(--rtk-color-brand-secondary) 85%, black); }
+.rtk-demo-button:focus-visible { outline: 3px solid var(--rtk-color-brand-secondary); outline-offset: 2px; }
 .rtk-demo-roles { display: grid; gap: 8px; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 10px; }
+.rtk-demo-roles[hidden] { display: none; }
 .rtk-demo-role { background: var(--rtk-field); border: 1px solid #e8e4ef; border-radius: 12px; cursor: pointer; display: flex; flex-direction: column; gap: 10px; min-height: 90px; min-width: 0; padding: 10px; position: relative; transition: border-color 150ms ease, background-color 150ms ease; }
 .rtk-demo-role:hover { border-color: var(--rtk-color-brand-secondary); }
 .rtk-demo-role:has(input:checked) { background: color-mix(in srgb, var(--rtk-color-brand-secondary) 6%, white); border-color: var(--rtk-color-brand-secondary); box-shadow: 0 0 0 1px var(--rtk-color-brand-secondary); }

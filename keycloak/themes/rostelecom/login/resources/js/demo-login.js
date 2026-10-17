@@ -5,10 +5,17 @@ document.addEventListener('DOMContentLoaded', () => {
     user: { username: 'user', password: 'user123' },
   };
   const roles = document.getElementById('rtk-demo-roles');
+  const toggle = document.getElementById('rtk-demo-toggle');
   const hint = document.getElementById('rtk-demo-hint');
   const username = document.getElementById('username');
   const password = document.getElementById('password');
-  if (!roles || !username || !password) return;
+  if (!toggle || !roles || !username || !password) return;
+
+  const setRolesOpen = (open) => {
+    roles.hidden = !open;
+    toggle.setAttribute('aria-expanded', String(open));
+  };
+  toggle.addEventListener('click', () => setRolesOpen(roles.hidden));
 
   let filling = false;
   const clearDemoSelection = () => {
@@ -31,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
       username.dispatchEvent(new Event('input', { bubbles: true }));
       password.dispatchEvent(new Event('input', { bubbles: true }));
       filling = false;
+      setRolesOpen(false);
       if (hint) hint.hidden = false;
       document.getElementById('kc-login')?.focus();
     });

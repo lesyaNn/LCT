@@ -36,9 +36,9 @@
                     <@buttons.loginButton />
                 </form>
                 <#if !usernameHidden??>
-                  <section class="rtk-demo-login" aria-labelledby="rtk-demo-title">
-                    <h2 id="rtk-demo-title">Демо-вход</h2>
-                    <div id="rtk-demo-roles" class="rtk-demo-roles" role="radiogroup" aria-label="Демо-роль">
+                  <section class="rtk-demo-login" aria-label="Демо-вход">
+                    <button id="rtk-demo-toggle" class="rtk-demo-button" type="button" aria-expanded="false" aria-controls="rtk-demo-roles">Демо-вход</button>
+                    <div id="rtk-demo-roles" class="rtk-demo-roles" role="radiogroup" aria-label="Демо-роль" hidden>
                       <label class="rtk-demo-role">
                         <input type="radio" name="rtk-demo-role" data-demo-role="admin" />
                         <span class="rtk-demo-role-icon" aria-hidden="true"><i class="fas fa-shield-alt"></i></span>
