@@ -43,6 +43,14 @@ test('contract notifications open documents and license notifications open licen
     '/universities/university-1?tab=licenses');
 });
 
+test('university scope notifications open the university or university list', () => {
+  const item = { entity_id: 'university-1', university_id: 'university-1' };
+  assert.equal(repositoryExports.notificationTarget({ ...item, entity_type: 'university' }),
+    '/universities/university-1');
+  assert.equal(repositoryExports.notificationTarget({ ...item, entity_type: 'universities' }),
+    '/universities');
+});
+
 test('notification targets depend on entity metadata, never message text', () => {
   const item = { entity_id: 'workflow-1', university_id: null, title: 'Совсем другой заголовок' };
   assert.equal(repositoryExports.notificationTarget({ ...item, entity_type: 'workflow' }), '/workflows/workflow-1');

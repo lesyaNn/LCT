@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import uuid
+import logging
 from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.permissions import user_permissions
@@ -25,6 +27,14 @@ EXPIRY_CHECKPOINTS = (30, 14, 7, 1)
 STAGE_CHECKPOINTS = (7, 2, 1)
 
 
+class _UnspecifiedEmail:
+    pass
+
+
+_UNSPECIFIED_EMAIL = _UnspecifiedEmail()
+logger = logging.getLogger("rtk")
+
+
 def _school_label(name: str) -> str:
     return name if "«" in name else f"«{name}»"
 
@@ -33,6 +43,7 @@ def publish(
     db: Session, *, recipient_user_id: str | None, event_key: str, type: str,
     priority: str, title: str, message: str, entity_type: str,
     entity_id: uuid.UUID | str, university_id: uuid.UUID | None = None,
+    recipient_email: str | None | _UnspecifiedEmail = _UNSPECIFIED_EMAIL,
 ) -> bool:
     """Persist one logical notification and its optional email intent atomically."""
     if not recipient_user_id:
@@ -66,12 +77,13 @@ def publish(
         if notification_id is None:
             raise RuntimeError("Notification conflict without an existing row")
     if settings.email_notifications_enabled:
-        # The linked CRM responsible is the local durable address source.
-        address = db.scalar(select(Responsible.email).where(
+        # Explicit addresses are snapshots from the event source. Legacy events
+        # continue to resolve their mailbox through the linked Responsible.
+        address = (db.scalar(select(Responsible.email).where(
             Responsible.keycloak_sub == recipient_user_id
-        ))
+        )) if isinstance(recipient_email, _UnspecifiedEmail) else recipient_email)
         try:
-            address = outbound_email(address) if address else None
+            address = outbound_email(address) if isinstance(address, str) and address else None
         except ValueError:
             address = None
         if address:
@@ -83,9 +95,15 @@ def publish(
                 delivery_stmt = pg_insert(NotificationDelivery).values(**delivery_values)
             else:
                 delivery_stmt = sqlite_insert(NotificationDelivery).values(**delivery_values)
-            db.execute(delivery_stmt.on_conflict_do_nothing(
-                index_elements=["notification_id", "channel"]
-            ))
+            try:
+                # Email is optional: an enqueue failure must not roll back the
+                # notification or its business audit event.
+                with db.begin_nested():
+                    db.execute(delivery_stmt.on_conflict_do_nothing(
+                        index_elements=["notification_id", "channel"]
+                    ))
+            except SQLAlchemyError:
+                logger.warning("email_delivery_enqueue_failed")
     return created
 
 
@@ -121,6 +139,39 @@ def notify_assignment(db: Session, responsible_id: uuid.UUID, university_id: uui
                  f"Вы назначены ответственным за работу с {_school_label(university.name)}."),
         entity_type=entity_type, entity_id=entity_id or university_id,
         university_id=university_id,
+    )
+
+
+def notify_user_university_assignment(
+    db: Session, *, recipient_user_id: str, university_ids: set[uuid.UUID], event_key: str,
+    recipient_email: str | None,
+) -> bool:
+    """Notify the changed Keycloak user once for all universities added in a save."""
+    if not university_ids:
+        return False
+    universities = sorted(db.scalars(select(University).where(
+        University.id.in_(university_ids)
+    )).all(), key=lambda university: (university.name.casefold(), str(university.id)))
+    if len(universities) != len(university_ids):
+        raise ValueError("Assigned university is missing")
+    if len(universities) == 1:
+        university = universities[0]
+        return publish(
+            db, recipient_user_id=recipient_user_id, event_key=event_key,
+            recipient_email=recipient_email,
+            type="user_university_assigned", priority="INFO",
+            title="Вам назначен новый ВУЗ",
+            message=f"Вам предоставлен доступ к ВУЗу {_school_label(university.name)}.",
+            entity_type="university", entity_id=university.id, university_id=university.id,
+        )
+    names = "\n".join(f"• {university.name}" for university in universities)
+    return publish(
+        db, recipient_user_id=recipient_user_id, event_key=event_key,
+        recipient_email=recipient_email,
+        type="user_university_assigned", priority="INFO",
+        title="Вам назначены новые ВУЗы",
+        message=f"Вам предоставлен доступ к {len(universities)} ВУЗам:\n{names}",
+        entity_type="universities", entity_id=recipient_user_id,
     )
 
 

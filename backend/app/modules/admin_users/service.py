@@ -13,6 +13,8 @@ from app.models.catalog import University
 from app.modules.admin_users.keycloak_client import KeycloakAdminClient
 from app.modules.admin_users.schemas import AdminUserOut, AdminUsersPage, UserInvite, UserScope, UserUpdate
 from app.modules.audit.service import AuditAction, AuditService, context_for
+from app.modules.audit.models import AuditEvent
+from app.modules.notifications import service as notification_service
 from app.schemas.errors import ErrorCode
 
 PUBLIC_ROLES = ("admin", "manager", "user")
@@ -171,17 +173,18 @@ def _target_display_name(user: dict | None, fallback: str = "") -> str | None:
 
 
 def _audit(db: Session, actor: CurrentUser, target_id: str, kind: str, before=None, after=None,
-           target_name: str | None = None) -> None:
+           target_name: str | None = None, *, flush: bool = False) -> AuditEvent:
     old_value: dict = {"audit_object_type": "user", "kind": kind, "value": before}
     new_value: dict = {"audit_object_type": "user", "kind": kind, "value": after}
     if target_name:
         old_value["target_name"] = target_name
         new_value["target_name"] = target_name
-    AuditService(db).log_event(
+    return AuditService(db).log_event(
         context=context_for(db, actor.id), action=AuditAction.ADMIN_CONFIG,
         entity_type="config", entity_id=uuid.UUID(target_id),
         old_value=old_value,
         new_value=new_value,
+        flush=flush,
     )
 
 
@@ -215,6 +218,7 @@ def update_user(db: Session, kc: KeycloakAdminClient, actor: CurrentUser,
     if old_role == "admin" and change.role != "admin":
         _last_admin_guard(db, kc, before, old_role)
     old_attributes = dict(before.get("attributes") or {})
+    old_university_ids = set(_scope(before, "user").university_ids)
     next_attributes = dict(old_attributes)
     next_attributes["university_ids"] = [str(value) for value in change.scope.university_ids]
     if change.scope.kind != "all":
@@ -259,8 +263,16 @@ def update_user(db: Session, kc: KeycloakAdminClient, actor: CurrentUser,
     if role_changed:
         _audit(db, actor, user_id, "role", old_role, change.role, target_name)
     if scope_changed:
-        _audit(db, actor, user_id, "scope", old_attributes.get("university_ids", []),
-               next_attributes["university_ids"], target_name)
+        scope_event = _audit(db, actor, user_id, "scope",
+                             old_attributes.get("university_ids", []),
+                             next_attributes["university_ids"], target_name, flush=True)
+        added_ids = set(change.scope.university_ids) - old_university_ids
+        if added_ids:
+            notification_service.notify_user_university_assignment(
+                db, recipient_user_id=user_id, university_ids=added_ids,
+                recipient_email=before.get("email"),
+                event_key=f"user-university-assigned:{scope_event.id}",
+            )
     db.commit()
     result = _dto({**before, "attributes": next_attributes}, change.role)
     return result.model_copy(update={"scope": manager_response_scope}) if manager_response_scope else result

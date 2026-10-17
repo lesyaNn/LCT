@@ -29,6 +29,7 @@ export const notificationsRepository = {
 export function notificationTarget(item: Notification): string | null {
   if (item.entity_type === 'workflow' && item.entity_id) return `/workflows/${encodeURIComponent(item.entity_id)}`;
   if (item.entity_type === 'university' && item.entity_id) return `/universities/${encodeURIComponent(item.entity_id)}`;
+  if (item.entity_type === 'universities') return '/universities';
   if (item.entity_type === 'contract' && item.university_id) return `/universities/${encodeURIComponent(item.university_id)}?tab=documents`;
   if (item.entity_type === 'license' && item.university_id) return `/universities/${encodeURIComponent(item.university_id)}?tab=licenses`;
   if (item.entity_type === 'import_job') return '/admin/import';
@@ -37,6 +38,7 @@ export function notificationTarget(item: Notification): string | null {
 
 const presentationTypes: Record<string, NotificationType> = {
   assignment: 'workflow',
+  user_university_assigned: 'workflow',
   workflow_stage_changed: 'stage',
   workflow_rollback: 'workflow',
   overdue: 'stage',
