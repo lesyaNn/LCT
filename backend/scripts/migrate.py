@@ -98,6 +98,7 @@ EXPECTED_TABLES = [
     "teacher_qualifications",
     "program_education_stats",
     "notifications",
+    "notification_deliveries",
     "assistant_conversations",
     "assistant_turns",
 ]

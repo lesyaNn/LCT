@@ -1,4 +1,4 @@
-"""The production worker drains the audit outbox alongside report jobs.
+"""The worker keeps its independent jobs running when another job fails.
 
 The daily health-score snapshot that used to sit in front of the job loop was
 removed with the health-score entity (migration 000029). Its import raised
@@ -6,6 +6,8 @@ removed with the health-score entity (migration 000029). Its import raised
 iteration of report processing between 00:00 and 00:04. The last test here
 pins that a failure of the surrounding bookkeeping can no longer stop jobs.
 """
+
+import pytest
 
 from app.modules.analytics import report_worker
 
@@ -55,3 +57,47 @@ def test_job_iteration_always_runs_even_when_bookkeeping_fails(monkeypatch):
 
     assert report_worker.main(["--once"]) == 0
     assert calls == ["jobs"], "the job loop must run on every iteration"
+
+
+@pytest.mark.parametrize("failing_task", ["audit", "notifications", "email", "jobs"])
+def test_worker_task_failure_does_not_block_other_tasks(monkeypatch, failing_task):
+    calls = []
+
+    def task(name):
+        def run():
+            calls.append(name)
+            if name == failing_task:
+                raise RuntimeError(f"{name} unavailable")
+        return run
+
+    monkeypatch.setattr(report_worker, "run_audit_relay_once", task("audit"))
+    monkeypatch.setattr(report_worker, "run_notification_scan_once", task("notifications"))
+    monkeypatch.setattr(report_worker, "run_email_delivery_once", task("email"))
+    monkeypatch.setattr(report_worker, "run_worker_once", task("jobs"))
+
+    assert report_worker.main(["--once"]) == 0
+    assert calls == ["audit", "notifications", "email", "jobs"]
+
+
+def test_health_snapshot_failure_does_not_stop_next_worker_iteration(monkeypatch):
+    from app.modules.health_score import history
+
+    calls = []
+    monkeypatch.setattr(report_worker, "run_audit_relay_once", lambda: calls.append("audit"))
+    monkeypatch.setattr(report_worker, "run_notification_scan_once", lambda: calls.append("notifications"))
+    monkeypatch.setattr(report_worker, "run_email_delivery_once", lambda: calls.append("email"))
+    monkeypatch.setattr(report_worker, "run_worker_once", lambda: calls.append("jobs"))
+
+    def failed_snapshot(_now):
+        calls.append("health")
+        raise RuntimeError("health unavailable")
+
+    monkeypatch.setattr(history, "record_daily_observations", failed_snapshot)
+
+    def stop_after_first_iteration(_seconds):
+        raise StopIteration
+
+    monkeypatch.setattr(report_worker.time, "sleep", stop_after_first_iteration)
+    with pytest.raises(StopIteration):
+        report_worker.main([])
+    assert calls == ["audit", "notifications", "email", "jobs", "health"]

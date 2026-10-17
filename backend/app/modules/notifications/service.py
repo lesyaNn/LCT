@@ -1,8 +1,4 @@
-"""Business-event projection into recipient-specific in-app deliveries.
-
-Call ``publish`` before the caller's commit. A later email adapter can consume
-the same event arguments without changing workflow or import decisions.
-"""
+"""Business-event projection into recipient-specific notifications and channels."""
 
 from __future__ import annotations
 
@@ -17,9 +13,12 @@ from sqlalchemy.orm import Session
 from app.core.permissions import user_permissions
 from app.core.policies import get_data_scope
 from app.core.security import CurrentUser
+from app.config import settings
 from app.models.catalog import Contract, License, Responsible, University, UniversityResponsible
 from app.models.notification import Notification
+from app.models.notification_delivery import NotificationDelivery
 from app.models.workflow_instances import InstanceStage, WorkflowInstance, WorkflowTask
+from app.modules.notifications.address import outbound_email
 from app.services.license_status import derive_contract_status
 
 EXPIRY_CHECKPOINTS = (30, 14, 7, 1)
@@ -35,7 +34,7 @@ def publish(
     priority: str, title: str, message: str, entity_type: str,
     entity_id: uuid.UUID | str, university_id: uuid.UUID | None = None,
 ) -> bool:
-    """Idempotent in-app delivery; never commits the business transaction."""
+    """Persist one logical notification and its optional email intent atomically."""
     if not recipient_user_id:
         return False
     if priority not in {"INFO", "WARNING", "CRITICAL"}:
@@ -57,7 +56,37 @@ def publish(
         )
     else:
         raise RuntimeError(f"Unsupported notification database: {dialect}")
-    return db.execute(stmt.returning(Notification.id)).scalar_one_or_none() is not None
+    notification_id = db.execute(stmt.returning(Notification.id)).scalar_one_or_none()
+    created = notification_id is not None
+    if notification_id is None:
+        notification_id = db.scalar(select(Notification.id).where(
+            Notification.recipient_user_id == recipient_user_id,
+            Notification.event_key == event_key,
+        ))
+        if notification_id is None:
+            raise RuntimeError("Notification conflict without an existing row")
+    if settings.email_notifications_enabled:
+        # The linked CRM responsible is the local durable address source.
+        address = db.scalar(select(Responsible.email).where(
+            Responsible.keycloak_sub == recipient_user_id
+        ))
+        try:
+            address = outbound_email(address) if address else None
+        except ValueError:
+            address = None
+        if address:
+            delivery_values = dict(
+                id=uuid.uuid4(), notification_id=notification_id, channel="email",
+                recipient=address, status="pending", attempts=0,
+            )
+            if dialect == "postgresql":
+                delivery_stmt = pg_insert(NotificationDelivery).values(**delivery_values)
+            else:
+                delivery_stmt = sqlite_insert(NotificationDelivery).values(**delivery_values)
+            db.execute(delivery_stmt.on_conflict_do_nothing(
+                index_elements=["notification_id", "channel"]
+            ))
+    return created
 
 
 def recipient_for_responsible(db: Session, responsible_id: uuid.UUID | None) -> str | None:
