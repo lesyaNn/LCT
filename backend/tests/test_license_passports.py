@@ -200,6 +200,11 @@ def test_pdf_a4_embedded_cyrillic_full_text_and_verification_link(long):
     for expected in (data.university_name, data.product_name, data.license_number, data.contract_number):
         assert "".join(expected.split()) in text
     assert "ПАСПОРТЛИЦЕНЗИИ" in text
+    assert "Проверка:" in text
+    assert data.verification_url in text
+    for certificate_page in pdf.pages:
+        links = [a.get_object()["/A"]["/URI"] for a in certificate_page["/Annots"]]
+        assert links.count(data.verification_url) >= 2  # QR and visible clickable URL
     assert page["/Annots"][0].get_object()["/A"]["/URI"] == data.verification_url
     assert any("/FontFile2" in font.get_object().get("/FontDescriptor", {})
                for font in page["/Resources"]["/Font"].values())

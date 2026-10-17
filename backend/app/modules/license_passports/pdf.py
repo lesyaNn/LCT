@@ -44,6 +44,16 @@ def generate_passport_pdf(data: LicensePassport) -> bytes:
     buffer = io.BytesIO()
     w, h = A4
     left, width = 48, w - 96
+    safe_url = escape(data.verification_url, {'"': '&quot;'})
+    verification_link = Paragraph(
+        f'Проверка: <link href="{safe_url}" color="#7700FF">'
+        f'<u>{escape(data.verification_url)}</u></link>',
+        ParagraphStyle("verification-link", fontName=FONT_REGULAR, fontSize=8,
+                       leading=11, textColor=MUTED, splitLongWords=True),
+    )
+    _, link_height = verification_link.wrap(width, h)
+    # Reserve additional space above the footer for unusually long hostnames.
+    verification_shift = max(0, link_height - 22)
 
     def decorate(canvas, document):
         def draw(text, x, top, available_width, size=11, **kwargs):
@@ -75,7 +85,7 @@ def generate_passport_pdf(data: LicensePassport) -> bytes:
         canvas.line(left, h - (247 if first else 200), w - left, h - (247 if first else 200))
 
         canvas.setStrokeColor(LINE)
-        canvas.line(left, 225, w - left, 225)
+        canvas.line(left, 225 + verification_shift, w - left, 225 + verification_shift)
         # Black vector QR with a four-module quiet zone, approximately 36 mm wide.
         qr = QrCodeWidget(data.verification_url, barLevel="M", barBorder=4)
         bounds = qr.getBounds()
@@ -83,20 +93,22 @@ def generate_passport_pdf(data: LicensePassport) -> bytes:
         scale = qr_size / (bounds[2] - bounds[0])
         drawing = Drawing(qr_size, qr_size, transform=[scale, 0, 0, scale, 0, 0])
         drawing.add(qr)
-        renderPDF.draw(drawing, canvas, left - 7, 105)
-        canvas.linkURL(data.verification_url, (left - 7, 105, left - 7 + qr_size, 209), relative=0)
+        renderPDF.draw(drawing, canvas, left - 7, 105 + verification_shift)
+        canvas.linkURL(data.verification_url, (left - 7, 105 + verification_shift,
+                       left - 7 + qr_size, 209 + verification_shift), relative=0)
         x = left + 120
-        draw("ПРОВЕРКА ПОДЛИННОСТИ", x, 204, width - 120, 9, bold=True)
-        draw("Отсканируйте QR-код для проверки подлинности лицензии", x, 183, width - 120, 10)
-        draw("Идентификатор лицензии", x, 144, width - 120, 8, color=MUTED)
-        draw(str(data.license_id), x, 130, width - 120, 8)
+        draw("ПРОВЕРКА ПОДЛИННОСТИ", x, 204 + verification_shift, width - 120, 9, bold=True)
+        draw("Отсканируйте QR-код для проверки подлинности лицензии", x, 183 + verification_shift, width - 120, 10)
+        draw("Идентификатор лицензии", x, 144 + verification_shift, width - 120, 8, color=MUTED)
+        draw(str(data.license_id), x, 130 + verification_shift, width - 120, 8)
+        verification_link.drawOn(canvas, left, 101 + verification_shift - link_height)
         draw("QR-код сверяет сведения с CRM. Документ не заменяет договор и электронную подпись.",
-             left, 94, width, 7.5, color=MUTED)
+             left, 69, width, 7.5, color=MUTED)
         canvas.setStrokeColor(LINE)
-        canvas.line(left, 64, w - left, 64)
-        draw(data.passport_number, left, 54, width * .6, 7, color=MUTED)
+        canvas.line(left, 52, w - left, 52)
+        draw(data.passport_number, left, 43, width * .6, 7, color=MUTED)
         draw(f"{data.generated_at:%d.%m.%Y %H:%M} UTC · {canvas.getPageNumber()}", left + width * .62,
-             54, width * .38, 7, color=MUTED)
+             43, width * .38, 7, color=MUTED)
 
     def label(value):
         return _paragraph(value, 8, color=MUTED, after=5)
@@ -136,7 +148,7 @@ def generate_passport_pdf(data: LicensePassport) -> bytes:
     )
     document.addPageTemplates([
         PageTemplate(id=name, onPage=decorate, autoNextPageTemplate="continuation", frames=[
-            Frame(left, 244, width, h - top - 244, leftPadding=0, rightPadding=0,
+            Frame(left, 244 + verification_shift, width, h - top - 244 - verification_shift, leftPadding=0, rightPadding=0,
                   topPadding=0, bottomPadding=0),
         ]) for name, top in (("first", 264), ("continuation", 217))
     ])
