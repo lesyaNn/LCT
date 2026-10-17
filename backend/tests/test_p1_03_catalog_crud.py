@@ -631,6 +631,8 @@ def test_vendor_contacts_are_editable_and_visible_through_product(client):
 
 def test_passport_documents_filter_and_authenticated_download(client, db, tmp_path, monkeypatch):
     from app.models.interactions import Document
+    from app.modules.audit.models import AuditEvent
+    from sqlalchemy import select
     from app.modules.workflow_attachments.router import get_storage
     from app.modules.workflow_attachments.storage import LocalStorageBackend
 
@@ -656,6 +658,11 @@ def test_passport_documents_filter_and_authenticated_download(client, db, tmp_pa
         uploaded = client.post(base, data={"document_type": "act", "title": "Новый акт"}, files={"file": ("act.pdf", b"act bytes", "application/pdf")})
         assert uploaded.status_code == 201, uploaded.text
         assert uploaded.json()["file_available"] is True
+        audit = db.scalar(select(AuditEvent).where(
+            AuditEvent.entity_id == uuid.UUID(uploaded.json()["id"]),
+        ))
+        assert audit is not None and audit.action == "CREATE"
+        assert audit.university_id == uuid.UUID(university["id"])
         assert client.get(f"{base}/{uploaded.json()['id']}/download").content == b"act bytes"
         assert client.get(base, params={"document_type": "act"}).json()["total"] == 1
     finally:

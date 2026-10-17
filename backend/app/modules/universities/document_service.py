@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import BusinessException
 from app.models.interactions import Document
+from app.modules.audit.service import AuditAction, AuditService, context_for
 from app.modules.workflow_attachments.policy import (
     MAX_FILE_SIZE_BYTES, UPLOAD_CHUNK_SIZE_BYTES, check_file_type,
     sanitize_filename,
@@ -42,6 +43,13 @@ def create_document(
             uploaded_by_keycloak_sub=actor_sub,
         )
         db.add(document)
+        db.flush()
+        AuditService(db).log_event(
+            context=context_for(db, actor_sub), action=AuditAction.CREATE,
+            entity_type="document", entity_id=document.id,
+            university_id=university_id,
+            new_value={"document_type": document_type, "title": document.title},
+        )
         db.commit()
         db.refresh(document)
         return document
