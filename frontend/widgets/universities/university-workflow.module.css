@@ -173,7 +173,7 @@
 .stageActionButtons { display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); }
 .confirmContent { display: flex; flex-direction: column; gap: var(--rtk-space-4); }
 .confirmContent p { margin: 0; }
-.stageAction span { color: var(--rtk-color-text-tertiary); font-size: 11px; }
+.stageAction > span { color: var(--rtk-color-text-tertiary); font-size: 11px; }
 .toastViewport { bottom: var(--rtk-space-5); display: flex; flex-direction: column; gap: var(--rtk-space-2); max-height: calc(100vh - 2 * var(--rtk-space-5)); max-width: min(420px, calc(100vw - 2 * var(--rtk-space-5))); overflow-y: auto; pointer-events: none; position: fixed; right: var(--rtk-space-5); z-index: 140; }
 .toastViewport > * { pointer-events: auto; }
 .emptyState { align-items: center; color: var(--rtk-color-text-secondary); display: flex; flex-direction: column; gap: var(--rtk-space-2); justify-content: center; min-height: 240px; text-align: center; }

@@ -41,6 +41,12 @@
 .agendaHeader > div, .agendaQuestionHeading > div { flex: 1 1 260px; min-width: 0; }
 .agendaHeader h2 { font-size: 18px; letter-spacing: -.02em; margin: 0; }
 .agendaHeader p, .agendaQuestionHeading p, .agendaDate { color: var(--rtk-color-text-secondary); font-size: 12px; line-height: 1.45; margin: var(--rtk-space-1) 0 0; }
+.agendaPdfAction { align-items: flex-start; display: flex; flex-direction: column; gap: var(--rtk-space-1); max-width: 100%; }
+.agendaPdfAction button { white-space: nowrap; }
+.agendaDetails { border-top: 1px solid var(--rtk-color-border); min-width: 0; padding-top: var(--rtk-space-3); }
+.agendaDetails summary { color: var(--rtk-color-brand); cursor: pointer; font-size: 12px; font-weight: 700; }
+.agendaDetails summary:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
+.agendaDetails > :not(summary) { margin-top: var(--rtk-space-4); }
 .agendaSelector { color: var(--rtk-color-text-secondary); display: flex; flex-direction: column; font-size: 12px; font-weight: 600; gap: var(--rtk-space-1); max-width: 360px; }
 .agendaGroup { border-top: 1px solid var(--rtk-color-border); display: flex; flex-direction: column; gap: var(--rtk-space-3); padding-top: var(--rtk-space-4); }
 .agendaGroup h3 { font-size: 15px; margin: 0; }
@@ -89,6 +95,7 @@
   .assignmentActions { flex-direction: column-reverse; }
   .assignmentActions button { width: 100%; }
   .meetingSurface { padding: var(--rtk-space-4); }
+  .agendaPdfAction, .agendaPdfAction button { width: 100%; }
   .agendaTopics { grid-template-columns: 1fr; }
 }
 @media (max-width: 420px) {

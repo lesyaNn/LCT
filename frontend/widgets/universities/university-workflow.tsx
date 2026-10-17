@@ -19,7 +19,7 @@ import { hasPermission } from '@/shared/lib/access-control';
 import type { WorkflowTransitionTarget } from '@/shared/lib/workflow-transition';
 import { formatDateRu, formatDateTimeRu, getRelativeDueDateRu } from '@/shared/lib/formatters';
 import { workflowStageStatusSemantics, type WorkflowStageIcon } from '@/shared/lib/status-semantics';
-import { completeWorkflowInstance, getApiUniversityWorkflow, getUniversityResponsibles, getUniversityWorkflow, getWorkflowAllowedTransitions, getWorkflowRollbackTargets, isRealWorkflowMode, listWorkflowTasksPage, universityResponsiblesQueryKey, updateWorkflowResponsible, updateWorkflowStageResponsible, updateWorkflowStageDueDate, workflowQueryKey, type UniversityWorkflow, type UniversityWorkflowAttachment, type UniversityWorkflowStage, type UniversityWorkflowStageStatus, type UniversityWorkflowTask } from '@/shared/lib/universities-repository';
+import { completeWorkflowInstance, getApiUniversityWorkflow, getUniversityResponsibles, getUniversityWorkflow, getWorkflowAllowedTransitions, getWorkflowRollbackTargets, isMeetingAgendaStage, isRealWorkflowMode, listWorkflowTasksPage, universityResponsiblesQueryKey, updateWorkflowResponsible, updateWorkflowStageResponsible, updateWorkflowStageDueDate, workflowQueryKey, type UniversityWorkflow, type UniversityWorkflowAttachment, type UniversityWorkflowStage, type UniversityWorkflowStageStatus, type UniversityWorkflowTask } from '@/shared/lib/universities-repository';
 import { queryKeys } from '@/shared/lib/query-keys';
 import { invalidateWorkflowRelatedQueries } from '@/shared/lib/workflow-cache';
 import { workflowAttachmentFromApi } from '@/shared/lib/workflow-attachments';
@@ -41,6 +41,7 @@ import { ListSkeleton, Skeleton, SkeletonGroup } from '@/shared/ui/skeleton';
 import { Toast } from '@/shared/ui/rtk/toast';
 import { Modal } from '@/shared/ui/rtk/modal';
 import { WorkflowComments } from './workflow-comments';
+import { MeetingAgendaPdfAction } from './workflow-meeting-agenda';
 import { WorkflowStageTasks } from './workflow-stage-tasks';
 import { AttachmentRow, WorkflowAttachments } from './workflow-attachments';
 import { WorkflowCreateModal } from './workflow-create-modal';
@@ -138,7 +139,7 @@ function getStageActions(stage: UniversityWorkflowStage, canAdvance: boolean, ca
   return actions;
 }
 
-function StageActionPanel({ stage, stages, instanceId, universityId, userId, canManage, allowedTargets, rollbackTargets, onTransitionOpen, onTransitionClose, onTransitionSuccess, onNotify }: { stage: UniversityWorkflowStage; stages: UniversityWorkflowStage[]; instanceId: string; universityId?: string | null; userId?: string | null; canManage: boolean; allowedTargets?: WorkflowTransitionTarget[]; rollbackTargets?: WorkflowTransitionTarget[]; onTransitionOpen: () => void; onTransitionClose: () => void; onTransitionSuccess: () => void; onNotify: (notification: WorkflowTransitionNotification) => void }) {
+function StageActionPanel({ stage, stages, instanceId, universityId, userId, canManage, agendaAvailable, allowedTargets, rollbackTargets, onTransitionOpen, onTransitionClose, onTransitionSuccess, onNotify }: { stage: UniversityWorkflowStage; stages: UniversityWorkflowStage[]; instanceId: string; universityId?: string | null; userId?: string | null; canManage: boolean; agendaAvailable: boolean; allowedTargets?: WorkflowTransitionTarget[]; rollbackTargets?: WorkflowTransitionTarget[]; onTransitionOpen: () => void; onTransitionClose: () => void; onTransitionSuccess: () => void; onNotify: (notification: WorkflowTransitionNotification) => void }) {
   const [transitionContext, setTransitionContext] = useState<{ currentStage: UniversityWorkflowStage; stages: UniversityWorkflowStage[] } | null>(null);
   const [rollbackContext, setRollbackContext] = useState<{ currentStage: UniversityWorkflowStage; stages: UniversityWorkflowStage[] } | null>(null);
   const [completeOpen, setCompleteOpen] = useState(false);
@@ -163,12 +164,12 @@ function StageActionPanel({ stage, stages, instanceId, universityId, userId, can
   const actions = getStageActions(stage, canManage && !isFinalStage && (allowedTargets === undefined || allowedTargets.length > 0), canManage && (rollbackTargets === undefined || rollbackTargets.length > 0));
   const transitionAction = actions.find((action) => action.label.startsWith('Перевести'));
   const rollbackAction = actions.find((action) => action.label.startsWith('Вернуть'));
-  if (!actions.length && !isFinalStage && !transitionContext && !rollbackContext) return null;
+  if (!actions.length && !isFinalStage && !agendaAvailable && !transitionContext && !rollbackContext) return null;
   return <div className={styles.stageAction} aria-label="Действия этапа"><div className={styles.stageActionButtons}>{actions.map((action) => {
     const openTransition = action === transitionAction;
     const openRollback = action === rollbackAction;
     return <Button key={action.label} variant={action.variant} size="s" type="button" onClick={() => { onTransitionOpen(); if (openTransition) setTransitionContext({ currentStage: stage, stages }); if (openRollback) setRollbackContext({ currentStage: stage, stages }); }}>{action.label}</Button>;
-  })}{isFinalStage ? <Button variant="primary" size="s" type="button" onClick={() => setCompleteOpen(true)}>Завершить Workflow</Button> : null}</div>{actions.length ? <span>Комментарий и подтверждение обязательны для перехода.</span> : null}{completeOpen ? <Modal title="Завершить Workflow?" onClose={() => { if (!complete.isPending) setCompleteOpen(false); }}><div className={styles.confirmContent}><p>После завершения Workflow перейдёт в состояние «Завершён». История и материалы сохранятся.</p><div className={styles.stageActionButtons}><Button variant="ghost" size="s" type="button" disabled={complete.isPending} onClick={() => setCompleteOpen(false)}>Отмена</Button><Button variant="primary" size="s" type="button" loading={complete.isPending} disabled={complete.isPending} onClick={() => complete.mutate()}>Завершить Workflow</Button></div></div></Modal> : null}{transitionContext ? <WorkflowTransitionModal open instanceId={instanceId} universityId={universityId} currentStage={transitionContext.currentStage} stages={transitionContext.stages} allowedTargets={allowedTargets} userId={userId} onClose={() => { setTransitionContext(null); onTransitionClose(); }} onSuccess={() => { setTransitionContext(null); onTransitionSuccess(); }} onNotify={onNotify} /> : null}{rollbackContext ? <WorkflowRollbackModal open instanceId={instanceId} universityId={universityId} currentStage={rollbackContext.currentStage} stages={rollbackContext.stages} allowedTargets={rollbackTargets} userId={userId} onClose={() => { setRollbackContext(null); onTransitionClose(); }} onSuccess={() => { setRollbackContext(null); onTransitionSuccess(); }} onNotify={onNotify} /> : null}</div>;
+  })}{isFinalStage ? <Button variant="primary" size="s" type="button" onClick={() => setCompleteOpen(true)}>Завершить Workflow</Button> : null}{agendaAvailable ? <MeetingAgendaPdfAction instanceId={instanceId} placement="workflow" /> : null}</div>{actions.length ? <span>Комментарий и подтверждение обязательны для перехода.</span> : null}{completeOpen ? <Modal title="Завершить Workflow?" onClose={() => { if (!complete.isPending) setCompleteOpen(false); }}><div className={styles.confirmContent}><p>После завершения Workflow перейдёт в состояние «Завершён». История и материалы сохранятся.</p><div className={styles.stageActionButtons}><Button variant="ghost" size="s" type="button" disabled={complete.isPending} onClick={() => setCompleteOpen(false)}>Отмена</Button><Button variant="primary" size="s" type="button" loading={complete.isPending} disabled={complete.isPending} onClick={() => complete.mutate()}>Завершить Workflow</Button></div></div></Modal> : null}{transitionContext ? <WorkflowTransitionModal open instanceId={instanceId} universityId={universityId} currentStage={transitionContext.currentStage} stages={transitionContext.stages} allowedTargets={allowedTargets} userId={userId} onClose={() => { setTransitionContext(null); onTransitionClose(); }} onSuccess={() => { setTransitionContext(null); onTransitionSuccess(); }} onNotify={onNotify} /> : null}{rollbackContext ? <WorkflowRollbackModal open instanceId={instanceId} universityId={universityId} currentStage={rollbackContext.currentStage} stages={rollbackContext.stages} allowedTargets={rollbackTargets} userId={userId} onClose={() => { setRollbackContext(null); onTransitionClose(); }} onSuccess={() => { setRollbackContext(null); onTransitionSuccess(); }} onNotify={onNotify} /> : null}</div>;
 }
 
 function CompletionSummary({ stage }: { stage: UniversityWorkflowStage }) {
@@ -205,10 +206,12 @@ function WorkflowHistorySection({ idPrefix, instanceId, events, stages, userId, 
 }
 
 function WorkflowStageDetails({ stage, stages, workflow, instanceId, universityId, userId, canManage, idPrefix, onTransitionOpen, onTransitionClose, onTransitionSuccess, onNotify, tasksState, attachmentsState, historyState, historyEvents, historyActorName, allowedTargets, rollbackTargets }: { stage: UniversityWorkflowStage; stages: UniversityWorkflowStage[]; workflow: UniversityWorkflow; instanceId: string; universityId?: string | null; userId?: string | null; canManage: boolean; idPrefix: string; onTransitionOpen: () => void; onTransitionClose: () => void; onTransitionSuccess: () => void; onNotify: (notification: WorkflowTransitionNotification) => void; tasksState?: WorkflowResourceState; attachmentsState?: WorkflowResourceState; historyState?: WorkflowResourceState; historyEvents: WorkflowHistoryEvent[]; historyActorName?: string; allowedTargets?: WorkflowTransitionTarget[]; rollbackTargets?: WorkflowTransitionTarget[] }) {
+  const { user } = useAuth();
   const semantics = workflowStageStatusSemantics[stage.status];
   const headingId = `${idPrefix}-stage-details-title`;
   const activeStage = workflow.currentStage?.id === stage.id && (stage.status === 'current' || stage.status === 'overdue');
   const editableStage = canManage && activeStage && isRealWorkflowMode();
+  const agendaAvailable = activeStage && workflow.status === 'active' && workflow.universityId === universityId && isRealWorkflowMode() && hasPermission(user, 'workflow.read') && isMeetingAgendaStage(stage.orderIndex, stage.templateStageId, stage.name);
   const hasFacts = Boolean(stage.deadline || stage.responsible || stage.startedAt || stage.completedAt);
   return (
     <section className={`${styles.detailPanel} ${styles[`detail-${stage.status}`]}`} aria-labelledby={headingId} id={idPrefix}>
@@ -225,7 +228,7 @@ function WorkflowStageDetails({ stage, stages, workflow, instanceId, universityI
       <WorkflowComments instanceId={instanceId} stageId={stage.templateStageId ?? stage.id} comments={stage.comments} readOnly={!canManage || !activeStage} onNotify={onNotify} />
       {attachmentsState?.loading ? <ListSkeleton items={2} /> : attachmentsState?.error ? <ErrorState title="Не удалось загрузить вложения" headingLevel={3} onRetry={attachmentsState.retry} /> : stage.attachments.length ? <><WorkflowAttachments instanceId={instanceId} stageId={stage.id} attachments={stage.attachments} uploadEnabled={false} readOnly={!canManage || !activeStage} onNotify={onNotify} />{attachmentsState?.hasMore ? <Button variant="ghost" size="s" type="button" loading={attachmentsState.loadingMore} onClick={attachmentsState.loadMore}>Загрузить ещё вложения</Button> : null}</> : null}
       <WorkflowHistorySection idPrefix={idPrefix} instanceId={instanceId} events={historyEvents} stages={stages} userId={userId ?? undefined} userName={historyActorName} state={historyState} />
-      <StageActionPanel stage={stage} stages={stages} instanceId={instanceId} universityId={universityId} userId={userId} canManage={editableStage} allowedTargets={allowedTargets} rollbackTargets={rollbackTargets} onTransitionOpen={onTransitionOpen} onTransitionClose={onTransitionClose} onTransitionSuccess={onTransitionSuccess} onNotify={onNotify} />
+      <StageActionPanel stage={stage} stages={stages} instanceId={instanceId} universityId={universityId} userId={userId} canManage={editableStage} agendaAvailable={agendaAvailable} allowedTargets={allowedTargets} rollbackTargets={rollbackTargets} onTransitionOpen={onTransitionOpen} onTransitionClose={onTransitionClose} onTransitionSuccess={onTransitionSuccess} onNotify={onNotify} />
     </section>
   );
 }

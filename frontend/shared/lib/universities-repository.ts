@@ -764,6 +764,12 @@ export interface MeetingAgenda {
 
 export const meetingAgendaQueryKey = (instanceId: string) => [...workflowQueryKey(instanceId), 'meeting-agenda'] as const;
 
+// Templates have no stage-kind field. Match the documented meeting-stage wording,
+// runtime position and template anchor, so an unrelated third stage is excluded.
+export function isMeetingAgendaStage(orderIndex: number, templateStageId: string | null | undefined, name: string): boolean {
+  return orderIndex === 3 && Boolean(templateStageId) && /^организация встречи с (?:представителями )?вуз(?:а|ом)$/iu.test(name.trim());
+}
+
 export async function getMeetingAgenda(instanceId: string, signal?: AbortSignal): Promise<MeetingAgenda> {
   return unwrapApiResult(await apiFetch<MeetingAgenda>(`/api/v1/workflow/instances/${encodeURIComponent(instanceId)}/meeting-agenda`, { signal }));
 }

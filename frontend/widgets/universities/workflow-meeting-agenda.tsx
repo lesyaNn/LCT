@@ -1,14 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import DocumentText from '@atomaro/icons/24/document/DocumentText';
+import ArrowRight from '@atomaro/icons/24/navigation/ArrowRight';
 import { useAuth } from '@/shared/auth/AuthProvider';
 import { hasPermission, hasRole } from '@/shared/lib/access-control';
 import { normalizeApiError } from '@/shared/lib/api-errors';
 import { downloadBlob } from '@/shared/lib/download-blob';
 import { formatDateRu, formatDateTimeRu } from '@/shared/lib/formatters';
 import { queryKeys } from '@/shared/lib/query-keys';
-import { createWorkflowComment, downloadMeetingAgenda, getMeetingAgenda, isRealWorkflowMode, listWorkflowCommentsPage, meetingAgendaQueryKey, updateWorkflowQuestionStatus, workflowCommentsQueryKey, type WorkflowCommentApiRecord } from '@/shared/lib/universities-repository';
+import { createWorkflowComment, downloadMeetingAgenda, getMeetingAgenda, isMeetingAgendaStage, isRealWorkflowMode, listWorkflowCommentsPage, meetingAgendaQueryKey, updateWorkflowQuestionStatus, workflowCommentsQueryKey, type WorkflowCommentApiRecord } from '@/shared/lib/universities-repository';
 import { listUniversityWorkflowInstances, universityWorkflowInstancesQueryKey } from '@/shared/lib/workflow-creation-repository';
 import { Button } from '@/shared/ui/rtk/button';
 import { Select } from '@/shared/ui/rtk/form-controls';
@@ -18,12 +20,35 @@ import { ListSkeleton } from '@/shared/ui/skeleton';
 import { CommentEditor } from './workflow-comments';
 import styles from './university-passport-sections.module.css';
 
+export function MeetingAgendaPdfAction({ instanceId, placement }: { instanceId: string; placement: 'meetings' | 'workflow' }) {
+  const requestInFlight = useRef(false);
+  const download = useMutation({
+    mutationFn: (id: string) => downloadMeetingAgenda(id),
+    onSuccess: (blob, id) => downloadBlob(blob, `meeting-agenda-${id}.pdf`),
+    onSettled: () => { requestInFlight.current = false; },
+  });
+  const startDownload = () => {
+    if (requestInFlight.current) return;
+    requestInFlight.current = true;
+    download.mutate(instanceId);
+  };
+  return <div className={styles.agendaPdfAction}>
+    <Button variant={placement === 'meetings' ? 'primary' : 'secondary'} size="s" type="button" loading={download.isPending} disabled={download.isPending} onClick={startDownload}>
+      <DocumentText size={16} fill="currentColor" />
+      {download.isPending ? 'Формирование…' : placement === 'meetings' ? 'Сформировать PDF' : 'Подготовить повестку PDF'}
+      {placement === 'workflow' && !download.isPending ? <ArrowRight size={16} fill="currentColor" /> : null}
+    </Button>
+    {download.isError ? <p className={styles.agendaError} role="alert">{normalizeApiError(download.error).message} Попробуйте ещё раз.</p> : null}
+  </div>;
+}
+
 export function WorkflowMeetingAgenda({ universityId }: { universityId: string }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addingQuestion, setAddingQuestion] = useState(false);
   const [showResolved, setShowResolved] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [actionError, setActionError] = useState('');
   const allowed = isRealWorkflowMode() && hasPermission(user, 'workflow.read');
   const instancesQuery = useQuery({
@@ -35,13 +60,13 @@ export function WorkflowMeetingAgenda({ universityId }: { universityId: string }
   const instances = instancesQuery.data ?? [];
   const meetingStages = instances.flatMap((instance) => {
     const stage = instance.stages.find((item) => item.id === instance.current_instance_stage_id);
-    return instance.status === 'active' && stage?.order_index === 3 ? [{ instance, stage }] : [];
+    return instance.university_id === universityId && instance.status === 'active' && stage && isMeetingAgendaStage(stage.order_index, stage.template_stage_id, stage.name) ? [{ instance, stage }] : [];
   });
   const selected = meetingStages.find(({ instance }) => instance.id === selectedId) ?? meetingStages[0];
   const agenda = useQuery({
     queryKey: meetingAgendaQueryKey(selected?.instance.id ?? ''),
     queryFn: ({ signal }) => getMeetingAgenda(selected!.instance.id, signal),
-    enabled: allowed && Boolean(selected),
+    enabled: allowed && Boolean(selected) && detailsOpen,
     staleTime: 30_000,
   });
   const resolvedQueryKey = ['meeting-agenda-resolved', universityId] as const;
@@ -62,12 +87,8 @@ export function WorkflowMeetingAgenda({ universityId }: { universityId: string }
       }));
       return pages.flat().filter((comment) => comment.question_status === 'resolved').sort((left, right) => right.updated_at.localeCompare(left.updated_at));
     },
-    enabled: allowed && Boolean(selected) && showResolved,
+    enabled: allowed && Boolean(selected) && detailsOpen && showResolved,
     staleTime: 30_000,
-  });
-  const download = useMutation({
-    mutationFn: () => downloadMeetingAgenda(selected!.instance.id),
-    onSuccess: (blob) => downloadBlob(blob, `meeting-agenda-${selected!.instance.id}.pdf`),
   });
   const createQuestion = useMutation({
     mutationFn: (content: string) => createWorkflowComment(selected!.instance.id, content, selected?.stage.template_stage_id ?? undefined, [], true),
@@ -107,17 +128,18 @@ export function WorkflowMeetingAgenda({ universityId }: { universityId: string }
   return <section className={styles.agenda} aria-labelledby="meeting-agenda-title">
     <div className={styles.agendaHeader}>
       <div>
-        <h2 id="meeting-agenda-title">Повестка для встречи</h2>
-        <p>Сводка по вузу для этапа «{selected.stage.name}». Она не привязана к записи конкретной встречи.</p>
+        <h2 id="meeting-agenda-title">Повестка встречи</h2>
+        <p>Программы, лицензии и открытые вопросы в одном PDF</p>
       </div>
-      <Button variant="secondary" size="s" type="button" loading={download.isPending} disabled={!data || download.isPending} onClick={() => download.mutate()}>Скачать PDF</Button>
+      <MeetingAgendaPdfAction instanceId={selected.instance.id} placement="meetings" />
     </div>
     {meetingStages.length > 1 ? <label className={styles.agendaSelector}>Workflow для повестки и нового вопроса
-      <Select value={selected.instance.id} disabled={download.isPending || createQuestion.isPending || changeQuestionStatus.isPending} onChange={(event) => { setSelectedId(event.target.value); setAddingQuestion(false); setActionError(''); }}>
+      <Select value={selected.instance.id} disabled={createQuestion.isPending || changeQuestionStatus.isPending} onChange={(event) => { setSelectedId(event.target.value); setAddingQuestion(false); setActionError(''); }}>
         {meetingStages.map(({ instance }) => <option value={instance.id} key={instance.id}>{instance.program_name || instance.product_name || 'Без программы'}</option>)}
       </Select>
     </label> : null}
-    {agenda.isPending ? <ListSkeleton items={3} /> : agenda.isError ? <ErrorState title="Не удалось загрузить повестку" description={normalizeApiError(agenda.error).message} headingLevel={3} onRetry={() => void agenda.refetch()} /> : data ? <>
+    <details className={styles.agendaDetails} open={detailsOpen} onToggle={(event) => setDetailsOpen(event.currentTarget.open)}><summary>Состав повестки и вопросы</summary>
+    {detailsOpen && (agenda.isPending ? <ListSkeleton items={3} /> : agenda.isError ? <ErrorState title="Не удалось загрузить повестку" description={normalizeApiError(agenda.error).message} headingLevel={3} onRetry={() => void agenda.refetch()} /> : data ? <>
       <p className={styles.agendaDate}>Данные на {formatDateRu(data.as_of)} · Workflow: {selected.instance.program_name || selected.instance.product_name || 'Без программы'}</p>
       <div className={styles.agendaGroup}>
         <h3>Пункты для обсуждения</h3>
@@ -144,8 +166,8 @@ export function WorkflowMeetingAgenda({ universityId }: { universityId: string }
         })}</ul> : <p className={styles.agendaEmpty}>Решённых вопросов нет.</p> : null}
         {addingQuestion ? <div className={styles.agendaEditor}><CommentEditor initialValue="" disabled={createQuestion.isPending} submitLabel="Добавить вопрос" questionMode onSubmit={async (content) => { await createQuestion.mutateAsync(content); }} onGlobalError={(error) => setActionError(error.message)} /></div> : null}
       </div>
-    </> : null}
+    </> : null)}
     {actionError ? <p className={styles.agendaError} role="alert">{actionError}</p> : null}
-    {download.isError ? <p className={styles.agendaError} role="alert">{normalizeApiError(download.error).message}</p> : null}
+    </details>
   </section>;
 }
