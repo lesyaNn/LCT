@@ -87,6 +87,7 @@ app = FastAPI(
         {"name": "Responsibles", "description": "Ответственные и связки с вузами (CRUD)"},
         {"name": "Catalog", "description": "Каталожный обзор и справочники"},
         {"name": "Service", "description": "Служебные проверки состояния"},
+        {"name": "Service API", "description": "Каталог методов и схема интеграции"},
     ],
 )
 register_error_handlers(app)
@@ -186,7 +187,10 @@ def custom_openapi():
         "404": ErrorCode.NOT_FOUND,
         "409": ErrorCode.CONFLICT,
         "422": ErrorCode.VALIDATION_ERROR,
+        "429": ErrorCode.RATE_LIMITED,
         "500": ErrorCode.INTERNAL_ERROR,
+        "503": ErrorCode.EXTERNAL_SOURCE_UNAVAILABLE,
+        "504": ErrorCode.ASSISTANT_TIMEOUT,
     }
     error_schema = {"$ref": "#/components/schemas/ErrorResponse"}
     for path, path_item in schema["paths"].items():
@@ -251,6 +255,9 @@ def custom_openapi():
         "description": "Единый формат ошибки API.",
         "content": {"application/json": {"schema": error_schema}},
     }
+    from app.modules.service_api.service import enrich_openapi
+
+    enrich_openapi(app, schema)
     app.openapi_schema = schema
     return app.openapi_schema
 

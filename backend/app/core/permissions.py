@@ -58,6 +58,8 @@ def require_permission(permission: str):
             return user
         raise SecurityError(ErrorCode.FORBIDDEN)
 
+    # Documentation reads these markers, never the checker's closure or docstring.
+    checker.api_required_permission = permission
     return checker
 
 
@@ -67,4 +69,5 @@ def require_role(*roles: str):
             return user
         raise SecurityError(ErrorCode.FORBIDDEN)
 
+    checker.api_allowed_roles = frozenset(roles) | {"admin"}
     return checker

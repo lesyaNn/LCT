@@ -21,6 +21,7 @@ const pageKeywords: Record<string, Metadata> = {
   '/admin/import': { description: 'Загрузка каталогов из файла', keywords: ['импорт', 'загрузить excel', 'импорт каталога', 'загрузить файл'] },
   '/admin/workflow/templates': { description: 'Настройка шаблонов Workflow', keywords: ['шаблон процесса', 'шаблон workflow'] },
   '/api-testing': { description: 'Проверка API', keywords: ['api', 'апи', 'тестирование api'] },
+  '/api': { description: 'Методы API и подключение сервисов', keywords: ['api', 'апи', 'интеграция', 'openapi', 'rest'] },
   '/docs': { description: 'Справочный центр CRM', keywords: ['справка', 'помощь', 'инструкция', 'документация'] },
 };
 
