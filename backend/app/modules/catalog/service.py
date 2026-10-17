@@ -120,6 +120,11 @@ def list_university_page(
     return items, total
 
 
+def list_university_map(db, **filters):
+    """Return the same visible university selection as the list, without pagination."""
+    return repo.list_universities_map(db, **filters)
+
+
 def get_university_detail(
     db: Session, university_id: uuid.UUID, user=None,
 ) -> UniversityDetail:

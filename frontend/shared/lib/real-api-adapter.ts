@@ -24,6 +24,7 @@ import type {
   UniversityHistoryFilters,
   UniversityLicenseRow,
   UniversityListItem,
+  UniversityMapItem,
   UniversityListQuery,
   UniversityMeetingRow,
   UniversityPassport,
@@ -179,6 +180,24 @@ export async function realGetUniversities(params: UniversityListQuery, signal?: 
     pageSize: page.page_size,
     total: page.total,
   };
+}
+
+export async function realGetUniversityMap(filters: UniversityFilters, signal?: AbortSignal): Promise<UniversityMapItem[]> {
+  const search = serializeUniversityListQuery({ filters, page: 1, pageSize: 1, sort: null, order: 'asc' });
+  search.delete('page');
+  search.delete('page_size');
+  search.delete('sort_by');
+  search.delete('sort_order');
+  const result = await apiFetch<Array<{
+    id: string; name: string; city: string | null; region_code: string | null;
+    programs_count: number; launched_programs: number; active_programs: number; active_workflow: boolean;
+  }>>(`/api/v1/universities/map?${search}`, { signal });
+  if (!result.ok) throw new ApiRequestError(result.status, result.body, 'Не удалось загрузить карту вузов.', result.error);
+  return result.data.map((item) => ({
+    id: item.id, name: item.name, city: item.city ?? '—', regionCode: item.region_code,
+    programsCount: item.programs_count, launchedPrograms: item.launched_programs,
+    activePrograms: item.active_programs, activeWorkflow: item.active_workflow,
+  }));
 }
 
 export async function realGetUniversityPassport(id: string, queryClient?: QueryClient): Promise<UniversityPassport> {

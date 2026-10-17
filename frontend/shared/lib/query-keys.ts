@@ -18,6 +18,7 @@ export const queryKeys = {
   universities: {
     all: ['universities'] as const,
     list: <T>(query: T) => ['universities', query] as const,
+    map: <T>(filters: T) => ['universities', 'map', filters] as const,
     passports: ['university-passport'] as const,
     passport: (id: string) => ['university-passport', id] as const,
     healthFamily: ['university-health'] as const,

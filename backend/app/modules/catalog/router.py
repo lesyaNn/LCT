@@ -46,6 +46,7 @@ from app.modules.catalog.schemas import (
     ResponsibleUpdate,
     UniversityDetail,
     UniversityListItem,
+    UniversityMapItem,
     UniversityResponsibleRead,
     UniversityProgramAttach,
     UniversityProgramRead,
@@ -156,6 +157,32 @@ def list_universities(
         workflow_stage=workflow_stage,
     )
     return PaginatedResponse(items=items, page=page, page_size=page_size, total=total)
+
+
+@router.get(
+    "/universities/map",
+    response_model=list[UniversityMapItem],
+    tags=["Universities"],
+    summary="Данные видимых вузов для карты",
+)
+def list_university_map(
+    search: str | None = Query(default=None),
+    city: list[str] | None = Query(default=None),
+    responsible_id: uuid.UUID | None = Query(default=None),
+    external_source: Literal["website"] | None = Query(default=None),
+    workflow_stage: list[str] | None = Query(default=None),
+    unified: UnifiedFilter = Depends(get_unified_filter),
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(READ),
+) -> list[UniversityMapItem]:
+    return [
+        UniversityMapItem.model_validate(item)
+        for item in service.list_university_map(
+            db, search=_norm(search), city=city, responsible_id=responsible_id,
+            external_source=external_source, workflow_stage=workflow_stage,
+            unified_filter=unified, user=user,
+        )
+    ]
 
 
 @router.get(

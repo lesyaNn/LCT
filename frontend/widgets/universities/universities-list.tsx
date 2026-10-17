@@ -31,6 +31,7 @@ import { MultiSelect } from '@/shared/ui/rtk/multiselect';
 import { StatusBadge as SemanticStatusBadge } from '@/shared/ui/rtk/status-badge';
 import { TableShell } from '@/shared/ui/rtk/table-shell';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
+import { useAuth } from '@/shared/auth/AuthProvider';
 import { Skeleton, SkeletonGroup, TableSkeleton } from '@/shared/ui/skeleton';
 import {
   getUniversities,
@@ -50,11 +51,14 @@ import {
   type CatalogReferenceData,
 } from '@/shared/lib/catalogs-repository';
 import styles from './universities-list.module.css';
+import { UniversitiesMap } from './universities-map';
 
 const DEFAULT_PAGE_SIZE = 8;
 const PAGE_SIZE_OPTIONS = [8, 12, 20];
 const VIEW_STORAGE_KEY = 'universities.view.v1';
 type UniversityView = 'cards' | 'table';
+type UniversitySurface = 'list' | 'map';
+const SURFACE_STORAGE_KEY = 'universities.surface.v1';
 
 type SearchParamsLike = {
   get: (name: string) => string | null;
@@ -287,7 +291,7 @@ function Filters({ state, options, catalogsLoading, catalogsUnavailable, searchI
       <MultiSelect label="Город" labelPlacement="outside" disabled={catalogsLoading || catalogsUnavailable} values={filters.cities} onChange={(cities) => onPatch({ city: cities, page: 1 })} options={options.cities.map((city) => ({ id: city, name: city }))} searchable placeholder="Все города" />
       <MultiSelect label="Ответственный" labelPlacement="outside" options={options.responsibles.map((person) => ({ id: person.id, name: person.name, description: person.role }))} values={filters.responsibleIds} searchable onChange={(values) => onPatch({ responsible: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
       <MultiSelect label="Текущий этап" labelPlacement="outside" disabled={!UNIVERSITY_LIST_CAPABILITIES.filters.stage} values={filters.workflowStageIds} onChange={(values) => onPatch({ stage: values, page: 1 })} options={options.stages} searchable placeholder="Все этапы" />
-      <div className={styles.periodField}><DateRangeField presets label={UNIVERSITY_LIST_CAPABILITIES.dateMeaning === 'created-at' ? 'Период создания' : 'Период последнего взаимодействия'} from={filters.dateFrom} to={filters.dateTo} onFromChange={(value) => updateDateRange('date_from', value)} onToChange={(value) => updateDateRange('date_to', value)} onRangeChange={(dateFrom, dateTo) => onPatch({ date_from: dateFrom, date_to: dateTo, page: 1 })} /></div>
+      <div className={styles.periodField}><DateRangeField presets label={UNIVERSITY_LIST_CAPABILITIES.dateMeaning === 'interaction-period' ? 'Период взаимодействия' : 'Период последнего взаимодействия'} from={filters.dateFrom} to={filters.dateTo} onFromChange={(value) => updateDateRange('date_from', value)} onToChange={(value) => updateDateRange('date_to', value)} onRangeChange={(dateFrom, dateTo) => onPatch({ date_from: dateFrom, date_to: dateTo, page: 1 })} /></div>
     </section>
   );
 }
@@ -421,12 +425,16 @@ function DesktopTable({ table }: { table: Table<UniversityListItem> }) {
 }
 
 export function UniversitiesList() {
+  const { user } = useAuth();
+  const scopeKey = user ? `${user.id}:${user.role}:${[...user.scope.universityIds].sort().join(',')}` : '';
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const state = useMemo(() => parseUrlState(searchParams), [searchParams]);
   const [searchInput, setSearchInput] = useState(state.filters.search);
   const [view, setView] = useState<UniversityView>('cards');
+  const [surface, setSurface] = useState<UniversitySurface>('list');
+  const [surfaceReady, setSurfaceReady] = useState(false);
   const storageRestoredRef = useRef(false);
   const storageReadyRef = useRef(false);
   const pendingStoredFiltersRef = useRef<UniversityFilters | null>(null);
@@ -438,10 +446,16 @@ export function UniversitiesList() {
   useEffect(() => setSearchInput(state.filters.search), [state.filters.search]);
   useEffect(() => {
     if (window.localStorage.getItem(VIEW_STORAGE_KEY) === 'table') setView('table');
+    if (window.localStorage.getItem(SURFACE_STORAGE_KEY) === 'map') setSurface('map');
+    setSurfaceReady(true);
   }, []);
   const selectView = (next: UniversityView) => {
     setView(next);
     window.localStorage.setItem(VIEW_STORAGE_KEY, next);
+  };
+  const selectSurface = (next: UniversitySurface) => {
+    setSurface(next);
+    window.localStorage.setItem(SURFACE_STORAGE_KEY, next);
   };
   useEffect(() => {
     if (searchInput === state.filters.search) return undefined;
@@ -477,9 +491,11 @@ export function UniversitiesList() {
   }, [state.filters]);
 
   const query = useQuery({
-    queryKey: universitiesListQueryKey(state),
+    queryKey: [...universitiesListQueryKey(state), scopeKey],
     queryFn: ({ signal }) => getUniversities(state, signal),
     placeholderData: keepPreviousData,
+    enabled: Boolean(scopeKey) && surfaceReady && surface === 'list',
+    staleTime: 5 * 60_000,
   });
   const catalogsQuery = useQuery({
     queryKey: catalogQueryKeys.references,
@@ -538,16 +554,17 @@ export function UniversitiesList() {
           <h1>ВУЗы</h1>
           <p className={styles.description}>Учебные заведения, программы и задачи, требующие внимания команды.</p>
         </div>
-        <div className={styles.headerActions}>
+        {surfaceReady && surface === 'list' ? <div className={styles.headerActions}>
           <Tabs items={[{ id: 'cards', label: 'Карточки' }, { id: 'table', label: 'Таблица' }]} activeId={view} onChange={(id) => selectView(id as UniversityView)} label="Представление вузов" prefix="university-view" />
-        </div>
+        </div> : null}
       </header>
       <div className={styles.filterArea}>
-        <FilterToolbar label="Фильтры списка вузов" collapsible controls={() => <Filters state={state} options={filterOptions} catalogsLoading={catalogsQuery.isPending} catalogsUnavailable={catalogsQuery.isError} searchInput={searchInput} setSearchInput={setSearchInput} onPatch={goToState} />} onReset={resetFilters} resetDisabled={!hasFilters} mobileCount={activeFilterCount} activeFilters={universityActiveFilters(state.filters, filterOptions, goToState)} />
+        <FilterToolbar label="Фильтры вузов" collapsible controls={() => <Filters state={state} options={filterOptions} catalogsLoading={catalogsQuery.isPending} catalogsUnavailable={catalogsQuery.isError} searchInput={searchInput} setSearchInput={setSearchInput} onPatch={goToState} />} onReset={resetFilters} resetDisabled={!hasFilters} mobileCount={activeFilterCount} activeFilters={universityActiveFilters(state.filters, filterOptions, goToState)} />
         {catalogsQuery.isError ? <RouteErrorState compact onRetry={() => void catalogsQuery.refetch()} /> : null}
         {stagesQuery.isError ? <RouteErrorState compact onRetry={() => void stagesQuery.refetch()} /> : null}
       </div>
-      {query.isPending ? view === 'cards' ? <CardsSkeleton /> : <TableSkeleton rows={6} columns={7} label="Загрузка списка вузов" /> : !query.data ? <RouteErrorState onRetry={() => void query.refetch()} /> : query.data.total === 0 ? <EmptyState icon={<Search size={20} fill="currentColor" />} title={hasFilters ? 'По выбранным условиям ВУЗы не найдены' : 'Вузы пока не добавлены'} description={hasFilters ? 'Измените условия поиска или сбросьте фильтры.' : 'Когда появятся записи, они будут отображены в этом списке.'} primaryAction={hasFilters ? { label: 'Сбросить фильтры', onClick: resetFilters, variant: 'secondary' } : undefined} /> : (
+      {surfaceReady ? <Tabs items={[{ id: 'list', label: 'Список' }, { id: 'map', label: 'Карта' }]} activeId={surface} onChange={(id) => selectSurface(id as UniversitySurface)} label="Режим просмотра вузов" prefix="university-surface" /> : null}
+      {!surfaceReady ? <TableSkeleton rows={6} columns={7} label="Загрузка вузов" /> : surface === 'map' ? <UniversitiesMap filters={state.filters} scopeKey={scopeKey} /> : query.isPending ? view === 'cards' ? <CardsSkeleton /> : <TableSkeleton rows={6} columns={7} label="Загрузка списка вузов" /> : !query.data ? <RouteErrorState onRetry={() => void query.refetch()} /> : query.data.total === 0 ? <EmptyState icon={<Search size={20} fill="currentColor" />} title={hasFilters ? 'По выбранным условиям ВУЗы не найдены' : 'Вузы пока не добавлены'} description={hasFilters ? 'Измените условия поиска или сбросьте фильтры.' : 'Когда появятся записи, они будут отображены в этом списке.'} primaryAction={hasFilters ? { label: 'Сбросить фильтры', onClick: resetFilters, variant: 'secondary' } : undefined} /> : (
         <>
           {query.isFetching ? <p className={styles.fetching} role="status">Обновляем список…</p> : null}
           {view === 'cards' ? <UniversityCards items={query.data.items} /> : <TableShell><DesktopTable table={table} /></TableShell>}

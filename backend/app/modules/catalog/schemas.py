@@ -157,6 +157,19 @@ class UniversityListItem(UniversityRead):
     attention: bool = False
 
 
+class UniversityMapItem(BaseModel):
+    """Lightweight visible university for regional aggregation in the map view."""
+
+    id: uuid.UUID
+    name: str
+    city: str | None = None
+    region_code: str | None = None
+    programs_count: int = 0
+    launched_programs: int = 0
+    active_programs: int = 0
+    active_workflow: bool = False
+
+
 class UniversityDetail(UniversityRead):
     # M:N via university_responsibles (the ONLY university<->responsible
     # binding). Loaded with ONE join query, never per-item.

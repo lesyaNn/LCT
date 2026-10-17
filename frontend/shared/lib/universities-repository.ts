@@ -17,6 +17,7 @@ import {
 } from '@/shared/mocks/api-adapter';
 import {
   realGetUniversities,
+  realGetUniversityMap,
   realGetUniversityDocuments,
   realGetUniversityHistory,
   realGetUniversityLicenses,
@@ -63,6 +64,17 @@ export interface UniversityListItem {
   /** Mock relationship ids mirror the fields expected from the future analytics API. */
   programIds?: string[];
   productIds?: string[];
+}
+
+export interface UniversityMapItem {
+  id: string;
+  name: string;
+  city: string;
+  regionCode: string | null;
+  programsCount: number;
+  launchedPrograms: number;
+  activePrograms: number;
+  activeWorkflow: boolean;
 }
 
 export type UniversitySortColumn = 'name' | 'responsible' | 'programs' | 'stage' | 'last_interaction';
@@ -116,7 +128,7 @@ export const UNIVERSITY_LIST_CAPABILITIES = isMockDataSourceFor('universities')
   : {
       filters: { university: true, program: true, product: true, responsible: true, stage: true, date: true },
       sorts: { name: true, responsible: false, programs: false, stage: false, last_interaction: false },
-      dateMeaning: 'created-at' as const,
+      dateMeaning: 'interaction-period' as const,
     };
 
 export const UNIVERSITY_PASSPORT_CAPABILITIES = isMockDataSourceFor('passport')
@@ -189,6 +201,7 @@ const universitiesMock: UniversityListItem[] = [
 
 export const universitiesQueryKey = queryKeys.universities.all;
 export const universitiesListQueryKey = queryKeys.universities.list;
+export const universitiesMapQueryKey = queryKeys.universities.map;
 export const universityStageOptionsQueryKey = ['universities', 'stage-options'] as const;
 
 export async function createUniversity(input: { name: string; city: string | null }): Promise<{ id: string }> {
@@ -296,6 +309,26 @@ export async function getUniversities(params: UniversityListQuery, signal?: Abor
   });
   result.items.forEach((item) => observedUniversities.set(item.id, item));
   return result;
+}
+
+const mockRegionByCity: Record<string, string> = {
+  'Москва': 'RU.48', 'Санкт-Петербург': 'RU.66', 'Екатеринбург': 'RU.71',
+  'Казань': 'RU.73', 'Новосибирск': 'RU.53', 'Владивосток': 'RU.59',
+  'Ростов-на-Дону': 'RU.61', 'Самара': 'RU.65', 'Томск': 'RU.75',
+  'Нижний Новгород': 'RU.51', 'Воронеж': 'RU.86', 'Пермь': 'RU.90',
+  'Калининград': 'RU.23', 'Красноярск': 'RU.91', 'Омск': 'RU.54', 'Саратов': 'RU.67',
+};
+
+export async function getUniversityMap(filters: UniversityFilters, signal?: AbortSignal): Promise<UniversityMapItem[]> {
+  return fromDataSource({
+    domain: 'universities', signal,
+    mock: async () => (await getMockUniversities({ filters, sort: null, order: 'asc', page: 1, pageSize: universitiesMock.length })).items.map((item) => ({
+      id: item.id, name: item.name, city: item.city, regionCode: mockRegionByCity[item.city] ?? null,
+      programsCount: item.programsCount, launchedPrograms: item.programStatusCounts.launched ?? 0,
+      activePrograms: item.programStatusCounts.active ?? 0, activeWorkflow: item.currentStage.id !== 'completed',
+    })),
+    real: () => realGetUniversityMap(filters, signal),
+  });
 }
 
 export type UniversityPassportEventType = 'meeting' | 'document' | 'workflow' | 'note';

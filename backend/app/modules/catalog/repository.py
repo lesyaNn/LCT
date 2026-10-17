@@ -301,6 +301,65 @@ def list_universities(
     return list(rows), int(total)
 
 
+def list_universities_map(
+    db: Session,
+    *,
+    search: str | None,
+    city: str | Sequence[str] | None,
+    responsible_id: uuid.UUID | None,
+    unified_filter=None,
+    user=None,
+    external_source: str | None = None,
+    workflow_stage: str | Sequence[str] | None = None,
+) -> list[dict]:
+    """One scoped selection plus two set-based status queries; no per-university IO."""
+    from app.models.interactions import UniversityProgram
+    from app.models.workflow_instances import WorkflowInstance
+    from app.modules.universities.city_region import city_region_code
+
+    conds = university_conditions(
+        search=search, city=city, responsible_id=responsible_id,
+        unified_filter=unified_filter, external_source=external_source,
+        workflow_stage=workflow_stage,
+    )
+    selection = select(University.id, University.name, University.city).where(*conds)
+    if user is not None:
+        from app.modules.analytics.filter_service import UnifiedFilterService
+
+        selection = UnifiedFilterService.apply_security_scope(selection, user)
+    rows = db.execute(selection.order_by(University.name.asc(), University.id.asc())).all()
+    if not rows:
+        return []
+
+    ids = selection.with_only_columns(University.id).subquery()
+    selected = select(ids.c.id)
+    counts: dict[uuid.UUID, dict[str, int]] = {}
+    for uni_id, status, count in db.execute(
+        select(UniversityProgram.university_id, UniversityProgram.status, func.count())
+        .where(UniversityProgram.university_id.in_(selected))
+        .group_by(UniversityProgram.university_id, UniversityProgram.status)
+    ).all():
+        counts.setdefault(uni_id, {})[status] = int(count)
+    active = set(db.execute(
+        select(WorkflowInstance.university_id)
+        .where(WorkflowInstance.university_id.in_(selected), WorkflowInstance.status == "active")
+        .distinct()
+    ).scalars().all())
+    return [
+        {
+            "id": uni_id,
+            "name": name,
+            "city": city_name,
+            "region_code": city_region_code(city_name),
+            "programs_count": sum(counts.get(uni_id, {}).values()),
+            "launched_programs": counts.get(uni_id, {}).get("launched", 0),
+            "active_programs": counts.get(uni_id, {}).get("active", 0),
+            "active_workflow": uni_id in active,
+        }
+        for uni_id, name, city_name in rows
+    ]
+
+
 def university_list_presentation(
     db: Session,
     university_ids: Sequence[uuid.UUID],
