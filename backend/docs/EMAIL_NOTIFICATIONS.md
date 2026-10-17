@@ -102,7 +102,7 @@ CRM attaches it inline using a Content-ID in the HTML part's `multipart/related`
 container; the original `text/plain` alternative stays unchanged. No remote
 request is needed for CRM images. Keycloak serves the matching PNG from its email
 theme's public resources URL; when rendering without a request URL, the company
-name is shown as text. Both paths retain alt text and a live product name.
+name is shown as text. Both paths retain alt text and the automatic-message footer.
 Brand fonts fall back to Arial; no external fonts or styles load.
 Presentation tables, a fluid 600px card, inline core styles, Outlook conditional
 width tables and padded button cells provide the baseline. Responsive padding

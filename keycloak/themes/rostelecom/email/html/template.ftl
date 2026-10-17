@@ -85,7 +85,6 @@
           <#else>
             <p class="email-heading" style="margin:0;color:#101828;font-size:24px;line-height:30px;font-weight:700;">Ростелеком</p>
           </#if>
-          <p class="email-muted" style="margin:6px 0 0;color:#667085;font-size:13px;line-height:20px;">RTK EdTech CRM</p>
         </td></tr>
         <tr><td class="email-card email-pad email-content" bgcolor="#ffffff" style="padding:0 40px 36px;background-color:#ffffff;border-radius:0 0 18px 18px;word-wrap:break-word;overflow-wrap:anywhere;word-break:break-word;">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;">
@@ -114,7 +113,7 @@
           </table>
         </td></tr>
         <tr><td class="email-muted" align="center" style="padding:24px 16px 0;color:#667085;font-size:12px;line-height:20px;">
-          RTK EdTech CRM<br>${msg("rtkAutomaticMessage")}
+          ${msg("rtkAutomaticMessage")}
         </td></tr>
       </table>
       <!--[if mso]></td></tr></table><![endif]-->

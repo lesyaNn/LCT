@@ -94,7 +94,7 @@ PAGE = r'''<!doctype html>
 <html lang="ru">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Все письма системы — RTK EdTech CRM</title>
+<title>Все письма системы</title>
 <style>
 :root{font:14px/1.5 Arial,sans-serif;color:#101828;background:#f4f4f7;color-scheme:light;--muted:#667085;--border:#e7e5ed;--surface:#fff;--page:#f4f4f7;--text:#101828;--purple:#7700ff}
 *{box-sizing:border-box}body{margin:0}button,input,select{font:inherit}button,select{cursor:pointer}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #ac79ff;outline-offset:3px}
@@ -108,7 +108,7 @@ header{padding:22px 32px;background:var(--surface);border-bottom:1px solid var(-
 </style>
 </head>
 <body>
-<header><div class="brand"><img src="{{LOGO}}" alt="Ростелеком — ИТ Школа" width="174" height="46" style="display:block;height:auto"><small>RTK EDTECH CRM</small></div><div class="header-note">Единый каталог email-уведомлений</div></header>
+<header><div class="brand"><img src="{{LOGO}}" alt="Ростелеком — ИТ Школа" width="174" height="46" style="display:block;height:auto"></div><div class="header-note">Единый каталог email-уведомлений</div></header>
 <section class="intro"><p class="eyebrow">КОММУНИКАЦИИ ПРОДУКТА</p><h1>Письма системы <span class="count" id="total"></span></h1><p>Только реализованные сценарии отправки из текущего кода проекта. Выберите письмо, посмотрите его на мобильном экране или в тёмной теме.</p><label class="mobile-picker">Выберите письмо<select id="mobile-select" style="width:100%;margin-top:6px" aria-label="Выберите письмо"></select></label></section>
 <div class="layout">
 <aside class="catalog" aria-label="Каталог писем"><div class="catalog-head"><input id="search" type="search" placeholder="Найти письмо…" aria-label="Найти письмо"></div><nav class="catalog-list" id="catalog"></nav></aside>
