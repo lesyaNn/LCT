@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useState } from 'react';
 import { getVisibleNavigationItems } from '@/shared/config/navigation';
+import type { NavigationItem } from '@/shared/types/navigation';
 import type { AuthUser } from '@/shared/types/user';
 import { Icon } from '@/shared/ui/rtk/icon';
 import { IconButton } from '@/shared/ui/rtk/icon-button';
@@ -38,13 +39,30 @@ export function Sidebar({ user, pathname, collapsed, mobileOpen = false, onToggl
 function SidebarContent({ user, pathname, collapsed, mobile = false, onToggleCollapse, onCloseMobile }: SidebarProps & { mobile?: boolean }) {
   const visibleItems = getVisibleNavigationItems(user);
   const items = visibleItems.filter((item) => item.href !== '/admin' && !item.href.startsWith('/admin/') && item.href !== '/api');
-  const adminItems = visibleItems.filter((item) => item.href.startsWith('/admin/') || item.href === '/api');
+  const adminItems = visibleItems.filter((item) => item.href.startsWith('/admin/'));
+  const apiItem = visibleItems.find((item) => item.href === '/api');
   const [adminOpen, setAdminOpen] = useState(false);
-  const adminActive = pathname.startsWith('/admin') || pathname === '/api';
+  const adminActive = pathname.startsWith('/admin');
   const adminExpanded = adminOpen || adminActive;
-  const activeHref = items
+  const activeHref = visibleItems
+    .filter((item) => item.href !== '/admin' && !item.href.startsWith('/admin/'))
     .filter((item) => pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(`${item.href}/`)))
     .sort((left, right) => right.href.length - left.href.length)[0]?.href;
+  const renderNavItem = (item: NavigationItem) => {
+    const active = activeHref === item.href;
+    return <Link
+      className={`${styles.navItem} ${active ? styles.active : ''}`}
+      href={item.href}
+      key={item.href}
+      onClick={mobile ? onCloseMobile : undefined}
+      title={collapsed && !mobile ? item.label : undefined}
+      aria-current={active ? 'page' : undefined}
+    >
+      <Icon name={item.icon} size={20} />
+      {(!collapsed || mobile) && <span>{item.label}</span>}
+      {active && <span className={styles.activeMarker} aria-hidden="true" />}
+    </Link>;
+  };
 
   return (
     <div className={`${styles.sidebarContent} ${mobile ? styles.mobileDrawerContent : ''}`}>
@@ -57,23 +75,7 @@ function SidebarContent({ user, pathname, collapsed, mobile = false, onToggleCol
 
       <nav className={styles.nav}>
         <p className={styles.sectionLabel}>{(!collapsed || mobile) && 'Рабочая область'}</p>
-        {items.map((item) => {
-          const active = activeHref === item.href;
-          return (
-            <Link
-              className={`${styles.navItem} ${active ? styles.active : ''}`}
-              href={item.href}
-              key={item.href}
-              onClick={mobile ? onCloseMobile : undefined}
-              title={collapsed && !mobile ? item.label : undefined}
-              aria-current={active ? 'page' : undefined}
-            >
-              <Icon name={item.icon} size={20} />
-              {(!collapsed || mobile) && <span>{item.label}</span>}
-              {active && <span className={styles.activeMarker} aria-hidden="true" />}
-            </Link>
-          );
-        })}
+        {items.map(renderNavItem)}
         {adminItems.length ? <>
           <button className={`${styles.navItem} ${adminActive ? styles.active : ''}`} type="button" onClick={() => setAdminOpen((value) => !value)} aria-expanded={adminExpanded} title={collapsed && !mobile ? 'Администрирование' : undefined}>
             <Icon name="admin" size={20} />
@@ -87,6 +89,7 @@ function SidebarContent({ user, pathname, collapsed, mobile = false, onToggleCol
             })}
           </div> : null}
         </> : null}
+        {apiItem ? renderNavItem(apiItem) : null}
       </nav>
 
       {!mobile && onToggleCollapse ? <div className={styles.sidebarFooter}><IconButton icon="chevron-right" label={collapsed ? 'Развернуть меню' : 'Свернуть меню'} className={`${styles.collapseButton} ${collapsed ? styles.collapseButtonRotated : ''}`} onClick={onToggleCollapse} /></div> : null}
