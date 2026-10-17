@@ -52,6 +52,7 @@ export function invalidateWorkflowRelatedQueries(queryClient: QueryClient, insta
       queryClient.invalidateQueries({ queryKey: universityPassportQueryKey(universityId) }),
       queryClient.invalidateQueries({ queryKey: queryKeys.universities.health(universityId) }),
       queryClient.invalidateQueries({ queryKey: universityHistoryFamilyQueryKey(universityId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.universities.meetingsFamily(universityId) }),
     );
   }
 

@@ -127,6 +127,7 @@ export function WorkflowCreateModal({ universityId, initialProgramId, onClose, o
         queryClient.invalidateQueries({ queryKey: universityWorkflowInstancesQueryKey(universityId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowByProgramFamily(universityId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.universities.passport(universityId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.universities.meetingsFamily(universityId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.universities.health(universityId) }),
         queryClient.invalidateQueries({ queryKey: workflowProgramsQueryKey(universityId) }),
       ]);

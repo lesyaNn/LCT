@@ -36,33 +36,8 @@
 .inlineDetails span { color: var(--rtk-color-text-secondary); display: block; margin-top: var(--rtk-space-1); }
 .meetingSurface { background: var(--rtk-color-surface); border-radius: var(--rtk-radius-medium); box-shadow: var(--rtk-shadow-elevation-2); padding: var(--rtk-space-5); }
 
-.agenda { border-bottom: 1px solid var(--rtk-color-border); display: flex; flex-direction: column; gap: var(--rtk-space-4); min-width: 0; padding: 0 0 var(--rtk-space-5); }
-.agendaHeader, .agendaQuestionHeading { align-items: flex-start; display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); justify-content: space-between; }
-.agendaHeader > div, .agendaQuestionHeading > div { flex: 1 1 260px; min-width: 0; }
-.agendaHeader h2 { font-size: 18px; letter-spacing: -.02em; margin: 0; }
-.agendaHeader p, .agendaQuestionHeading p, .agendaDate { color: var(--rtk-color-text-secondary); font-size: 12px; line-height: 1.45; margin: var(--rtk-space-1) 0 0; }
 .agendaPdfAction { align-items: flex-start; display: flex; flex-direction: column; gap: var(--rtk-space-1); max-width: 100%; }
 .agendaPdfAction button { white-space: nowrap; }
-.agendaDetails { border-top: 1px solid var(--rtk-color-border); min-width: 0; padding-top: var(--rtk-space-3); }
-.agendaDetails summary { color: var(--rtk-color-brand); cursor: pointer; font-size: 12px; font-weight: 700; }
-.agendaDetails summary:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
-.agendaDetails > :not(summary) { margin-top: var(--rtk-space-4); }
-.agendaSelector { color: var(--rtk-color-text-secondary); display: flex; flex-direction: column; font-size: 12px; font-weight: 600; gap: var(--rtk-space-1); max-width: 360px; }
-.agendaGroup { border-top: 1px solid var(--rtk-color-border); display: flex; flex-direction: column; gap: var(--rtk-space-3); padding-top: var(--rtk-space-4); }
-.agendaGroup h3 { font-size: 15px; margin: 0; }
-.agendaGroup h3 span, .agendaTopics h4 span { color: var(--rtk-color-text-tertiary); font-size: 12px; font-weight: 500; }
-.agendaTopics { display: grid; gap: var(--rtk-space-5); grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.agendaTopics h4 { font-size: 13px; margin: 0 0 var(--rtk-space-2); }
-.agendaTopics ul, .agendaQuestions { list-style: none; margin: 0; padding: 0; }
-.agendaTopics li { border-top: 1px solid var(--rtk-color-border); font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; padding: var(--rtk-space-2) 0; }
-.agendaTopics p, .agendaTopics small, .agendaEmpty, .agendaMore { color: var(--rtk-color-text-secondary); font-size: 12px; margin: 0; }
-.agendaQuestions li { align-items: flex-start; border-top: 1px solid var(--rtk-color-border); display: flex; flex-wrap: wrap; gap: var(--rtk-space-2) var(--rtk-space-4); justify-content: space-between; padding: var(--rtk-space-3) 0; }
-.agendaQuestionText { flex: 1 1 240px; min-width: 0; }
-.agendaQuestionText p { font-size: 13px; line-height: 1.5; margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
-.agendaQuestionText small { color: var(--rtk-color-text-tertiary); display: block; font-size: 11px; margin-top: var(--rtk-space-1); }
-.agendaQuestionActions { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); }
-.agendaToggle { align-self: flex-start; }
-.agendaEditor { border-top: 1px solid var(--rtk-color-border); padding-top: var(--rtk-space-4); }
 .agendaError { color: var(--rtk-color-danger); font-size: 12px; margin: 0; }
 .meetingTimeline { list-style: none; margin: 0; padding: 0; }
 .meetingItem { display: grid; gap: var(--rtk-space-4); grid-template-columns: 16px minmax(0, 1fr); min-width: 0; position: relative; }
@@ -70,6 +45,10 @@
 .meetingMarker { background: var(--rtk-color-brand); border: 3px solid var(--rtk-color-brand-soft); border-radius: 50%; height: 16px; position: relative; width: 16px; z-index: 1; }
 .meetingContent { border-bottom: 1px solid var(--rtk-color-border); min-width: 0; padding: 0 0 var(--rtk-space-5); }
 .meetingItem:not(:first-child) .meetingContent { padding-top: var(--rtk-space-5); }
+.meetingWorkflowLink { color: var(--rtk-color-brand); font-weight: 650; text-decoration: none; }
+.meetingWorkflowLink:hover { text-decoration: underline; }
+.meetingWorkflowLink:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
+.meetingContent > .agendaPdfAction { margin-top: var(--rtk-space-3); }
 .meetingMeta { align-items: center; color: var(--rtk-color-text-tertiary); display: flex; flex-wrap: wrap; font-size: 12px; gap: var(--rtk-space-2); }
 .meetingType { background: var(--rtk-color-surface-subtle); border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-secondary); padding: 4px 8px; }
 .meetingContent h3 { font-size: 16px; margin: var(--rtk-space-2) 0 var(--rtk-space-3); }
@@ -96,7 +75,6 @@
   .assignmentActions button { width: 100%; }
   .meetingSurface { padding: var(--rtk-space-4); }
   .agendaPdfAction, .agendaPdfAction button { width: 100%; }
-  .agendaTopics { grid-template-columns: 1fr; }
 }
 @media (max-width: 420px) {
 }

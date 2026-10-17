@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, type ReactNode } from 'react';
+import Link from 'next/link';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Calendar from '@atomaro/icons/24/communication/Calendar';
 import { useAuth } from '@/shared/auth/AuthProvider';
@@ -37,7 +38,7 @@ import {
 } from '@/shared/lib/universities-repository';
 import { PassportDataTable, PassportTableSkeleton, type PassportMobileField, type PassportTableColumn } from './passport-data-table';
 import { MeetingMutationForm, ProductAssignmentForm } from './passport-mutation-forms';
-import { WorkflowMeetingAgenda } from './workflow-meeting-agenda';
+import { MeetingAgendaPdfAction } from './workflow-meeting-agenda';
 import styles from './university-passport-sections.module.css';
 import { PassportDocumentsSection } from './passport-documents-section';
 
@@ -134,12 +135,14 @@ function MeetingParticipants({ participants }: { participants: UniversityMeeting
 }
 
 function MeetingsSection({ id, canAdd }: { id: string; canAdd: boolean }) {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [editor, setEditor] = useState<UniversityMeetingRow | null | undefined>(undefined);
   const [deleteCandidate, setDeleteCandidate] = useState<UniversityMeetingRow | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const canWrite = canAdd;
+  const canReadWorkflow = hasPermission(user, 'workflow.read');
   const query = useQuery({ queryKey: universityMeetingsQueryKey(id, page), queryFn: ({ signal }) => getUniversityMeetings(id, page, 20, signal), placeholderData: keepPreviousData, staleTime: 30_000 });
   const remove = useMutation({
     mutationFn: (meetingId: string) => deleteUniversityMeeting(meetingId),
@@ -159,8 +162,19 @@ function MeetingsSection({ id, canAdd }: { id: string; canAdd: boolean }) {
   if (!query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
   return <section className={`${styles.section} ${styles.meetingSurface}`} aria-label="Встречи">
     {canWrite ? <SectionToolbar><Button variant="primary" size="s" type="button" onClick={() => setEditor(null)}><Calendar size={16} fill="currentColor" />Добавить встречу</Button></SectionToolbar> : null}
-    <WorkflowMeetingAgenda universityId={id} />
-    {query.data.items.length ? <ol className={styles.meetingTimeline}>{query.data.items.slice().sort((left, right) => right.occurredAt.localeCompare(left.occurredAt)).map((meeting) => <li className={styles.meetingItem} key={meeting.id}><div className={styles.meetingMarker} aria-hidden="true" /><article className={styles.meetingContent}><div className={styles.meetingMeta}><time dateTime={meeting.occurredAt}>{formatDateTimeRu(meeting.occurredAt)}</time><span className={styles.meetingType}>{meetingTypeLabels[meeting.type]}</span></div><h3>{meeting.subject}</h3><MeetingParticipants participants={meeting.participants} /><details className={styles.meetingDetails}><summary>Итог и следующее действие</summary><p><strong>Итог:</strong> {meeting.outcome}</p><p><strong>Следующее действие:</strong> {meeting.nextAction}{meeting.dueDate ? ` до ${formatDateRu(meeting.dueDate)}` : ''}</p></details><span className={styles.meetingAuthor}>Автор: {meeting.author}</span>{canWrite ? <div className={styles.assignmentActions}><Button variant="ghost" size="s" type="button" onClick={() => setEditor(meeting)}>Изменить</Button><Button variant="ghost" size="s" type="button" onClick={() => setDeleteCandidate(meeting)}>Удалить</Button></div> : null}</article></li>)}</ol> : <EmptyState icon={<Calendar size={20} fill="currentColor" />} title="Встреч пока нет" description={canWrite ? 'Добавьте первую встречу, чтобы зафиксировать взаимодействие.' : 'Встречи появятся после их добавления на сервере.'} headingLevel={3} />}
+    {query.data.items.length ? <ol className={styles.meetingTimeline}>{query.data.items.map((meeting) => <li className={styles.meetingItem} key={meeting.id}><div className={styles.meetingMarker} aria-hidden="true" /><article className={styles.meetingContent}>
+      <div className={styles.meetingMeta}>
+        {meeting.occurredAt ? <time dateTime={meeting.occurredAt}>{formatDateTimeRu(meeting.occurredAt)}</time> : <span>Дата не назначена</span>}
+        {meeting.type ? <span className={styles.meetingType}>{meetingTypeLabels[meeting.type]}</span> : null}
+        {meeting.workflowInstanceId ? canReadWorkflow ? <Link className={styles.meetingWorkflowLink} href={`/workflows/${meeting.workflowInstanceId}`}>Из Workflow{meeting.workflowStageName ? ` · ${meeting.workflowStageName}` : ''}</Link> : <span>Из Workflow</span> : null}
+      </div>
+      <h3>{meeting.subject}</h3>
+      {meeting.participants.length ? <MeetingParticipants participants={meeting.participants} /> : null}
+      {meeting.outcome !== '—' || meeting.nextAction !== '—' ? <details className={styles.meetingDetails}><summary>Итог и следующее действие</summary>{meeting.outcome !== '—' ? <p><strong>Итог:</strong> {meeting.outcome}</p> : null}{meeting.nextAction !== '—' ? <p><strong>Следующее действие:</strong> {meeting.nextAction}{meeting.dueDate ? ` до ${formatDateRu(meeting.dueDate)}` : ''}</p> : null}</details> : null}
+      {meeting.workflowInstanceId && meeting.workflowStageId && canReadWorkflow ? <MeetingAgendaPdfAction instanceId={meeting.workflowInstanceId} stageId={meeting.workflowStageId} placement="meetings" /> : null}
+      <span className={styles.meetingAuthor}>Автор: {meeting.author}</span>
+      {canWrite ? <div className={styles.assignmentActions}><Button variant="ghost" size="s" type="button" onClick={() => setEditor(meeting)}>Изменить</Button><Button variant="ghost" size="s" type="button" onClick={() => setDeleteCandidate(meeting)}>Удалить</Button></div> : null}
+    </article></li>)}</ol> : <EmptyState icon={<Calendar size={20} fill="currentColor" />} title="Встреч пока нет" description={canWrite ? 'Добавьте первую встречу, чтобы зафиксировать взаимодействие.' : 'Встречи появятся после их добавления на сервере.'} headingLevel={3} />}
     {query.data.total > 20 ? <div className={styles.sectionToolbar}><span>Страница {page} из {Math.ceil(query.data.total / 20)}</span><div className={styles.toolbarControls}><Button variant="ghost" size="s" type="button" disabled={page === 1} onClick={() => setPage(page - 1)}>Назад</Button><Button variant="ghost" size="s" type="button" disabled={page * 20 >= query.data.total} onClick={() => setPage(page + 1)}>Далее</Button></div></div> : null}
     {editor !== undefined ? <MeetingMutationForm universityId={id} meeting={editor} onClose={() => setEditor(undefined)} onSaved={() => { setEditor(undefined); setMessage('Встреча сохранена.'); }} /> : null}
     {deleteCandidate ? <Modal title="Удалить встречу?" onClose={() => { if (!remove.isPending) setDeleteCandidate(null); }}><p>Встреча «{deleteCandidate.subject}» будет удалена без возможности восстановления.</p><div className={styles.assignmentActions}><Button variant="ghost" type="button" disabled={remove.isPending} onClick={() => setDeleteCandidate(null)}>Отмена</Button><Button variant="danger" type="button" loading={remove.isPending} disabled={remove.isPending} onClick={() => remove.mutate(deleteCandidate.id)}>Удалить</Button></div></Modal> : null}

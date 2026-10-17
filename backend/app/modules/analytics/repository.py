@@ -66,7 +66,7 @@ def load_data(db: Session, selection: Selection, *, today: date, filters: dict |
     data.stages = selected_rows(db, InstanceStage, InstanceStage.instance_id.in_(instance_ids)) if instance_ids else []
     data.tasks = selected_rows(db, WorkflowTask, WorkflowTask.instance_id.in_(instance_ids)) if instance_ids else []
     data.transitions = selected_rows(db, WorkflowStageTransition, WorkflowStageTransition.instance_id.in_(instance_ids)) if instance_ids else []
-    data.meetings = selected_rows(db, Meeting, Meeting.university_id.in_(uni_ids))
+    data.meetings = selected_rows(db, Meeting, Meeting.university_id.in_(uni_ids) & Meeting.meeting_at.is_not(None))
     data.interaction_notes = selected_rows(db, InteractionNote, InteractionNote.university_id.in_(uni_ids))
     data.responsibles = list(db.scalars(select(Responsible)))
     standard_template = db.scalar(

@@ -764,18 +764,17 @@ export interface MeetingAgenda {
 
 export const meetingAgendaQueryKey = (instanceId: string) => [...workflowQueryKey(instanceId), 'meeting-agenda'] as const;
 
-// Templates have no stage-kind field. Match the documented meeting-stage wording,
-// runtime position and template anchor, so an unrelated third stage is excluded.
-export function isMeetingAgendaStage(orderIndex: number, templateStageId: string | null | undefined, name: string): boolean {
-  return orderIndex === 3 && Boolean(templateStageId) && /^организация встречи с (?:представителями )?вуз(?:а|ом)$/iu.test(name.trim());
+// Runtime stage names are the only meeting indicator in configurable templates.
+export function isMeetingAgendaStage(templateStageId: string | null | undefined, name: string): boolean {
+  return Boolean(templateStageId) && /(?<![\p{L}\p{N}_])встреч(?:а|и|у|е|ей)(?![\p{L}\p{N}_])/iu.test(name);
 }
 
-export async function getMeetingAgenda(instanceId: string, signal?: AbortSignal): Promise<MeetingAgenda> {
-  return unwrapApiResult(await apiFetch<MeetingAgenda>(`/api/v1/workflow/instances/${encodeURIComponent(instanceId)}/meeting-agenda`, { signal }));
+export async function getMeetingAgenda(instanceId: string, signal?: AbortSignal, stageId?: string): Promise<MeetingAgenda> {
+  return unwrapApiResult(await apiFetch<MeetingAgenda>(`/api/v1/workflow/instances/${encodeURIComponent(instanceId)}/meeting-agenda${stageId ? `?stage_id=${encodeURIComponent(stageId)}` : ''}`, { signal }));
 }
 
-export async function downloadMeetingAgenda(instanceId: string): Promise<Blob> {
-  return unwrapApiResult(await apiDownload(`/api/v1/workflow/instances/${encodeURIComponent(instanceId)}/meeting-agenda.pdf`));
+export async function downloadMeetingAgenda(instanceId: string, stageId?: string): Promise<Blob> {
+  return unwrapApiResult(await apiDownload(`/api/v1/workflow/instances/${encodeURIComponent(instanceId)}/meeting-agenda.pdf${stageId ? `?stage_id=${encodeURIComponent(stageId)}` : ''}`));
 }
 
 export async function deleteWorkflowComment(commentId: string): Promise<void> {
@@ -1241,14 +1240,17 @@ export interface UniversityMeetingParticipant {
 
 export interface UniversityMeetingRow {
   id: string;
-  occurredAt: string;
-  type: UniversityMeetingType;
+  occurredAt: string | null;
+  type: UniversityMeetingType | null;
   subject: string;
   participants: UniversityMeetingParticipant[];
   outcome: string;
   nextAction: string;
   dueDate: string | null;
   author: string;
+  workflowInstanceId?: string | null;
+  workflowStageId?: string | null;
+  workflowStageName?: string | null;
 }
 
 export interface UniversityMeetingInput {

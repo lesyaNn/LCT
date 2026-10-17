@@ -58,9 +58,9 @@ export function ProductAssignmentForm({ universityId, existingProductIds, onClos
 
 export function MeetingMutationForm({ universityId, meeting, onClose, onSaved }: { universityId: string; meeting: UniversityMeetingRow | null; onClose: () => void; onSaved: () => void }) {
   const queryClient = useQueryClient();
-  const [type, setType] = useState<UniversityMeetingInput['type']>(meeting?.type ?? 'online');
+  const [type, setType] = useState<UniversityMeetingInput['type'] | ''>(meeting && !meeting.type ? '' : meeting?.type ?? 'online');
   const [subject, setSubject] = useState(meeting?.subject ?? '');
-  const [meetingAt, setMeetingAt] = useState(localDateTime(meeting?.occurredAt));
+  const [meetingAt, setMeetingAt] = useState(meeting && !meeting.occurredAt ? '' : localDateTime(meeting?.occurredAt ?? undefined));
   const [participants, setParticipants] = useState(meeting?.participants.map((item) => item.name).join(', ') ?? '');
   const [outcome, setOutcome] = useState(meeting?.outcome === '—' ? '' : meeting?.outcome ?? '');
   const [nextAction, setNextAction] = useState(meeting?.nextAction === '—' ? '' : meeting?.nextAction ?? '');
@@ -83,10 +83,11 @@ export function MeetingMutationForm({ universityId, meeting, onClose, onSaved }:
     event.preventDefault();
     if (save.isPending) return;
     const nextErrors: Record<string, string> = {};
+    if (!type) nextErrors.meeting_type = 'Укажите формат встречи.';
     if (!subject.trim()) nextErrors.subject = 'Укажите тему встречи.';
     if (!meetingAt || Number.isNaN(new Date(meetingAt).getTime())) nextErrors.meeting_at = 'Укажите дату и время.';
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length) return;
+    if (!type || Object.keys(nextErrors).length) return;
     setMessage(null);
     save.mutate({ type, subject, meetingAt: new Date(meetingAt).toISOString(), participants: participants.split(',').map((item) => item.trim()).filter(Boolean), outcome, nextAction, dueDate }, {
       onError: (cause) => {
@@ -97,7 +98,7 @@ export function MeetingMutationForm({ universityId, meeting, onClose, onSaved }:
     });
   };
   return <Modal title={meeting ? 'Редактировать встречу' : 'Добавить встречу'} onClose={() => { if (!save.isPending) onClose(); }}><form className={styles.assignmentForm} onSubmit={submit} noValidate>
-    <label className={styles.filter}><span>Тип</span><Select value={type} onChange={(event) => setType(event.target.value as UniversityMeetingInput['type'])}><option value="online">Онлайн</option><option value="offline">Очно</option><option value="phone">Телефон</option><option value="email">Email</option></Select></label>
+    <label className={styles.filter}><span>Тип</span><Select value={type} aria-invalid={Boolean(errors.meeting_type)} onChange={(event) => setType(event.target.value as UniversityMeetingInput['type'])}><option value="" disabled>Выберите формат</option><option value="online">Онлайн</option><option value="offline">Очно</option><option value="phone">Телефон</option><option value="email">Email</option></Select>{fieldError(errors, 'meeting_type')}</label>
     <label className={styles.filter}><span>Тема *</span><Input value={subject} maxLength={1024} aria-invalid={Boolean(errors.subject)} onChange={(event) => setSubject(event.target.value)} />{fieldError(errors, 'subject')}</label>
     <label className={styles.filter}><span>Дата и время *</span><Input type="datetime-local" value={meetingAt} aria-invalid={Boolean(errors.meeting_at)} onChange={(event) => setMeetingAt(event.target.value)} />{fieldError(errors, 'meeting_at')}</label>
     <label className={styles.filter}><span>Участники через запятую</span><Input value={participants} onChange={(event) => setParticipants(event.target.value)} /></label>

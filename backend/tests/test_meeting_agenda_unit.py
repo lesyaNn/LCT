@@ -126,7 +126,7 @@ def admin():
     return CurrentUser(id="admin", roles={"admin"})
 
 
-def _db(*, order=3, status="active", university_id=None):
+def _db(*, order=3, status="active", name="Встреча", started=True, university_id=None):
     return ScriptedDB(
         [
             {
@@ -135,7 +135,8 @@ def _db(*, order=3, status="active", university_id=None):
                 "current_instance_stage_id": uuid4(),
             }
         ],
-        [{"id": uuid4(), "name": "Встреча", "order_index": order}],
+        [{"id": uuid4(), "name": name, "order_index": order,
+          "template_stage_id": uuid4(), "started_at": datetime.now(UTC) if started else None}],
         [{"name": "Вуз", "city": "Москва"}],
         [],
         [],
@@ -162,8 +163,9 @@ def test_service_empty_has_bounded_queries_and_same_date_window():
     assert (
         result.as_of in sql[4].params.values() and result.expires_through in sql[4].params.values()
     )
-    assert "workflow_instances.university_id" in str(sql[5])
-    assert "archived" in sql[5].params.values() and "open" in sql[5].params.values()
+    assert "workflow_comments.instance_id" in str(sql[5])
+    assert "workflow_comments.stage_id" in str(sql[5])
+    assert "open" in sql[5].params.values()
 
 
 def test_section_reports_omissions_and_license_days():
@@ -184,16 +186,43 @@ def test_section_reports_omissions_and_license_days():
     assert result.expiring_licenses.items[0].days_left == 30
 
 
-@pytest.mark.parametrize(
-    "order,status", [(1, "active"), (2, "active"), (4, "active"), (3, "completed"), (3, "archived")]
-)
-def test_only_active_third_stage(order, status):
-    db = _db(order=order, status=status)
+@pytest.mark.parametrize("name,status,started", [
+    ("Согласование", "active", True),
+    ("Встречаются команды", "active", True),
+    ("Встреча", "completed", True),
+    ("Встреча", "archived", True),
+    ("Встреча", "active", False),
+])
+def test_only_active_visited_meeting_stage(name, status, started):
+    db = _db(name=name, status=status, started=started)
     with pytest.raises(BusinessException) as caught:
         service.build_agenda(db, uuid4(), admin())
     assert caught.value.status_code == 409
-    assert caught.value.details["reason"] == "meeting_agenda_requires_stage_3"
+    assert caught.value.details["reason"] == "meeting_agenda_requires_meeting_stage"
     assert len(db.statements) == 2
+
+
+def test_configured_meeting_stage_can_be_fourth():
+    assert service.build_agenda(_db(order=4), uuid4(), admin()).stage_order == 4
+
+
+def test_visited_meeting_stage_can_be_downloaded_after_completion():
+    assert service.build_agenda(_db(status="completed"), uuid4(), admin(), uuid4()).stage_order == 3
+
+
+def test_rolled_back_meeting_keeps_its_pdf_link():
+    db = _db(started=False)
+    db.results.insert(2, [{"id": uuid4()}])
+    assert service.build_agenda(db, uuid4(), admin(), uuid4()).stage_order == 3
+    assert "meetings.workflow_instance_stage_id" in str(db.statements[2])
+
+
+def test_unvisited_meeting_stage_cannot_be_requested_explicitly():
+    db = _db(started=False)
+    db.results.insert(2, [])
+    with pytest.raises(BusinessException) as caught:
+        service.build_agenda(db, uuid4(), admin(), uuid4())
+    assert caught.value.status_code == 409
 
 
 @pytest.mark.parametrize("roles,ids", [({"user"}, None), ({"manager"}, ()), ({"curator"}, None)])

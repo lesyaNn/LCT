@@ -41,6 +41,7 @@ from app.models.workflow_instances import (
     WorkflowTask,
 )
 from app.models.workflow_templates import WorkflowStage, WorkflowTemplate
+from app.modules.meetings.service import ensure_workflow_meeting
 
 from .overdue import compute_overdue, today_utc
 from .schemas import InstanceDetail, InstanceStageRead, WorkflowActivityRead
@@ -433,6 +434,7 @@ def create_instance(
         first.started_at = datetime.now(timezone.utc)
         instance.current_instance_stage_id = first.id
         instance.current_stage_id = first.template_stage_id
+        ensure_workflow_meeting(db, instance, first, actor_sub or "")
         db.add(
             WorkflowStageTransition(
                 instance_id=instance.id,
