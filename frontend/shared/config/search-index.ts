@@ -17,6 +17,7 @@ const pageKeywords: Record<string, Metadata> = {
   '/audit': { description: 'Журнал действий пользователей', keywords: ['журнал', 'история действий', 'события', 'действия пользователей', 'кто изменил'] },
   '/admin': { description: 'Настройки системы', keywords: ['настройки системы', 'администратор'] },
   '/admin/users': { description: 'Учётные записи, приглашения и роли', keywords: ['пользователь', 'приглашение', 'права', 'роль', 'роли'] },
+  '/admin/university-assignments': { description: 'Назначение вузов пользователям и граф связей', keywords: ['пользователь', 'вуз', 'вузы', 'назначение', 'граф связей'] },
   '/admin/catalogs': { description: 'Справочники и каталоги', keywords: ['каталог', 'справочник', 'продукт', 'вендор', 'договор', 'лицензия'] },
   '/admin/import': { description: 'Загрузка каталогов из файла', keywords: ['импорт', 'загрузить excel', 'импорт каталога', 'загрузить файл'] },
   '/admin/workflow/templates': { description: 'Настройка шаблонов Workflow', keywords: ['шаблон процесса', 'шаблон workflow'] },
