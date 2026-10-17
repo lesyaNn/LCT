@@ -13,6 +13,9 @@
 .contacts a:hover { text-decoration: underline; }
 .contacts a:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
 .contacts svg { flex: 0 0 auto; }
+.contactRow { align-items: center; display: flex; gap: var(--rtk-space-2); min-width: 0; }
+.contactRow a { flex: 1; }
+.copyButton { flex: 0 0 auto; }
 .assignmentForm { display: flex; flex-direction: column; gap: var(--rtk-space-4); }
 .assignmentIntro, .assignmentHint { color: var(--rtk-color-text-secondary); font-size: 13px; line-height: 1.45; margin: 0; }
 .primaryOption { align-items: flex-start; cursor: pointer; display: flex; gap: var(--rtk-space-3); }

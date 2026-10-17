@@ -17,10 +17,11 @@ import { Toast } from '@/shared/ui/rtk/toast';
 import { PassportTableSkeleton } from './passport-data-table';
 import { ResponsibleAssignmentDrawer } from './responsible-assignment-drawer';
 import { ResponsibleCard } from './responsible-card';
+import { UniversityLocalClock } from './university-local-clock';
 import { invalidateResponsibleQueries } from './responsible-queries';
 import styles from './university-responsibles-section.module.css';
 
-export function ResponsiblesSection({ id, canEdit }: { id: string; canEdit: boolean }) {
+export function ResponsiblesSection({ id, canEdit, city = '', timeZone }: { id: string; canEdit: boolean; city?: string; timeZone?: string | null }) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const canManage = hasPermission(user, 'university_responsible.manage') && !isMockDataSourceFor('passport');
@@ -41,6 +42,7 @@ export function ResponsiblesSection({ id, canEdit }: { id: string; canEdit: bool
 
   return <>
     <section className={styles.section} aria-label="Ответственные">
+      <UniversityLocalClock city={city} timeZone={timeZone} />
       {canManage || canEdit ? <div className={styles.toolbar}><Button variant="primary" size="s" type="button" onClick={() => setAssignmentOpen(true)}>Добавить ответственного</Button></div> : null}
       {query.data.length ? <div className={styles.grid}>{query.data.map((person) => <ResponsibleCard key={person.id} person={person} onRemove={canManage ? () => { setError(null); setRemoveTarget(person); } : undefined} />)}</div> : <EmptyState icon={<Mail size={20} fill="currentColor" />} title="Ответственные не назначены" description="Контактные лица появятся здесь после назначения." headingLevel={3} />}
     </section>

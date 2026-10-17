@@ -1,0 +1,7 @@
+.clock { align-items: flex-start; color: var(--rtk-color-text-secondary); display: flex; gap: var(--rtk-space-2); max-width: 100%; padding-block: var(--rtk-space-2); }
+.clock > svg { flex: 0 0 auto; margin-top: 2px; }
+.caption { display: block; font-size: 12px; overflow-wrap: anywhere; }
+.reading { align-items: baseline; display: flex; flex-wrap: wrap; font-size: 12px; gap: var(--rtk-space-2); }
+.time { color: var(--rtk-color-text-primary); font-size: 18px; font-variant-numeric: tabular-nums; font-weight: 600; }
+.hint { color: var(--rtk-color-text-secondary); display: block; font-size: 12px; }
+.unknown { color: var(--rtk-color-text-tertiary); display: block; font-size: 12px; padding-block: var(--rtk-space-2); }

@@ -78,3 +78,5 @@
 }
 @media (max-width: 420px) {
 }
+.copyValue { align-items: center; display: flex; gap: var(--rtk-space-2); min-width: 0; overflow-wrap: anywhere; }
+.copyValue strong { min-width: 0; }
