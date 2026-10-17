@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import Filter from '@atomaro/icons/24/action/Filter';
+import ChevronDown from '@atomaro/icons/24/navigation/ChevronDown';
 import { Button } from './button';
 import { Drawer } from './drawer';
 import { ActiveFilters, type ActiveFilterItem } from './active-filters';
@@ -46,8 +47,19 @@ export function FilterToolbar({ label, controls, periodControls, onReset, resetD
   const reset = onReset && !resetDisabled ? <Button variant="ghost" size="s" type="button" onClick={onReset}>Сбросить</Button> : null;
   return <>
     <FilterSurface mobileDrawer={false} className={`${styles.desktop} ${embedded ? styles.embedded : ''}`} label={label}>
-      {collapsible ? <Button variant="secondary" size="s" type="button" className={styles.collapseTrigger} aria-expanded={expanded} aria-controls={panelId} onClick={() => setExpanded((value) => !value)}><Filter size={16} fill="currentColor" />{expanded ? 'Скрыть фильтры' : 'Показать фильтры'}{mobileCount ? ` (${mobileCount})` : ''}</Button> : null}
-      <div id={panelId} className={styles.panel} hidden={collapsible && !expanded}><div className={`${styles.desktopLayout} ${compact ? styles.compact : ''}`}><div className={styles.grid}>{controls(false)}</div>{reset || actions ? <div className={styles.desktopActions}>{reset}{actions}</div> : null}</div>{periodControls ? <div className={styles.periodRow}>{periodControls}</div> : null}</div>
+      {collapsible ? (
+        <button type="button" className={styles.collapseHeader} aria-label={expanded ? 'Скрыть фильтры' : 'Показать фильтры'} aria-expanded={expanded} aria-controls={panelId} onClick={() => setExpanded((value) => !value)}>
+          <Filter size={16} fill="currentColor" aria-hidden="true" />
+          <span>Фильтры</span>
+          <ChevronDown className={styles.chevron} size={20} fill="currentColor" aria-hidden="true" />
+        </button>
+      ) : null}
+      <div id={panelId} className={collapsible ? styles.collapsiblePanel : undefined} aria-hidden={collapsible ? !expanded : undefined} inert={collapsible && !expanded}>
+        <div className={collapsible ? styles.panelInner : undefined}>
+          <div className={`${styles.desktopLayout} ${compact ? styles.compact : ''}`}><div className={styles.grid}>{controls(false)}</div>{reset || actions ? <div className={styles.desktopActions}>{reset}{actions}</div> : null}</div>
+          {periodControls ? <div className={styles.periodRow}>{periodControls}</div> : null}
+        </div>
+      </div>
     </FilterSurface>
     <Button className={styles.mobileTrigger} variant="secondary" size="s" type="button" onClick={() => setOpen(true)}><Filter size={16} fill="currentColor" />Фильтры{mobileCount ? ` (${mobileCount})` : ''}</Button>
     {open ? <Drawer title="Фильтры" onClose={() => setOpen(false)}><div className={`${styles.grid} ${styles.mobileGrid}`}>{controls(true)}</div>{periodControls ? <div className={styles.periodRow}>{periodControls}</div> : null}<div className={styles.actions}>{reset}{actions}<Button variant="primary" size="s" type="button" onClick={() => setOpen(false)}>Показать результаты</Button></div></Drawer> : null}

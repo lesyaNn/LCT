@@ -9,8 +9,16 @@
 .grid > label { display: flex; flex-direction: column; gap: var(--rtk-space-1); }
 .grid > label > span { color: var(--rtk-color-text-secondary); font-size: 11px; font-weight: 600; line-height: 14px; min-height: 14px; }
 .periodRow { margin-top: var(--rtk-space-4); min-width: 0; }
-.panel[hidden] { display: none; }
-.collapseTrigger { margin-bottom: var(--rtk-space-3); }
+.collapseHeader { align-items: center; background: transparent; border: 0; border-bottom: 1px solid transparent; color: var(--rtk-color-text-primary); cursor: pointer; display: flex; font: inherit; font-size: 14px; font-weight: 700; gap: var(--rtk-space-2); min-height: 36px; padding: 0; text-align: left; transition: background-color 180ms ease, border-color 180ms ease, margin-bottom 180ms ease, padding-bottom 180ms ease; width: 100%; }
+.collapseHeader:hover { background: var(--rtk-color-surface-hover); }
+.collapseHeader[aria-expanded="true"] { border-bottom-color: var(--rtk-color-border); margin-bottom: var(--rtk-space-2); padding-bottom: var(--rtk-space-2); }
+.collapseHeader:focus-visible { border-radius: var(--rtk-radius-small); outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
+.collapseHeader > svg:first-child { flex: 0 0 auto; }
+.chevron { color: var(--rtk-color-text-secondary); flex: 0 0 auto; margin-left: auto; transition: transform 180ms ease; }
+.collapseHeader[aria-expanded="true"] .chevron { transform: rotate(180deg); }
+.collapsiblePanel { display: grid; grid-template-rows: 1fr; opacity: 1; transition: grid-template-rows 180ms ease, opacity 180ms ease; }
+.collapsiblePanel[aria-hidden="true"] { grid-template-rows: 0fr; opacity: 0; }
+.panelInner { min-height: 0; overflow: hidden; }
 .actions { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); justify-content: flex-end; margin-top: var(--rtk-space-3); }
 /* Override Button's display regardless of CSS module insertion order. */
 .mobileTrigger.mobileTrigger { display: none; }
@@ -18,3 +26,4 @@
 .mobileGrid { grid-template-columns: 1fr; }
 .mobileGrid:has(> :only-child) { grid-template-columns: 1fr; }
 @media (max-width: 768px) { .desktop { display: none; } .mobileTrigger.mobileTrigger { align-self: flex-start; display: inline-flex; justify-self: start; max-width: 100%; width: fit-content; } .mobileGrid { grid-template-columns: 1fr; } .actions { justify-content: stretch; } .actions > * { flex: 1 1 auto; } }
+@media (prefers-reduced-motion: reduce) { .collapseHeader, .chevron, .collapsiblePanel { transition: none; } }
