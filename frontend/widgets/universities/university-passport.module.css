@@ -27,9 +27,16 @@
 .tabActive { background: transparent; border: 0; border-bottom: 3px solid transparent; color: var(--rtk-color-text-secondary); cursor: pointer; flex: 0 0 auto; font-size: 13px; font-weight: 600; min-height: 48px; padding: 0 var(--rtk-space-3); }
 .tab:hover { color: var(--rtk-color-text-primary); }
 .tabActive { border-bottom-color: var(--rtk-color-brand); color: var(--rtk-color-brand); }
-.desktopPanel { min-width: 0; }
+.page .passportContent { padding: 0; }
+.desktopPanel { min-width: 0; padding: var(--rtk-space-5); }
+.desktopPanel.flushPanel { padding: 0; }
 .mobileAccordion { display: none; }
-.overviewContent { display: flex; flex-direction: column; gap: var(--rtk-space-6); }
+.overviewContent { display: flex; flex-direction: column; gap: 0; }
+.overviewContent > .section,
+.overviewContent > .workflowCard,
+.overviewContent > .timelineCard { padding: var(--rtk-space-5); }
+.overviewContent > .workflowCard,
+.overviewContent > .timelineCard { border-radius: 0; border-top: 1px solid var(--rtk-color-border); box-shadow: none; }
 .section { display: flex; flex-direction: column; gap: var(--rtk-space-4); }
 .sectionHeading { align-items: flex-start; display: flex; gap: var(--rtk-space-4); justify-content: space-between; }
 .sectionHeading h2 { font-size: 20px; letter-spacing: -.02em; margin: 0; }
@@ -103,7 +110,10 @@
   .accordionTrigger svg { transition: transform 160ms ease; }
   .accordionTriggerActive svg { transform: rotate(90deg); }
   .accordionPanel { border-top: 1px solid var(--rtk-color-border); padding: var(--rtk-space-4); }
-  .accordionPanel .overviewContent { gap: var(--rtk-space-4); }
+  .accordionPanel.flushPanel { padding: 0; }
+  .overviewContent > .section,
+  .overviewContent > .workflowCard,
+  .overviewContent > .timelineCard { padding: var(--rtk-space-4); }
   .accordionPanel .sectionHeading { align-items: flex-start; flex-direction: column; }
   .metricsGrid,
   .skeletonMetrics { grid-template-columns: 1fr; }
