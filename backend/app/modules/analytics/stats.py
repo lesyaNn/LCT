@@ -78,7 +78,9 @@ STAT_DIMENSIONS: tuple[str, ...] = (
 
 #: Human-readable dimension titles, reused by the chart exporter and the PDF.
 DIMENSION_TITLES: dict[str, str] = {
+    "by_university": "Распределение строк по вузам",
     "by_direction": "Распределение строк по ИТ-направлениям",
+    "by_program": "Распределение строк по ИТ-программам",
     "by_product": "Распределение строк по ИТ-продуктам",
     "by_workflow_status": "Распределение строк по статусу работы",
     "by_responsible": "Распределение вузов по ответственным",
@@ -139,6 +141,59 @@ class _Aliases:
 
 class ReportStatsService:
     """SQL aggregation for the report statistics (never row-by-row)."""
+
+    @staticmethod
+    def group_slice(
+        db: Session,
+        filters: UnifiedFilter,
+        group_by: str,
+        *,
+        columns: list[str] | None = None,
+        user: Any | None = None,
+        today: date | None = None,
+    ) -> StatSlice:
+        """One supported summary dimension, using the same filtered selection."""
+        from app.modules.analytics.columns import COLUMN_REGISTRY, resolve_columns
+
+        license_grain = any(COLUMN_REGISTRY[key].needs_license_join for key in resolve_columns(columns))
+        if group_by == "responsible":
+            return ReportStatsService._responsible_distribution(
+                db, filters, user=user, today=today
+            )
+        base = ReportStatsService._filtered_rows(filters, user=user, today=today)
+        labels = {
+            "university": University.name,
+            "direction": ReportDatasetService.direction_label(
+                base.aliases.lic_dir, base.aliases.prog_dir
+            ),
+            "program": ReportDatasetService.program_label(base.program),
+            "product": ReportDatasetService.product_label(base.product),
+            "workflow_status": ReportDatasetService.workflow_status_label(),
+        }
+        if group_by not in labels:
+            raise ValueError(f"unsupported report grouping: {group_by}")
+        resolved = base.with_label(labels[group_by]).subquery()
+        bucket = func.coalesce(
+            func.nullif(func.cast(resolved.c.label, String), ""), NO_VALUE_LABEL
+        )
+        count = func.count() if license_grain else func.count(distinct(resolved.c.id))
+        rows = db.execute(
+            select(bucket.label("label"), count.label("count"))
+            .select_from(resolved)
+            .group_by(bucket)
+            .order_by(count.desc(), bucket.asc())
+        ).all()
+        buckets = tuple(StatBucket(str(row[0]), int(row[1])) for row in rows)
+        title = DIMENSION_TITLES[f"by_{group_by}"]
+        if not license_grain:
+            title = "Вузы" if group_by == "university" else title.replace("строк", "вузов")
+        return StatSlice(
+            dimension=f"by_{group_by}",
+            title=title,
+            unit="rows" if license_grain else "universities",
+            total=sum(bucket.count for bucket in buckets),
+            buckets=buckets,
+        )
 
     @staticmethod
     def build(
@@ -249,7 +304,7 @@ class ReportStatsService:
         )
         if user is not None:
             stmt = UnifiedFilterService.apply_security_scope(stmt, user)
-        return _RowSelection(stmt=stmt, aliases=aliases, product=product)
+        return _RowSelection(stmt=stmt, aliases=aliases, product=product, program=program)
 
     # ----------------------------------------------------------- aggregation
 
@@ -331,6 +386,7 @@ class _RowSelection:
     stmt: Any
     aliases: _Aliases
     product: Any
+    program: Any
 
     def with_label(self, label: Any) -> Any:
         """Project the label as a column, keeping the row grain intact.

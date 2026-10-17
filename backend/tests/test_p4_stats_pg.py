@@ -133,6 +133,25 @@ def _buckets(stats, dimension):
     return dict(item.buckets and {b.label: b.count for b in item.buckets})
 
 
+def test_grouped_report_counts_match_selected_row_grain(session, data):
+    by_university_rows = ReportStatsService.group_slice(
+        session, SEPTEMBER, "university", columns=["university", "product"], today=TODAY
+    )
+    assert by_university_rows.unit == "rows"
+    assert {item.label: item.count for item in by_university_rows.buckets} == {"ВУЗ Альфа": 3, "ВУЗ Бета": 1}
+
+    by_university_entities = ReportStatsService.group_slice(
+        session, SEPTEMBER, "university", columns=["university"], today=TODAY
+    )
+    assert by_university_entities.unit == "universities"
+    assert {item.label: item.count for item in by_university_entities.buckets} == {"ВУЗ Альфа": 1, "ВУЗ Бета": 1}
+
+    by_program = ReportStatsService.group_slice(
+        session, SEPTEMBER, "program", columns=["university", "program"], today=TODAY
+    )
+    assert {item.label: item.count for item in by_program.buckets} == {"Программа А": 3, NO_VALUE_LABEL: 1}
+
+
 # ------------------------------------------------------------- the selection
 
 

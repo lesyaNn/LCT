@@ -64,6 +64,7 @@ from sqlalchemy.orm import Session
 from app.modules.analytics.columns import COLUMN_REGISTRY, resolve_columns
 from app.modules.analytics.dataset import ReportDatasetService
 from app.modules.analytics.filters import UnifiedFilter
+from app.modules.analytics.stats import ReportStatsService
 from app.modules.analytics.xlsx import GeneratedReport
 
 __all__ = [
@@ -156,6 +157,7 @@ def generate_json_report(
     user: Any | None = None,
     generated_at: datetime | None = None,
     batch_size: int = 1000,
+    group_by: str | None = None,
 ) -> GeneratedReport:
     """Generate the frozen JSON export from the report dataset.
 
@@ -224,6 +226,10 @@ def generate_json_report(
                         out.write(chunk)
                 out.write("\n")
             out.write("]")
+            if group_by:
+                summary = ReportStatsService.group_slice(db, filters, group_by, columns=resolved, user=user)
+                groups = {"dimension": summary.dimension, "title": summary.title, "unit": summary.unit, "buckets": [{"label": bucket.label, "count": bucket.count} for bucket in summary.buckets]}
+                out.write(f',\n  "groups": {json.dumps(groups, ensure_ascii=False)}')
             out.write(f',\n  "totals": {json.dumps(totals, ensure_ascii=False)}')
             out.write("\n}\n")
         tmp_path.replace(final_path)

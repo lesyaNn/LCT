@@ -1,7 +1,6 @@
 'use client';
 
 import Filter from '@atomaro/icons/24/action/Filter';
-import Calendar from '@atomaro/icons/24/communication/Calendar';
 import DocumentText from '@atomaro/icons/24/document/DocumentText';
 import FolderAdd from '@atomaro/icons/24/document/FolderAdd';
 import PasswordShow from '@atomaro/icons/24/action/PasswordShow';
@@ -16,6 +15,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { applyServerErrorsToForm, normalizeApiError } from '@/shared/lib/api-errors';
+import { catalogQueryKeys, getCatalogReferenceData } from '@/shared/lib/catalogs-repository';
 import { Button } from '@/shared/ui/rtk/button';
 import { FormErrorBanner } from '@/shared/ui/rtk/form-field';
 import { Toast, type ToastIntent } from '@/shared/ui/rtk/toast';
@@ -37,7 +37,7 @@ import {
   type ReportTemplate,
 } from '@/shared/lib/reports-repository';
 import { reportFields, reportSchema, type ReportFormSchema } from './report-form-schema';
-import { buildActiveFilters, ReportFilterFields } from './report-filters';
+import { ReportFilterFields, type ReportFilterKey } from './report-filters';
 import { ReportColumnSelector } from './report-columns';
 import { ReportFormatField } from './report-format';
 import { ReportPreviewModal } from './report-preview-modal';
@@ -60,6 +60,7 @@ function ReportParameters({ onCreated }: { onCreated: (job: ReportJob) => void }
     defaultValues: EMPTY_REPORT_FORM,
   });
   const values = useWatch({ control }) as ReportFormSchema;
+  const catalogsQuery = useQuery({ queryKey: catalogQueryKeys.references, queryFn: ({ signal }) => getCatalogReferenceData(signal), staleTime: 5 * 60_000 });
 
   const createMutation = useMutation({
     mutationFn: createReportJob,
@@ -102,9 +103,26 @@ function ReportParameters({ onCreated }: { onCreated: (job: ReportJob) => void }
     setValue('dateTo', dateTo, { shouldDirty: true, shouldValidate: true });
     clearErrors(['dateFrom', 'dateTo']);
   };
-  const clearFilters = () => setPeriod('', '');
-
-  const activeFilters = buildActiveFilters(values, setPeriod);
+  const setFilter = (key: ReportFilterKey, selected: string[]) => {
+    setValue(key, selected as never, { shouldDirty: true, shouldValidate: true });
+    const options = catalogsQuery.data;
+    if (key === 'directionIds' && options) {
+      const remainingPrograms = values.programIds.filter((id) => {
+        const program = options.programs.find((item) => item.id === id);
+        return !selected.length || !program?.parentId || selected.includes(program.parentId);
+      });
+      if (remainingPrograms.length !== values.programIds.length) setValue('programIds', remainingPrograms, { shouldDirty: true });
+      const allowedPrograms = remainingPrograms.length ? remainingPrograms : options.programs.filter((item) => !selected.length || !item.parentId || selected.includes(item.parentId)).map((item) => item.id);
+      setValue('productIds', values.productIds.filter((id) => { const product = options.products.find((item) => item.id === id); return !selected.length || !product?.parentId || allowedPrograms.includes(product.parentId); }), { shouldDirty: true });
+    }
+    if (key === 'programIds' && options && selected.length) {
+      setValue('productIds', values.productIds.filter((id) => { const product = options.products.find((item) => item.id === id); return !product?.parentId || selected.includes(product.parentId); }), { shouldDirty: true });
+    }
+  };
+  const clearFilters = () => {
+    setPeriod('', '');
+    (['universityIds', 'directionIds', 'programIds', 'productIds', 'responsibleIds', 'workflowStatuses'] as ReportFilterKey[]).forEach((key) => setValue(key, [] as never, { shouldDirty: true }));
+  };
 
   const submit = (request: ReportRequest) => {
     setGlobalError(null);
@@ -122,24 +140,18 @@ function ReportParameters({ onCreated }: { onCreated: (job: ReportJob) => void }
 
   return (
     <div className={styles.reportsLayout}>
-      <section className={styles.periodSurface} aria-labelledby="report-period-heading">
-        <div className={styles.sectionHeading}>
-          <div className={styles.headingWithIcon}>
-            <Calendar size={18} fill="currentColor" aria-hidden="true" />
-            <div>
-              <h3 id="report-period-heading">Период</h3>
-              <p>Выберите готовый период или укажите даты.</p>
-            </div>
-          </div>
-        </div>
+      <div className={styles.filterSurface}>
         <ReportFilterFields
           values={values}
+          options={catalogsQuery.data}
+          loading={catalogsQuery.isPending}
+          unavailable={catalogsQuery.isError}
           errors={errors}
+          onChange={setFilter}
           onPeriodChange={setPeriod}
           onReset={clearFilters}
-          activeFilters={activeFilters}
         />
-      </section>
+      </div>
       <div className={styles.formSurface}>
         <div className={styles.sectionHeading}>
           <div className={styles.headingWithIcon}>

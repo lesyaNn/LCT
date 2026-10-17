@@ -167,6 +167,18 @@ def _gen(tmp_path: Path, columns, rows: list[dict], **kw):
     return result
 
 
+def test_selected_grouping_adds_summary_sheet(tmp_path, monkeypatch):
+    from app.modules.analytics.stats import ReportStatsService, StatBucket, StatSlice
+
+    summary = StatSlice("by_university", "Распределение строк по вузам", "rows", 2, (StatBucket("МГУ", 2),))
+    monkeypatch.setattr(ReportStatsService, "group_slice", staticmethod(lambda *args, **kwargs: summary))
+    result = _gen(tmp_path, ["university"], [{"university": "МГУ"}], group_by="university")
+    book = load_workbook(result.path, read_only=True)
+    assert book.sheetnames == ["Отчёт", "Фильтры", "Группировка"]
+    assert book["Группировка"]["A3"].value == "МГУ"
+    assert book["Группировка"]["B3"].value == 2
+
+
 # ------------------------------------------------------------- sanitizer
 
 

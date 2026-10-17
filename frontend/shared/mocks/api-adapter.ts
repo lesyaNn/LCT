@@ -909,9 +909,9 @@ export function mockGetCatalogReferenceData(): CatalogReferenceData {
   return {
     vendors: [...catalogGroup('vendors').values()].flatMap((item) => item.type === 'vendors' ? [{ id: item.id, name: item.name }] : []),
     universities: [...catalogGroup('universities').values()].filter((item) => item.type === 'universities').map((item) => ({ id: item.id, name: item.name })),
-    products: [...catalogGroup('products').values()].flatMap((item) => item.type === 'products' ? [{ id: item.id, name: item.name, description: item.vendorName }] : []),
+    products: [...catalogGroup('products').values()].flatMap((item) => item.type === 'products' ? [{ id: item.id, name: item.name, description: item.vendorName, parentId: item.programId }] : []),
     directions: [...catalogGroup('directions').values()].flatMap((item) => item.type === 'directions' ? [{ id: item.id, name: item.name, description: item.code }] : []),
-    programs: [...catalogGroup('programs').values()].flatMap((item) => item.type === 'programs' ? [{ id: item.id, name: item.name, description: item.directionName }] : []),
+    programs: [...catalogGroup('programs').values()].flatMap((item) => item.type === 'programs' ? [{ id: item.id, name: item.name, description: item.directionName, parentId: item.directionId }] : []),
     responsibles: [...catalogGroup('responsibles').values()].flatMap((item) => item.type === 'responsibles' ? [{ id: item.id, name: item.name, description: item.role || item.email }] : []),
     contracts: [...catalogGroup('agreements').values()].flatMap((item) => item.type === 'agreements' && item.kind === 'contracts' ? [{ id: item.id, name: item.contractNumber, description: item.universityName }] : []),
   };

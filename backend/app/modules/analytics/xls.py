@@ -37,6 +37,7 @@ from sqlalchemy.orm import Session
 from app.modules.analytics.cells import classify_cell, estimate_width
 from app.modules.analytics.columns import COLUMN_REGISTRY, resolve_columns
 from app.modules.analytics.dataset import ReportDatasetService
+from app.modules.analytics.stats import ReportStatsService
 from app.modules.analytics.filters import UnifiedFilter
 from app.modules.analytics.xlsx import (
     DATA_START_ROW,
@@ -179,6 +180,7 @@ def generate_xls_report(
     user: Any | None = None,
     generated_at: datetime | None = None,
     batch_size: int = 1000,
+    group_by: str | None = None,
 ) -> GeneratedReport:
     """Generate a legacy ``.xls`` workbook from the report dataset.
 
@@ -254,6 +256,19 @@ def generate_xls_report(
             sheet.col(idx).width = int(min(width, float(MAX_COLUMN_WIDTH)) * _WIDTH_UNIT)
 
         _write_filters_sheet(book, filters, styles)
+        if group_by:
+            summary = ReportStatsService.group_slice(db, filters, group_by, columns=resolved, user=user)
+            if len(summary.buckets) + 2 > XLS_MAX_ROWS:
+                raise XlsCapacityError("Группировка превышает лимит строк XLS; используйте XLSX")
+            group_sheet = book.add_sheet("Группировка")
+            group_sheet.write(0, 0, summary.title)
+            group_sheet.write(1, 0, "Группа", styles["header"])
+            group_sheet.write(1, 1, "Вузов" if summary.unit == "universities" else "Строк", styles["header"])
+            for index, bucket in enumerate(summary.buckets, start=2):
+                group_sheet.write(index, 0, bucket.label)
+                group_sheet.write(index, 1, bucket.count)
+            group_sheet.col(0).width = 42 * 256
+            group_sheet.col(1).width = 16 * 256
         book.save(str(tmp_path))
         tmp_path.replace(final_path)
     except Exception:
