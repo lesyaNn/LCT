@@ -97,23 +97,31 @@
 .assigneeTrigger { align-items: center; color: var(--rtk-color-text-secondary); display: inline-flex; font-size: 11px; gap: var(--rtk-space-1); max-width: 100%; min-width: 0; overflow-wrap: anywhere; }
 .assigneeTrigger:focus-visible { border-radius: var(--rtk-radius-small); outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
 .assigneeTrigger > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.assigneeTrigger > span:first-child { font-size: 9px; height: 24px; width: 24px; }
 .unassigned { color: var(--rtk-color-text-tertiary); }
 .dueSoon { color: var(--atmr-warning-on-container) !important; font-weight: 650; }
 .stageSummary { align-items: center; color: var(--rtk-color-text-tertiary); display: flex; flex-wrap: wrap; font-size: 10px; gap: var(--rtk-space-3); }
 .stageSummary > span { align-items: center; display: inline-flex; gap: 4px; }
 .stageSummary > [data-empty='true'] { opacity: .65; }
 .stageSummary svg { color: var(--rtk-color-text-secondary); }
+.stageRenameError { color: var(--rtk-color-danger); font-size: 12px; }
 .globalResources { composes: surface from '../../shared/ui/rtk/section-surface.module.css'; }
 .globalResources > .historyDisclosure { border: 0; }
 .globalResources > .historyDisclosure > summary { padding: 0; }
 .globalResourcesContent { display: flex; flex-direction: column; gap: var(--rtk-space-4); padding-top: var(--rtk-space-4); }
 .detailPanel { display: flex; flex-direction: column; gap: var(--rtk-space-5); }
 .detailHeader h2 { font-size: 24px; max-width: 500px; overflow-wrap: anywhere; }
+.detailTitle { align-items: center; display: flex; flex: 1 1 auto; flex-wrap: wrap; gap: var(--rtk-space-2); min-width: 0; }
 .detail-overdue { border-top: 2px solid var(--atmr-error-on-container); }
-.detailFacts { display: grid; gap: var(--rtk-space-4); grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
-.detailFacts div { display: flex; flex-direction: column; gap: var(--rtk-space-1); min-width: 0; }
-.detailFacts dt { color: var(--rtk-color-text-tertiary); font-size: 11px; }
+.detailFacts { display: flex; margin: 0; overflow-x: auto; }
+.detailFacts > div { display: flex; flex: 1 0 145px; flex-direction: column; gap: var(--rtk-space-1); min-width: 0; padding: 0 var(--rtk-space-3); }
+.detailFacts > div:first-child { padding-left: 0; }
+.detailFacts > div + div { border-left: 1px solid var(--rtk-color-border); }
+.detailFacts dt { align-items: center; color: var(--rtk-color-text-tertiary); display: inline-flex; font-size: 11px; gap: var(--rtk-space-1); }
+.detailFacts dt svg { color: var(--rtk-color-text-secondary); flex: 0 0 auto; }
 .detailFacts dd { align-items: center; display: flex; flex-wrap: wrap; font-size: 13px; gap: var(--rtk-space-1) var(--rtk-space-2); margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.detailFacts .stageDeadline svg { display: none; }
+.detailFacts .stageDeadline small { padding-left: 0; }
 .futureNotice { background: var(--rtk-color-surface-subtle); border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-secondary); font-size: 13px; margin: 0; padding: var(--rtk-space-3); }
 .detailSection { display: flex; flex-direction: column; gap: var(--rtk-space-3); min-width: 0; }
 .detailSection + .detailSection { border-top: 1px solid var(--rtk-color-border); padding-top: var(--rtk-space-5); }
@@ -191,7 +199,7 @@
 @keyframes workflowShimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 @keyframes workflowDetailsReveal { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 900px) { .layout, .skeletonLayout { grid-template-columns: 1fr; } }
-@media (max-width: 480px) { .stagesPanel, .detailPanel, .overallProgress { padding: var(--rtk-space-4); } .detailFacts { grid-template-columns: 1fr; } .detailHeader { flex-direction: column; } .stageButton { gap: var(--rtk-space-2); grid-template-columns: 36px minmax(0, 1fr); min-height: 52px; padding: var(--rtk-space-2); } .stageMarker { height: 36px; width: 36px; } .stageItem:not(:last-child)::after { left: 18px; top: 44px; } .stageMeta { align-items: flex-start; flex-direction: column; gap: var(--rtk-space-1); } .progressLabel { align-items: flex-start; flex-direction: column; gap: var(--rtk-space-1); } .taskList label { min-height: 44px; } .stageActionButtons { align-items: stretch; flex-direction: column; } .stageActionButtons > button { width: 100%; } .completionSummary time { margin-left: 0; width: 100%; } }
+@media (max-width: 480px) { .stagesPanel, .detailPanel, .overallProgress { padding: var(--rtk-space-4); } .detailHeader { flex-direction: column; } .stageButton { gap: var(--rtk-space-2); grid-template-columns: 36px minmax(0, 1fr); min-height: 52px; padding: var(--rtk-space-2); } .stageMarker { height: 36px; width: 36px; } .stageItem:not(:last-child)::after { left: 18px; top: 44px; } .stageMeta { align-items: flex-start; flex-direction: column; gap: var(--rtk-space-1); } .progressLabel { align-items: flex-start; flex-direction: column; gap: var(--rtk-space-1); } .taskList label { min-height: 44px; } .stageActionButtons { align-items: stretch; flex-direction: column; } .stageActionButtons > button { width: 100%; } .completionSummary time { margin-left: 0; width: 100%; } }
 @media (max-width: 480px) { .instancesHeader { align-items: stretch; flex-direction: column; } .instancesHeader > button { width: 100%; } }
 @media (max-width: 480px) { .toastViewport { bottom: var(--rtk-space-3); left: var(--rtk-space-3); max-height: calc(100vh - 2 * var(--rtk-space-3)); max-width: none; right: var(--rtk-space-3); } .toastViewport > * { max-width: none; } }
 @media (prefers-reduced-motion: reduce) { .progressTrack span, .taskProgress span, .skeletonStages span, .skeletonDetails span, .skeletonHeader span, .detailPanel { animation: none; transition: none; } }

@@ -164,8 +164,12 @@ function readPalette(): Palette {
 }
 
 export function NetworkGraph({ showIntro = true }: { showIntro?: boolean }) {
+  const { user } = useAuth();
+  const viewerKey = user
+    ? `${user.id}:${user.role}:${[...user.scope.universityIds].sort().join(',')}`
+    : 'anonymous';
   const graphQuery = useQuery({
-    queryKey: networkGraphQueryKey,
+    queryKey: [...networkGraphQueryKey, viewerKey],
     queryFn: ({ signal }) => getNetworkGraph(signal),
     staleTime: 60_000,
   });
@@ -234,6 +238,7 @@ function NetworkCanvas({ data }: { data: NetworkGraphData }) {
   const canAssign = Boolean(
     currentUser && hasPermission(currentUser, 'admin.users') && USERS_API_CAPABILITIES.updateRoleAndScope,
   );
+  const managerView = Boolean(currentUser && hasPermission(currentUser, 'user_university.manage') && !hasPermission(currentUser, 'admin.users'));
 
   const nodeById = useMemo(() => new Map<string, NetworkNode>(data.nodes.map((node) => [node.id, node])), [data]);
 
@@ -860,6 +865,7 @@ function NetworkCanvas({ data }: { data: NetworkGraphData }) {
         <span className={styles.chip}>Вузы: <strong>{data.universitiesCount}</strong></span>
         <span className={styles.chip}>Связи: <strong>{data.linksCount}</strong></span>
         {data.scope === 'own' ? <span className={styles.chip}>Показаны только ваши вузы</span> : null}
+        {data.scope === 'full' && managerView ? <span className={styles.chip}>Показаны доступные вам пользователи и вузы</span> : null}
         {data.isolatedCount > 0 ? <span className={styles.chip}>Без связей: <strong>{data.isolatedCount}</strong></span> : null}
       </div>
 
