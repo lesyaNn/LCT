@@ -55,7 +55,8 @@ does not require SMTP settings.
 ## Delivery
 
 Every event currently handled by `Notification Service` is eligible: assignment,
-workflow stage change and rollback, current stage/task deadline and overdue,
+Workflow stage completion, rollback and final completion, task creation and
+completion, current stage/task deadline and overdue,
 contract and license expiry, import errors, user university assignment and manual
 Workflow comments (including comments with attachments). The
 existing scanner and its event deduplication rules are reused. The inbox's target
@@ -146,7 +147,7 @@ must support STARTTLS or SSL; the application has no plaintext fallback.
 
 ### Preview without sending mail
 
-From `backend/`, generate all 16 CRM scenarios (HTML and original text), including
+From `backend/`, generate all 19 CRM scenarios (HTML and original text), including
 both university access destinations, comments and both import outcomes:
 
 ```sh
@@ -180,8 +181,8 @@ After generating the Keycloak previews, build the single offline gallery from
 python -m scripts.build_email_gallery --keycloak-dir /tmp/rtk-emails/keycloak --output ../docs/email-examples.html
 ```
 
-The resulting `docs/email-examples.html` embeds only the 18 implemented sending
-scenarios: 16 CRM variants and 2 account scenarios (invitation and administrator
+The resulting `docs/email-examples.html` embeds only the 21 implemented sending
+scenarios: 19 CRM variants and 2 account scenarios (invitation and administrator
 password update), both using `executeActions` with `UPDATE_PASSWORD`. The gallery
 uses Russian, matching the realm configuration. Inherited Keycloak templates
 without an application trigger are excluded. It includes navigation,

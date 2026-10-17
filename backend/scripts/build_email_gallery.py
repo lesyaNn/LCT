@@ -19,7 +19,7 @@ CRM_LABELS = (
     ("Назначена работа", "После назначения ответственного за работу с вузом."),
     ("Доступ к одному вузу", "Администратор предоставил пользователю доступ к одному вузу."),
     ("Доступ к нескольким вузам", "Администратор одновременно предоставил доступ к нескольким вузам."),
-    ("Переход на следующий этап", "Работа с вузом переведена на другой этап."),
+    ("Этап Workflow завершён", "Сотрудник завершил этап и перевёл работу на следующий этап."),
     ("Возврат этапа", "Работа возвращена на предыдущий этап с указанием причины."),
     ("Новый комментарий", "Другой сотрудник оставил самостоятельный комментарий в Workflow."),
     ("Приближается срок этапа", "Наступила контрольная дата текущего этапа."),
@@ -31,6 +31,9 @@ CRM_LABELS = (
     ("Этап просрочен", "Истёк срок текущего этапа Workflow."),
     ("Приближается срок задачи", "Наступила контрольная дата открытой задачи."),
     ("Комментарий с вложением", "Комментарий опубликован с файлом. В письмо попадает текст комментария."),
+    ("Workflow завершён", "Сотрудник завершил финальный этап и весь Workflow."),
+    ("Добавлена новая задача", "Сотрудник создал задачу на этапе Workflow."),
+    ("Задача выполнена", "Сотрудник перевёл задачу из открытого состояния в выполненное."),
 )
 
 # Only these account email calls are wired into admin_users.service.
@@ -123,7 +126,8 @@ const examples=JSON.parse(document.getElementById('examples').textContent);
 const $=id=>document.getElementById(id);
 let selected=examples[0], theme='light', width='desktop', toastTimer;
 const groups={crm:'Уведомления CRM',account:'Учётная запись · Keycloak'};
-$('total').textContent=`${examples.length} примеров`;
+const exampleWords={one:'пример',few:'примера',many:'примеров',other:'примера'};
+$('total').textContent=`${examples.length} ${exampleWords[new Intl.PluralRules('ru').select(examples.length)]}`;
 function makeItem(example,index){const button=document.createElement('button');button.type='button';button.className='item';button.dataset.id=example.id;button.setAttribute('aria-current',String(selected.id===example.id));const number=document.createElement('span');number.className='number';number.textContent=String(index+1).padStart(2,'0');const title=document.createElement('span');title.textContent=example.label;button.append(number,title);button.addEventListener('click',()=>select(example));return button;}
 function catalog(){const query=$('search').value.trim().toLocaleLowerCase('ru');$('catalog').replaceChildren();let count=0;for(const [group,name]of Object.entries(groups)){const items=examples.filter(e=>e.group===group&&`${e.label} ${e.description} ${e.subject} ${e.kind}`.toLocaleLowerCase('ru').includes(query));if(!items.length)continue;const title=document.createElement('p');title.className='group-title';title.textContent=`${name} · ${items.length}`;$('catalog').append(title);for(const example of items){$('catalog').append(makeItem(example,examples.indexOf(example)));count++;}}if(!count){const empty=document.createElement('p');empty.className='empty';empty.textContent='Писем по этому запросу нет';$('catalog').append(empty);}}
 for(const[group,name]of Object.entries(groups)){const optgroup=document.createElement('optgroup');optgroup.label=name;for(const e of examples.filter(e=>e.group===group)){const option=document.createElement('option');option.value=e.id;option.textContent=e.label;optgroup.append(option);}$('mobile-select').append(optgroup);}
