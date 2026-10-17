@@ -81,8 +81,8 @@
 .statCaption { color: var(--rtk-color-text-secondary); flex: 0 0 auto; font-size: 11px; margin: auto 0 0; }
 .statEmpty { color: var(--rtk-color-text-tertiary); font-size: 12px; margin: 0; }
 .statTooltip { background: var(--rtk-color-surface-elevated); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); box-shadow: var(--rtk-shadow-elevation-2); display: flex; flex-direction: column; font-size: 11px; gap: 2px; max-width: 240px; padding: var(--rtk-space-2) var(--rtk-space-3); }
-.jobsSurface { display: flex; flex-direction: column; gap: var(--rtk-space-4); min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; }
-.jobsSurface:focus-visible, .templatesSurface:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: -2px; }
+.jobsSurface { display: flex; flex-direction: column; gap: var(--rtk-space-4); min-height: 0; overflow: hidden; }
+.templatesSurface:focus-visible, .jobsListShell:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: -2px; }
 .jobsHeader { align-items: flex-start; display: flex; gap: var(--rtk-space-4); justify-content: space-between; }
 .jobsHeader > svg { color: var(--rtk-color-brand); flex: 0 0 auto; }
 .jobsHeader > div { min-width: 0; }
@@ -90,7 +90,7 @@
 .jobsHeader p { color: var(--rtk-color-text-secondary); font-size: 12px; margin: var(--rtk-space-1) 0 0; }
 .jobsCapability { align-items: flex-start; color: var(--rtk-color-text-tertiary); display: inline-flex; font-size: 11px; gap: var(--rtk-space-1); max-width: 220px; }
 .jobsCapability svg { flex: 0 0 auto; }
-.jobsListShell { background: transparent; border-radius: 0; box-shadow: none; overflow: visible; }
+.jobsListShell { flex: 1 1 auto; min-height: 0; max-height: min(52vh, 560px); overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
 .jobsDesktop { display: none; overflow-x: auto; }
 .jobsDesktop table { border-collapse: collapse; min-width: 660px; table-layout: fixed; width: 100%; }
 .jobsDesktop th, .jobsDesktop td { border-bottom: 1px solid var(--rtk-color-border); padding: var(--rtk-space-3); text-align: left; vertical-align: top; }

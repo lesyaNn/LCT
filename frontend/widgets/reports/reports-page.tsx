@@ -287,7 +287,7 @@ function ReportQueue() {
   };
 
   return (
-    <section className={styles.jobsSurface} aria-labelledby="report-jobs-heading" tabIndex={0}>
+    <section className={styles.jobsSurface} aria-labelledby="report-jobs-heading">
       <div className={styles.jobsHeader}>
         <DocumentText size={20} fill="currentColor" aria-hidden="true" />
         <div>

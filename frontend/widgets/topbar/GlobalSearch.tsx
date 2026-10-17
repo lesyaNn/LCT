@@ -11,9 +11,10 @@ import { Input } from '@/shared/ui/rtk/form-controls';
 import styles from './global-search.module.css';
 
 type Hit = { id: string; title: string; subtitle: string | null; university_id: string | null };
-type Results = { universities: Hit[]; workflows: Hit[]; documents: Hit[]; contracts: Hit[]; products: Hit[]; responsibles: Hit[] };
+type DocumentationHit = { id: string; title: string; subtitle: string; href: string };
+type Results = { universities: Hit[]; workflows: Hit[]; documents: Hit[]; contracts: Hit[]; products: Hit[]; responsibles: Hit[]; documentation: DocumentationHit[] };
 type Option = { key: string; title: string; subtitle: string; href: string; icon: 'university' | 'workflow' | 'docs' | 'admin' | 'report' | 'audit' | 'dashboard' | 'api' };
-const empty: Results = { universities: [], workflows: [], documents: [], contracts: [], products: [], responsibles: [] };
+const empty: Results = { universities: [], workflows: [], documents: [], contracts: [], products: [], responsibles: [], documentation: [] };
 
 export function GlobalSearch({ user }: { user: AuthUser }) {
   const router = useRouter();
@@ -58,19 +59,19 @@ export function GlobalSearch({ user }: { user: AuthUser }) {
   }, [open, mobile]);
 
   useEffect(() => {
-    if (!open || !entityTerm) return;
+    if (!open || term.length < 2) return;
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       setLoading(true);
       setError(false);
-      const response = await apiFetch<Results>(`/api/v1/search?q=${encodeURIComponent(entityTerm)}`, { signal: controller.signal });
+      const response = await apiFetch<Results>(`/api/v1/search?q=${encodeURIComponent(query.trim())}&records_q=${encodeURIComponent(entityTerm ?? '')}`, { signal: controller.signal });
       if (controller.signal.aborted) return;
       setResults(response.ok ? response.data : empty);
       setError(!response.ok);
       setLoading(false);
     }, 300);
     return () => { controller.abort(); window.clearTimeout(timer); };
-  }, [query, entityTerm, open]);
+  }, [query, entityTerm, open, term]);
 
   const groups: { label: string; items: Option[] }[] = [
     { label: 'Действия', items: staticSearch.results.filter((item) => item.kind === 'action') },
@@ -81,6 +82,7 @@ export function GlobalSearch({ user }: { user: AuthUser }) {
     { label: 'ИТ-продукты', items: results.products.map((hit) => ({ key: `p-${hit.id}-${hit.university_id}`, title: hit.title, subtitle: hit.subtitle || 'ИТ-продукт', href: `/universities/${hit.university_id}?tab=products`, icon: 'admin' })) },
     { label: 'Ответственные', items: results.responsibles.map((hit) => ({ key: `r-${hit.id}-${hit.university_id}`, title: hit.title, subtitle: hit.subtitle || 'Ответственный', href: `/universities/${hit.university_id}?tab=responsibles`, icon: 'admin' })) },
     { label: 'Разделы', items: staticSearch.results.filter((item) => item.kind === 'navigation') },
+    { label: 'Документация', items: results.documentation.filter((hit) => !staticSearch.results.some((item) => item.href === hit.href)).map((hit) => ({ key: `doc-${hit.id}`, title: hit.title, subtitle: hit.subtitle, href: hit.href, icon: 'docs' })) },
   ];
   const options = term.length >= 2 ? groups.flatMap((group) => group.items) : [];
   const choose = (option: Option) => {
@@ -107,7 +109,7 @@ export function GlobalSearch({ user }: { user: AuthUser }) {
 
   return <div className={`${styles.root} ${mobile ? styles.mobileOpen : ''}`} ref={root} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) window.setTimeout(() => setOpen(false), 150); }}>
     <button type="button" className={styles.mobileButton} aria-label="Открыть поиск" onClick={() => { setMobile(true); setOpen(true); requestAnimationFrame(() => input.current?.focus()); }}><span className={styles.magnifier} /></button>
-    <div className={styles.field}><span className={styles.magnifier} aria-hidden="true" /><Input ref={input} type="search" aria-label="Поиск по системе" role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={listId} aria-activedescendant={open && active >= 0 ? `${listId}-${active}` : undefined} placeholder="Поиск по системе..." value={query} onFocus={() => setOpen(true)} onChange={(event) => { setQuery(event.target.value); setActive(-1); setResults(empty); setLoading(Boolean(searchStaticIndex(event.target.value, user).entityTerm)); }} onKeyDown={onKeyDown} /></div>
+    <div className={styles.field}><span className={styles.magnifier} aria-hidden="true" /><Input ref={input} type="search" aria-label="Поиск по системе" role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={listId} aria-activedescendant={open && active >= 0 ? `${listId}-${active}` : undefined} placeholder="Поиск по системе..." value={query} onFocus={() => setOpen(true)} onChange={(event) => { setQuery(event.target.value); setActive(-1); setResults(empty); setLoading(event.target.value.trim().length >= 2); }} onKeyDown={onKeyDown} /></div>
     {mobile ? <button className={styles.close} type="button" onClick={() => { setMobile(false); setOpen(false); }}>Отмена</button> : null}
     {typeof document !== 'undefined' && dropdown ? createPortal(dropdown, document.body) : null}
   </div>;

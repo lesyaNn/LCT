@@ -13,7 +13,6 @@ services:
       ASSISTANT_MAX_CONCURRENT: ${ASSISTANT_MAX_CONCURRENT:-2}
       ASSISTANT_RETENTION_DAYS: ${ASSISTANT_RETENTION_DAYS:-30}
     volumes:
-      - ./frontend/public/docs:/app/assistant-docs:ro
       - assistant-index:/app/assistant-index
     depends_on:
       ollama:
