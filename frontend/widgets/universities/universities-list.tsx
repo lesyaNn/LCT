@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   flexRender,
   getCoreRowModel,
@@ -21,6 +21,14 @@ import SortUp from '@atomaro/icons/24/editor/SortUp';
 import User from '@atomaro/icons/24/communication/User';
 import BookOpen from '@atomaro/icons/24/culture/BookOpen';
 import { Button } from '@/shared/ui/rtk/button';
+import { Input } from '@/shared/ui/rtk/form-controls';
+import { FormField } from '@/shared/ui/rtk/form-field';
+import { Modal } from '@/shared/ui/rtk/modal';
+import { useAuth } from '@/shared/auth/AuthProvider';
+import { hasPermission } from '@/shared/lib/access-control';
+import { normalizeApiError } from '@/shared/lib/api-errors';
+import { isMockDataSourceFor } from '@/shared/lib/data-source';
+import { queryKeys } from '@/shared/lib/query-keys';
 import { Tabs } from '@/shared/ui/rtk/tabs';
 import { FilterToolbar } from '@/shared/ui/rtk/filter-surface';
 import { SearchField } from '@/shared/ui/rtk/filter-field';
@@ -35,6 +43,7 @@ import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { Skeleton, SkeletonGroup, TableSkeleton } from '@/shared/ui/skeleton';
 import {
   getUniversities,
+  createUniversity,
   getUniversityStageOptions,
   UNIVERSITY_LIST_CAPABILITIES,
   universitiesListQueryKey,
@@ -426,6 +435,25 @@ function DesktopTable({ table }: { table: Table<UniversityListItem> }) {
 
 export function UniversitiesList() {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const canCreate = !isMockDataSourceFor('universities') && hasPermission(user, 'university.create');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newCity, setNewCity] = useState('');
+  const [createError, setCreateError] = useState('');
+  const create = useMutation({
+    mutationFn: () => createUniversity({ name: newName.trim(), city: newCity.trim() || null }),
+    onSuccess: async ({ id }) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.universities.all });
+      await queryClient.invalidateQueries({ queryKey: catalogQueryKeys.references });
+      setCreateOpen(false);
+      setNewName('');
+      setNewCity('');
+      router.push(`/universities/${id}`);
+    },
+    onError: (cause) => setCreateError(normalizeApiError(cause).message),
+  });
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const state = useMemo(() => parseUrlState(searchParams), [searchParams]);
@@ -542,8 +570,19 @@ export function UniversitiesList() {
           <h1>ВУЗы</h1>
           <p className={styles.description}>Учебные заведения, программы и задачи, требующие внимания команды.</p>
         </div>
-        <Tabs items={[{ id: 'cards', label: 'Карточки' }, { id: 'table', label: 'Таблица' }]} activeId={view} onChange={(id) => selectView(id as UniversityView)} label="Представление вузов" prefix="university-view" />
+        <div className={styles.headerActions}>
+          {canCreate ? <Button variant="primary" size="s" type="button" onClick={() => { setCreateError(''); setCreateOpen(true); }}>Добавить вуз</Button> : null}
+          <Tabs items={[{ id: 'cards', label: 'Карточки' }, { id: 'table', label: 'Таблица' }]} activeId={view} onChange={(id) => selectView(id as UniversityView)} label="Представление вузов" prefix="university-view" />
+        </div>
       </header>
+      {canCreate && createOpen ? <Modal title="Добавить вуз" onClose={() => { if (!create.isPending) setCreateOpen(false); }}>
+        <form className={styles.createForm} onSubmit={(event) => { event.preventDefault(); setCreateError(''); if (newName.trim()) create.mutate(); }}>
+          <FormField label="Название вуза" htmlFor="new-university-name" required errorId="new-university-name-error"><Input id="new-university-name" autoFocus required maxLength={512} value={newName} onChange={(event) => setNewName(event.target.value)} disabled={create.isPending} /></FormField>
+          <FormField label="Город" htmlFor="new-university-city" errorId="new-university-city-error"><Input id="new-university-city" maxLength={256} value={newCity} onChange={(event) => setNewCity(event.target.value)} disabled={create.isPending} /></FormField>
+          {createError ? <p className={styles.createError} role="alert">{createError}</p> : null}
+          <div className={styles.createActions}><Button variant="ghost" size="s" type="button" disabled={create.isPending} onClick={() => setCreateOpen(false)}>Отмена</Button><Button variant="primary" size="s" type="submit" loading={create.isPending} disabled={create.isPending || !newName.trim()}>Создать вуз</Button></div>
+        </form>
+      </Modal> : null}
       <div className={styles.filterArea}>
         <FilterToolbar label="Фильтры списка вузов" collapsible controls={() => <Filters state={state} options={filterOptions} catalogsLoading={catalogsQuery.isPending} catalogsUnavailable={catalogsQuery.isError} searchInput={searchInput} setSearchInput={setSearchInput} onPatch={goToState} />} onReset={resetFilters} resetDisabled={!hasFilters} mobileCount={activeFilterCount} activeFilters={universityActiveFilters(state.filters, filterOptions, goToState)} />
         {catalogsQuery.isError ? <RouteErrorState compact onRetry={() => void catalogsQuery.refetch()} /> : null}

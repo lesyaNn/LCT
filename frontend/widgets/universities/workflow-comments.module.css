@@ -15,6 +15,10 @@
 .commentMeta span + span::before, .commentMeta time::before { color: var(--rtk-color-border-strong); content: '·'; margin-right: var(--rtk-space-2); }
 .pending { color: var(--rtk-color-text-secondary); font-weight: 600; }
 .commentText { font-size: 13px; line-height: 1.5; margin: var(--rtk-space-2) 0 0 40px; overflow-wrap: anywhere; white-space: pre-wrap; }
+.questionOption { align-items: center; color: var(--rtk-color-text-secondary); display: flex; font-size: 12px; gap: var(--rtk-space-2); }
+.questionOption input { accent-color: var(--rtk-color-brand); }
+.questionBadge { color: var(--rtk-color-brand); display: block; font-size: 11px; font-weight: 650; margin: var(--rtk-space-2) 0 0 40px; }
+.questionActions { display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); margin: var(--rtk-space-1) 0 0 40px; }
 .editor { display: flex; flex-direction: column; gap: var(--rtk-space-2); }
 .commentList + .editor { border-top: 1px solid var(--rtk-color-border); margin-top: var(--rtk-space-2); padding-top: var(--rtk-space-4); }
 .editor label { color: var(--rtk-color-text-secondary); font-size: 12px; font-weight: 650; }
@@ -42,5 +46,5 @@
 .skeleton span:nth-child(2) { width: 82%; }
 .skeleton span:nth-child(3) { width: 64%; }
 @keyframes commentsShimmer { from { opacity: .55; } 50% { opacity: 1; } to { opacity: .55; } }
-@media (max-width: 480px) { .commentHeader { align-items: flex-start; flex-wrap: wrap; } .commentText { margin-left: 0; } .editorFooter { align-items: flex-start; flex-direction: column; } .editorActions { width: 100%; } .editorActions > button { flex: 1 1 auto; } }
+@media (max-width: 480px) { .commentHeader { align-items: flex-start; flex-wrap: wrap; } .commentText, .questionBadge, .questionActions { margin-left: 0; } .editorFooter { align-items: flex-start; flex-direction: column; } .editorActions { width: 100%; } .editorActions > button { flex: 1 1 auto; } }
 @media (prefers-reduced-motion: reduce) { .skeleton span { animation: none; } }

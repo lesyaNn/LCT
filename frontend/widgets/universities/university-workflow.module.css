@@ -117,6 +117,18 @@
 .futureNotice { background: var(--rtk-color-surface-subtle); border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-secondary); font-size: 13px; margin: 0; padding: var(--rtk-space-3); }
 .detailSection { display: flex; flex-direction: column; gap: var(--rtk-space-3); min-width: 0; }
 .detailSection + .detailSection { border-top: 1px solid var(--rtk-color-border); padding-top: var(--rtk-space-5); }
+.agendaHeading { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); justify-content: space-between; }
+.agendaAsOf { color: var(--rtk-color-text-secondary); font-size: 12px; margin: var(--rtk-space-2) 0 0; }
+.agendaSections { display: grid; gap: var(--rtk-space-4); grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: var(--rtk-space-4); }
+.agendaSections > div { background: var(--rtk-color-surface-subtle); border-radius: var(--rtk-radius-small); min-width: 0; padding: var(--rtk-space-3); }
+.agendaSections h4 { font-size: 13px; margin: 0 0 var(--rtk-space-2); }
+.agendaSections h4 span { color: var(--rtk-color-text-secondary); font-weight: 400; }
+.agendaSections ul { display: flex; flex-direction: column; gap: var(--rtk-space-2); list-style: none; margin: 0; padding: 0; }
+.agendaSections li, .agendaSections p, .agendaSections small { font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+.agendaSections p { color: var(--rtk-color-text-secondary); margin: 0; }
+.agendaSections small { color: var(--rtk-color-text-secondary); display: block; margin-top: var(--rtk-space-2); }
+.agendaError { color: var(--rtk-color-danger); font-size: 12px; margin: var(--rtk-space-3) 0 0; }
+@media (max-width: 900px) { .agendaSections { grid-template-columns: 1fr; } }
 .detailSectionHeading { align-items: center; }
 .detailSectionHeading h3 { align-items: center; display: inline-flex; font-size: 15px; gap: var(--rtk-space-2); margin: 0; }
 .detailSectionHeading h3 svg { color: var(--rtk-color-brand); flex: 0 0 auto; }

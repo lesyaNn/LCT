@@ -8,6 +8,7 @@ import { hasPermission } from '@/shared/lib/access-control';
 import { canMutateCatalog, catalogQueryKeys, deleteContractFile, downloadContractFile, listCatalogItems, updateCatalogItem, uploadContractFile, type ContractCatalogItem, type ContractStatusRaw, type TransferStatus } from '@/shared/lib/catalogs-repository';
 import { createUniversityDocument, downloadUniversityDocument, getUniversityDocuments, universityDocumentsQueryKey, universityPassportQueryKey, type UniversityDocumentRow, type UniversityDocumentType } from '@/shared/lib/universities-repository';
 import { normalizeApiError } from '@/shared/lib/api-errors';
+import { downloadBlob } from '@/shared/lib/download-blob';
 import { formatDateRu } from '@/shared/lib/formatters';
 import { AttachmentDropZone } from './workflow-attachments';
 import { PassportDataTable, PassportTableSkeleton, type PassportTableColumn, type PassportMobileField } from './passport-data-table';
@@ -23,14 +24,6 @@ import styles from './university-passport-sections.module.css';
 const statusNames: Record<ContractStatusRaw, string> = { draft: 'Черновик', signed: 'Подписан', terminated: 'Расторгнут' };
 const effectiveStatusNames: Record<string, string> = { draft: 'Черновик', signed: 'Подписан', active: 'Действует', expires_soon: 'Скоро истекает', expired: 'Истёк', terminated: 'Расторгнут' };
 const typeNames: Record<UniversityDocumentType, string> = { act: 'Акт', protocol: 'Протокол', other: 'Иное', contract: 'Договор', license: 'Лицензия' };
-const download = (blob: Blob, name: string) => {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = name;
-  link.click();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-};
 
 export function PassportDocumentsSection({ id }: { id: string }) {
   const { user } = useAuth();
@@ -60,8 +53,8 @@ export function PassportDocumentsSection({ id }: { id: string }) {
   const addDocument = useMutation({ mutationFn: () => createUniversityDocument(id, { type: documentType, title: documentTitle.trim(), file: documentFile! }), onSuccess: async () => { setDocumentOpen(false); setDocumentTitle(''); setDocumentFile(null); setDocumentPage(1); await refreshDocuments(); }, onError: (cause) => setError(normalizeApiError(cause).message) });
   const openEdit = (row: ContractCatalogItem) => { setError(''); setEditing(row); setStatus(row.statusRaw); setSignedAt(row.signedAt); setExpiresAt(row.expiresAt); };
   const openFile = (row: ContractCatalogItem) => { setError(''); setFile(null); setFileTarget(row); };
-  const getFile = async (row: ContractCatalogItem) => { try { download(await downloadContractFile(row.id), row.fileName); } catch (cause) { setError(normalizeApiError(cause).message); } };
-  const getDocument = async (row: UniversityDocumentRow) => { try { download(await downloadUniversityDocument(id, row.id), row.fileName); } catch (cause) { setError(normalizeApiError(cause).message); } };
+  const getFile = async (row: ContractCatalogItem) => { try { downloadBlob(await downloadContractFile(row.id), row.fileName); } catch (cause) { setError(normalizeApiError(cause).message); } };
+  const getDocument = async (row: UniversityDocumentRow) => { try { downloadBlob(await downloadUniversityDocument(id, row.id), row.fileName); } catch (cause) { setError(normalizeApiError(cause).message); } };
   const removeFile = async (row: ContractCatalogItem) => { try { await deleteContractFile(row.id); await refreshContracts(); } catch (cause) { setError(normalizeApiError(cause).message); } };
   const contractColumns: PassportTableColumn<ContractCatalogItem>[] = [
     { id: 'number', label: 'Номер', render: (row) => <strong className={styles.primaryCell}>{row.contractNumber}</strong> },

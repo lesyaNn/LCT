@@ -191,6 +191,12 @@ export const universitiesQueryKey = queryKeys.universities.all;
 export const universitiesListQueryKey = queryKeys.universities.list;
 export const universityStageOptionsQueryKey = ['universities', 'stage-options'] as const;
 
+export async function createUniversity(input: { name: string; city: string | null }): Promise<{ id: string }> {
+  const result = await apiFetch<{ id: string }>('/api/v1/universities', { method: 'POST', body: input });
+  if (!result.ok) throw new ApiRequestError(result.status, result.body, 'Не удалось создать вуз.', result.error);
+  return result.data;
+}
+
 export async function getUniversityStageOptions(signal?: AbortSignal): Promise<UniversityStage[]> {
   if (isMockDataSourceFor('universities')) return universityFilterOptions.stages;
   const result = await apiFetch<string[]>('/api/v1/universities/stage-options', { signal });
@@ -398,6 +404,7 @@ export interface UniversityWorkflowComment {
   canDelete?: boolean;
   isOptimistic?: boolean;
   attachments?: UniversityWorkflowAttachment[];
+  questionStatus?: 'none' | 'open' | 'resolved';
 }
 
 export interface UniversityWorkflowAttachment {
@@ -493,6 +500,7 @@ export interface WorkflowCommentApiRecord {
   author_name?: string | null;
   content: string;
   is_internal: boolean;
+  question_status?: 'none' | 'open' | 'resolved';
   created_at: string;
   updated_at: string;
   attachments?: import('./workflow-attachments').WorkflowAttachmentApiRecord[];
@@ -526,7 +534,7 @@ export async function listWorkflowCommentsPage(instanceId: string, page: number)
   return unwrapApiResult(await apiFetch<WorkflowPage<WorkflowCommentApiRecord>>(`/api/v1/workflow/instances/${instanceId}/comments?page=${page}&page_size=100`));
 }
 
-export async function createWorkflowComment(instanceId: string, content: string, stageId?: string, files: File[] = []): Promise<WorkflowCommentApiRecord> {
+export async function createWorkflowComment(instanceId: string, content: string, stageId?: string, files: File[] = [], isQuestion = false): Promise<WorkflowCommentApiRecord> {
   if (!isWorkflowApiInstanceId(instanceId)) throw new Error('Добавление комментариев недоступно для этого Workflow-источника.');
   if (files.length) {
     if (!isRealWorkflowMode()) throw new WorkflowApiError(0, 'Загрузка файлов доступна только при подключённом backend.');
@@ -538,6 +546,7 @@ export async function createWorkflowComment(instanceId: string, content: string,
     }
     const body = new FormData();
     body.append('content', content);
+    body.append('is_question', String(isQuestion));
     if (stageId) body.append('stage_id', stageId);
     for (const file of files) body.append('files', file, file.name);
     const result = await apiUploadFormData<WorkflowCommentApiRecord>(`/api/v1/workflow/instances/${instanceId}/comments/with-attachments`, body);
@@ -546,7 +555,7 @@ export async function createWorkflowComment(instanceId: string, content: string,
   }
   return fromDataSource({
     mock: () => mockCreateWorkflowComment(instanceId, content, stageId),
-    real: async () => unwrapApiResult(await apiFetch<WorkflowCommentApiRecord>(`/api/v1/workflow/instances/${instanceId}/comments`, { method: 'POST', body: { content, stage_id: stageId ?? null } })),
+    real: async () => unwrapApiResult(await apiFetch<WorkflowCommentApiRecord>(`/api/v1/workflow/instances/${instanceId}/comments`, { method: 'POST', body: { content, stage_id: stageId ?? null, is_question: isQuestion } })),
     domain: 'workflow',
   });
 }
@@ -730,6 +739,37 @@ export async function editWorkflowComment(commentId: string, content: string): P
     real: async () => unwrapApiResult(await apiFetch<WorkflowCommentApiRecord>(`/api/v1/workflow/comments/${commentId}`, { method: 'PATCH', body: { content } })),
     domain: 'workflow',
   });
+}
+
+export async function updateWorkflowQuestionStatus(commentId: string, status: 'none' | 'open' | 'resolved'): Promise<WorkflowCommentApiRecord> {
+  return unwrapApiResult(await apiFetch<WorkflowCommentApiRecord>(`/api/v1/workflow/comments/${encodeURIComponent(commentId)}/question-status`, { method: 'PATCH', body: { status } }));
+}
+
+export interface MeetingAgenda {
+  university_id: string;
+  university_name: string;
+  city: string | null;
+  instance_id: string;
+  stage_id: string;
+  stage_name: string;
+  stage_order: number;
+  generated_at: string;
+  as_of: string;
+  expires_through: string;
+  warning_days: number;
+  programs: { items: { program_id: string; name: string; direction: string; status: 'active' | 'launched'; launch_date: string | null }[]; total: number; omitted: number };
+  expiring_licenses: { items: { license_id: string; license_number: string; product: string; expires_at: string; days_left: number }[]; total: number; omitted: number };
+  open_questions: { items: { comment_id: string; instance_id: string; stage_id: string | null; content: string; created_at: string }[]; total: number; omitted: number };
+}
+
+export const meetingAgendaQueryKey = (instanceId: string) => [...workflowQueryKey(instanceId), 'meeting-agenda'] as const;
+
+export async function getMeetingAgenda(instanceId: string, signal?: AbortSignal): Promise<MeetingAgenda> {
+  return unwrapApiResult(await apiFetch<MeetingAgenda>(`/api/v1/workflow/instances/${encodeURIComponent(instanceId)}/meeting-agenda`, { signal }));
+}
+
+export async function downloadMeetingAgenda(instanceId: string): Promise<Blob> {
+  return unwrapApiResult(await apiDownload(`/api/v1/workflow/instances/${encodeURIComponent(instanceId)}/meeting-agenda.pdf`));
 }
 
 export async function deleteWorkflowComment(commentId: string): Promise<void> {
