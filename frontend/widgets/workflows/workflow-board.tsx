@@ -12,6 +12,7 @@ import { getAvailableWorkflowTransitionTargets, type WorkflowTransitionTarget } 
 import { getWorkflowAllowedTransitions, isRealWorkflowMode } from '@/shared/lib/universities-repository';
 import { workflowStageKey, type WorkflowOverviewItem } from '@/shared/lib/workflow-overview-repository';
 import { Toast } from '@/shared/ui/rtk/toast';
+import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { WorkflowTransitionModal, type WorkflowTransitionNotification } from '@/widgets/universities/workflow-transition-modal';
 import { WorkflowCard } from './workflow-card';
 import styles from './workflow-overview.module.css';
@@ -39,7 +40,7 @@ function DraggableWorkflowCard({ item, enabled }: { item: WorkflowOverviewItem; 
 function WorkflowBoardColumn({ column, valid, active }: { column: Column; valid: boolean; active: boolean }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.key, disabled: !valid });
   return <section ref={setNodeRef} className={[styles.column, valid ? styles.validColumn : '', isOver ? styles.overColumn : ''].join(' ')} data-testid={valid ? 'workflow-valid-drop-target' : undefined} aria-label={`${column.name}, процессов: ${column.items.length}`}>
-    <header><h2>{column.name}</h2><span>{column.items.length}</span></header>
+    <header><h2>{column.name}</h2><StatusBadge intent="neutral" showIndicator={false}>{column.items.length}</StatusBadge></header>
     <div className={styles.columnCards}>{column.items.map((item) => <DraggableWorkflowCard item={item} enabled={active && item.status !== 'completed' && transitionTargets(item).size > 0} key={item.instanceId} />)}
       {isOver ? <div className={styles.dropPlaceholder}>Перевести сюда</div> : null}
     </div>
@@ -50,7 +51,7 @@ export function WorkflowBoard({ items }: { items: WorkflowOverviewItem[] }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const realWorkflow = isRealWorkflowMode();
-  const canManage = realWorkflow ? hasPermission(user, 'workflow.change_status') : (user?.role === 'admin' || user?.role === 'manager');
+  const canManage = hasPermission(user, 'workflow.change_status');
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingDrop | null>(null);
   const [notification, setNotification] = useState<WorkflowTransitionNotification | null>(null);
@@ -84,6 +85,10 @@ export function WorkflowBoard({ items }: { items: WorkflowOverviewItem[] }) {
       })).map((target) => ({ id: target.id, orderIndex: target.order_index, name: target.name })) : undefined;
       const targetStageId = transitionTargets(item, allowedTargets).get(String(over.id));
       if (targetStageId) setPending({ item, targetStageId, allowedTargets });
+      else {
+        setNotification({ intent: 'error', title: 'Переход недоступен', message: 'Доступные этапы изменились. Обновите данные и попробуйте снова.' });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowOverview });
+      }
     } catch (cause) {
       setNotification({ intent: 'error', title: 'Не удалось проверить переход', message: normalizeApiError(cause).message });
     }

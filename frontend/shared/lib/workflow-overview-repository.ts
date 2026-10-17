@@ -81,8 +81,12 @@ async function universityInstances(university: UniversityListItem): Promise<Work
 /** Aggregate only instance IDs actually exposed by existing university/passport and website APIs. */
 export async function getWorkflowOverview(): Promise<WorkflowOverview> {
   if (!isMockDataSourceFor('workflow')) {
-    const page = await listWorkflowInstancePage(1, 100);
-    const items = page.items.flatMap((record) => {
+    const firstPage = await listWorkflowInstancePage(1, 100);
+    const records = [...firstPage.items];
+    for (let page = 2; page <= Math.ceil(firstPage.total / firstPage.page_size); page += 1) {
+      records.push(...(await listWorkflowInstancePage(page, 100)).items);
+    }
+    const items = records.flatMap((record) => {
       const workflow = getApiUniversityWorkflow(record);
       const stage = workflow.currentStage ?? workflow.stages.at(-1);
       return stage ? [{
@@ -98,7 +102,7 @@ export async function getWorkflowOverview(): Promise<WorkflowOverview> {
         status: record.status === 'completed' ? 'completed' as const : stage.status === 'overdue' ? 'overdue' as const : 'in_progress' as const,
       }] : [];
     });
-    return { items, unavailableUniversities: 0, limited: page.total > page.items.length };
+    return { items, unavailableUniversities: 0, limited: records.length < firstPage.total };
   }
   const page = await getUniversities({ filters: emptyFilters, sort: 'name', order: 'asc', page: 1, pageSize: 100 });
   const results = await Promise.allSettled(page.items.map(universityInstances));

@@ -147,7 +147,7 @@ test('seeded real Kanban: cancel keeps stage, confirm moves once', async ({ page
   const currentOrder = before.stages.find((stage) => stage.id === before.current_instance_stage_id)?.order_index;
   if (currentOrder === 3) {
     await page.goto('/workflows');
-    await page.getByRole('tab', { name: 'Доска' }).click();
+    await page.getByRole('tab', { name: 'Канбан' }).click();
     await expect(page.getByRole('heading', { name: before.stages.find((stage) => stage.id === before.current_instance_stage_id)?.name ?? '' })).toBeVisible();
     await page.getByRole('link', { name: 'Открыть / перевести' }).first().click();
     await expect(page).toHaveURL(new RegExp(`/workflows/${instanceId}$`));
@@ -163,7 +163,7 @@ test('seeded real Kanban: cancel keeps stage, confirm moves once', async ({ page
     if (outgoing.method() === 'GET' && outgoing.url().includes('/allowed-transitions')) allowedRequests.push(outgoing.url());
   });
   await page.goto('/workflows');
-  await page.getByRole('tab', { name: 'Доска' }).click();
+  await page.getByRole('tab', { name: 'Канбан' }).click();
   await expect(page.locator('article').filter({ has: page.locator(`a[href="/workflows/${instanceId}"]`) })).toBeVisible();
   expect(allowedRequests, 'Kanban must not fetch allowed transitions for every card on load').toHaveLength(0);
   const handle = page.locator('article').filter({ has: page.locator(`a[href="/workflows/${instanceId}"]`) })
@@ -196,7 +196,7 @@ test('seeded real Kanban: cancel keeps stage, confirm moves once', async ({ page
   const after = await read();
   expect(after.current_instance_stage_id).toBe(allowed[0].id);
   await page.reload();
-  await page.getByRole('tab', { name: 'Доска' }).click();
+  await page.getByRole('tab', { name: 'Канбан' }).click();
   await expect(page.getByRole('heading', { name: allowed[0].name, exact: true })).toBeVisible();
 });
 
