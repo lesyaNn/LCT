@@ -86,7 +86,7 @@ function ReportParameters({ onCreated }: { onCreated: (job: ReportJob) => void }
   const selectionKey = previewRequest ? JSON.stringify(previewRequest) : '';
   const previewQuery = useQuery({
     queryKey: [...reportQueryKeys.preview, selectionKey],
-    queryFn: () => getReportPreview(previewRequest!, 20),
+    queryFn: () => getReportPreview(previewRequest!, 200),
     enabled: Boolean(previewRequest),
     staleTime: 0,
   });

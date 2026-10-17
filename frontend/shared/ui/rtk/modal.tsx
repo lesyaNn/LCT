@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import CloseLarge from '@atomaro/icons/24/navigation/CloseLarge';
 import styles from './modal.module.css';
 
-export function Modal({ title, children, onClose, labelledBy, initialFocusRef, size = 'm' }: { title: string; children: ReactNode; onClose: () => void; labelledBy?: string; initialFocusRef?: RefObject<HTMLElement | null>; size?: 'm' | 'l' }) {
+export function Modal({ title, children, onClose, labelledBy, initialFocusRef, size = 'm' }: { title: string; children: ReactNode; onClose: () => void; labelledBy?: string; initialFocusRef?: RefObject<HTMLElement | null>; size?: 'm' | 'l' | 'xl' }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const mounted = useSyncExternalStore(() => () => undefined, () => true, () => false);
   const onCloseRef = useRef(onClose);

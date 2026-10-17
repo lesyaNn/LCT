@@ -5,6 +5,9 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -20,6 +23,7 @@ import styles from './reports-page.module.css';
 
 const numberFormatter = new Intl.NumberFormat('ru-RU');
 const formatCount = (value: number) => numberFormatter.format(value);
+const segmentColors = ['var(--rtk-color-brand)', 'var(--rtk-color-brand-secondary)', 'var(--rtk-color-success)', 'var(--rtk-color-border-strong)'];
 
 interface ChartCardProps {
   title: string;
@@ -89,11 +93,23 @@ function StatBarChart({ slice }: { slice: ReportStatSlice }) {
           </ResponsiveContainer>
         </div>
       </div>
-      <p className={styles.statCaption}>
-        Всего: {formatCount(slice.total)} {unitWord}
-      </p>
+      <p className={styles.statCaption}><span className={styles.statLegendDot} aria-hidden="true" />Количество {unitWord} · всего {formatCount(slice.total)}</p>
     </>
   );
+}
+
+function StatDonutChart({ slice }: { slice: ReportStatSlice }) {
+  return <div className={styles.statDonutLayout}>
+    <div className={styles.statDonut} role="img" aria-label={`${slice.title}. Всего ${formatCount(slice.total)} строк.`}>
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart><Pie data={slice.buckets} dataKey="count" nameKey="label" innerRadius="58%" outerRadius="82%" paddingAngle={2} stroke="none" isAnimationActive={false}>
+          {slice.buckets.map((bucket, index) => <Cell key={bucket.label} fill={segmentColors[index % segmentColors.length]} />)}
+        </Pie><Tooltip content={<BucketTooltip unit={slice.unit} />} /></PieChart>
+      </ResponsiveContainer>
+      <span className={styles.statDonutTotal}><strong>{formatCount(slice.total)}</strong><small>строк</small></span>
+    </div>
+    <ul className={styles.statDonutLegend}>{slice.buckets.map((bucket, index) => <li key={bucket.label}><span style={{ background: segmentColors[index % segmentColors.length] }} aria-hidden="true" /><span>{bucket.label}</span><strong>{formatCount(bucket.count)}</strong></li>)}</ul>
+  </div>;
 }
 
 interface ReportStatisticsPanelProps {
@@ -111,7 +127,7 @@ const chartColumns: Record<string, string> = {
   by_responsible: 'responsible',
 };
 
-/** At most two charts, and only for dimensions present in the export columns. */
+/** Only dimensions selected for export, and only at a compatible row grain. */
 export function ReportStatisticsPanel({ statistics, pending, error, sameRowGrain, onRetry }: ReportStatisticsPanelProps) {
   if (error) {
     return (
@@ -128,7 +144,7 @@ export function ReportStatisticsPanel({ statistics, pending, error, sameRowGrain
   const slices = ['by_workflow_status', 'by_direction', 'by_product', 'by_responsible']
     .flatMap((dimension) => statistics.slices.filter((slice) => slice.dimension === dimension))
     .filter((slice) => statistics.columns.includes(chartColumns[slice.dimension]) && slice.buckets.length && (slice.unit === 'universities' || sameRowGrain))
-    .slice(0, 2);
+    .slice(0, 4);
   if (!slices.length) {
     if (statistics.universityCount > 0) return <p className={styles.statEmpty}>Для выбранного состава нет графиков с той же детализацией, что у файла.</p>;
     return <EmptyState title="Нет данных для выбранных условий" headingLevel={3} />;
@@ -144,7 +160,7 @@ export function ReportStatisticsPanel({ statistics, pending, error, sameRowGrain
               exportSlug={slice.dimension}
               exportTestId={`chart-export-${slice.dimension}`}
             >
-              <StatBarChart slice={slice} />
+              {slice.dimension === 'by_workflow_status' ? <StatDonutChart slice={slice} /> : <StatBarChart slice={slice} />}
             </ChartCard>
           ))}
       </div>
