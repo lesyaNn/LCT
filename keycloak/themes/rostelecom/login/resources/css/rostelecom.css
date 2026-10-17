@@ -345,7 +345,7 @@ html.login-pf,
   .pf-v5-c-login__main::after { margin-top: 32px; font-size: 12px; }
 }
 
-.rtk-demo-login { border-top: 1px solid #e8e4ef; margin-top: 18px; padding-top: 16px; }
+.rtk-demo-login { margin-top: 12px; }
 .rtk-demo-button { background: var(--rtk-color-brand-secondary); border: 0; border-radius: 12px; color: #fff; cursor: pointer; font-size: 17px; font-weight: 700; min-height: 54px; width: 100%; }
 .rtk-demo-button:hover { background: color-mix(in srgb, var(--rtk-color-brand-secondary) 85%, black); }
 .rtk-demo-button:focus-visible { outline: 3px solid var(--rtk-color-brand-secondary); outline-offset: 2px; }
