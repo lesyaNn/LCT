@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import type { MouseEventHandler, ReactNode, TouchEventHandler } from 'react';
 import User from '@atomaro/icons/24/communication/User';
 import Calendar from '@atomaro/icons/24/communication/Calendar';
 import { formatDateRu } from '@/shared/lib/formatters';
@@ -13,16 +13,16 @@ function statusLabel(status: WorkflowOverviewItem['status']) {
   return status === 'completed' ? 'Завершён' : status === 'overdue' ? 'Просрочен' : 'В работе';
 }
 
-export function WorkflowCard({ item, dragHandle }: { item: WorkflowOverviewItem; dragHandle?: ReactNode }) {
+export function WorkflowCard({ item, dragListeners, keyboardDragControl }: { item: WorkflowOverviewItem; dragListeners?: { onMouseDown?: MouseEventHandler<HTMLAnchorElement>; onTouchStart?: TouchEventHandler<HTMLAnchorElement> }; keyboardDragControl?: ReactNode }) {
   const href = isMockDataSourceFor('workflow') && item.programKey
     ? `/universities/${encodeURIComponent(item.universityId)}?tab=workflow&program=${encodeURIComponent(item.programKey)}&workflow=${encodeURIComponent(item.instanceId)}`
     : `/workflows/${encodeURIComponent(item.instanceId)}`;
   const responsible = item.stage.responsible;
   return <article className={`${styles.card} ${item.status === 'overdue' ? styles.cardOverdue : ''}`}>
-    <Link className={styles.cardHitArea} href={href} aria-label={`Открыть Workflow: ${item.universityName}${item.programName ? ` — ${item.programName}` : ''}`} onKeyDown={(event) => {
+    <Link className={`${styles.cardHitArea} ${dragListeners ? styles.cardDraggable : ''}`} href={href} aria-label={`Открыть Workflow: ${item.universityName}${item.programName ? ` — ${item.programName}` : ''}`} {...dragListeners} onKeyDown={(event) => {
       if (event.key === ' ') { event.preventDefault(); event.currentTarget.click(); }
     }} />
-    <div className={styles.cardTop}><strong className={styles.cardTitle}>{item.universityName}</strong><div className={styles.cardTopActions}>{dragHandle}<WorkflowArchiveAction instanceId={item.instanceId} universityId={item.universityId} active={item.status !== 'completed'} label="Удалить workflow" /></div></div>
+    <div className={styles.cardTop}><strong className={styles.cardTitle}>{item.universityName}</strong><div className={styles.cardTopActions}>{keyboardDragControl}<WorkflowArchiveAction instanceId={item.instanceId} universityId={item.universityId} active={item.status !== 'completed'} label="Удалить workflow" /></div></div>
     {item.programName ? <p className={styles.program}>{item.programName}</p> : null}
     <p className={styles.stageName}>{item.stage.name}</p>
     <StatusBadge intent={item.status === 'completed' ? 'success' : item.status === 'overdue' ? 'orange' : 'brand'}>{statusLabel(item.status)}</StatusBadge>

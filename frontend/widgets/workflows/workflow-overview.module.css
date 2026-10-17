@@ -17,18 +17,19 @@
 .card:hover { border-color: var(--rtk-color-brand); box-shadow: var(--rtk-shadow-elevation-2); }
 .cardOverdue:hover { border-color: var(--rtk-color-brand-secondary); }
 .cardHitArea { border-radius: inherit; inset: 0; position: absolute; z-index: 1; }
+.cardDraggable { cursor: grab; }
+.cardDraggable:active { cursor: grabbing; }
 .cardHitArea:focus-visible { outline: 3px solid var(--rtk-color-brand); outline-offset: 2px; }
 .cardTop { align-items: start; display: flex; gap: var(--rtk-space-2); justify-content: space-between; width: 100%; }
 .cardTopActions { align-items: center; display: flex; flex: 0 0 auto; gap: var(--rtk-space-1); position: relative; z-index: 2; }
-.dragHandle { align-items: center; background: transparent; border: 0; border-radius: 6px; color: var(--rtk-color-text-secondary); cursor: grab; display: inline-flex; flex: 0 0 auto; justify-content: center; min-height: 30px; min-width: 30px; padding: 4px; touch-action: none; }
-.dragHandle:hover, .dragHandle:focus-visible { background: var(--rtk-color-brand-soft); color: var(--rtk-color-brand); }
-.dragHandle:active { cursor: grabbing; }
+.keyboardDragHandle { clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; right: 0; top: 0; white-space: nowrap; width: 1px; }
+.keyboardDragHandle:focus-visible { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-brand); border-radius: var(--rtk-radius-small); clip-path: none; color: var(--rtk-color-brand); height: 32px; outline: 2px solid var(--rtk-color-brand); padding: 4px 8px; right: 0; top: 0; width: auto; z-index: 3; }
 .dragSource { opacity: .35; }
 .validColumn { background: color-mix(in srgb, var(--rtk-color-brand) 6%, var(--rtk-color-surface-subtle)); }
 .overColumn { outline: 2px solid var(--rtk-color-brand); outline-offset: -2px; }
 .dropPlaceholder { border: 1px dashed var(--rtk-color-brand); border-radius: var(--rtk-radius-small); color: var(--rtk-color-brand); font-size: 12px; padding: var(--rtk-space-4); text-align: center; }
-.dragOverlay { background: var(--rtk-color-surface-elevated); border-radius: var(--rtk-radius-small); box-shadow: var(--rtk-shadow-elevation-2); color: var(--rtk-color-text-primary); font-size: 13px; font-weight: 700; max-width: 272px; padding: var(--rtk-space-4); }
-.dragOverlay small { color: var(--rtk-color-text-secondary); display: block; font-size: 11px; font-weight: 400; margin-top: 4px; }
+.dragOverlay { height: 100%; pointer-events: none; width: 100%; }
+.dragOverlay .card { box-sizing: border-box; height: 100%; }
 .toastViewport { bottom: var(--rtk-space-5); position: fixed; right: var(--rtk-space-5); z-index: 70; }
 .cardTitle { color: var(--rtk-color-text-primary); display: -webkit-box; font-size: 18px; font-weight: 700; line-height: 1.35; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .program, .stageName { margin: 0; overflow-wrap: anywhere; }

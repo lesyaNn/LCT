@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getWorkflowOverview, workflowOverviewQueryKey, type WorkflowOverviewItem } from '@/shared/lib/workflow-overview-repository';
 import { FilterToolbar } from '@/shared/ui/rtk/filter-surface';
-import { Input, Select } from '@/shared/ui/rtk/form-controls';
-import { SearchableSelect } from '@/shared/ui/rtk/multiselect';
+import { Input } from '@/shared/ui/rtk/form-controls';
+import { MultiSelect } from '@/shared/ui/rtk/multiselect';
 import { Tabs } from '@/shared/ui/rtk/tabs';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { EmptyState } from '@/shared/ui/empty-state';
@@ -15,8 +15,21 @@ import styles from './workflow-overview.module.css';
 
 type View = 'list' | 'board';
 const viewTabs = [{ id: 'list', label: 'Список' }, { id: 'board', label: 'Канбан' }] as const;
-type Filters = { search: string; university: string; program: string; responsible: string; status: string; stage: string };
-const initialFilters: Filters = { search: '', university: '', program: '', responsible: '', status: '', stage: '' };
+type SelectionKey = 'university' | 'program' | 'responsible' | 'status' | 'stage';
+type Filters = { search: string } & Record<SelectionKey, string[]>;
+const initialFilters: Filters = { search: '', university: [], program: [], responsible: [], status: [], stage: [] };
+const statusOptions = [
+  { id: 'in_progress', name: 'В работе' },
+  { id: 'overdue', name: 'Просрочен' },
+  { id: 'completed', name: 'Завершён' },
+];
+const selects = [
+  { key: 'university', label: 'ВУЗ', all: 'Все ВУЗы' },
+  { key: 'program', label: 'ИТ-программа', all: 'Все ИТ-программы' },
+  { key: 'responsible', label: 'Ответственный за этап', all: 'Все сотрудники' },
+  { key: 'stage', label: 'Этап', all: 'Все этапы' },
+  { key: 'status', label: 'Статус', all: 'Все статусы' },
+] as const;
 
 function WorkflowList({ items }: { items: WorkflowOverviewItem[] }) {
   return <div className={styles.list}>{items.map((item) => <WorkflowCard item={item} key={item.instanceId} />)}</div>;
@@ -39,25 +52,21 @@ export function WorkflowOverviewPage() {
   const [filters, setFilters] = useState<Filters>(initialFilters);
   const query = useQuery({ queryKey: workflowOverviewQueryKey, queryFn: getWorkflowOverview, staleTime: 30_000 });
   const items = query.data?.items ?? [];
-  const update = (key: keyof Filters, value: string) => setFilters((current) => ({ ...current, [key]: value }));
+  const update = (key: SelectionKey, values: string[]) => setFilters((current) => ({ ...current, [key]: values }));
   const filtered = items.filter((item) => {
     const search = filters.search.trim().toLocaleLowerCase('ru-RU');
     return (!search || `${item.universityName} ${item.programName ?? ''} ${item.stage.name} ${item.responsible?.name ?? ''}`.toLocaleLowerCase('ru-RU').includes(search))
-      && (!filters.university || item.universityId === filters.university)
-      && (!filters.program || item.programName === filters.program)
-      && (!filters.responsible || item.responsible?.id === filters.responsible)
-      && (!filters.status || item.status === filters.status)
-      && (!filters.stage || item.stageKey === filters.stage);
+      && (!filters.university.length || filters.university.includes(item.universityId))
+      && (!filters.program.length || (item.programName !== null && filters.program.includes(item.programName)))
+      && (!filters.responsible.length || (item.responsible !== null && filters.responsible.includes(item.responsible.id)))
+      && (!filters.status.length || filters.status.includes(item.status))
+      && (!filters.stage.length || filters.stage.includes(item.stageKey));
   });
-  const selects = [
-    { key: 'university', label: 'ВУЗ', all: 'Все ВУЗы' },
-    { key: 'program', label: 'ИТ-программа', all: 'Все ИТ-программы' },
-    { key: 'responsible', label: 'Ответственный за этап', all: 'Все сотрудники' },
-    { key: 'stage', label: 'Этап', all: 'Все этапы' },
-  ] as const;
-  const filterControls = () => <><label><span>Поиск</span><Input type="search" placeholder="ВУЗ, программа или этап" value={filters.search} onChange={(event) => update('search', event.target.value)} /></label>{selects.map(({ key, label, all }) => <SearchableSelect key={key} label={label} labelPlacement="outside" value={filters[key]} onChange={(value) => update(key, value)} options={[{ id: '', name: all }, ...options(items, key).map(([id, name]) => ({ id, name }))]} placeholder={all} hint={query.data?.limited ? 'Поиск среди загруженных процессов.' : undefined} />)}<label><span>Статус</span><Select value={filters.status} onChange={(event) => update('status', event.target.value)}><option value="">Все статусы</option><option value="in_progress">В работе</option><option value="overdue">Просрочен</option><option value="completed">Завершён</option></Select></label></>;
+  const filterControls = () => <><label><span>Поиск</span><Input type="search" placeholder="ВУЗ, программа или этап" value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} /></label>{selects.map(({ key, label, all }) => <MultiSelect key={key} label={label} labelPlacement="outside" values={filters[key]} onChange={(values) => update(key, values)} options={key === 'status' ? statusOptions : options(items, key).map(([id, name]) => ({ id, name }))} searchable placeholder={all} hint={query.data?.limited ? 'Поиск среди загруженных процессов.' : undefined} />)}</>;
+  const activeSelections = selects.filter(({ key }) => filters[key].length > 0);
+  const hasFilters = Boolean(filters.search || activeSelections.length);
   return <div className={styles.page}><header className={styles.heading}><div><h1>Workflow</h1><p>Процессы взаимодействия с ВУЗами</p></div><Tabs items={viewTabs} activeId={view} onChange={(id) => setView(id as View)} label="Представление Workflow" prefix="workflow-view" panelPrefix="workflow-view-panel" /></header>
-    <FilterToolbar activeFilters={(Object.keys(filters) as (keyof Filters)[]).filter((key) => filters[key]).map((key) => ({ id: key, label: `${({ search: 'Поиск', university: 'ВУЗ', program: 'ИТ-программа', responsible: 'Ответственный', status: 'Статус', stage: 'Этап' } as Record<keyof Filters, string>)[key]}: ${key === 'status' ? ({ in_progress: 'В работе', overdue: 'Просрочен', completed: 'Завершён' } as Record<string, string>)[filters[key]] ?? filters[key] : key === 'search' ? filters[key] : options(items, key as 'university' | 'program' | 'responsible' | 'stage').find(([id]) => id === filters[key])?.[1] ?? filters[key]}`, onRemove: () => update(key, '') }))} label="Фильтры Workflow" collapsible controls={filterControls} onReset={() => setFilters(initialFilters)} resetDisabled={Object.values(filters).every((value) => !value)} mobileCount={Object.values(filters).filter(Boolean).length} />
+    <FilterToolbar activeFilters={[...(filters.search ? [{ id: 'search', label: `Поиск: ${filters.search}`, onRemove: () => setFilters((current) => ({ ...current, search: '' })) }] : []), ...activeSelections.map(({ key, label }) => ({ id: key, label: `${label}: выбрано ${filters[key].length}`, onRemove: () => update(key, []) }))]} label="Фильтры Workflow" collapsible controls={filterControls} onReset={() => setFilters(initialFilters)} resetDisabled={!hasFilters} mobileCount={Number(Boolean(filters.search)) + activeSelections.length} />
     <section className={styles.content} id={`workflow-view-panel-${view}`} role="tabpanel" aria-labelledby={`workflow-view-${view}`}>
         {query.isPending ? <p className={styles.message}>Загрузка процессов…</p> : !query.data ? <RouteErrorState onRetry={() => void query.refetch()} /> : <><div className={styles.summary}><strong>{filtered.length} процессов</strong>{query.data.limited ? <span>Загружена только часть процессов. Обновите страницу позже.</span> : null}{query.data.unavailableUniversities ? <span>Часть данных ВУЗов недоступна.</span> : null}</div>{filtered.length ? view === 'board' ? <WorkflowBoard items={filtered} /> : <WorkflowList items={filtered} /> : <EmptyState title="Процессы не найдены" description={items.length ? 'Измените фильтры.' : 'Процессы появятся после запуска работы с вузами.'} />}</>}
     </section>

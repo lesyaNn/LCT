@@ -3,7 +3,6 @@
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { DndContext, DragOverlay, KeyboardSensor, MouseSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
-import DragVerticalDots from '@atomaro/icons/24/editor/DragVerticalDots';
 import { useAuth } from '@/shared/auth/AuthProvider';
 import { hasPermission } from '@/shared/lib/access-control';
 import { normalizeApiError } from '@/shared/lib/api-errors';
@@ -31,9 +30,9 @@ function transitionTargets(item: WorkflowOverviewItem, allowedTargets?: Workflow
 }
 
 function DraggableWorkflowCard({ item, enabled }: { item: WorkflowOverviewItem; enabled: boolean }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.instanceId, disabled: !enabled });
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, isDragging } = useDraggable({ id: item.instanceId, disabled: !enabled });
   return <div ref={setNodeRef} className={isDragging ? styles.dragSource : undefined}>
-    <WorkflowCard item={item} dragHandle={enabled ? <button className={styles.dragHandle} type="button" aria-label={`Переместить: ${item.universityName}`} title="Переместить" {...attributes} {...listeners}><DragVerticalDots size={16} fill="currentColor" /></button> : undefined} />
+    <WorkflowCard item={item} dragListeners={enabled ? { onMouseDown: (event) => listeners?.onMouseDown?.(event), onTouchStart: (event) => listeners?.onTouchStart?.(event) } : undefined} keyboardDragControl={enabled ? <button ref={setActivatorNodeRef} className={styles.keyboardDragHandle} type="button" aria-label={`Переместить: ${item.universityName}`} {...attributes} onKeyDown={(event) => listeners?.onKeyDown?.(event)}>Переместить</button> : undefined} />
   </div>;
 }
 
@@ -97,7 +96,7 @@ export function WorkflowBoard({ items }: { items: WorkflowOverviewItem[] }) {
   return <>
     <DndContext sensors={sensors} onDragStart={(event) => setDraggingId(String(event.active.id))} onDragEnd={(event) => { void finishDrag(event); }} onDragCancel={() => setDraggingId(null)}>
       <div className={styles.boardScroll} aria-label="Доска Workflow"><div className={styles.board}>{columns.map((column) => <WorkflowBoardColumn column={column} valid={validTargets.has(column.key)} active={canManage} key={column.key} />)}</div></div>
-      <DragOverlay>{draggingItem ? <div className={styles.dragOverlay}>{draggingItem.universityName}<small>{draggingItem.programName ?? draggingItem.stage.name}</small></div> : null}</DragOverlay>
+      <DragOverlay>{draggingItem ? <div className={styles.dragOverlay} aria-hidden="true" inert><WorkflowCard item={draggingItem} /></div> : null}</DragOverlay>
     </DndContext>
     {pending ? <WorkflowTransitionModal open instanceId={pending.item.instanceId} universityId={pending.item.universityId} currentStage={pending.item.stage} stages={pending.item.workflow.stages} allowedTargets={pending.allowedTargets} initialTargetStageId={pending.targetStageId} userId={user?.id} onClose={() => setPending(null)} onSuccess={() => setPending(null)} onNotify={setNotification} /> : null}
     {notification ? <div className={styles.toastViewport}><Toast intent={notification.intent} title={notification.title} message={notification.message} onClose={() => setNotification(null)} /></div> : null}

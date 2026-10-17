@@ -26,7 +26,6 @@ import { FilterToolbar } from '@/shared/ui/rtk/filter-surface';
 import { SearchField } from '@/shared/ui/rtk/filter-field';
 import type { ActiveFilterItem } from '@/shared/ui/rtk/active-filters';
 import { DateRangeField } from '@/shared/ui/rtk/date-range-field';
-import { Select } from '@/shared/ui/rtk/form-controls';
 import { EmptyState } from '@/shared/ui/empty-state';
 import { MultiSelect, SearchableSelect } from '@/shared/ui/rtk/multiselect';
 import { StatusBadge as SemanticStatusBadge } from '@/shared/ui/rtk/status-badge';
@@ -284,13 +283,7 @@ function Filters({ state, options, catalogsLoading, catalogsUnavailable, searchI
       <MultiSelect label="ИТ-продукт" labelPlacement="outside" options={options.products} values={filters.productIds} searchable onChange={(values) => onPatch({ product: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
       <SearchableSelect label="Город" labelPlacement="outside" disabled={catalogsLoading || catalogsUnavailable} value={filters.city} onChange={(city) => onPatch({ city, page: 1 })} options={options.cities.map((city) => ({ id: city, name: city }))} placeholder="Все города" />
       <MultiSelect label="Ответственный" labelPlacement="outside" options={options.responsibles.map((person) => ({ id: person.id, name: person.name, description: person.role }))} values={filters.responsibleIds} searchable onChange={(values) => onPatch({ responsible: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
-      <label className={styles.field} title={!UNIVERSITY_LIST_CAPABILITIES.filters.stage ? 'Фильтр по текущему этапу пока недоступен.' : undefined}>
-        <span>Текущий этап</span>
-        <Select disabled={!UNIVERSITY_LIST_CAPABILITIES.filters.stage} value={filters.workflowStageId} onChange={(event) => onPatch({ stage: event.target.value, page: 1 })}>
-          <option value="">Все этапы</option>
-          {options.stages.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-        </Select>
-      </label>
+      <SearchableSelect label="Текущий этап" labelPlacement="outside" disabled={!UNIVERSITY_LIST_CAPABILITIES.filters.stage} value={filters.workflowStageId} onChange={(value) => onPatch({ stage: value, page: 1 })} options={[{ id: '', name: 'Все этапы' }, ...options.stages]} placeholder="Все этапы" />
       <div className={styles.periodField}><DateRangeField presets label={UNIVERSITY_LIST_CAPABILITIES.dateMeaning === 'created-at' ? 'Период создания' : 'Период последнего взаимодействия'} from={filters.dateFrom} to={filters.dateTo} onFromChange={(value) => updateDateRange('date_from', value)} onToChange={(value) => updateDateRange('date_to', value)} onRangeChange={(dateFrom, dateTo) => onPatch({ date_from: dateFrom, date_to: dateTo, page: 1 })} /></div>
     </section>
   );
