@@ -112,6 +112,11 @@ def list_workflow_activity(db: Session, instance_id: uuid.UUID) -> list[Workflow
             title = f"{date_label(old.get('due_date'))} → {date_label(new.get('due_date'))}"
             stage_name = stage_names.get(str(new.get("stage_id")), "Этап Workflow")
             stage_id = uuid.UUID(str(new["stage_id"])) if str(new.get("stage_id")) in stage_names else None
+        elif "stage_name" in new and old.get("stage_name") != new.get("stage_name"):
+            kind = "stage_name_changed"
+            title = f"{old.get('stage_name') or 'Этап Workflow'} → {new['stage_name']}"
+            stage_name = new["stage_name"]
+            stage_id = uuid.UUID(str(new["stage_id"])) if str(new.get("stage_id")) in stage_names else None
         else:
             continue
         events.append(WorkflowActivityRead(
@@ -641,6 +646,38 @@ def set_instance_stage_due_date(
             university_id=instance.university_id,
             old_value={"stage_id": str(stage_id), "due_date": previous.isoformat() if previous else None},
             new_value={"stage_id": str(stage_id), "due_date": due_date.isoformat() if due_date else None},
+        )
+    db.commit()
+    return get_instance_detail(db, instance_id)
+
+
+def set_instance_stage_name(
+    db: Session,
+    instance_id: uuid.UUID,
+    stage_id: uuid.UUID,
+    name: str,
+    actor_sub: str = "",
+) -> InstanceDetail:
+    """Rename one runtime snapshot stage without changing its template."""
+    instance = get_instance_or_404(db, instance_id)
+    stage = db.get(InstanceStage, stage_id)
+    if stage is None or stage.instance_id != instance_id:
+        raise NotFound("Workflow stage not found")
+    if instance.status != "active":
+        raise BadTransition("Only stages of an active Workflow can be renamed")
+    if stage.name == name:
+        return get_instance_detail(db, instance_id)
+    previous = stage.name
+    stage.name = name
+    if "audit_context" in db.info:
+        from app.modules.audit.service import AuditService, context_for
+
+        AuditService(db).log_event(
+            context=context_for(db, actor_sub or "system"),
+            action="UPDATE", entity_type="workflow_instance",
+            entity_id=instance.id, university_id=instance.university_id,
+            old_value={"stage_id": str(stage_id), "stage_name": previous},
+            new_value={"stage_id": str(stage_id), "stage_name": name},
         )
     db.commit()
     return get_instance_detail(db, instance_id)

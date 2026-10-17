@@ -36,9 +36,13 @@ class InstanceStageDueDateUpdate(BaseModel):
     due_date: date | None
 
 
+class InstanceStageNameUpdate(BaseModel):
+    name: NonBlankText = Field(min_length=1, max_length=512)
+
+
 class WorkflowActivityRead(BaseModel):
     id: uuid.UUID
-    type: Literal["responsible_changed", "stage_responsible_changed", "deadline_changed", "workflow_completed"]
+    type: Literal["responsible_changed", "stage_responsible_changed", "deadline_changed", "stage_name_changed", "workflow_completed"]
     created_at: datetime
     actor_name: str
     stage_id: uuid.UUID | None = None

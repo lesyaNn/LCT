@@ -2,6 +2,7 @@
 
 import os
 from datetime import date
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -72,7 +73,7 @@ def test_current_stage_due_date_round_trip_and_wrong_stage_rejected(setup):
     assert len(deadline_changes) == 2
     assert deadline_changes[-1]["title"] == "15.10.2026 → 20.10.2026"
     assert deadline_changes[-1]["stage_name"] == "Current"
-    assert "stage_id" not in deadline_changes[-1]
+    assert deadline_changes[-1]["stage_id"] == str(stage_id)
     assert "old_value" not in deadline_changes[-1]
     denied = client.patch(f"/api/v1/workflow/instances/{instance_id}/stages/{other_stage_id}/due-date", json={"due_date": "2026-10-21"})
     assert denied.status_code in (400, 409), denied.text
@@ -89,3 +90,30 @@ def test_current_stage_due_date_round_trip_and_wrong_stage_rejected(setup):
     unauthorized = client.patch(path, json={"due_date": "2026-10-22"})
     assert unauthorized.status_code == 401
     assert client.get(f"/api/v1/workflow/instances/{instance_id}/activity").status_code == 401
+
+
+def test_runtime_stage_names_persist_and_are_audited(setup):
+    client, engine, (instance_id, stage_id, next_stage_id) = setup
+    path = f"/api/v1/workflow/instances/{instance_id}/stages/{stage_id}/name"
+    renamed = client.patch(path, json={"name": "  Подготовка встречи  "})
+    assert renamed.status_code == 200, renamed.text
+    assert renamed.json()["stages"][0]["name"] == "Подготовка встречи"
+    next_path = f"/api/v1/workflow/instances/{instance_id}/stages/{next_stage_id}/name"
+    assert client.patch(next_path, json={"name": "Обсуждение"}).status_code == 200
+    assert [stage["name"] for stage in client.get(f"/api/v1/workflow/instances/{instance_id}").json()["stages"]] == ["Подготовка встречи", "Обсуждение"]
+    activity = client.get(f"/api/v1/workflow/instances/{instance_id}/activity")
+    assert [event["type"] for event in activity.json()] == ["stage_name_changed", "stage_name_changed"]
+    assert activity.json()[0]["title"] == "Current → Подготовка встречи"
+    assert client.patch(path, json={"name": "  "}).status_code == 422
+    assert client.patch(f"/api/v1/workflow/instances/{instance_id}/stages/{uuid4()}/name", json={"name": "Чужой"}).status_code == 404
+    with Session(engine) as db:
+        assert db.get(InstanceStage, stage_id).name == "Подготовка встречи"
+        assert db.get(InstanceStage, next_stage_id).name == "Обсуждение"
+        changes = db.scalars(select(AuditEvent).where(AuditEvent.entity_id == instance_id, AuditEvent.action == "UPDATE")).all()
+        assert any(event.new_value and event.new_value.get("stage_name") == "Подготовка встречи" for event in changes)
+        instance = db.get(WorkflowInstance, instance_id)
+        instance.status = "completed"
+        db.commit()
+    assert client.patch(path, json={"name": "Снова"}).status_code in (400, 409)
+    settings.auth_dev_bypass = False
+    assert client.patch(path, json={"name": "Снова"}).status_code == 401

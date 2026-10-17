@@ -1,5 +1,8 @@
 .section { display: flex; flex-direction: column; gap: var(--rtk-space-3); min-width: 0; }
 .heading { align-items: center; display: flex; gap: var(--rtk-space-3); justify-content: space-between; }
+.headingActions { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-1); }
+.body { display: flex; flex-direction: column; gap: var(--rtk-space-3); min-width: 0; }
+.body[hidden] { display: none; }
 .heading h3 { align-items: center; display: inline-flex; font-size: 15px; gap: var(--rtk-space-2); margin: 0; }
 .heading h3 svg { color: var(--rtk-color-brand); flex: 0 0 auto; }
 .count { color: var(--rtk-color-text-tertiary); font-size: 12px; font-weight: 500; }

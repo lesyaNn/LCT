@@ -29,6 +29,7 @@ from app.modules.workflow_instances.schemas import (
     InstanceResponsibleUpdate,
     InstanceStageResponsibleUpdate,
     InstanceStageDueDateUpdate,
+    InstanceStageNameUpdate,
     WorkflowActivityRead,
     WorkflowTaskRead,
     WorkflowTaskCreate,
@@ -216,6 +217,26 @@ def update_workflow_stage_due_date(
     service.authorize_scope(user, detail)
     return service.set_instance_stage_due_date(
         db, instance_id, stage_id, data.due_date, actor_sub=user.id
+    )
+
+
+@router.patch(
+    "/instances/{instance_id}/stages/{stage_id}/name",
+    response_model=InstanceDetail,
+    summary="Переименовать этап экземпляра Workflow",
+    description="Меняет название только runtime-этапа данного Workflow, сохраняя шаблон и историю. Требуемое право: workflow.change_status.",
+)
+def update_workflow_stage_name(
+    instance_id: uuid.UUID,
+    stage_id: uuid.UUID,
+    data: InstanceStageNameUpdate,
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(WRITE),
+) -> InstanceDetail:
+    detail = service.get_instance_detail(db, instance_id)
+    service.authorize_scope(user, detail)
+    return service.set_instance_stage_name(
+        db, instance_id, stage_id, data.name, actor_sub=user.id,
     )
 
 
