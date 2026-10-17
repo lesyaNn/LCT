@@ -191,6 +191,12 @@ export const universitiesQueryKey = queryKeys.universities.all;
 export const universitiesListQueryKey = queryKeys.universities.list;
 export const universityStageOptionsQueryKey = ['universities', 'stage-options'] as const;
 
+export async function createUniversity(input: { name: string; city: string | null }): Promise<{ id: string }> {
+  const result = await apiFetch<{ id: string }>('/api/v1/universities', { method: 'POST', body: input });
+  if (!result.ok) throw new ApiRequestError(result.status, result.body, 'Не удалось создать вуз.', result.error);
+  return result.data;
+}
+
 export async function getUniversityStageOptions(signal?: AbortSignal): Promise<UniversityStage[]> {
   if (isMockDataSourceFor('universities')) return universityFilterOptions.stages;
   const result = await apiFetch<string[]>('/api/v1/universities/stage-options', { signal });
@@ -398,6 +404,7 @@ export interface UniversityWorkflowComment {
   canDelete?: boolean;
   isOptimistic?: boolean;
   attachments?: UniversityWorkflowAttachment[];
+  questionStatus?: 'none' | 'open' | 'resolved';
 }
 
 export interface UniversityWorkflowAttachment {
@@ -493,6 +500,7 @@ export interface WorkflowCommentApiRecord {
   author_name?: string | null;
   content: string;
   is_internal: boolean;
+  question_status?: 'none' | 'open' | 'resolved';
   created_at: string;
   updated_at: string;
   attachments?: import('./workflow-attachments').WorkflowAttachmentApiRecord[];
@@ -526,7 +534,7 @@ export async function listWorkflowCommentsPage(instanceId: string, page: number)
   return unwrapApiResult(await apiFetch<WorkflowPage<WorkflowCommentApiRecord>>(`/api/v1/workflow/instances/${instanceId}/comments?page=${page}&page_size=100`));
 }
 
-export async function createWorkflowComment(instanceId: string, content: string, stageId?: string, files: File[] = []): Promise<WorkflowCommentApiRecord> {
+export async function createWorkflowComment(instanceId: string, content: string, stageId?: string, files: File[] = [], isQuestion = false): Promise<WorkflowCommentApiRecord> {
   if (!isWorkflowApiInstanceId(instanceId)) throw new Error('Добавление комментариев недоступно для этого Workflow-источника.');
   if (files.length) {
     if (!isRealWorkflowMode()) throw new WorkflowApiError(0, 'Загрузка файлов доступна только при подключённом backend.');
@@ -538,6 +546,7 @@ export async function createWorkflowComment(instanceId: string, content: string,
     }
     const body = new FormData();
     body.append('content', content);
+    body.append('is_question', String(isQuestion));
     if (stageId) body.append('stage_id', stageId);
     for (const file of files) body.append('files', file, file.name);
     const result = await apiUploadFormData<WorkflowCommentApiRecord>(`/api/v1/workflow/instances/${instanceId}/comments/with-attachments`, body);
@@ -546,7 +555,7 @@ export async function createWorkflowComment(instanceId: string, content: string,
   }
   return fromDataSource({
     mock: () => mockCreateWorkflowComment(instanceId, content, stageId),
-    real: async () => unwrapApiResult(await apiFetch<WorkflowCommentApiRecord>(`/api/v1/workflow/instances/${instanceId}/comments`, { method: 'POST', body: { content, stage_id: stageId ?? null } })),
+    real: async () => unwrapApiResult(await apiFetch<WorkflowCommentApiRecord>(`/api/v1/workflow/instances/${instanceId}/comments`, { method: 'POST', body: { content, stage_id: stageId ?? null, is_question: isQuestion } })),
     domain: 'workflow',
   });
 }
@@ -653,6 +662,13 @@ export async function updateWorkflowStageDueDate(instanceId: string, stageId: st
   }));
 }
 
+export async function updateWorkflowStageName(instanceId: string, stageId: string, name: string): Promise<WorkflowInstanceApiRecord> {
+  if (!isWorkflowApiInstanceId(instanceId) || !isWorkflowApiInstanceId(stageId)) throw new WorkflowApiError(0, 'Переименование недоступно для этого Workflow.');
+  return unwrapApiResult(await apiFetch<WorkflowInstanceApiRecord>(`/api/v1/workflow/instances/${instanceId}/stages/${stageId}/name`, {
+    method: 'PATCH', body: { name },
+  }));
+}
+
 export async function listWorkflowInstancePage(page: number, pageSize = 100): Promise<WorkflowPage<WorkflowInstanceApiRecord>> {
   return unwrapApiResult(await apiFetch<WorkflowPage<WorkflowInstanceApiRecord>>(`/api/v1/workflow/instances?page=${page}&page_size=${pageSize}`));
 }
@@ -660,7 +676,7 @@ export async function listWorkflowInstancePage(page: number, pageSize = 100): Pr
 export interface WorkflowTaskApiRecord { id: string; instance_id: string; stage_id: string | null; title: string; status: string; responsible_id: string | null; deadline: string | null; completed_at: string | null }
 export interface WorkflowAttachmentApiRecord { id: string; instance_id: string; stage_id: string | null; comment_id?: string | null; original_filename: string; mime_type: string; file_size: number; uploaded_by_keycloak_sub: string; uploaded_by_name?: string | null; created_at: string; updated_at: string }
 export interface WorkflowTransitionApiRecord { id: string; instance_id: string; from_stage_id: string | null; to_stage_id: string | null; actor_keycloak_sub: string; comment: string; created_at: string }
-export interface WorkflowActivityApiRecord { id: string; type: 'responsible_changed' | 'stage_responsible_changed' | 'deadline_changed' | 'workflow_completed'; created_at: string; actor_name: string; stage_id?: string | null; stage_name: string; title: string }
+export interface WorkflowActivityApiRecord { id: string; type: 'responsible_changed' | 'stage_responsible_changed' | 'deadline_changed' | 'stage_name_changed' | 'workflow_completed'; created_at: string; actor_name: string; stage_id?: string | null; stage_name: string; title: string }
 export interface WorkflowAllowedApiRecord { id: string; name: string; order_index: number }
 
 export async function listWorkflowTasksPage(instanceId: string, page: number): Promise<WorkflowPage<WorkflowTaskApiRecord>> {
@@ -730,6 +746,42 @@ export async function editWorkflowComment(commentId: string, content: string): P
     real: async () => unwrapApiResult(await apiFetch<WorkflowCommentApiRecord>(`/api/v1/workflow/comments/${commentId}`, { method: 'PATCH', body: { content } })),
     domain: 'workflow',
   });
+}
+
+export async function updateWorkflowQuestionStatus(commentId: string, status: 'none' | 'open' | 'resolved'): Promise<WorkflowCommentApiRecord> {
+  return unwrapApiResult(await apiFetch<WorkflowCommentApiRecord>(`/api/v1/workflow/comments/${encodeURIComponent(commentId)}/question-status`, { method: 'PATCH', body: { status } }));
+}
+
+export interface MeetingAgenda {
+  university_id: string;
+  university_name: string;
+  city: string | null;
+  instance_id: string;
+  stage_id: string;
+  stage_name: string;
+  stage_order: number;
+  generated_at: string;
+  as_of: string;
+  expires_through: string;
+  warning_days: number;
+  programs: { items: { program_id: string; name: string; direction: string; status: 'active' | 'launched'; launch_date: string | null }[]; total: number; omitted: number };
+  expiring_licenses: { items: { license_id: string; license_number: string; product: string; expires_at: string; days_left: number }[]; total: number; omitted: number };
+  open_questions: { items: { comment_id: string; instance_id: string; stage_id: string | null; author_keycloak_sub?: string | null; content: string; created_at: string }[]; total: number; omitted: number };
+}
+
+export const meetingAgendaQueryKey = (instanceId: string) => [...workflowQueryKey(instanceId), 'meeting-agenda'] as const;
+
+// Runtime stage names are the only meeting indicator in configurable templates.
+export function isMeetingAgendaStage(templateStageId: string | null | undefined, name: string): boolean {
+  return Boolean(templateStageId) && /(?<![\p{L}\p{N}_])встреч(?:а|и|у|е|ей)(?![\p{L}\p{N}_])/iu.test(name);
+}
+
+export async function getMeetingAgenda(instanceId: string, signal?: AbortSignal, stageId?: string): Promise<MeetingAgenda> {
+  return unwrapApiResult(await apiFetch<MeetingAgenda>(`/api/v1/workflow/instances/${encodeURIComponent(instanceId)}/meeting-agenda${stageId ? `?stage_id=${encodeURIComponent(stageId)}` : ''}`, { signal }));
+}
+
+export async function downloadMeetingAgenda(instanceId: string, stageId?: string): Promise<Blob> {
+  return unwrapApiResult(await apiDownload(`/api/v1/workflow/instances/${encodeURIComponent(instanceId)}/meeting-agenda.pdf${stageId ? `?stage_id=${encodeURIComponent(stageId)}` : ''}`));
 }
 
 export async function deleteWorkflowComment(commentId: string): Promise<void> {
@@ -1195,14 +1247,17 @@ export interface UniversityMeetingParticipant {
 
 export interface UniversityMeetingRow {
   id: string;
-  occurredAt: string;
-  type: UniversityMeetingType;
+  occurredAt: string | null;
+  type: UniversityMeetingType | null;
   subject: string;
   participants: UniversityMeetingParticipant[];
   outcome: string;
   nextAction: string;
   dueDate: string | null;
   author: string;
+  workflowInstanceId?: string | null;
+  workflowStageId?: string | null;
+  workflowStageName?: string | null;
 }
 
 export interface UniversityMeetingInput {

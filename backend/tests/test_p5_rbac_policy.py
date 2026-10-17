@@ -39,14 +39,19 @@ def actor(*roles, ids=None):
 
 def test_registry_and_role_compatibility():
     assert PUBLIC_ROLE_NAMES == {"user", "manager", "admin"}
-    assert USER_PERMISSIONS <= MANAGER_PERMISSIONS <= ADMIN_PERMISSIONS
+    assert USER_PERMISSIONS - {"import.read"} <= MANAGER_PERMISSIONS <= ADMIN_PERMISSIONS
     assert user_permissions(actor("user")) == USER_PERMISSIONS
     assert user_permissions(actor("manager")) == MANAGER_PERMISSIONS
+    assert user_permissions(actor("manager", "user")) == MANAGER_PERMISSIONS
     assert user_permissions(actor("admin")) == ADMIN_PERMISSIONS
+    assert user_permissions(actor("admin", "manager")) == ADMIN_PERMISSIONS
     assert user_permissions(actor("curator")) == set()
     assert "audit.read" not in USER_PERMISSIONS
     assert {"workflow.task.read", "workflow.task.update", "reports.create"} <= USER_PERMISSIONS
     assert {"university_responsible.manage", "analytics.extended", "audit.read"} <= MANAGER_PERMISSIONS
+    assert {"catalog.read", "university.edit", "user_university.manage"} <= MANAGER_PERMISSIONS
+    assert {"catalog.manage", "import.read", "import.write"}.isdisjoint(MANAGER_PERMISSIONS)
+    assert {"catalog.manage", "import.read", "import.write"} <= ADMIN_PERMISSIONS
     assert {"workflow_template.manage", "admin.users", "admin.settings"} <= ADMIN_PERMISSIONS
     assert "workflow_template.manage" not in MANAGER_PERMISSIONS
 

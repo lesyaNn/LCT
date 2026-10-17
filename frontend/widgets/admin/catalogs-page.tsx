@@ -39,6 +39,7 @@ import { TabbedSurface } from '@/shared/ui/rtk/tabbed-surface';
 import { EmptyState } from '@/shared/ui/empty-state';
 import { FilterField, SearchField } from '@/shared/ui/rtk/filter-field';
 import { Select } from '@/shared/ui/rtk/form-controls';
+import { SearchableSelect } from '@/shared/ui/rtk/multiselect';
 import { Modal } from '@/shared/ui/rtk/modal';
 import { Drawer } from '@/shared/ui/rtk/drawer';
 import { IconButton } from '@/shared/ui/rtk/icon-button';
@@ -65,9 +66,9 @@ const contactCatalogTypes: ReadonlyArray<CatalogType> = ['products', 'vendors'];
 function secondaryFields(item: CatalogItem, universityNames: ReadonlyMap<string, string>): Array<{ label: string; value: string }> {
   if (item.type === 'universities') return [{ label: 'Город', value: item.city || '—' }];
   if (item.type === 'directions') return [{ label: 'Код', value: item.code }];
-  if (item.type === 'programs') return [{ label: 'Направление', value: item.directionName || '—' }, { label: 'Описание', value: item.description || '—' }];
+  if (item.type === 'programs') return [{ label: 'ИТ-направление', value: item.directionName || '—' }, { label: 'Описание', value: item.description || '—' }];
   if (item.type === 'vendors') return [];
-  if (item.type === 'products') return [{ label: 'Вендор', value: item.vendorName || '—' }, { label: 'Программа', value: item.programName || '—' }, { label: 'Версия', value: item.version || '—' }];
+  if (item.type === 'products') return [{ label: 'Вендор', value: item.vendorName || '—' }, { label: 'ИТ-программа', value: item.programName || '—' }, { label: 'Версия', value: item.version || '—' }];
   if (item.type === 'agreements') return agreementFields(item);
   return [{ label: 'Email', value: item.email }, { label: 'Роль', value: item.role || '—' }, { label: 'ВУЗы', value: item.universityIds.length ? item.universityIds.map((id) => universityNames.get(id) ?? '—').join(', ') : 'Нет' }];
 }
@@ -81,7 +82,7 @@ function agreementFields(item: AgreementCatalogItem): Array<{ label: string; val
   if (item.kind === 'contracts') {
     return [
       ...base,
-      { label: 'Продукт', value: item.productName || '—' },
+      { label: 'ИТ-продукт', value: item.productName || '—' },
       { label: 'Подписан', value: item.signedAt || '—' },
       { label: 'Окончание', value: item.expiresAt || 'Бессрочно' },
       { label: 'Статус', value: agreementStatusLabels[item.status] },
@@ -91,9 +92,9 @@ function agreementFields(item: AgreementCatalogItem): Array<{ label: string; val
   }
   return [
     ...base,
-    { label: 'Продукт', value: item.productName || '—' },
+    { label: 'ИТ-продукт', value: item.productName || '—' },
     { label: 'Договор', value: item.contractNumber || '—' },
-    { label: 'Программа', value: item.programName || '—' },
+    { label: 'ИТ-программа', value: item.programName || '—' },
     { label: 'Подписан', value: item.signedAt || '—' },
     { label: 'Окончание', value: item.expiresAt || 'Бессрочно' },
     { label: 'Статус', value: agreementStatusLabels[item.status] },
@@ -104,13 +105,13 @@ function agreementFields(item: AgreementCatalogItem): Array<{ label: string; val
 function tableHeaders(type: CatalogType, kind: AgreementKind): string[] {
   if (type === 'universities') return ['Название', 'Город'];
   if (type === 'directions') return ['Название', 'Код'];
-  if (type === 'programs') return ['Название', 'Направление', 'Описание'];
+  if (type === 'programs') return ['Название', 'ИТ-направление', 'Описание'];
   if (type === 'vendors') return ['Название'];
-  if (type === 'products') return ['Название', 'Вендор', 'Программа', 'Версия'];
+  if (type === 'products') return ['Название', 'Вендор', 'ИТ-программа', 'Версия'];
   if (type === 'agreements') {
     return kind === 'contracts'
-      ? ['Номер договора', 'ВУЗ', 'Вендор', 'Продукт', 'Подписан', 'Окончание', 'Статус', 'Передача', 'Лицензий']
-      : ['Номер лицензии', 'ВУЗ', 'Вендор', 'Продукт', 'Договор', 'Программа', 'Подписан', 'Окончание', 'Статус', 'Передача'];
+      ? ['Номер договора', 'ВУЗ', 'Вендор', 'ИТ-продукт', 'Подписан', 'Окончание', 'Статус', 'Передача', 'Лицензий']
+      : ['Номер лицензии', 'ВУЗ', 'Вендор', 'ИТ-продукт', 'Договор', 'ИТ-программа', 'Подписан', 'Окончание', 'Статус', 'Передача'];
   }
   return ['ФИО', 'Email', 'Роль', 'ВУЗы'];
 }
@@ -124,7 +125,7 @@ function itemContacts(item: CatalogItem | undefined): CatalogContact[] | undefin
 }
 
 function CatalogActions({ item, canWrite, busy, onEdit, onDelete }: { item: CatalogItem; canWrite: boolean; busy: boolean; onEdit: () => void; onDelete: () => void }) {
-  const writeHint = canWrite ? null : 'Изменять каталоги может только администратор или менеджер.';
+  const writeHint = canWrite ? null : 'Изменять каталоги может только администратор.';
   const editLabel = `Изменить ${item.name}`;
   const deleteLabel = `Удалить ${item.name}`;
   return <div className={styles.rowActions}>
@@ -167,7 +168,7 @@ export function CatalogsPage() {
   const [deleteTarget, setDeleteTarget] = useState<CatalogItem | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ intent: ToastIntent; title: string; message?: string } | null>(null);
-  const canWrite = canMutateCatalog(user?.role);
+  const canWrite = canMutateCatalog(user);
 
   useEffect(() => { const timer = window.setTimeout(() => setDebouncedSearch(search), 250); return () => window.clearTimeout(timer); }, [search]);
 
@@ -218,7 +219,7 @@ export function CatalogsPage() {
   const busyId = deleteMutation.isPending ? deleteMutation.variables?.item.id : undefined;
 
   return <div className={styles.page}>
-    <header className={styles.pageHeader}><div><h1>Управление каталогами</h1><p>Управляйте основными справочниками CRM.</p></div></header>
+    <header className={styles.pageHeader}><div><h1>Управление каталогами</h1><p>ИТ-направления, ИТ-программы и ИТ-продукты находятся в отдельных вкладках. Прокрутите строку вкладок, чтобы увидеть все.</p></div></header>
     <TabbedSurface tabs={<Tabs items={catalogDefinitions} activeId={type} onChange={(id) => chooseType(id as CatalogType)} label="Каталоги" prefix="catalog-tab" />}>
       <div data-testid="catalog-tabs">
         <section id="catalog-panel" role="tabpanel" aria-labelledby={`catalog-tab-${type}`} className={styles.panel}>
@@ -227,7 +228,7 @@ export function CatalogsPage() {
             embedded
             label="Фильтры каталога"
             activeFilters={[...(search ? [{ id: 'search', label: `Поиск: ${search}`, onRemove: () => { setSearch(''); setPage(1); } }] : []), ...(type === 'agreements' && universityId ? [{ id: 'university', label: `ВУЗ: ${references.universities.find((item) => item.id === universityId)?.name ?? 'Выбран'}`, onRemove: () => { setUniversityId(''); setPage(1); } }] : []), ...(type === 'agreements' && agreementStatus ? [{ id: 'status', label: `Состояние: ${agreementStatusLabels[agreementStatus]}`, onRemove: () => { setAgreementStatus(''); setPage(1); } }] : [])]}
-            controls={() => <><SearchField label={type === 'agreements' ? agreementKind === 'contracts' ? 'Номер договора' : 'Номер лицензии' : 'Поиск'} value={search} placeholder={type === 'agreements' ? 'Введите номер' : definition.searchPlaceholder} onChange={(value) => { setSearch(value); setPage(1); }} />{type === 'agreements' ? <><FilterField label="ВУЗ"><Select value={universityId} onChange={(event) => { setUniversityId(event.target.value); setPage(1); }}><option value="">Все ВУЗы</option>{references.universities.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></FilterField><FilterField label="Состояние"><Select value={agreementStatus} onChange={(event) => { setAgreementStatus(event.target.value as AgreementStatus | ''); setPage(1); }}><option value="">Все состояния</option>{(agreementKind === 'contracts' ? contractStatuses : licenseStatuses).map((status) => <option key={status} value={status}>{agreementStatusLabels[status]}</option>)}</Select></FilterField></> : null}</>}
+            controls={() => <><SearchField label={type === 'agreements' ? agreementKind === 'contracts' ? 'Номер договора' : 'Номер лицензии' : 'Поиск'} value={search} placeholder={type === 'agreements' ? 'Введите номер' : definition.searchPlaceholder} onChange={(value) => { setSearch(value); setPage(1); }} />{type === 'agreements' ? <><SearchableSelect label="ВУЗ" labelPlacement="outside" value={universityId} onChange={(value) => { setUniversityId(value); setPage(1); }} options={[{ id: '', name: 'Все ВУЗы' }, ...references.universities]} placeholder="Все ВУЗы" /><FilterField label="Состояние"><Select value={agreementStatus} onChange={(event) => { setAgreementStatus(event.target.value as AgreementStatus | ''); setPage(1); }}><option value="">Все состояния</option>{(agreementKind === 'contracts' ? contractStatuses : licenseStatuses).map((status) => <option key={status} value={status}>{agreementStatusLabels[status]}</option>)}</Select></FilterField></> : null}</>}
             actions={<div className={styles.actions}>{canWrite ? addButton : <Tooltip content="На текущем этапе каталоги подключены только для чтения.">{addButton}</Tooltip>}<ButtonLink href={`/admin/import?type=${type}`} variant="orange">Импорт</ButtonLink></div>}
             onReset={resetFilters}
             resetDisabled={!search && !universityId && !agreementStatus}

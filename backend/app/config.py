@@ -3,8 +3,13 @@
 MINIMAL AUTH STAGE: auth does NOT depend on PostgreSQL/Redis/MinIO.
 Domain DB settings stay for the next stage but are unused at runtime.
 """
-from pydantic import model_validator
+from pathlib import Path
+from urllib.parse import urlsplit
+
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from app.modules.notifications.address import outbound_email
 
 DEV_BYPASS_ENVIRONMENTS = frozenset({"dev", "development", "local", "test", "testing"})
 
@@ -31,6 +36,28 @@ class Settings(BaseSettings):
 
     frontend_origin: str = "http://localhost:3000"
 
+    # Email is an optional delivery channel for persisted notifications.
+    email_notifications_enabled: bool = False
+    smtp_host: str = ""
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_username: str = ""
+    smtp_password: SecretStr = SecretStr("")
+    smtp_from_email: str = ""
+    smtp_from_name: str = "RTK EdTech CRM"
+    smtp_security: str = "starttls"  # starttls or ssl; plaintext is unsupported
+    smtp_timeout_seconds: float = Field(default=10, ge=1, le=60)
+    email_max_attempts: int = Field(default=5, ge=1, le=20)
+
+    @model_validator(mode="after")
+    def validate_email(self) -> "Settings":
+        if self.smtp_security not in {"starttls", "ssl"}:
+            raise ValueError("SMTP_SECURITY must be starttls or ssl")
+        if self.email_notifications_enabled and (not self.smtp_host or not self.smtp_from_email):
+            raise ValueError("SMTP_HOST and SMTP_FROM_EMAIL are required when email is enabled")
+        if self.email_notifications_enabled:
+            self.smtp_from_email = outbound_email(self.smtp_from_email)
+        return self
+
     # --- Domain stage (NOT used by minimal auth stack) ---
     database_url: str = "sqlite:///./dev.db"
     # M5: explicit DB pool/timeout knobs (PostgreSQL only; SQLite ignores them).
@@ -39,6 +66,7 @@ class Settings(BaseSettings):
     db_pool_size: int = 5
     db_max_overflow: int = 10
     db_pool_timeout: int = 30
+    db_connect_timeout_seconds: int = Field(default=5, ge=1, le=30)
     db_statement_timeout_ms: int = 30000
     # KeyDB (wire-совместим с Redis, тот же RESP-протокол и redis-py клиент).
     # Схема URL остаётся ``redis://`` — это схема протокола, а не вендора.
@@ -68,6 +96,37 @@ class Settings(BaseSettings):
     # --- Rate limiting (M10, heavy endpoints only) ---
     # 0 disables the limiter (tests); default 120 req/min per token/IP.
     rate_limit_per_minute: int = 120
+
+    # Documentation assistant. Models are downloaded explicitly, never by an API request.
+    assistant_enabled: bool = False
+    assistant_ollama_url: str = "http://localhost:11434"
+    assistant_model: str = Field(default="qwen3:1.7b", min_length=1, max_length=128)
+    assistant_embedding_model: str = Field(default="qwen3-embedding:0.6b", min_length=1,
+                                           max_length=128)
+    assistant_docs_root: str = str(
+        Path(__file__).resolve().parents[2] / "frontend" / "public" / "docs"
+    )
+    assistant_index_path: str = "var/assistant/index.json"
+    assistant_timeout_seconds: float = Field(default=120, ge=1, le=300)
+    assistant_context_tokens: int = Field(default=4096, ge=2048, le=16384)
+    assistant_answer_tokens: int = Field(default=256, ge=128, le=1024)
+    assistant_rate_limit_per_minute: int = Field(default=10, ge=1, le=120)
+    assistant_max_concurrent: int = Field(default=1, ge=1, le=8)
+    assistant_history_turns: int = Field(default=3, ge=0, le=6)
+    assistant_max_turns: int = Field(default=100, ge=1, le=500)
+    assistant_retention_days: int = Field(default=30, ge=1, le=365)
+
+    @model_validator(mode="after")
+    def validate_assistant(self) -> "Settings":
+        target = urlsplit(self.assistant_ollama_url)
+        if (target.scheme not in {"http", "https"} or not target.hostname
+                or target.username or target.password or target.query or target.fragment
+                or target.path not in {"", "/"}):
+            raise ValueError("ASSISTANT_OLLAMA_URL must be an HTTP(S) origin")
+        for model in (self.assistant_model, self.assistant_embedding_model):
+            if not model.strip() or "cloud" in model.lower() or "://" in model:
+                raise ValueError("Assistant requires explicit local model names")
+        return self
 
     # --- Analytics reports (P4-06-01) ---
     # Filesystem root for generated xlsx/pdf/json reports. Mounted as a

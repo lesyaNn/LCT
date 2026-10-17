@@ -73,6 +73,28 @@ def _dto(record: dict, role: str) -> AdminUserOut:
     )
 
 
+def _manager_scope(record: dict, role: str,
+                   allowed_ids: frozenset[uuid.UUID]) -> UserScope | None:
+    """Expose regular users with no scope or a link to the manager's universities."""
+    if role != "user" or not allowed_ids:
+        return None
+    assigned = _scope(record, role).university_ids
+    if assigned and not allowed_ids.intersection(assigned):
+        return None
+    return UserScope(kind="universities",
+                     university_ids=[item for item in assigned if item in allowed_ids])
+
+
+def _visible_dto(record: dict, role: str,
+                 manager_ids: frozenset[uuid.UUID] | None) -> AdminUserOut | None:
+    if manager_ids is None:
+        return _dto(record, role)
+    scope = _manager_scope(record, role, manager_ids)
+    if scope is None:
+        return None
+    return _dto(record, role).model_copy(update={"scope": scope})
+
+
 def _user_role(kc: KeycloakAdminClient, user_id: str) -> str:
     names = {role.get("name") for role in kc.user_roles(user_id)}
     for role in PUBLIC_ROLES:
@@ -83,21 +105,29 @@ def _user_role(kc: KeycloakAdminClient, user_id: str) -> str:
 
 
 def list_users(kc: KeycloakAdminClient, *, search: str, role: str | None,
-               page: int, page_size: int) -> AdminUsersPage:
+               page: int, page_size: int,
+               manager_ids: frozenset[uuid.UUID] | None = None) -> AdminUsersPage:
+    if manager_ids is not None and not manager_ids:
+        return AdminUsersPage(items=[], page=page, page_size=page_size, total=0)
     memberships = _role_memberships(kc)
     # Keycloak's user-list representation has attributes but no realm roles;
     # role-users has roles but not reliable attributes. Aggregate both in a
     # bounded number of paged calls and paginate the joined result here.
-    matched = [item for item in _searched_users(kc, search)
-               if item["id"] in memberships and (role is None or memberships[item["id"]] == role)]
+    matched = [visible for item in _searched_users(kc, search)
+               if item["id"] in memberships and (role is None or memberships[item["id"]] == role)
+               if (visible := _visible_dto(item, memberships[item["id"]], manager_ids)) is not None]
     total = len(matched)
     rows = matched[(page - 1) * page_size:page * page_size]
-    return AdminUsersPage(items=[_dto(row, memberships[row["id"]]) for row in rows],
+    return AdminUsersPage(items=rows,
                           page=page, page_size=page_size, total=total)
 
 
-def get_user(kc: KeycloakAdminClient, user_id: str) -> AdminUserOut:
-    return _dto(kc.user(user_id), _user_role(kc, user_id))
+def get_user(kc: KeycloakAdminClient, user_id: str,
+             manager_ids: frozenset[uuid.UUID] | None = None) -> AdminUserOut:
+    result = _visible_dto(kc.user(user_id), _user_role(kc, user_id), manager_ids)
+    if result is None:
+        raise BusinessException(ErrorCode.NOT_FOUND)
+    return result
 
 
 def _validate_scope(db: Session, scope: UserScope) -> None:
@@ -156,14 +186,34 @@ def _audit(db: Session, actor: CurrentUser, target_id: str, kind: str, before=No
 
 
 def update_user(db: Session, kc: KeycloakAdminClient, actor: CurrentUser,
-                user_id: str, change: UserUpdate) -> AdminUserOut:
+                user_id: str, change: UserUpdate,
+                manager_ids: frozenset[uuid.UUID] | None = None) -> AdminUserOut:
     before = kc.user(user_id)
     old_role = _user_role(kc, user_id)
+    manager_response_scope = None
+    if manager_ids is not None:
+        if not manager_ids:
+            raise SecurityError(ErrorCode.FORBIDDEN)
+        if _manager_scope(before, old_role, manager_ids) is None:
+            raise BusinessException(ErrorCode.NOT_FOUND)
+        if change.role != old_role:
+            raise SecurityError(ErrorCode.FORBIDDEN)
+        requested = set(change.scope.university_ids)
+        if change.scope.kind != "universities" or not requested <= manager_ids:
+            raise SecurityError(ErrorCode.FORBIDDEN)
+        _validate_scope(db, change.scope)
+        manager_response_scope = change.scope
+        existing = _scope(before, old_role).university_ids
+        preserved = [item for item in existing if item not in manager_ids]
+        change = UserUpdate(role=old_role, scope=UserScope(
+            kind="universities", university_ids=preserved + change.scope.university_ids,
+        ))
+    else:
+        _validate_scope(db, change.scope)
     if actor.id == user_id and change.role != "admin":
         raise SecurityError(ErrorCode.FORBIDDEN)
     if old_role == "admin" and change.role != "admin":
         _last_admin_guard(db, kc, before, old_role)
-    _validate_scope(db, change.scope)
     old_attributes = dict(before.get("attributes") or {})
     next_attributes = dict(old_attributes)
     next_attributes["university_ids"] = [str(value) for value in change.scope.university_ids]
@@ -172,7 +222,8 @@ def update_user(db: Session, kc: KeycloakAdminClient, actor: CurrentUser,
     scope_changed = old_attributes.get("university_ids", []) != next_attributes["university_ids"]
     role_changed = old_role != change.role
     if not scope_changed and not role_changed:
-        return _dto(before, old_role)
+        result = _dto(before, old_role)
+        return result.model_copy(update={"scope": manager_response_scope}) if manager_response_scope else result
     new_role = kc.role(change.role) if role_changed else None
     previous_role = kc.role(old_role) if role_changed else None
     assigned_new = False
@@ -211,7 +262,8 @@ def update_user(db: Session, kc: KeycloakAdminClient, actor: CurrentUser,
         _audit(db, actor, user_id, "scope", old_attributes.get("university_ids", []),
                next_attributes["university_ids"], target_name)
     db.commit()
-    return _dto({**before, "attributes": next_attributes}, change.role)
+    result = _dto({**before, "attributes": next_attributes}, change.role)
+    return result.model_copy(update={"scope": manager_response_scope}) if manager_response_scope else result
 
 
 def set_blocked(db: Session, kc: KeycloakAdminClient, actor: CurrentUser,

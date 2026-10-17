@@ -1,5 +1,7 @@
 'use client';
 
+import Checklist from '@atomaro/icons/24/action/Checklist';
+import { useState } from 'react';
 import { Controller, type Control } from 'react-hook-form';
 import { Button } from '@/shared/ui/rtk/button';
 import { FormError } from '@/shared/ui/rtk/form-field';
@@ -25,12 +27,16 @@ interface ReportColumnSelectorProps {
  * optional one instead of appearing as an undifferentiated list of 17.
  */
 export function ReportColumnSelector({ control, error }: ReportColumnSelectorProps) {
+  const [extraColumnsOpen, setExtraColumnsOpen] = useState(true);
   return (
     <div className={styles.columnSection}>
       <div className={styles.sectionHeading}>
-        <div>
-          <h3>Колонки</h3>
-          <p>Выберите данные, которые войдут в отчёт.</p>
+        <div className={styles.headingWithIcon}>
+          <Checklist size={18} fill="currentColor" aria-hidden="true" />
+          <div>
+            <h3>Колонки</h3>
+            <p>Выберите данные, которые войдут в отчёт.</p>
+          </div>
         </div>
         {error ? <FormError id="report-columns-error">{error}</FormError> : null}
       </div>
@@ -47,11 +53,15 @@ export function ReportColumnSelector({ control, error }: ReportColumnSelectorPro
           return (
             <>
               <div className={styles.columnPresets} aria-label="Наборы колонок">
-                {reportColumnPresetNames.map((name) => (
-                  <Button key={name} variant="ghost" size="s" type="button" onClick={() => field.onChange([...reportColumnPresets[name]])}>
-                    {name}
-                  </Button>
-                ))}
+                {reportColumnPresetNames.map((name) => {
+                  const preset = reportColumnPresets[name];
+                  const selected = field.value.length === preset.length && preset.every((id) => field.value.includes(id));
+                  return (
+                    <Button key={name} variant={selected ? 'primary' : 'secondary'} size="s" type="button" aria-pressed={selected} onClick={() => field.onChange([...preset])}>
+                      {name}
+                    </Button>
+                  );
+                })}
               </div>
               <fieldset className={styles.columnFieldset}>
                 <legend className={styles.columnLegend}>Колонки по ТЗ</legend>
@@ -66,19 +76,24 @@ export function ReportColumnSelector({ control, error }: ReportColumnSelectorPro
                     ))}
                 </div>
               </fieldset>
-              <fieldset className={styles.columnFieldset}>
-                <legend className={styles.columnLegend}>Дополнительные колонки</legend>
-                <div className={styles.columnGrid}>
-                  {reportColumnDefinitions
-                    .filter((column) => !(TZ_REPORT_COLUMNS as readonly string[]).includes(column.id))
-                    .map((column) => (
-                      <label key={column.id}>
-                        <input type="checkbox" checked={field.value.includes(column.id)} onChange={() => toggle(column.id)} />
-                        <span>{column.label}</span>
-                      </label>
-                    ))}
-                </div>
-              </fieldset>
+              <details className={styles.extraColumns} open={extraColumnsOpen} onToggle={(event) => setExtraColumnsOpen(event.currentTarget.open)}>
+                <summary>
+                  <span>Дополнительные колонки</span>
+                  <span>{field.value.filter((id) => !(TZ_REPORT_COLUMNS as readonly string[]).includes(id)).length} выбрано</span>
+                </summary>
+                <fieldset className={styles.columnFieldset} aria-label="Дополнительные колонки">
+                  <div className={styles.columnGrid}>
+                    {reportColumnDefinitions
+                      .filter((column) => !(TZ_REPORT_COLUMNS as readonly string[]).includes(column.id))
+                      .map((column) => (
+                        <label key={column.id}>
+                          <input type="checkbox" checked={field.value.includes(column.id)} onChange={() => toggle(column.id)} />
+                          <span>{column.label}</span>
+                        </label>
+                      ))}
+                  </div>
+                </fieldset>
+              </details>
             </>
           );
         }}

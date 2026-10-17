@@ -30,6 +30,7 @@ export function WorkflowStageTasks({ stage, instanceId, canEdit, state }: { stag
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.universities.workflowTasks(instanceId) }),
       queryClient.invalidateQueries({ queryKey: workflowQueryKey(instanceId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.universities.healthFamily }),
     ]);
   };
   const mutation = useMutation({

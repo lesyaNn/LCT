@@ -12,7 +12,6 @@ import { EmptyState } from '@/shared/ui/empty-state';
 import { ErrorState } from '@/shared/ui/error-state';
 import { Progress } from '@/shared/ui/rtk/progress';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
-import { TableShell } from '@/shared/ui/rtk/table-shell';
 import { TableSkeleton } from '@/shared/ui/skeleton';
 import { Tooltip } from '@/shared/ui/rtk/tooltip';
 import { formatDateTimeRu, formatFileSize } from '@/shared/lib/formatters';
@@ -198,7 +197,7 @@ export function ReportJobsPanel({ jobs, loading, error, pollingErrors, retryErro
   if (!jobs.length) return <EmptyState title="Отчёты ещё не формировались" description="Созданные задачи появятся здесь." headingLevel={3} />;
 
   return (
-    <TableShell ariaLabel="Задачи отчётов" className={styles.jobsListShell}>
+    <div aria-label="Задачи отчётов" className={styles.jobsListShell} tabIndex={0}>
       <div className={styles.jobsDesktop}>
         <table>
           <caption className={styles.visuallyHidden}>Задачи отчётов</caption>
@@ -220,6 +219,6 @@ export function ReportJobsPanel({ jobs, loading, error, pollingErrors, retryErro
           <ReportJobCard key={job.id} job={job} pollingError={pollingErrors.get(job.id)} retryError={retryErrors.get(job.id)} retrying={retryingId === job.id} onRetry={onRetry} />
         ))}
       </div>
-    </TableShell>
+    </div>
   );
 }

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import SecurityError
 from app.core.permissions import require_permission
+from app.core.policies import get_data_scope
 from app.core.security import CurrentUser
 from app.modules.admin_users import service
 from app.modules.admin_users.keycloak_client import KeycloakAdminClient, get_keycloak_admin_client
@@ -20,6 +21,7 @@ from app.schemas.errors import ErrorCode
 
 router = APIRouter(prefix="/admin/users", tags=["Admin Users"])
 ADMIN = require_permission("admin.users")
+ASSIGNMENTS = require_permission("user_university.manage")
 
 
 def live_admin(
@@ -34,22 +36,42 @@ def live_admin(
     return actor
 
 
+def live_user_scope_actor(
+    actor: CurrentUser = Depends(ASSIGNMENTS),
+    kc: KeycloakAdminClient = Depends(get_keycloak_admin_client),
+) -> tuple[CurrentUser, frozenset[UUID] | None]:
+    """Use live Keycloak role and scope before any user-assignment read/write."""
+    record = kc.user(actor.id)
+    roles = {role.get("name") for role in kc.user_roles(actor.id)}
+    if not record.get("enabled", True):
+        raise SecurityError(ErrorCode.FORBIDDEN)
+    if "admin" in (actor.roles or set()) and "admin" in roles:
+        return actor, None
+    if "manager" in (actor.roles or set()) and "manager" in roles:
+        raw = (record.get("attributes") or {}).get("university_ids") or []
+        values = raw if isinstance(raw, list) else [raw]
+        live = CurrentUser(id=actor.id, roles={"manager"},
+                           university_ids=tuple(str(value) for value in values))
+        return actor, get_data_scope(live).university_ids
+    raise SecurityError(ErrorCode.FORBIDDEN)
+
+
 @router.get(
     "",
     response_model=AdminUsersPage,
     summary="Список пользователей",
-    description="Возвращает постраничный список пользователей Keycloak с поиском по строке и фильтром по роли. Требуется право admin.users (проверка live_admin).",
+    description="Admin видит всех пользователей; Manager — только доступных ему обычных пользователей и назначения в своей области. Проверяется актуальная роль и область доступа в Keycloak.",
 )
 def list_admin_users(
     search: str = Query(default="", max_length=256),
     role: Literal["user", "manager", "admin"] | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
-    _actor: CurrentUser = Depends(live_admin),
+    access: tuple[CurrentUser, frozenset[UUID] | None] = Depends(live_user_scope_actor),
     kc: KeycloakAdminClient = Depends(get_keycloak_admin_client),
 ):
     return service.list_users(kc, search=search.strip(), role=role,
-                              page=page, page_size=page_size)
+                              page=page, page_size=page_size, manager_ids=access[1])
 
 
 @router.post(
@@ -72,27 +94,28 @@ def invite_admin_user(
     "/{user_id}",
     response_model=AdminUserOut,
     summary="Карточка пользователя",
-    description="Возвращает одного пользователя по UUID из Keycloak. Требуется право admin.users.",
+    description="Admin видит любого пользователя; Manager — только обычного пользователя в своей области.",
 )
 def get_admin_user(
-    user_id: UUID, _actor: CurrentUser = Depends(live_admin),
+    user_id: UUID, access: tuple[CurrentUser, frozenset[UUID] | None] = Depends(live_user_scope_actor),
     kc: KeycloakAdminClient = Depends(get_keycloak_admin_client),
 ):
-    return service.get_user(kc, str(user_id))
+    return service.get_user(kc, str(user_id), manager_ids=access[1])
 
 
 @router.patch(
     "/{user_id}",
     response_model=AdminUserOut,
     summary="Обновить пользователя",
-    description="Обновляет имя, email и роли пользователя в Keycloak. Требуется право admin.users.",
+    description="Admin меняет роль и вузы; Manager меняет только назначения обычного пользователя в своей области.",
 )
 def update_admin_user(
-    user_id: UUID, change: UserUpdate, actor: CurrentUser = Depends(live_admin),
+    user_id: UUID, change: UserUpdate,
+    access: tuple[CurrentUser, frozenset[UUID] | None] = Depends(live_user_scope_actor),
     db: Session = Depends(get_audit_db),
     kc: KeycloakAdminClient = Depends(get_keycloak_admin_client),
 ):
-    return service.update_user(db, kc, actor, str(user_id), change)
+    return service.update_user(db, kc, access[0], str(user_id), change, manager_ids=access[1])
 
 
 @router.post(

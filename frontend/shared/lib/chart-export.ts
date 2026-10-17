@@ -71,6 +71,15 @@ async function renderChartComposition(target: HTMLElement): Promise<string> {
   clone.style.width = `${targetRect.width}px`;
   clone.style.height = `${targetRect.height}px`;
   clone.style.flex = 'none';
+  const scrollArea = target.querySelector<HTMLElement>('[data-chart-scroll]');
+  const cloneScrollArea = clone.querySelector<HTMLElement>('[data-chart-scroll]');
+  if (scrollArea && cloneScrollArea) {
+    clone.style.height = 'auto';
+    clone.style.minHeight = `${targetRect.height}px`;
+    cloneScrollArea.style.flex = 'none';
+    cloneScrollArea.style.height = `${scrollArea.scrollHeight}px`;
+    cloneScrollArea.style.overflow = 'visible';
+  }
 
   const rootStyles = getComputedStyle(document.documentElement);
   const surface = resolveColor(rootStyles.getPropertyValue('--rtk-color-surface').trim() || 'white');
@@ -126,11 +135,11 @@ async function renderChartComposition(target: HTMLElement): Promise<string> {
   }
 }
 
-async function imageDimensions(dataUrl: string): Promise<{ width: number; height: number }> {
+async function decodeImage(dataUrl: string): Promise<HTMLImageElement> {
   const image = new Image();
   image.src = dataUrl;
   await image.decode();
-  return { width: image.naturalWidth, height: image.naturalHeight };
+  return image;
 }
 
 export async function exportChart(
@@ -146,16 +155,32 @@ export async function exportChart(
     return;
   }
 
-  const [{ jsPDF }, dimensions] = await Promise.all([import('jspdf'), imageDimensions(png)]);
+  const [{ jsPDF }, image] = await Promise.all([import('jspdf'), decodeImage(png)]);
   const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4', compress: true });
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
   const margin = 10;
   const availableWidth = pageWidth - margin * 2;
   const availableHeight = pageHeight - margin * 2;
-  const scale = Math.min(availableWidth / dimensions.width, availableHeight / dimensions.height);
-  const width = dimensions.width * scale;
-  const height = dimensions.height * scale;
-  pdf.addImage(png, 'PNG', (pageWidth - width) / 2, (pageHeight - height) / 2, width, height, undefined, 'FAST');
+  const widthScale = availableWidth / image.naturalWidth;
+  if (image.naturalHeight * widthScale <= availableHeight * 2) {
+    const scale = Math.min(widthScale, availableHeight / image.naturalHeight);
+    const width = image.naturalWidth * scale;
+    const height = image.naturalHeight * scale;
+    pdf.addImage(png, 'PNG', (pageWidth - width) / 2, (pageHeight - height) / 2, width, height, undefined, 'FAST');
+  } else {
+    const pixelsPerPage = Math.floor(availableHeight / widthScale);
+    for (let top = 0; top < image.naturalHeight; top += pixelsPerPage) {
+      const sliceHeight = Math.min(pixelsPerPage, image.naturalHeight - top);
+      const canvas = document.createElement('canvas');
+      canvas.width = image.naturalWidth;
+      canvas.height = sliceHeight;
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Не удалось подготовить страницу PDF.');
+      context.drawImage(image, 0, top, image.naturalWidth, sliceHeight, 0, 0, image.naturalWidth, sliceHeight);
+      if (top) pdf.addPage();
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, margin, availableWidth, sliceHeight * widthScale, undefined, 'FAST');
+    }
+  }
   pdf.save(`${filename}.pdf`);
 }

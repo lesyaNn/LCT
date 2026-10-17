@@ -4,10 +4,9 @@ Thin routes: params -> frozen RBAC -> university scope -> service -> DTO.
 No SQL here.
 
 RBAC (frozen permission names, no invented ones):
-* ``GET`` instance needs ``workflow.read`` (manager/admin read path,
-  same as the P2-05 attachments read gate).
-* ``POST`` instance needs ``workflow.change_status`` (mutation gate, same as
-  the P2-05 attachments write gate).
+* ``GET`` instance needs ``workflow.read`` for all three public roles.
+* ``POST`` instance needs ``workflow.change_status`` for all three public roles.
+* ``POST`` archive needs the admin role.
 """
 
 from __future__ import annotations
@@ -17,7 +16,7 @@ import uuid
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
-from app.core.permissions import require_permission, user_permissions
+from app.core.permissions import require_permission, require_role, user_permissions
 from app.core.errors import SecurityError
 from app.schemas.errors import ErrorCode
 from app.core.security import CurrentUser
@@ -30,6 +29,7 @@ from app.modules.workflow_instances.schemas import (
     InstanceResponsibleUpdate,
     InstanceStageResponsibleUpdate,
     InstanceStageDueDateUpdate,
+    InstanceStageNameUpdate,
     WorkflowActivityRead,
     WorkflowTaskRead,
     WorkflowTaskCreate,
@@ -44,6 +44,7 @@ router = APIRouter(prefix="/workflow", tags=["Workflow"])
 READ = require_permission("workflow.read")
 WRITE = require_permission("workflow.change_status")
 ASSIGN = require_permission("university_responsible.manage")
+ADMIN = require_role("admin")
 
 
 @router.post(
@@ -131,12 +132,12 @@ def get_workflow_instance(
     "/instances/{instance_id}/archive",
     response_model=InstanceDetail,
     summary="Архивирование экземпляра Workflow",
-    description="Архивирует активный экземпляр workflow без удаления истории и файлов. Требуемое право: workflow.change_status.",
+    description="Архивирует активный экземпляр workflow без удаления истории и файлов. Доступно только роли admin.",
 )
 def archive_workflow_instance(
     instance_id: uuid.UUID,
     db: Session = Depends(get_audit_db),
-    user: CurrentUser = Depends(WRITE),
+    user: CurrentUser = Depends(ADMIN),
 ) -> InstanceDetail:
     detail = service.get_instance_detail(db, instance_id)
     service.authorize_scope(user, detail)
@@ -216,6 +217,26 @@ def update_workflow_stage_due_date(
     service.authorize_scope(user, detail)
     return service.set_instance_stage_due_date(
         db, instance_id, stage_id, data.due_date, actor_sub=user.id
+    )
+
+
+@router.patch(
+    "/instances/{instance_id}/stages/{stage_id}/name",
+    response_model=InstanceDetail,
+    summary="Переименовать этап экземпляра Workflow",
+    description="Меняет название только runtime-этапа данного Workflow, сохраняя шаблон и историю. Требуемое право: workflow.change_status.",
+)
+def update_workflow_stage_name(
+    instance_id: uuid.UUID,
+    stage_id: uuid.UUID,
+    data: InstanceStageNameUpdate,
+    db: Session = Depends(get_audit_db),
+    user: CurrentUser = Depends(WRITE),
+) -> InstanceDetail:
+    detail = service.get_instance_detail(db, instance_id)
+    service.authorize_scope(user, detail)
+    return service.set_instance_stage_name(
+        db, instance_id, stage_id, data.name, actor_sub=user.id,
     )
 
 

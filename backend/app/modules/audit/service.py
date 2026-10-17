@@ -213,6 +213,7 @@ def _comment_snapshot(comment) -> dict[str, Any]:
         "instance_id": comment.instance_id,
         "stage_id": comment.stage_id,
         "is_internal": comment.is_internal,
+        "question_status": comment.question_status or "none",
     }
 
 

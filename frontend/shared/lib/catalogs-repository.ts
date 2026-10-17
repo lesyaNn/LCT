@@ -1,4 +1,5 @@
-import type { UserRole } from '@/shared/types/user';
+import type { AuthUser } from '@/shared/types/user';
+import { hasPermission } from './access-control';
 import { ApiRequestError } from './api-errors';
 import { apiDownload, apiFetch, apiUploadFormData } from './api-client';
 import { fromDataSource } from './data-source';
@@ -216,10 +217,10 @@ export interface CatalogReferenceData {
 
 export const catalogDefinitions: ReadonlyArray<{ id: CatalogType; label: string; singular: string; searchPlaceholder: string }> = [
   { id: 'universities', label: 'Вузы', singular: 'ВУЗ', searchPlaceholder: 'Название или город' },
-  { id: 'directions', label: 'Направления', singular: 'направление', searchPlaceholder: 'Название или код' },
+  { id: 'directions', label: 'ИТ-направления', singular: 'ИТ-направление', searchPlaceholder: 'Название или код направления' },
   { id: 'programs', label: 'ИТ-программы', singular: 'ИТ-программу', searchPlaceholder: 'Название программы' },
   { id: 'vendors', label: 'Вендоры', singular: 'вендора', searchPlaceholder: 'Название вендора' },
-  { id: 'products', label: 'Продукты', singular: 'продукт', searchPlaceholder: 'Название продукта' },
+  { id: 'products', label: 'ИТ-продукты', singular: 'ИТ-продукт', searchPlaceholder: 'Название продукта' },
   { id: 'agreements', label: 'Договоры и лицензии', singular: 'договор или лицензию', searchPlaceholder: 'Номер договора или лицензии' },
   { id: 'responsibles', label: 'Ответственные', singular: 'ответственного', searchPlaceholder: 'ФИО или email' },
 ] as const;
@@ -235,11 +236,10 @@ export const catalogQueryKeys = {
 export const CATALOG_API_CAPABILITIES = {
   /** Every catalog entity is hard-deletable; the backend answers 409 when still referenced. */
   hardDelete: true,
-  mutationRoles: ['admin', 'manager'] as UserRole[],
 } as const;
 
-export function canMutateCatalog(role: UserRole | undefined): boolean {
-  return Boolean(role && CATALOG_API_CAPABILITIES.mutationRoles.includes(role));
+export function canMutateCatalog(user: AuthUser | null | undefined): boolean {
+  return hasPermission(user, 'catalog.manage');
 }
 
 export function catalogDefinition(type: CatalogType) {

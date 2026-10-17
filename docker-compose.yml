@@ -106,6 +106,9 @@ services:
       KEYCLOAK_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-change-me}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
+      EMAIL_NOTIFICATIONS_ENABLED: ${EMAIL_NOTIFICATIONS_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
       KEYDB_URL: redis://keydb:6379/0
       # Legacy fallback: код читает KEYDB_URL, иначе REDIS_URL.
       REDIS_URL: redis://keydb:6379/0
@@ -116,6 +119,7 @@ services:
       UPLOAD_ALLOWED_EXTENSIONS: ${UPLOAD_ALLOWED_EXTENSIONS:-pdf,png,jpg,jpeg,doc,docx,xls,xlsx,zip,gz,gzip,rar}
       EXTERNAL_ADAPTER_MODE: ${EXTERNAL_ADAPTER_MODE:-disabled}
       REPORTS_ROOT: /app/reports
+      ASSISTANT_DOCS_ROOT: /app/assistant-docs
       # Dev-2 analytics boundary: Dev-1 filter adapter (non-empty filters
       # in /analytics/* stop returning 503 FILTER_PROVIDER_NOT_CONFIGURED).
       P4_FILTER_PROVIDER: ${P4_FILTER_PROVIDER:-app.modules.analytics.dev1_provider:provider}
@@ -126,6 +130,7 @@ services:
       - workflow-storage:/app/storage
       # P4-06-01 generated reports persist across container recreation.
       - reports-storage:/app/reports
+      - ./frontend/public/docs:/app/assistant-docs:ro
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)\""]
       interval: 15s
@@ -139,7 +144,8 @@ services:
   worker:
     # P4-06-01: dedicated background worker (no BackgroundTasks in the API).
     # Owns report/import execution: atomic claim (SKIP LOCKED) -> run ->
-    # ready, up to 3 attempts, then failed. Shares the backend image.
+    # ready, up to 3 attempts, then failed; also records daily Health Score.
+    # Shares the backend image.
     build: ./backend
     restart: unless-stopped
     networks: [rtk-net]
@@ -159,6 +165,17 @@ services:
       REDIS_URL: redis://keydb:6379/0
       IMPORT_STAGING_DIR: /tmp/rtk-imports
       REPORTS_ROOT: /app/reports
+      EMAIL_NOTIFICATIONS_ENABLED: ${EMAIL_NOTIFICATIONS_ENABLED:-false}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-RTK EdTech CRM}
+      SMTP_SECURITY: ${SMTP_SECURITY:-starttls}
+      SMTP_TIMEOUT_SECONDS: ${SMTP_TIMEOUT_SECONDS:-10}
+      EMAIL_MAX_ATTEMPTS: ${EMAIL_MAX_ATTEMPTS:-5}
       P4_FILTER_PROVIDER: ${P4_FILTER_PROVIDER:-app.modules.analytics.dev1_provider:provider}
     volumes:
       - import-staging:/tmp/rtk-imports

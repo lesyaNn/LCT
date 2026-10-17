@@ -212,15 +212,33 @@ def test_buckets_are_ordered_by_count_desc_then_label(session, data):
         assert keys == sorted(keys), item.dimension
 
 
-def test_long_tail_is_folded_into_one_honest_bucket(session, data, monkeypatch):
-    """More buckets than MAX_BUCKETS must not produce an unreadable chart."""
-    monkeypatch.setattr(ReportStatsService, "MAX_BUCKETS", 1)
+def test_long_tail_keeps_every_product_bucket(session, data):
+    """The chart can scroll through every product without an aggregate tail."""
+    products = [
+        ITProduct(id=uuid4(), vendor_id=data["prod_a"].vendor_id, name=f"ПО {index:02d}")
+        for index in range(11)
+    ]
+    session.add_all(products)
+    session.flush()
+    session.add_all([
+        License(
+            id=uuid4(), university_id=data["alpha"].id, product_id=product.id,
+            contract_id=None, program_id=None, direction_id=None,
+            license_number=f"EXTRA-{index}", signed_at=date(2026, 6, 1),
+            expires_at=date(2027, 6, 1), transfer_status_raw="transferred",
+            comment=None,
+        )
+        for index, product in enumerate(products)
+    ])
+    session.commit()
     stats = ReportStatsService.build(session, SEPTEMBER, today=TODAY)
     item = stats.slice("by_product")
-    assert len(item.buckets) == 2
-    assert item.buckets[-1].label == "Прочее"
-    # Folding must not lose counts.
-    assert item.total == stats.row_count
+    assert item is not None
+    assert len(item.buckets) == 13
+    assert {bucket.label for bucket in item.buckets} == {
+        "ПО А", "ПО Б", *(product.name for product in products),
+    }
+    assert item.total == sum(bucket.count for bucket in item.buckets) == stats.row_count
 
 
 # --------------------------------------------------------------------- scope

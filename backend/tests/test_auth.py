@@ -101,13 +101,14 @@ def test_me_manager_permissions(client):
     r = client.get("/api/v1/auth/me", headers=auth(mint(client, ("manager",))))
     assert r.status_code == 200
     assert r.json()["permissions"] == sorted({
+        "assistant.use",
         "university.read", "catalog.read", "workflow.read",
         "workflow.change_status", "workflow.comment.create", "workflow.comment.update",
         "workflow.attachment.read", "workflow.attachment.create",
         "workflow.attachment.delete", "workflow.task.read", "workflow.task.update",
-        "reports.read", "reports.create", "analytics.read", "import.read",
+        "reports.read", "reports.create", "analytics.read",
         "university.edit", "university_responsible.manage", "analytics.extended",
-        "audit.read", "import.write",
+        "audit.read", "user_university.manage",
     })
 
 

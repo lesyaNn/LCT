@@ -13,11 +13,12 @@ import Education from '@atomaro/icons/24/culture/Education';
 import Edit from '@atomaro/icons/24/editor/Edit';
 import ArrowRight from '@atomaro/icons/24/navigation/ArrowRight';
 import { useAuth } from '@/shared/auth/AuthProvider';
-import { hasPermission, hasRole } from '@/shared/lib/access-control';
+import { hasPermission } from '@/shared/lib/access-control';
 import { formatDateTimeRu } from '@/shared/lib/formatters';
 import { normalizeApiError } from '@/shared/lib/api-errors';
 import { getUniversityHealth } from '@/shared/lib/dashboard-repository';
 import { queryKeys } from '@/shared/lib/query-keys';
+import { healthLevelMeta } from '@/shared/lib/status-semantics';
 import {
   getWorkflowSelectorPrograms,
   getUniversityPassport,
@@ -39,7 +40,8 @@ import { NotFoundState } from '@/shared/ui/not-found-state';
 import { ForbiddenState } from '@/shared/ui/access-state';
 import { MetricCardSkeleton, Skeleton, SkeletonGroup } from '@/shared/ui/skeleton';
 import { UniversityHistory } from './university-history';
-import { DocumentsSection, LicensesSection, MeetingsSection, ProductsSection, ResponsiblesSection } from './university-passport-sections';
+import { DocumentsSection, LicensesSection, MeetingsSection, ProductsSection } from './university-passport-sections';
+import { ResponsiblesSection } from './university-responsibles-section';
 import { UniversityWorkflow } from './university-workflow';
 import { WorkflowCreateModal } from './workflow-create-modal';
 import { PassportWorkflowCard } from './passport-workflow-card';
@@ -61,7 +63,7 @@ function isMobileLayout() {
 const tabDefinitions = [
   { id: 'overview', label: 'Обзор' },
   { id: 'health', label: 'Health Score' },
-  { id: 'products', label: 'Продукты' },
+  { id: 'products', label: 'ИТ-продукты' },
   { id: 'licenses', label: 'Лицензии' },
   { id: 'documents', label: 'Документы' },
   { id: 'meetings', label: 'Встречи' },
@@ -106,7 +108,7 @@ function OverviewMetrics({ passport }: { passport: UniversityPassport }) {
       <div className={styles.sectionHeading}><h2 id="passport-metrics-title">Ключевые показатели</h2></div>
       <div className={styles.metricsGrid}>
         <MetricCard label="Активные программы" value={health?.active_workflows ?? '—'} icon={Book} />
-        <MetricCard label="Health Score" value={health?.score === null || health?.score === undefined ? '—' : `${health.score} / 100`} icon={StatisticsBoard} />
+        <MetricCard label="Health Score" value={health?.score === null || health?.score === undefined ? '—' : <><span style={{ color: `var(--rtk-color-${healthLevelMeta[health.level].intent}, var(--rtk-color-text-primary))` }}>{health.score}</span> / 100</>} icon={StatisticsBoard} />
         <MetricCard label="Лицензии" value={licensesTotal} icon={Education} indicators={[{ value: metrics.licenses.active, label: 'действуют', intent: 'success' }, { value: metrics.licenses.expiring, label: 'истекают', intent: 'warning' }, { value: metrics.licenses.overdue, label: 'просрочены', intent: 'danger' }]} />
         <MetricCard label="Документы" value={metrics.documents.limited ? `≥${metrics.documents.total}` : metrics.documents.total} icon={DocumentText} indicators={metrics.documents.limited ? undefined : [{ value: metrics.documents.signed, label: 'подписано', intent: 'success' }, { value: metrics.documents.overdue, label: 'просрочено', intent: 'danger' }]} />
       </div>
@@ -118,7 +120,7 @@ function WorkflowOverview({ passport }: { passport: UniversityPassport }) {
   const { user } = useAuth();
   const [launchProgramId, setLaunchProgramId] = useState<string | null>(null);
   const realWorkflow = isRealWorkflowMode();
-  const canCreate = realWorkflow && hasPermission(user, 'workflow.change_status') && hasRole(user, 'admin');
+  const canCreate = realWorkflow && hasPermission(user, 'workflow.change_status');
   const instancesQuery = useQuery({ queryKey: universityWorkflowInstancesQueryKey(passport.id), queryFn: ({ signal }) => listUniversityWorkflowInstances(passport.id, signal), enabled: realWorkflow, staleTime: 30_000 });
   const programsQuery = useQuery({ queryKey: workflowProgramsQueryKey(passport.id), queryFn: ({ signal }) => getWorkflowSelectorPrograms(passport.id, signal), enabled: realWorkflow, staleTime: 30_000 });
   const instances = instancesQuery.data ?? [];
@@ -214,12 +216,12 @@ export function UniversityPassport({ id }: { id: string }) {
   return (
     <div className={styles.page}>
       <PassportHeader passport={passport} onTabChange={selectTab} />
-      <TabbedSurface tabs={!mobileLayout ? <Tabs items={tabDefinitions} activeId={activeTab} onChange={(id) => selectTab(id as PassportTabId)} label="Разделы паспорта вуза" prefix="passport-tab" /> : undefined}>
-      {!mobileLayout ? <div className={styles.desktopPanel} id="passport-panel" role="tabpanel" aria-labelledby={`passport-tab-${activeTab}`}>{renderContent(activeTab)}</div> : null}
+      <TabbedSurface contentClassName={styles.passportContent} tabs={!mobileLayout ? <Tabs items={tabDefinitions} activeId={activeTab} onChange={(id) => selectTab(id as PassportTabId)} label="Разделы паспорта вуза" prefix="passport-tab" /> : undefined}>
+      {!mobileLayout ? <div className={`${styles.desktopPanel} ${activeTab === 'overview' || activeTab === 'health' || activeTab === 'meetings' ? styles.flushPanel : ''}`} id="passport-panel" role="tabpanel" aria-labelledby={`passport-tab-${activeTab}`}>{renderContent(activeTab)}</div> : null}
       {mobileLayout ? <div className={styles.mobileAccordion} aria-label="Разделы паспорта вуза">
         {tabDefinitions.map((tab) => {
           const isOpen = activeTab === tab.id;
-          return <section className={styles.accordionItem} key={tab.id}><button className={isOpen ? styles.accordionTriggerActive : styles.accordionTrigger} type="button" aria-expanded={isOpen} onClick={() => selectTab(tab.id)}><span>{tab.label}</span><ArrowRight size={18} fill="currentColor" /></button>{isOpen ? <div className={styles.accordionPanel}>{renderContent(tab.id)}</div> : null}</section>;
+          return <section className={styles.accordionItem} key={tab.id}><button className={isOpen ? styles.accordionTriggerActive : styles.accordionTrigger} type="button" aria-expanded={isOpen} onClick={() => selectTab(tab.id)}><span>{tab.label}</span><ArrowRight size={18} fill="currentColor" /></button>{isOpen ? <div className={`${styles.accordionPanel} ${tab.id === 'overview' || tab.id === 'health' || tab.id === 'meetings' ? styles.flushPanel : ''}`}>{renderContent(tab.id)}</div> : null}</section>;
         })}
       </div> : null}
       </TabbedSurface>

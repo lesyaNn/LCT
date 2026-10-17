@@ -16,6 +16,7 @@ import { FilterToolbar } from '@/shared/ui/rtk/filter-surface';
 import { FilterField } from '@/shared/ui/rtk/filter-field';
 import { DateRangeField } from '@/shared/ui/rtk/date-range-field';
 import { Select } from '@/shared/ui/rtk/form-controls';
+import { SearchableSelect } from '@/shared/ui/rtk/multiselect';
 import { Button } from '@/shared/ui/rtk/button';
 import { Modal } from '@/shared/ui/rtk/modal';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
@@ -60,8 +61,8 @@ function HistoryFilters({ filters, options, onChange, onReset }: { filters: Univ
   ];
   return <FilterToolbar embedded label="Фильтры истории" activeFilters={activeFilters} mobileCount={activeFilters.length} controls={() => <>
     <FilterField label="Тип события"><Select value={filters.type} onChange={(event) => onChange({ type: event.target.value as UniversityHistoryFilters['type'] })}>{eventTypes.map((type) => <option value={type} key={type}>{eventTypeOptions[type]}</option>)}</Select></FilterField>
-    <FilterField label="Пользователь"><Select value={filters.userId} onChange={(event) => onChange({ userId: event.target.value })}><option value="">Все пользователи</option>{options.users.map((user) => <option value={user.id} key={user.id}>{user.name}</option>)}</Select></FilterField>
-    <FilterField label="Сущность"><Select value={filters.entityId} onChange={(event) => onChange({ entityId: event.target.value })}><option value="">Все сущности</option>{options.entities.map((entity) => <option value={entity.id} key={entity.id}>{entity.label}</option>)}</Select></FilterField>
+    <SearchableSelect label="Пользователь" labelPlacement="outside" value={filters.userId} onChange={(value) => onChange({ userId: value })} options={[{ id: '', name: 'Все пользователи' }, ...options.users]} placeholder="Все пользователи" />
+    <SearchableSelect label="Сущность" labelPlacement="outside" value={filters.entityId} onChange={(value) => onChange({ entityId: value })} options={[{ id: '', name: 'Все сущности' }, ...options.entities.map((entity) => ({ id: entity.id, name: entity.label }))]} placeholder="Все сущности" />
     <DateRangeField from={filters.dateFrom} to={filters.dateTo} onFromChange={(dateFrom) => onChange({ dateFrom })} onToChange={(dateTo) => onChange({ dateTo })} onRangeChange={(dateFrom, dateTo) => onChange({ dateFrom, dateTo })} />
   </>} onReset={onReset} resetDisabled={!activeFilters.length} />;
 }

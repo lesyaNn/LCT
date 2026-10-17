@@ -34,6 +34,13 @@ class ErrorCode(StrEnum):
     REPORT_NOT_READY = "REPORT_NOT_READY"
     EXTERNAL_SOURCE_UNAVAILABLE = "EXTERNAL_SOURCE_UNAVAILABLE"
     EXTERNAL_SYNC_FAILED = "EXTERNAL_SYNC_FAILED"
+    ASSISTANT_DISABLED = "ASSISTANT_DISABLED"
+    ASSISTANT_UNAVAILABLE = "ASSISTANT_UNAVAILABLE"
+    ASSISTANT_TIMEOUT = "ASSISTANT_TIMEOUT"
+    ASSISTANT_BUSY = "ASSISTANT_BUSY"
+    ASSISTANT_KNOWLEDGE_UNAVAILABLE = "ASSISTANT_KNOWLEDGE_UNAVAILABLE"
+    ASSISTANT_INVALID_RESPONSE = "ASSISTANT_INVALID_RESPONSE"
+    ASSISTANT_STORAGE_UNAVAILABLE = "ASSISTANT_STORAGE_UNAVAILABLE"
     RATE_LIMITED = "RATE_LIMITED"
     METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
     HTTP_ERROR = "HTTP_ERROR"
@@ -62,6 +69,13 @@ ERROR_STATUS_MAP: dict[ErrorCode, int] = {
     ErrorCode.REPORT_NOT_READY: 400,
     ErrorCode.EXTERNAL_SOURCE_UNAVAILABLE: 503,
     ErrorCode.EXTERNAL_SYNC_FAILED: 500,
+    ErrorCode.ASSISTANT_DISABLED: 503,
+    ErrorCode.ASSISTANT_UNAVAILABLE: 503,
+    ErrorCode.ASSISTANT_TIMEOUT: 504,
+    ErrorCode.ASSISTANT_BUSY: 429,
+    ErrorCode.ASSISTANT_KNOWLEDGE_UNAVAILABLE: 503,
+    ErrorCode.ASSISTANT_INVALID_RESPONSE: 503,
+    ErrorCode.ASSISTANT_STORAGE_UNAVAILABLE: 503,
     ErrorCode.RATE_LIMITED: 429,
     ErrorCode.METHOD_NOT_ALLOWED: 405,
     ErrorCode.HTTP_ERROR: 500,
@@ -93,6 +107,13 @@ ERROR_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.REPORT_NOT_READY: "Отчёт ещё формируется. Подождите немного.",
     ErrorCode.EXTERNAL_SOURCE_UNAVAILABLE: "Внешний источник данных временно недоступен.",
     ErrorCode.EXTERNAL_SYNC_FAILED: "Ошибка синхронизации с внешним источником.",
+    ErrorCode.ASSISTANT_DISABLED: "Помощник пока не включён.",
+    ErrorCode.ASSISTANT_UNAVAILABLE: "Модель помощника временно недоступна.",
+    ErrorCode.ASSISTANT_TIMEOUT: "Помощник не успел ответить. Попробуйте позже.",
+    ErrorCode.ASSISTANT_BUSY: "Помощник занят. Попробуйте через несколько секунд.",
+    ErrorCode.ASSISTANT_KNOWLEDGE_UNAVAILABLE: "Документация помощника недоступна.",
+    ErrorCode.ASSISTANT_INVALID_RESPONSE: "Помощник не смог подготовить проверяемый ответ.",
+    ErrorCode.ASSISTANT_STORAGE_UNAVAILABLE: "История помощника временно недоступна.",
     ErrorCode.RATE_LIMITED: "Слишком много запросов. Попробуйте позже.",
     ErrorCode.METHOD_NOT_ALLOWED: "Метод запроса не поддерживается для этого ресурса.",
     ErrorCode.HTTP_ERROR: "Не удалось обработать запрос.",

@@ -4,6 +4,12 @@ export const queryKeys = {
     all: ['auth'] as const,
     me: ['auth', 'me'] as const,
   },
+  notifications: {
+    all: ['notifications'] as const,
+    user: (userId: string) => ['notifications', userId] as const,
+    count: (userId: string) => ['notifications', userId, 'count'] as const,
+    list: (userId: string, filter: string, limit: number, offset: number) => ['notifications', userId, 'list', filter, limit, offset] as const,
+  },
   dashboard: {
     overview: ['dashboard-overview'] as const,
     analytics: ['dashboard-analytics'] as const,
@@ -14,6 +20,7 @@ export const queryKeys = {
     list: <T>(query: T) => ['universities', query] as const,
     passports: ['university-passport'] as const,
     passport: (id: string) => ['university-passport', id] as const,
+    healthFamily: ['university-health'] as const,
     health: (id: string) => ['university-health', id] as const,
     passportBundle: (id: string) => ['university-passport', id, 'bundle'] as const,
     workflow: (instanceId: string) => ['workflow', instanceId] as const,

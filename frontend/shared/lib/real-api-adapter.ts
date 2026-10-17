@@ -58,7 +58,7 @@ type ApiProgram = { id: string; name: string; direction_name: string; status: Pr
 type ApiLicense = { id: string; license_number: string; product_name: string; vendor_name: string; signed_at: string; expires_at: string; status: string; transfer_status: string; contract_number: string | null };
 type ApiProduct = { id: string; name: string; version: string; vendor_name: string; status: string; license: ApiLicense | null };
 type ApiDocument = { id: string; document_type: string; title: string; file_name: string; file_available?: boolean; file_size: number; signed_at: string | null; expires_at: string | null; status: string; uploaded_by: string; created_at: string };
-type ApiMeeting = { id: string; meeting_type: string; subject: string; participants: string[]; outcome: string | null; next_action: string | null; next_action_due: string | null; meeting_at: string; created_by: string };
+type ApiMeeting = { id: string; meeting_type: string | null; subject: string; participants: string[]; outcome: string | null; next_action: string | null; next_action_due: string | null; meeting_at: string | null; created_by: string; workflow_instance_stage_id?: string | null; workflow_instance_id?: string | null; workflow_stage_name?: string | null };
 type ApiMeetingRead = Omit<ApiMeeting, 'participants' | 'created_by'> & { participants: unknown[]; created_by_keycloak_sub: string };
 type ApiResponsible = { id: string; full_name: string; email: string; phone: string | null; role: string; is_primary?: boolean };
 type ApiTimeline = { id: string; type: string; title: string; description: string | null; author: string; created_at: string };
@@ -323,7 +323,7 @@ export async function realGetUniversityMeetings(id: string, page = 1, pageSize =
   return { items: data.items.map((item) => ({
     id: item.id,
     occurredAt: item.meeting_at,
-    type: item.meeting_type === 'offline' || item.meeting_type === 'phone' || item.meeting_type === 'email' ? item.meeting_type : 'online',
+    type: item.meeting_type === 'offline' || item.meeting_type === 'phone' || item.meeting_type === 'email' || item.meeting_type === 'online' ? item.meeting_type : null,
     subject: item.subject,
     participants: item.participants.map((participant, index) => {
       const person = isRecord(participant) ? participant : {};
@@ -334,6 +334,9 @@ export async function realGetUniversityMeetings(id: string, page = 1, pageSize =
     nextAction: item.next_action ?? '—',
     dueDate: item.next_action_due,
     author: item.created_by_keycloak_sub,
+    workflowInstanceId: item.workflow_instance_id ?? null,
+    workflowStageId: item.workflow_instance_stage_id ?? null,
+    workflowStageName: item.workflow_stage_name ?? null,
   })), page: data.page, pageSize: data.page_size, total: data.total };
 }
 
@@ -531,8 +534,10 @@ export async function realResetAdminUserPassword(id: string): Promise<{ status: 
   return { status: 'requested' };
 }
 
-export async function realListResponsibleCandidates(): Promise<ResponsibleCandidate[]> {
-  const data = unwrap(await apiFetch<unknown>('/api/v1/responsibles?page=1&page_size=100'), 'Не удалось загрузить список ответственных.');
+export async function realListResponsibleCandidates(search = ''): Promise<ResponsibleCandidate[]> {
+  const query = new URLSearchParams({ page: '1', page_size: '100' });
+  if (search.trim()) query.set('search', search.trim());
+  const data = unwrap(await apiFetch<unknown>(`/api/v1/responsibles?${query}`), 'Не удалось загрузить список ответственных.');
   const payload = isRecord(data) ? data : {};
   const rows = Array.isArray(data) ? data : Array.isArray(payload.items) ? payload.items : [];
   return rows.map((value): ResponsibleCandidate => {
@@ -551,6 +556,14 @@ export async function realAssignUniversityResponsible(input: ResponsibleAssignme
     method: 'PATCH',
     body: { responsible_id: input.responsibleId, reason: input.reason },
   }), 'Не удалось назначить ответственного ВУЗа.');
+}
+
+export async function realAddUniversityResponsible(universityId: string, responsibleId: string): Promise<void> {
+  unwrap(await apiFetch<unknown>(`/api/v1/universities/${encodeURIComponent(universityId)}/responsibles/${encodeURIComponent(responsibleId)}`, { method: 'POST' }), 'Не удалось добавить ответственного ВУЗа.');
+}
+
+export async function realRemoveUniversityResponsible(universityId: string, responsibleId: string): Promise<void> {
+  unwrap(await apiFetch<unknown>(`/api/v1/universities/${encodeURIComponent(universityId)}/responsibles/${encodeURIComponent(responsibleId)}`, { method: 'DELETE' }), 'Не удалось снять ответственного ВУЗа.');
 }
 
 // -------------------------------------------------------------- catalog CRUD

@@ -1,8 +1,7 @@
 'use client';
 
 import { DateRangeField } from '@/shared/ui/rtk/date-range-field';
-import { FilterToolbar } from '@/shared/ui/rtk/filter-surface';
-import type { ActiveFilterItem } from '@/shared/ui/rtk/active-filters';
+import { ActiveFilters, type ActiveFilterItem } from '@/shared/ui/rtk/active-filters';
 import type { ReportFormSchema } from './report-form-schema';
 
 type PeriodValues = Pick<ReportFormSchema, 'dateFrom' | 'dateTo'>;
@@ -34,26 +33,21 @@ export function ReportFilterFields({
   activeFilters,
 }: ReportFilterFieldsProps) {
   return (
-    <FilterToolbar
-      embedded
-      label="Период"
-      activeFilters={activeFilters}
-      onReset={onReset}
-      resetDisabled={!activeFilters.length}
-      mobileCount={1}
-      controls={() => (
-        <DateRangeField
-          presets
-          from={values.dateFrom}
-          to={values.dateTo}
-          onFromChange={(dateFrom) => onPeriodChange(dateFrom, values.dateTo)}
-          onToChange={(dateTo) => onPeriodChange(values.dateFrom, dateTo)}
-          onRangeChange={onPeriodChange}
-          fromError={errors.dateFrom?.message}
-          toError={errors.dateTo?.message}
-        />
-      )}
-    />
+    <>
+      <DateRangeField
+        label="Быстрый выбор и даты"
+        presets
+        wideSplit
+        from={values.dateFrom}
+        to={values.dateTo}
+        onFromChange={(dateFrom) => onPeriodChange(dateFrom, values.dateTo)}
+        onToChange={(dateTo) => onPeriodChange(values.dateFrom, dateTo)}
+        onRangeChange={onPeriodChange}
+        fromError={errors.dateFrom?.message}
+        toError={errors.dateTo?.message}
+      />
+      <ActiveFilters items={activeFilters} onClearAll={onReset} />
+    </>
   );
 }
 

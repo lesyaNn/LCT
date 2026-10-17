@@ -18,7 +18,7 @@ from uuid import uuid4
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
-from sqlalchemy import create_engine, inspect, select
+from sqlalchemy import create_engine, delete, inspect, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -219,8 +219,8 @@ def test_restrict_blocks_parent_delete(db: Session):
     db.rollback()
 
 
-def test_cascade_license_children(db: Session):
-    """Deleting a university cascades to its licenses (migration 000002)."""
+def test_license_restricts_university_delete(db: Session):
+    """A license keeps its university from deletion (migration 000002)."""
     g = _mini_catalog(db)
     university = g["university"]
     db.add(License(
@@ -230,9 +230,11 @@ def test_cascade_license_children(db: Session):
         expires_at=date.today(), transfer_status_raw="pending", comment=None,
     ))
     db.commit()
-    db.delete(university)
-    db.commit()
-    assert db.execute(select(License).where(License.license_number == "CASC-1")).scalars().all() == []
+    with pytest.raises(IntegrityError):
+        db.execute(delete(University).where(University.id == university.id))
+        db.commit()
+    db.rollback()
+    assert db.execute(select(License).where(License.license_number == "CASC-1")).scalars().one()
 
 
 def test_set_null_on_contract_delete(db: Session):
@@ -433,8 +435,9 @@ def test_sql_migration_single_head_chain():
         assert m, f"bad migration filename: {fname}"
         (ups if m.group(2) == "up" else downs).add(m.group(1))
     assert ups == downs, f"unpaired migrations: up^down={ups ^ downs}"
-    assert sorted(ups)[-1] == "000038_instance_stage_responsible"
-    assert len(ups) == 38
+    assert "000044_assistant_conversations" in ups
+    assert sorted(ups)[-1] == "000048_notification_email_delivery"
+    assert len(ups) == 48
 
 
 @pytest.mark.skipif(

@@ -20,6 +20,7 @@ __pycache__/
 .pytest_cache/
 **/.pytest_cache/
 *.pyc
+*.egg-info/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -28,3 +29,7 @@ yarn-error.log*
 /report_*.xlsx
 /CRM *.xlsx
 /Отчёт_CRM.xlsx
+
+# Локальные образцы и рендеры повестки встречи
+/output/pdf/meeting-agenda-*.pdf
+/tmp/pdfs/

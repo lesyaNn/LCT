@@ -1,0 +1,3 @@
+DROP INDEX ix_workflow_comments_open_questions;
+ALTER TABLE workflow_comments DROP CONSTRAINT ck_workflow_comments_question_status;
+ALTER TABLE workflow_comments DROP COLUMN question_status;

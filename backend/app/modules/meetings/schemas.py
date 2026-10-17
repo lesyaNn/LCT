@@ -52,13 +52,16 @@ class MeetingUpdate(BaseModel):
 class MeetingRead(BaseModel):
     id: uuid.UUID
     university_id: uuid.UUID
-    meeting_type: str
+    meeting_type: str | None
     subject: str
     participants: list = Field(default_factory=list)
     outcome: str | None = None
     next_action: str | None = None
     next_action_due: date | None = None
-    meeting_at: datetime
+    meeting_at: datetime | None
+    workflow_instance_stage_id: uuid.UUID | None = None
+    workflow_instance_id: uuid.UUID | None = None
+    workflow_stage_name: str | None = None
     created_by_keycloak_sub: str
     created_at: datetime
     updated_at: datetime

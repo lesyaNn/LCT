@@ -1,10 +1,8 @@
 """P1-03 catalog HTTP API (mounted under /api/v1).
 
 Thin routes: query params -> RBAC -> service -> DTO. No SQL and no business
-logic here. RBAC reuses the frozen permission names: ``university.read``
-for GET, ``university.edit`` for mutations (there are no separate
-create/update/delete permissions in the frozen model — manager and admin
-can write, manager/user can only read). Includes the read-only
+logic here. RBAC uses ``university.read`` for GET, ``catalog.manage``
+for catalog mutations, and ``university.edit`` for passport relationships. Includes the read-only
 ``/catalog/overview`` import viewer.
 """
 
@@ -73,7 +71,7 @@ router = APIRouter()
 
 READ = require_permission("university.read")
 WRITE = require_permission("university.edit")
-LEGACY_CATALOG_WRITE = require_role("admin", "manager")
+CATALOG_WRITE = require_permission("catalog.manage")
 
 
 UniversitySortBy = Literal["name", "city", "created_at"]
@@ -104,12 +102,12 @@ def _norm(search: str | None) -> str | None:
     status_code=201,
     tags=["Universities"],
     summary="Создать вуз",
-    description="Создаёт вуз с названием и городом. Требуются роли admin или manager.",
+    description="Создаёт вуз с названием и городом. Требуется право catalog.manage.",
 )
 def create_university(
     data: UniversityCreate,
     db: Session = Depends(get_audit_db),
-    _user: CurrentUser = Depends(require_role("admin", "manager")),
+    _user: CurrentUser = Depends(CATALOG_WRITE),
 ) -> UniversityDetail:
     return service.create_university(db, name=data.name, city=data.city)
 
@@ -198,13 +196,13 @@ def get_university(
     response_model=UniversityDetail,
     tags=["Universities"],
     summary="Частично обновить вуз",
-    description="Частично обновляет название и город вуза. Требуется право university.edit.",
+    description="Частично обновляет название и город вуза. Требуется право catalog.manage.",
 )
 def patch_university(
     university_id: uuid.UUID,
     data: UniversityUpdate,
     db: Session = Depends(get_audit_db),
-    user: CurrentUser = Depends(WRITE),
+    user: CurrentUser = Depends(CATALOG_WRITE),
 ) -> UniversityDetail:
     ensure_university_visible(university_id, user)
     fields = data.model_fields_set
@@ -224,12 +222,12 @@ def patch_university(
     status_code=204,
     tags=["Universities"],
     summary="Удалить вуз",
-    description="Безвозвратно удаляет вуз; при наличии связанных записей возвращается 409. Требуются роли admin или manager.",
+    description="Безвозвратно удаляет вуз; при наличии связанных записей возвращается 409. Требуется право catalog.manage.",
 )
 def delete_university(
     university_id: uuid.UUID,
     db: Session = Depends(get_audit_db),
-    user: CurrentUser = Depends(require_role("admin", "manager")),
+    user: CurrentUser = Depends(CATALOG_WRITE),
 ) -> None:
     ensure_university_visible(university_id, user)
     service.delete_university(db, university_id)
@@ -337,12 +335,12 @@ def unassign_responsible(
     status_code=201,
     tags=["Directions"],
     summary="Создать направление",
-    description="Создаёт ИТ-направление с кодом и названием. Требуются роли admin или manager.",
+    description="Создаёт ИТ-направление с кодом и названием. Требуется право catalog.manage.",
 )
 def create_direction(
     data: DirectionCreate,
     db: Session = Depends(get_audit_db),
-    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+    _user: CurrentUser = Depends(CATALOG_WRITE),
 ) -> DirectionDetail:
     return service.create_direction(db, code=data.code, name=data.name)
 
@@ -394,13 +392,13 @@ def get_direction(
     response_model=DirectionDetail,
     tags=["Directions"],
     summary="Частично обновить направление",
-    description="Частично обновляет код и название направления. Требуются роли admin или manager.",
+    description="Частично обновляет код и название направления. Требуется право catalog.manage.",
 )
 def patch_direction(
     direction_id: uuid.UUID,
     data: DirectionUpdate,
     db: Session = Depends(get_audit_db),
-    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+    _user: CurrentUser = Depends(CATALOG_WRITE),
 ) -> DirectionDetail:
     return service.patch_direction(db, direction_id, code=data.code, name=data.name)
 
@@ -411,12 +409,12 @@ def patch_direction(
     status_code=204,
     tags=["Directions"],
     summary="Удалить направление",
-    description="Безвозвратно удаляет направление; при наличии программ — ошибка (RESTRICT). Требуются роли admin или manager.",
+    description="Безвозвратно удаляет направление; при наличии программ — ошибка (RESTRICT). Требуется право catalog.manage.",
 )
 def delete_direction(
     direction_id: uuid.UUID,
     db: Session = Depends(get_audit_db),
-    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+    _user: CurrentUser = Depends(CATALOG_WRITE),
 ) -> None:
     service.delete_direction(db, direction_id)
 
@@ -430,12 +428,12 @@ def delete_direction(
     status_code=201,
     tags=["Programs"],
     summary="Создать программу",
-    description="Создаёт программу внутри направления. Требуются роли admin или manager.",
+    description="Создаёт программу внутри направления. Требуется право catalog.manage.",
 )
 def create_program(
     data: ProgramCreate,
     db: Session = Depends(get_audit_db),
-    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+    _user: CurrentUser = Depends(CATALOG_WRITE),
 ) -> ProgramDetail:
     return service.create_program(
         db, direction_id=data.direction_id, name=data.name, description=data.description
@@ -491,13 +489,13 @@ def get_program(
     response_model=ProgramDetail,
     tags=["Programs"],
     summary="Частично обновить программу",
-    description="Частично обновляет программу (направление, название, описание). Требуются роли admin или manager.",
+    description="Частично обновляет программу (направление, название, описание). Требуется право catalog.manage.",
 )
 def patch_program(
     program_id: uuid.UUID,
     data: ProgramUpdate,
     db: Session = Depends(get_audit_db),
-    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+    _user: CurrentUser = Depends(CATALOG_WRITE),
 ) -> ProgramDetail:
     return service.patch_program(
         db,
@@ -514,12 +512,12 @@ def patch_program(
     status_code=204,
     tags=["Programs"],
     summary="Удалить программу",
-    description="Безвозвратно удаляет программу; при наличии связей — ошибка (RESTRICT). Требуются роли admin или manager.",
+    description="Безвозвратно удаляет программу; при наличии связей — ошибка (RESTRICT). Требуется право catalog.manage.",
 )
 def delete_program(
     program_id: uuid.UUID,
     db: Session = Depends(get_audit_db),
-    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+    _user: CurrentUser = Depends(CATALOG_WRITE),
 ) -> None:
     service.delete_program(db, program_id)
 
@@ -533,12 +531,12 @@ def delete_program(
     status_code=201,
     tags=["Products"],
     summary="Создать продукт",
-    description="Создаёт продукт с вендором, программой, названием и версией. Требуются роли admin или manager.",
+    description="Создаёт продукт с вендором, программой, названием и версией. Требуется право catalog.manage.",
 )
 def create_product(
     data: ProductCreate,
     db: Session = Depends(get_audit_db),
-    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+    _user: CurrentUser = Depends(CATALOG_WRITE),
 ) -> ProductDetail:
     return service.create_product(
         db, vendor_id=data.vendor_id, program_id=data.program_id,
@@ -597,13 +595,13 @@ def get_product(
     response_model=ProductDetail,
     tags=["Products"],
     summary="Частично обновить продукт",
-    description="Частично обновляет продукт (вендор, название, версия, программа). Требуются роли admin или manager.",
+    description="Частично обновляет продукт (вендор, название, версия, программа). Требуется право catalog.manage.",
 )
 def patch_product(
     product_id: uuid.UUID,
     data: ProductUpdate,
     db: Session = Depends(get_audit_db),
-    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+    _user: CurrentUser = Depends(CATALOG_WRITE),
 ) -> ProductDetail:
     program_id = data.program_id if "program_id" in data.model_fields_set else service.UNSET
     return service.patch_product(
@@ -618,12 +616,12 @@ def patch_product(
     status_code=204,
     tags=["Products"],
     summary="Удалить продукт",
-    description="Безвозвратно удаляет продукт; при наличии лицензий или связей — ошибка (RESTRICT). Требуются роли admin или manager.",
+    description="Безвозвратно удаляет продукт; при наличии лицензий или связей — ошибка (RESTRICT). Требуется право catalog.manage.",
 )
 def delete_product(
     product_id: uuid.UUID,
     db: Session = Depends(get_audit_db),
-    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+    _user: CurrentUser = Depends(CATALOG_WRITE),
 ) -> None:
     service.delete_product(db, product_id)
 
@@ -637,12 +635,12 @@ def delete_product(
     status_code=201,
     tags=["Vendors"],
     summary="Создать вендора",
-    description="Создаёт вендора с названием и контактами. Требуются роли admin или manager.",
+    description="Создаёт вендора с названием и контактами. Требуется право catalog.manage.",
 )
 def create_vendor(
     data: VendorCreate,
     db: Session = Depends(get_audit_db),
-    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+    _user: CurrentUser = Depends(CATALOG_WRITE),
 ) -> VendorDetail:
     return service.create_vendor(db, name=data.name, contacts=data.contacts)
 
@@ -694,13 +692,13 @@ def get_vendor(
     response_model=VendorDetail,
     tags=["Vendors"],
     summary="Частично обновить вендора",
-    description="Частично обновляет название и контакты вендора. Требуются роли admin или manager.",
+    description="Частично обновляет название и контакты вендора. Требуется право catalog.manage.",
 )
 def patch_vendor(
     vendor_id: uuid.UUID,
     data: VendorUpdate,
     db: Session = Depends(get_audit_db),
-    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+    _user: CurrentUser = Depends(CATALOG_WRITE),
 ) -> VendorDetail:
     return service.patch_vendor(db, vendor_id, name=data.name, contacts=data.contacts)
 
@@ -711,12 +709,12 @@ def patch_vendor(
     status_code=204,
     tags=["Vendors"],
     summary="Удалить вендора",
-    description="Безвозвратно удаляет вендора; при наличии продуктов — ошибка (RESTRICT). Требуются роли admin или manager.",
+    description="Безвозвратно удаляет вендора; при наличии продуктов — ошибка (RESTRICT). Требуется право catalog.manage.",
 )
 def delete_vendor(
     vendor_id: uuid.UUID,
     db: Session = Depends(get_audit_db),
-    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+    _user: CurrentUser = Depends(CATALOG_WRITE),
 ) -> None:
     service.delete_vendor(db, vendor_id)
 
@@ -734,12 +732,12 @@ def delete_vendor(
     status_code=201,
     tags=["Contracts"],
     summary="Создать договор",
-    description="Создаёт договор, привязанный к вузу и продукту. Требуются роли admin или manager.",
+    description="Создаёт договор, привязанный к вузу и продукту. Требуется право catalog.manage.",
 )
 def create_contract(
     data: ContractCreate,
     db: Session = Depends(get_audit_db),
-    user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+    user: CurrentUser = Depends(CATALOG_WRITE),
 ) -> ContractDetail:
     ensure_university_visible(data.university_id, user)
     return service.create_contract(db, data)
@@ -796,13 +794,13 @@ def get_contract(
     response_model=ContractDetail,
     tags=["Contracts"],
     summary="Обновить договор",
-    description="Обновляет договор, включая смену вуза с проверкой видимости. Требуются роли admin или manager.",
+    description="Обновляет договор, включая смену вуза с проверкой видимости. Требуется право catalog.manage.",
 )
 def patch_contract(
     contract_id: uuid.UUID,
     data: ContractUpdate,
     db: Session = Depends(get_audit_db),
-    user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+    user: CurrentUser = Depends(CATALOG_WRITE),
 ) -> ContractDetail:
     detail = service.get_contract_detail(db, contract_id)
     ensure_university_visible(detail.university_id, user)
@@ -816,14 +814,14 @@ def patch_contract(
     response_model=ContractDetail,
     tags=["Contracts"],
     summary="Загрузить файл договора",
-    description="Загружает файл договора (скан или копия) в хранилище. Требуются роли admin или manager.",
+    description="Загружает файл договора (скан или копия) в хранилище. Требуется право catalog.manage.",
 )
 def upload_contract_file(
     contract_id: uuid.UUID,
     file: UploadFile = File(...),
     db: Session = Depends(get_audit_db),
     storage: StorageBackend = Depends(get_storage),
-    user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+    user: CurrentUser = Depends(CATALOG_WRITE),
 ) -> ContractDetail:
     contract = contract_or_404(db, contract_id)
     ensure_university_visible(contract.university_id, user)
@@ -865,13 +863,13 @@ def download_contract_file(
     status_code=204,
     tags=["Contracts"],
     summary="Удалить файл договора",
-    description="Удаляет файл договора из хранилища, сам договор сохраняется. Требуются роли admin или manager.",
+    description="Удаляет файл договора из хранилища, сам договор сохраняется. Требуется право catalog.manage.",
 )
 def delete_contract_file(
     contract_id: uuid.UUID,
     db: Session = Depends(get_audit_db),
     storage: StorageBackend = Depends(get_storage),
-    user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+    user: CurrentUser = Depends(CATALOG_WRITE),
 ) -> None:
     contract = contract_or_404(db, contract_id)
     ensure_university_visible(contract.university_id, user)
@@ -884,13 +882,13 @@ def delete_contract_file(
     status_code=204,
     tags=["Contracts"],
     summary="Удалить договор",
-    description="Безвозвратно удаляет договор вместе с файлом; при наличии лицензий — 409. Требуются роли admin или manager.",
+    description="Безвозвратно удаляет договор вместе с файлом; при наличии лицензий — 409. Требуется право catalog.manage.",
 )
 def delete_contract(
     contract_id: uuid.UUID,
     db: Session = Depends(get_audit_db),
     storage: StorageBackend = Depends(get_storage),
-    user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+    user: CurrentUser = Depends(CATALOG_WRITE),
 ) -> None:
     detail = service.get_contract_detail(db, contract_id)
     ensure_university_visible(detail.university_id, user)
@@ -909,12 +907,12 @@ def delete_contract(
     status_code=201,
     tags=["Licenses"],
     summary="Создать лицензию",
-    description="Создаёт лицензию, привязанную к вузу, продукту и договору. Требуются роли admin или manager.",
+    description="Создаёт лицензию, привязанную к вузу, продукту и договору. Требуется право catalog.manage.",
 )
 def create_license(
     data: LicenseCreate,
     db: Session = Depends(get_audit_db),
-    user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+    user: CurrentUser = Depends(CATALOG_WRITE),
 ) -> LicenseRead:
     ensure_university_visible(data.university_id, user)
     return service.create_license(db, data)
@@ -971,13 +969,13 @@ def get_license(
     response_model=LicenseRead,
     tags=["Licenses"],
     summary="Обновить лицензию",
-    description="Обновляет лицензию, включая смену вуза с проверкой видимости. Требуются роли admin или manager.",
+    description="Обновляет лицензию, включая смену вуза с проверкой видимости. Требуется право catalog.manage.",
 )
 def patch_license(
     license_id: uuid.UUID,
     data: LicenseUpdate,
     db: Session = Depends(get_audit_db),
-    user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+    user: CurrentUser = Depends(CATALOG_WRITE),
 ) -> LicenseRead:
     detail = service.get_license_detail(db, license_id)
     ensure_university_visible(detail.university_id, user)
@@ -992,12 +990,12 @@ def patch_license(
     status_code=204,
     tags=["Licenses"],
     summary="Удалить лицензию",
-    description="Безвозвратно удаляет лицензию. Требуются роли admin или manager.",
+    description="Безвозвратно удаляет лицензию. Требуется право catalog.manage.",
 )
 def delete_license(
     license_id: uuid.UUID,
     db: Session = Depends(get_audit_db),
-    user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+    user: CurrentUser = Depends(CATALOG_WRITE),
 ) -> None:
     detail = service.get_license_detail(db, license_id)
     ensure_university_visible(detail.university_id, user)
@@ -1012,12 +1010,12 @@ def delete_license(
     status_code=201,
     tags=["Responsibles"],
     summary="Создать ответственного",
-    description="Создаёт ответственного с ФИО, email, телефоном и ролью. Требуются роли admin или manager.",
+    description="Создаёт ответственного с ФИО, email, телефоном и ролью. Требуется право catalog.manage.",
 )
 def create_responsible(
     data: ResponsibleCreate,
     db: Session = Depends(get_audit_db),
-    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+    _user: CurrentUser = Depends(CATALOG_WRITE),
 ) -> ResponsibleDetail:
     return service.create_responsible(
         db,
@@ -1082,13 +1080,13 @@ def get_responsible(
     response_model=ResponsibleDetail,
     tags=["Responsibles"],
     summary="Частично обновить ответственного",
-    description="Частично обновляет данные ответственного. Требуются роли admin или manager.",
+    description="Частично обновляет данные ответственного. Требуется право catalog.manage.",
 )
 def patch_responsible(
     responsible_id: uuid.UUID,
     data: ResponsibleUpdate,
     db: Session = Depends(get_audit_db),
-    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+    _user: CurrentUser = Depends(CATALOG_WRITE),
 ) -> ResponsibleDetail:
     fields = data.model_fields_set
     return service.patch_responsible(
@@ -1113,12 +1111,12 @@ def patch_responsible(
     status_code=204,
     tags=["Responsibles"],
     summary="Удалить ответственного",
-    description="Безвозвратно удаляет ответственного; связи с вузами каскадируются, вузы сохраняются. Требуются роли admin или manager.",
+    description="Безвозвратно удаляет ответственного; связи с вузами каскадируются, вузы сохраняются. Требуется право catalog.manage.",
 )
 def delete_responsible(
     responsible_id: uuid.UUID,
     db: Session = Depends(get_audit_db),
-    _user: CurrentUser = Depends(LEGACY_CATALOG_WRITE),
+    _user: CurrentUser = Depends(CATALOG_WRITE),
 ) -> None:
     service.delete_responsible(db, responsible_id)
 

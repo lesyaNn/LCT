@@ -757,7 +757,13 @@ def assign_responsible(
             role_in_university=data.role_in_university if data else None,
             is_primary=data.is_primary if data else False,
         ),
+        commit=False,
     )
+    from app.modules.notifications.service import notify_assignment
+
+    notify_assignment(db, responsible_id, university_id,
+                      event_key=f"university-assigned:{link.id}")
+    db.commit()
     return UniversityResponsibleRead.model_validate(link), True
 
 

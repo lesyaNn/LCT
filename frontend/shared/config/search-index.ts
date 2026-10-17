@@ -11,12 +11,13 @@ export type StaticSearchResult = { kind: 'action' | 'navigation'; key: string; t
 // describe existing pages and actions that can be reached from those pages.
 const pageKeywords: Record<string, Metadata> = {
   '/dashboard': { description: 'Обзор показателей и задач', keywords: ['главная', 'сводка', 'показатели'] },
-  '/universities': { description: 'Список и паспорта ВУЗов', keywords: ['вуз', 'вузы', 'университет', 'учебное заведение', 'документ', 'договор', 'лицензия', 'ответственный', 'история'] },
+  '/universities': { description: 'Список и паспорта ВУЗов', keywords: ['вуз', 'вузы', 'университет', 'учебное заведение', 'документ', 'договор', 'лицензия', 'ответственный'] },
   '/workflows': { description: 'Процессы, этапы и задачи ВУЗов', keywords: ['воркфлоу', 'процесс', 'маршрут', 'этап', 'дедлайн', 'срок', 'задача', 'комментарий', 'вложение', 'запуск'] },
   '/reports': { description: 'Формирование и скачивание отчётов', keywords: ['отчет', 'статистика', 'график', 'скачать отчет', 'сформировать отчет'] },
-  '/audit': { description: 'Журнал действий пользователей', keywords: ['журнал', 'события', 'действия пользователей', 'кто изменил'] },
+  '/audit': { description: 'Журнал действий пользователей', keywords: ['журнал', 'история действий', 'события', 'действия пользователей', 'кто изменил'] },
   '/admin': { description: 'Настройки системы', keywords: ['настройки системы', 'администратор'] },
   '/admin/users': { description: 'Учётные записи, приглашения и роли', keywords: ['пользователь', 'приглашение', 'права', 'роль', 'роли'] },
+  '/admin/university-assignments': { description: 'Назначение вузов пользователям и граф связей', keywords: ['пользователь', 'вуз', 'вузы', 'назначение', 'граф связей'] },
   '/admin/catalogs': { description: 'Справочники и каталоги', keywords: ['каталог', 'справочник', 'продукт', 'вендор', 'договор', 'лицензия'] },
   '/admin/import': { description: 'Загрузка каталогов из файла', keywords: ['импорт', 'загрузить excel', 'импорт каталога', 'загрузить файл'] },
   '/admin/workflow/templates': { description: 'Настройка шаблонов Workflow', keywords: ['шаблон процесса', 'шаблон workflow'] },
@@ -33,7 +34,7 @@ const actions: readonly Action[] = [
   { title: 'Прикрепить файл', description: 'Открыть вложения этапа Workflow', href: '/workflows', icon: 'workflow', requiredPermission: 'workflow.attachment.create', keywords: ['файл', 'вложение', 'прикрепить', 'скачать файл'] },
   { title: 'Договоры ВУЗа', description: 'Открыть документы и договоры в паспорте ВУЗа', href: '/universities', icon: 'university', keywords: ['договор', 'договора', 'договоры', 'контракт'] },
   { title: 'Лицензии ВУЗа', description: 'Открыть лицензии в паспорте ВУЗа', href: '/universities', icon: 'university', keywords: ['лицензия', 'лицензии', 'лицензию'] },
-  { title: 'История ВУЗа', description: 'Открыть историю изменений в паспорте ВУЗа', href: '/universities', icon: 'university', keywords: ['история', 'изменения', 'кто изменил'] },
+  { title: 'История изменений', description: 'Как открыть историю ВУЗа, Workflow и журнал аудита', href: '/docs?article=user-guide%2Fhistory', icon: 'docs', keywords: ['история', 'изменения', 'кто изменил'] },
   { title: 'Скачать отчёт', description: 'Открыть раздел формирования и скачивания отчётов', href: '/reports', icon: 'report', keywords: ['скачать отчет', 'сформировать отчет', 'отчет за месяц'] },
   { title: 'Импортировать каталоги', description: 'Открыть загрузку каталогов из файла', href: '/admin/import', icon: 'admin', keywords: ['импорт', 'загрузить excel', 'импорт каталога'] },
   { title: 'Пригласить пользователя', description: 'Открыть пользователей и права', href: '/admin/users', icon: 'admin', keywords: ['пригласить пользователя', 'приглашение', 'создать приглашение', 'назначить роль'] },
@@ -62,6 +63,7 @@ function match(query: string, phrase: string): number {
   if (!alias) return 0;
   if (query === alias) return 100 + alias.length;
   if (` ${query} `.includes(` ${alias} `)) return 70 + alias.length;
+  if (query.length >= 3 && alias.includes(query)) return 45 + query.length;
   if (!query.includes(' ') && !alias.includes(' ') && similarToken(query, alias)) return 35;
   return 0;
 }
@@ -75,7 +77,7 @@ export function searchStaticIndex(query: string, user: AuthUser): { results: Sta
   const matchedAliases: string[] = [];
   for (const item of visible) {
     const meta = pageKeywords[item.href];
-    const phrases = [item.label, ...(meta?.keywords ?? [])];
+    const phrases = [item.label, ...(meta ? [meta.description, ...meta.keywords] : [])];
     const score = Math.max(...phrases.map((phrase) => match(term, phrase)));
     if (score) {
       candidates.push({ kind: 'navigation', key: `n-${item.href}`, title: item.label, subtitle: meta?.description ?? 'Раздел системы', href: item.href, icon: item.icon, score });
@@ -83,7 +85,7 @@ export function searchStaticIndex(query: string, user: AuthUser): { results: Sta
     }
   }
   for (const action of actions) {
-    if (!visibleHrefs.has(action.href) || (action.requiredPermission && !hasPermission(user, action.requiredPermission)) || (action.adminOnly && !hasRole(user, 'admin'))) continue;
+    if (!visibleHrefs.has(action.href.split('?')[0]) || (action.requiredPermission && !hasPermission(user, action.requiredPermission)) || (action.adminOnly && !hasRole(user, 'admin'))) continue;
     const score = Math.max(...action.keywords.map((phrase) => match(term, phrase)));
     if (score) {
       candidates.push({ kind: 'action', key: `a-${action.title}`, title: action.title, subtitle: action.description, href: action.href, icon: action.icon, score: score + 15 });

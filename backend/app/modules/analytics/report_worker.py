@@ -11,6 +11,9 @@ creates jobs (``202``) and never executes them — ``BackgroundTasks`` are
 banned for reports by the spec (they die with the API process,
 block the loop and have no retries).
 
+The same long-running worker records Health Score observations once per UTC
+day, independently of whether anyone opens a university passport.
+
 :meth:`generate_report_task` stays callable standalone (tests, one-off
 retries): it claims the job itself first. Every entry receives ONLY
 ``job_id`` — never a request-scoped DB session — and opens a FRESH
@@ -35,6 +38,7 @@ import logging
 import time
 
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 from sqlalchemy.orm import Session
@@ -75,6 +79,27 @@ def run_audit_relay_once() -> int:
         return relay_audit_events(db)
     finally:
         db.close()
+
+
+def run_notification_scan_once() -> int:
+    """Project due dates into the same durable in-app inbox."""
+    from app.db.session import SessionLocal
+    from app.modules.notifications.service import scan_due_notifications
+
+    db = SessionLocal()
+    try:
+        return scan_due_notifications(db)
+    finally:
+        db.close()
+
+
+def run_email_delivery_once() -> bool:
+    """Deliver one due notification through the existing worker process."""
+    from app.db.session import SessionLocal
+    from app.modules.notifications.email import run_email_delivery_once as deliver
+
+    with SessionLocal() as db:
+        return deliver(db)
 
 
 def build_worker_user(job: ReportJob) -> CurrentUser:
@@ -161,13 +186,22 @@ def run_import_job(db: Session, job: ReportJob) -> str:
         # Import files may contain personal data and database exceptions may
         # include cell values. Keep the public job error deliberately generic.
         logger.error("import worker failed id=%s type=%s", job.id, type(exc).__name__)
-        return jobs.requeue_or_fail(
+        outcome = jobs.requeue_or_fail(
             db, job, RuntimeError("Не удалось обработать импорт; проверьте файл и лист"),
         )
+        if outcome == "failed":
+            from app.modules.notifications.service import notify_import_result
+
+            notify_import_result(db, job, failed=True)
+            db.commit()
+        return outcome
     artifact = Path(jobs.job_file_path(job.id, "xlsx"))
     size = import_service.write_error_report(summary, artifact)
     job.result = summary
     db.add(job)
+    from app.modules.notifications.service import notify_import_result
+
+    notify_import_result(db, job)
     jobs.mark_ready(db, job, file_path=artifact, file_size=size)
     return "ready"
 
@@ -283,24 +317,43 @@ def main(argv: list[str] | None = None) -> int:
         "--idle-sleep", type=float, default=2.0, help="idle sleep seconds"
     )
     args = parser.parse_args(argv)
+    last_health_snapshot_date = None
+    next_health_snapshot_retry = 0.0
+    next_notification_scan = 0.0
     while True:
         try:
             run_audit_relay_once()
         except Exception:
             logger.exception("audit outbox relay iteration failed")
+        if time.monotonic() >= next_notification_scan:
+            try:
+                run_notification_scan_once()
+                next_notification_scan = time.monotonic() + 3600
+            except Exception:
+                logger.exception("notification deadline scan failed")
+                next_notification_scan = time.monotonic() + 60
         try:
-            # Only report/import job execution here. The daily health-score
-            # snapshot that used to run in this block was removed together
-            # with the health_score entity (migration 000029); its import
-            # raised ModuleNotFoundError and, because it sat in front of
-            # run_worker_once(), it silently skipped a whole iteration of
-            # report processing.
+            run_email_delivery_once()
+        except Exception:
+            logger.exception("email delivery iteration failed")
+        try:
             outcome = run_worker_once()
         except Exception:
             logger.exception("report worker iteration failed")
             outcome = "failed"
         if args.once:
             return 0
+        now = datetime.now(timezone.utc)
+        if last_health_snapshot_date != now.date() and time.monotonic() >= next_health_snapshot_retry:
+            try:
+                from app.modules.health_score.history import record_daily_observations
+
+                recorded = record_daily_observations(now)
+                last_health_snapshot_date = now.date()
+                logger.info("Daily Health Score observations saved: %s", recorded)
+            except Exception:
+                logger.exception("Daily Health Score observation failed; retrying in five minutes")
+                next_health_snapshot_retry = time.monotonic() + 300
         time.sleep(0 if outcome else args.idle_sleep)
     return 0
 

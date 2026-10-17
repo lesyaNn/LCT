@@ -470,7 +470,7 @@ def get_meetings(db, university_id: uuid.UUID) -> list[MeetingShort]:
     rows = (
         db.execute(
             select(Meeting)
-            .where(Meeting.university_id == university_id)
+            .where(Meeting.university_id == university_id, Meeting.meeting_at.is_not(None))
             .order_by(Meeting.meeting_at.desc())
             .limit(MEETINGS_LIMIT)
         )

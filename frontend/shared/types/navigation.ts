@@ -13,6 +13,7 @@ export interface NavigationItem {
   href: string;
   icon: IconName;
   requiredPermission?: string;
+  hiddenWithPermission?: string;
 }
 
 export interface BreadcrumbEntry {

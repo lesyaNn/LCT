@@ -21,11 +21,11 @@ function load(file) {
 }
 
 const { searchStaticIndex } = load(resolve(root, 'shared/config/search-index.ts'));
-const { navigationItems } = load(resolve(root, 'shared/config/navigation.ts'));
+const { navigationItems, getVisibleNavigationItems, canAccessRoute } = load(resolve(root, 'shared/config/navigation.ts'));
 const user = (role, permissions) => ({ rawRoles: [role], permissions });
 const regular = user('user', ['university.read', 'workflow.read', 'workflow.change_status', 'workflow.task.update', 'workflow.comment.create', 'workflow.attachment.create', 'reports.read']);
 const admin = user('admin', ['*']);
-const manager = user('manager', [...regular.permissions, 'university_responsible.manage', 'audit.read', 'university.edit', 'import.write']);
+const manager = user('manager', [...regular.permissions, 'university_responsible.manage', 'audit.read', 'university.edit', 'user_university.manage']);
 const titles = (query, account) => searchStaticIndex(query, account).results.map((item) => item.title);
 
 assert.equal(titles('дедлайн', regular)[0], 'Установить дедлайн');
@@ -37,13 +37,26 @@ assert.equal(searchStaticIndex('договор ИТМО', regular).entityTerm, '
 assert.equal(searchStaticIndex('WORKFLOW', regular).entityTerm, null);
 assert.ok(titles('запуска', admin).includes('Запустить Workflow'));
 assert.equal(searchStaticIndex('ИТМО', regular).entityTerm, 'итмо');
+assert.equal(searchStaticIndex('история', regular).results[0].href, '/docs?article=user-guide%2Fhistory');
+assert.ok(titles('истор', regular).includes('История изменений'));
 assert.equal(titles('запустить', admin)[0], 'Запустить Workflow');
 assert.ok(!titles('запустить', regular).includes('Запустить Workflow'));
 for (const term of ['задача', 'комментарий', 'файл', 'договор', 'лицензия', 'история', 'срок', 'отчёт', 'отчет', 'отчетт', 'запустт']) {
   assert.ok(titles(term, regular).length, `No result for ${term}`);
 }
-assert.ok(titles('импорт', manager).includes('Импорт каталогов'));
+assert.ok(!titles('импорт', manager).includes('Импорт каталогов'));
+assert.ok(titles('импорт', admin).includes('Импорт каталогов'));
 assert.ok(titles('аудит', manager).includes('Аудит'));
+assert.ok(getVisibleNavigationItems(manager).some((item) => item.href === '/admin/university-assignments'));
+assert.ok(!getVisibleNavigationItems(admin).some((item) => item.href === '/admin/university-assignments'));
+assert.ok(canAccessRoute('/admin', manager));
+assert.ok(canAccessRoute('/admin/university-assignments', manager));
+assert.ok(!canAccessRoute('/admin/users', manager));
+for (const path of ['/admin/catalogs', '/admin/import']) {
+  assert.ok(!getVisibleNavigationItems(manager).some((item) => item.href === path));
+  assert.ok(!canAccessRoute(path, manager));
+  assert.ok(canAccessRoute(path, admin));
+}
 assert.ok(titles('приглашение', admin).includes('Пригласить пользователя'));
 if (navigationItems.some((item) => item.href === '/api-testing')) {
   assert.ok(titles('api', admin).includes('Тестирование API'));

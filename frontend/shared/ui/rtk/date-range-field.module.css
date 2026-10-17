@@ -1,4 +1,6 @@
 .root { display: flex; flex-direction: column; gap: var(--rtk-space-1); grid-column: 1 / -1; min-width: 0; }
+.wideSplit { container-type: inline-size; }
+.wideSplit > .label { display: none; }
 .label { color: var(--rtk-color-text-secondary); font-size: 11px; font-weight: 600; line-height: 14px; min-height: 14px; }
 .controls { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); min-width: 0; }
 .presets { display: flex; flex-wrap: wrap; gap: var(--rtk-space-1); min-width: 0; }
@@ -7,4 +9,24 @@
 .fields label { align-items: center; color: var(--rtk-color-text-secondary); display: flex; font-size: 11px; font-weight: 600; gap: var(--rtk-space-1); min-width: 0; white-space: nowrap; }
 .fields input { font-size: 12px; height: 46px; min-height: 46px; min-width: 0; padding: 0 8px; width: 130px; }
 .fields small { color: var(--rtk-color-danger); font-weight: 400; }
+@container (min-width: 860px) {
+  .wideSplit .controls { align-items: end; display: grid; gap: var(--rtk-space-4); grid-template-columns: minmax(0, 1fr) auto; }
+  .wideSplit .presets { flex-wrap: nowrap; }
+  .wideSplit .presets button { flex: 1 1 0; min-width: 0; }
+  .wideSplit .fields { display: grid; gap: var(--rtk-space-2); grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wideSplit .fields label { align-items: stretch; flex-direction: column; }
+  .wideSplit .fields input { width: 140px; }
+}
+@container (max-width: 859.98px) {
+  .wideSplit .controls { align-items: stretch; display: grid; grid-template-columns: minmax(0, 1fr); width: 100%; }
+  .wideSplit .presets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; }
+  .wideSplit .presets button { min-width: 0; width: 100%; }
+  .wideSplit .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  .wideSplit .fields label { align-items: stretch; flex-direction: column; }
+  .wideSplit .fields input { width: 100%; }
+}
+@container (max-width: 600px) {
+  .wideSplit .presets { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media (max-width: 768px) { .presets button { height: 48px; min-height: 48px; } .controls, .fields { width: 100%; } .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } .fields label { align-items: stretch; flex-direction: column; } .fields input { height: 48px; min-height: 48px; width: 100%; } }
+@media (max-width: 480px) { .wideSplit .fields { grid-template-columns: 1fr; } }

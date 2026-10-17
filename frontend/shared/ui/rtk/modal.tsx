@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import CloseLarge from '@atomaro/icons/24/navigation/CloseLarge';
 import styles from './modal.module.css';
 
-export function Modal({ title, children, onClose, labelledBy, initialFocusRef, size = 'm' }: { title: string; children: ReactNode; onClose: () => void; labelledBy?: string; initialFocusRef?: RefObject<HTMLElement | null>; size?: 'm' | 'l' }) {
+export function Modal({ title, children, onClose, labelledBy, initialFocusRef, size = 'm', fullHeight = false }: { title: string; children: ReactNode; onClose: () => void; labelledBy?: string; initialFocusRef?: RefObject<HTMLElement | null>; size?: 'm' | 'l'; fullHeight?: boolean }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const mounted = useSyncExternalStore(() => () => undefined, () => true, () => false);
   const onCloseRef = useRef(onClose);
@@ -49,5 +49,5 @@ export function Modal({ title, children, onClose, labelledBy, initialFocusRef, s
   }, [initialFocusRef, mounted]);
 
   if (!mounted) return null;
-  return createPortal(<div className={styles.overlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><div className={`${styles.dialog} ${styles[size]}`} role="dialog" aria-modal="true" aria-labelledby={titleId}><div className={styles.header}><h2 id={titleId}>{title}</h2><button ref={closeRef} className={styles.close} type="button" aria-label="Закрыть" onClick={onClose}><CloseLarge size={20} fill="currentColor" /></button></div><div className={styles.body}>{children}</div></div></div>, document.body);
+  return createPortal(<div className={styles.overlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><div className={`${styles.dialog} ${styles[size]}${fullHeight ? ` ${styles.full}` : ''}`} role="dialog" aria-modal="true" aria-labelledby={titleId}><div className={styles.header}><h2 id={titleId}>{title}</h2><button ref={closeRef} className={styles.close} type="button" aria-label="Закрыть" onClick={onClose}><CloseLarge size={20} fill="currentColor" /></button></div><div className={styles.body}>{children}</div></div></div>, document.body);
 }

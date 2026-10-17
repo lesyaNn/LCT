@@ -41,6 +41,7 @@ from app.models.workflow_instances import (
     WorkflowTask,
 )
 from app.models.workflow_templates import WorkflowStage, WorkflowTemplate
+from app.modules.meetings.service import ensure_workflow_meeting
 
 from .overdue import compute_overdue, today_utc
 from .schemas import InstanceDetail, InstanceStageRead, WorkflowActivityRead
@@ -110,6 +111,11 @@ def list_workflow_activity(db: Session, instance_id: uuid.UUID) -> list[Workflow
             kind = "deadline_changed"
             title = f"{date_label(old.get('due_date'))} → {date_label(new.get('due_date'))}"
             stage_name = stage_names.get(str(new.get("stage_id")), "Этап Workflow")
+            stage_id = uuid.UUID(str(new["stage_id"])) if str(new.get("stage_id")) in stage_names else None
+        elif "stage_name" in new and old.get("stage_name") != new.get("stage_name"):
+            kind = "stage_name_changed"
+            title = f"{old.get('stage_name') or 'Этап Workflow'} → {new['stage_name']}"
+            stage_name = new["stage_name"]
             stage_id = uuid.UUID(str(new["stage_id"])) if str(new.get("stage_id")) in stage_names else None
         else:
             continue
@@ -433,6 +439,7 @@ def create_instance(
         first.started_at = datetime.now(timezone.utc)
         instance.current_instance_stage_id = first.id
         instance.current_stage_id = first.template_stage_id
+        ensure_workflow_meeting(db, instance, first, actor_sub or "")
         db.add(
             WorkflowStageTransition(
                 instance_id=instance.id,
@@ -441,6 +448,11 @@ def create_instance(
                 actor_keycloak_sub=actor_sub or "",
             )
         )
+    if responsible_id is not None:
+        from app.modules.notifications.service import notify_assignment
+
+        notify_assignment(db, responsible_id, university_id, entity_type="workflow",
+                          entity_id=instance.id, event_key=f"workflow-assigned:{instance.id}:created")
     db.commit()  # header + snapshot + pointers + transition atomically
     if "audit_context" in db.info:
         # H3: instance creation is audited in a follow-up statement (the core
@@ -525,6 +537,11 @@ def set_instance_responsible(
             old_value={"responsible_id": str(old_responsible_id) if old_responsible_id else None},
             new_value={"responsible_id": str(responsible_id) if responsible_id else None},
         )
+    if responsible_id is not None and responsible_id != old_responsible_id:
+        from app.modules.notifications.service import notify_assignment
+
+        notify_assignment(db, responsible_id, instance.university_id, entity_type="workflow",
+                          entity_id=instance.id, event_key=f"workflow-assigned:{instance.id}:{uuid.uuid4()}")
     db.commit()
     return get_instance_detail(db, instance.id)
 
@@ -576,6 +593,8 @@ def set_instance_stage_responsible(
     previous = stage.responsible_id
     if previous == responsible_id:
         return get_instance_detail(db, instance_id)
+    effective_before = previous or instance.responsible_id
+    effective_after = responsible_id or instance.responsible_id
     stage.responsible_id = responsible_id
     if "audit_context" in db.info:
         from app.modules.audit.service import AuditService, context_for
@@ -587,6 +606,11 @@ def set_instance_stage_responsible(
             old_value={"stage_id": str(stage_id), "stage_name": stage.name, "stage_responsible_id": str(previous) if previous else None},
             new_value={"stage_id": str(stage_id), "stage_name": stage.name, "stage_responsible_id": str(responsible_id) if responsible_id else None},
         )
+    if effective_after is not None and effective_after != effective_before:
+        from app.modules.notifications.service import notify_assignment
+
+        notify_assignment(db, effective_after, instance.university_id, entity_type="workflow",
+                          entity_id=instance.id, event_key=f"stage-assigned:{stage.id}:{uuid.uuid4()}")
     db.commit()
     return get_instance_detail(db, instance_id)
 
@@ -622,6 +646,38 @@ def set_instance_stage_due_date(
             university_id=instance.university_id,
             old_value={"stage_id": str(stage_id), "due_date": previous.isoformat() if previous else None},
             new_value={"stage_id": str(stage_id), "due_date": due_date.isoformat() if due_date else None},
+        )
+    db.commit()
+    return get_instance_detail(db, instance_id)
+
+
+def set_instance_stage_name(
+    db: Session,
+    instance_id: uuid.UUID,
+    stage_id: uuid.UUID,
+    name: str,
+    actor_sub: str = "",
+) -> InstanceDetail:
+    """Rename one runtime snapshot stage without changing its template."""
+    instance = get_instance_or_404(db, instance_id)
+    stage = db.get(InstanceStage, stage_id)
+    if stage is None or stage.instance_id != instance_id:
+        raise NotFound("Workflow stage not found")
+    if instance.status != "active":
+        raise BadTransition("Only stages of an active Workflow can be renamed")
+    if stage.name == name:
+        return get_instance_detail(db, instance_id)
+    previous = stage.name
+    stage.name = name
+    if "audit_context" in db.info:
+        from app.modules.audit.service import AuditService, context_for
+
+        AuditService(db).log_event(
+            context=context_for(db, actor_sub or "system"),
+            action="UPDATE", entity_type="workflow_instance",
+            entity_id=instance.id, university_id=instance.university_id,
+            old_value={"stage_id": str(stage_id), "stage_name": previous},
+            new_value={"stage_id": str(stage_id), "stage_name": name},
         )
     db.commit()
     return get_instance_detail(db, instance_id)

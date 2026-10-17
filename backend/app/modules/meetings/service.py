@@ -12,12 +12,16 @@ import uuid
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.errors import BusinessException
 from app.core.exceptions import NotFound
 from app.core.policies import ensure_university_visible
 from app.models.catalog import University
 from app.models.interactions import Meeting
+from app.models.workflow_instances import InstanceStage, WorkflowInstance
+from app.modules.meeting_agenda.eligibility import is_meeting_stage
 from app.modules.audit.service import AuditAction, AuditService, context_for
 from app.modules.meetings.schemas import MeetingCreate, MeetingRead, MeetingUpdate
+from app.schemas.errors import ErrorCode
 
 
 def _check_scope(user, university_id: uuid.UUID) -> None:
@@ -46,7 +50,42 @@ def _snapshot(meeting: Meeting) -> dict:
         "next_action": meeting.next_action,
         "next_action_due": meeting.next_action_due,
         "meeting_at": meeting.meeting_at,
+        "workflow_instance_stage_id": meeting.workflow_instance_stage_id,
     }
+
+
+def _read(meeting: Meeting) -> MeetingRead:
+    result = MeetingRead.model_validate(meeting)
+    stage = meeting.workflow_stage
+    if stage is None:
+        return result
+    return result.model_copy(update={
+        "workflow_instance_id": stage.instance_id,
+        "workflow_stage_name": stage.name,
+    })
+
+
+def ensure_workflow_meeting(db: Session, instance: WorkflowInstance, stage: InstanceStage, actor_sub: str) -> Meeting | None:
+    """Add one unscheduled Meeting for a visited meeting stage in the caller's transaction."""
+    if not is_meeting_stage(stage.name, stage.template_stage_id):
+        return None
+    existing = db.execute(select(Meeting).where(Meeting.workflow_instance_stage_id == stage.id)).scalar_one_or_none()
+    if existing is not None:
+        return existing
+    meeting = Meeting(
+        university_id=instance.university_id,
+        workflow_instance_stage_id=stage.id,
+        meeting_type=None,
+        subject=stage.name,
+        participants=[],
+        meeting_at=None,
+        created_by_keycloak_sub=actor_sub,
+    )
+    db.add(meeting)
+    if "audit_context" in db.info:
+        db.flush()
+        _audit(db, meeting, AuditAction.CREATE, new=_snapshot(meeting))
+    return meeting
 
 
 def _audit(db: Session, meeting: Meeting, action: AuditAction, *, old=None, new=None) -> None:
@@ -97,7 +136,7 @@ def create_meeting(
         _audit(db, meeting, AuditAction.CREATE, new=_snapshot(meeting))
     db.commit()
     db.refresh(meeting)
-    return MeetingRead.model_validate(meeting)
+    return _read(meeting)
 
 
 def list_meeting_page(
@@ -116,20 +155,20 @@ def list_meeting_page(
     ).scalar_one()
     rows = (
         db.execute(
-            base.order_by(Meeting.meeting_at.desc(), Meeting.id.desc())
+            base.order_by(Meeting.meeting_at.is_(None).desc(), Meeting.meeting_at.desc(), Meeting.id.desc())
             .limit(page_size)
             .offset((page - 1) * page_size)
         )
         .scalars()
         .all()
     )
-    return [MeetingRead.model_validate(r) for r in rows], total
+    return [_read(r) for r in rows], total
 
 
 def get_meeting(db: Session, meeting_id: uuid.UUID, *, user) -> MeetingRead:
     meeting = _get_meeting_or_404(db, meeting_id)
     _check_scope(user, meeting.university_id)
-    return MeetingRead.model_validate(meeting)
+    return _read(meeting)
 
 
 def patch_meeting(
@@ -139,6 +178,8 @@ def patch_meeting(
     _check_scope(user, meeting.university_id)
     old = _snapshot(meeting)
     fields = data.model_fields_set
+    if "meeting_at" in fields and data.meeting_at is None and meeting.workflow_instance_stage_id is None:
+        raise BusinessException(ErrorCode.VALIDATION_ERROR, message="Укажите дату и время встречи.")
     if "meeting_type" in fields and data.meeting_type is not None:
         meeting.meeting_type = data.meeting_type.value
     for field in (
@@ -154,7 +195,7 @@ def patch_meeting(
     _audit(db, meeting, AuditAction.UPDATE, old=old, new=_snapshot(meeting))
     db.commit()
     db.refresh(meeting)
-    return MeetingRead.model_validate(meeting)
+    return _read(meeting)
 
 
 def delete_meeting(db: Session, meeting_id: uuid.UUID, *, user) -> None:

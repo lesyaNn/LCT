@@ -23,7 +23,9 @@ from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401  (register metadata)
 from app.core.exceptions import BadTransition, Conflict
+from app.core.security import CurrentUser
 from app.models.catalog import University
+from app.models.interactions import Meeting
 from app.models.workflow_instances import (
     InstanceStage,
     WorkflowComment,
@@ -34,6 +36,8 @@ from app.models.workflow_templates import WorkflowStage, WorkflowTemplate
 from app.modules.audit.models import AuditEvent
 from app.models.audit_outbox import AuditOutbox
 from app.modules.audit.relay import relay_audit_events
+from app.modules.meeting_agenda.service import build_agenda
+from app.modules.meetings.service import list_meeting_page
 from app.modules.workflow_transitions import service
 from app.modules.workflow_transitions.schemas import (
     WorkflowCommentCreate,
@@ -138,6 +142,7 @@ def test_transition_skips_optional_records_history_and_audit(db):
     assert by_order[2].status == "skipped"
     assert by_order[2].started_at is None
     assert by_order[3].status == "pending"
+    assert db.scalars(select(Meeting).where(Meeting.university_id == instance.university_id)).all() == []
 
     history = service.list_transitions(db, instance.id)
     assert len(history) == 2  # creation + this move
@@ -165,6 +170,32 @@ def test_transition_skips_optional_records_history_and_audit(db):
     assert len(events) == 1
     assert events[0].user_id == "actor-1"
     assert events[0].university_id == moved.university_id
+
+
+def test_meeting_transition_creates_one_unscheduled_link_across_reentry(db):
+    instance, rows, _ = _graph(db, middle_required=True)
+    service.transition_instance(db, instance.id, rows[1].id, "Назначаем встречу", "actor-1")
+    meeting = db.scalar(select(Meeting).where(Meeting.workflow_instance_stage_id == rows[1].id))
+    assert meeting is not None
+    assert meeting.university_id == instance.university_id
+    assert meeting.meeting_at is None and meeting.meeting_type is None
+    assert meeting.participants == []
+    page, total = list_meeting_page(db, instance.university_id, page=1, page_size=20,
+                                    user=CurrentUser(id="actor-1", roles={"admin"}))
+    assert total == 1
+    assert page[0].workflow_instance_id == instance.id
+    assert page[0].workflow_instance_stage_id == rows[1].id
+
+    service.transition_instance(db, instance.id, rows[2].id, "Дальше", "actor-1")
+    service.rollback_instance(db, instance.id, rows[0].id, "Вернулись к контактам", "actor-1")
+    db.refresh(rows[1])
+    assert rows[1].started_at is None
+    assert build_agenda(db, instance.id, CurrentUser(id="actor-1", roles={"admin"}), rows[1].id).stage_id == rows[1].id
+    service.transition_instance(db, instance.id, rows[1].id, "Повторно назначаем встречу", "actor-1")
+    linked = db.scalars(select(Meeting).where(Meeting.workflow_instance_stage_id == rows[1].id)).all()
+    assert [row.id for row in linked] == [meeting.id]
+    service.transition_instance(db, instance.id, rows[2].id, "Повторно завершили встречу", "actor-1")
+    assert build_agenda(db, instance.id, CurrentUser(id="actor-1", roles={"admin"}), rows[1].id).stage_id == rows[1].id
 
 
 def test_complete_final_stage_persists_and_rejects_mutations(db):

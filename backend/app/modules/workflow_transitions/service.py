@@ -57,6 +57,7 @@ from app.models.workflow_instances import (
 )
 from app.models.workflow_templates import WorkflowStage
 from app.modules.audit.service import AuditAction, AuditService, context_for
+from app.modules.meetings.service import ensure_workflow_meeting
 from app.modules.workflow_instances.service import get_instance_or_404
 from app.modules.workflow_transitions.schemas import (
     WorkflowCommentCreate,
@@ -195,6 +196,7 @@ def transition_instance(
     target.started_at = now
     instance.current_instance_stage_id = target.id
     instance.current_stage_id = target.template_stage_id
+    ensure_workflow_meeting(db, instance, target, actor)
     db.add(
         WorkflowStageTransition(
             instance_id=instance.id,
@@ -218,6 +220,10 @@ def transition_instance(
         new_value={"audit_object_type": "workflow_transition",
                    "stage_id": _stage_ref(target), "stage_name": target.name},
     )
+    from app.modules.notifications.service import notify_stage_change
+
+    notify_stage_change(db, instance, current, target, rollback=False, reason="",
+                        event_key=f"workflow-transition:{instance.id}:{uuid.uuid4()}")
     db.commit()
     return get_instance_or_404(db, instance.id)
 
@@ -341,6 +347,7 @@ def rollback_instance(
     current.started_at = None
     instance.current_instance_stage_id = target.id
     instance.current_stage_id = target.template_stage_id
+    ensure_workflow_meeting(db, instance, target, actor)
     db.add(
         WorkflowStageTransition(
             instance_id=instance.id,
@@ -359,6 +366,10 @@ def rollback_instance(
         old_value={"stage_id": current.template_stage_id, "stage_name": current.name},
         new_value={"stage_id": target.template_stage_id, "stage_name": target.name, "comment": text, "rollback": True},
     )
+    from app.modules.notifications.service import notify_stage_change
+
+    notify_stage_change(db, instance, current, target, rollback=True, reason=text,
+                        event_key=f"workflow-rollback:{instance.id}:{uuid.uuid4()}")
     db.commit()
     return get_instance_or_404(db, instance.id)
 
@@ -484,6 +495,7 @@ def add_comment(
         # Explicit model default: the audit before_flush snapshot reads the
         # attribute before flush-time defaults fire, so None would leak in.
         is_internal=True,
+        question_status="open" if data.is_question else "none",
     )
     db.add(comment)
     db.commit()
@@ -511,6 +523,7 @@ def add_comment_with_files(
     comment = WorkflowComment(
         instance_id=instance_id, stage_id=data.stage_id,
         author_keycloak_sub=actor, content=content, is_internal=True,
+        question_status="open" if data.is_question else "none",
     )
     keys: list[str] = []
     try:

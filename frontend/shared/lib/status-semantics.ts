@@ -1,6 +1,6 @@
 import type { UpcomingDateStatus } from './formatters';
 import type { ProgramStatus, UniversityDocumentStatus, UniversityHistoryEventType, UniversityLicenseStatus, UniversityPassportWorkflow, UniversityProductStatus, UniversityWorkflowStageStatus } from './universities-repository';
-import type { AttentionItem } from './dashboard-repository';
+import type { AttentionItem, UniversityHealth } from './dashboard-repository';
 
 export type SemanticIntent = 'neutral' | 'brand' | 'orange' | 'info' | 'success' | 'warning' | 'danger';
 export type WorkflowStageIcon = 'check' | 'information' | 'time' | 'skip' | 'error';
@@ -21,3 +21,9 @@ export const workflowStageStatusSemantics: Record<UniversityWorkflowStageStatus,
 export const historyEventTypeLabels: Record<UniversityHistoryEventType, string> = { workflow: 'Workflow', document: 'Файл', meeting: 'Встреча', note: 'Заметка', audit: 'Изменение' };
 export const historyEventTypeIntent: Record<UniversityHistoryEventType, SemanticIntent> = { workflow: 'brand', document: 'neutral', meeting: 'brand', note: 'neutral', audit: 'warning' };
 export const attentionSeverityIntent: Record<AttentionItem['severity'], SemanticIntent> = { red: 'danger', orange: 'warning', yellow: 'warning' };
+export const healthLevelMeta: Record<UniversityHealth['level'], { label: string; intent: SemanticIntent }> = {
+  stable: { label: 'Стабильно', intent: 'success' },
+  attention: { label: 'Требует внимания', intent: 'warning' },
+  critical: { label: 'Критично', intent: 'danger' },
+  no_data: { label: 'Недостаточно данных', intent: 'neutral' },
+};

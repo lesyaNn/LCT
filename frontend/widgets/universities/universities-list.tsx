@@ -28,7 +28,7 @@ import type { ActiveFilterItem } from '@/shared/ui/rtk/active-filters';
 import { DateRangeField } from '@/shared/ui/rtk/date-range-field';
 import { Select } from '@/shared/ui/rtk/form-controls';
 import { EmptyState } from '@/shared/ui/empty-state';
-import { MultiSelect } from '@/shared/ui/rtk/multiselect';
+import { MultiSelect, SearchableSelect } from '@/shared/ui/rtk/multiselect';
 import { StatusBadge as SemanticStatusBadge } from '@/shared/ui/rtk/status-badge';
 import { TableShell } from '@/shared/ui/rtk/table-shell';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
@@ -280,16 +280,10 @@ function Filters({ state, options, catalogsLoading, catalogsUnavailable, searchI
     <section className={styles.filters} aria-label="Фильтры списка вузов">
       <SearchField label="Поиск по названию вуза" value={searchInput} onChange={setSearchInput} placeholder="Поиск по названию вуза" />
       <MultiSelect label="Вуз" labelPlacement="outside" options={options.universities} values={filters.universityIds} onChange={(values) => onPatch({ university: values, page: 1 })} searchable loading={catalogsLoading} disabled={catalogsUnavailable} />
-      <MultiSelect label="Программа" labelPlacement="outside" options={options.programs} values={filters.programIds} onChange={(values) => onPatch({ program: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
-      <MultiSelect label="Продукт" labelPlacement="outside" options={options.products} values={filters.productIds} onChange={(values) => onPatch({ product: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
-      <label className={styles.field}>
-        <span>Город</span>
-        <Select disabled={catalogsLoading || catalogsUnavailable} value={filters.city} onChange={(event) => onPatch({ city: event.target.value, page: 1 })}>
-          <option value="">Все города</option>
-          {options.cities.map((city) => <option key={city} value={city}>{city}</option>)}
-        </Select>
-      </label>
-      <MultiSelect label="Ответственный" labelPlacement="outside" options={options.responsibles.map((person) => ({ id: person.id, name: person.name, description: person.role }))} values={filters.responsibleIds} onChange={(values) => onPatch({ responsible: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
+      <MultiSelect label="ИТ-программа" labelPlacement="outside" options={options.programs} values={filters.programIds} searchable onChange={(values) => onPatch({ program: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
+      <MultiSelect label="ИТ-продукт" labelPlacement="outside" options={options.products} values={filters.productIds} searchable onChange={(values) => onPatch({ product: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
+      <SearchableSelect label="Город" labelPlacement="outside" disabled={catalogsLoading || catalogsUnavailable} value={filters.city} onChange={(city) => onPatch({ city, page: 1 })} options={options.cities.map((city) => ({ id: city, name: city }))} placeholder="Все города" />
+      <MultiSelect label="Ответственный" labelPlacement="outside" options={options.responsibles.map((person) => ({ id: person.id, name: person.name, description: person.role }))} values={filters.responsibleIds} searchable onChange={(values) => onPatch({ responsible: values, page: 1 })} loading={catalogsLoading} disabled={catalogsUnavailable} />
       <label className={styles.field} title={!UNIVERSITY_LIST_CAPABILITIES.filters.stage ? 'Фильтр по текущему этапу пока недоступен.' : undefined}>
         <span>Текущий этап</span>
         <Select disabled={!UNIVERSITY_LIST_CAPABILITIES.filters.stage} value={filters.workflowStageId} onChange={(event) => onPatch({ stage: event.target.value, page: 1 })}>
@@ -312,8 +306,8 @@ function universityActiveFilters(filters: UniversityFilters, options: University
   const chips: Array<{ key: string; label: string; patch: QueryPatch }> = [];
   if (filters.search) chips.push({ key: 'search', label: `Поиск: ${filters.search}`, patch: { search: null, page: 1 } });
   if (filters.universityIds.length) chips.push({ key: 'university', label: `Вуз: ${selectedNames(filters.universityIds, options.universities)}`, patch: { university: null, page: 1 } });
-  if (filters.programIds.length) chips.push({ key: 'program', label: `Программа: ${selectedNames(filters.programIds, options.programs)}`, patch: { program: null, page: 1 } });
-  if (filters.productIds.length) chips.push({ key: 'product', label: `Продукт: ${selectedNames(filters.productIds, options.products)}`, patch: { product: null, page: 1 } });
+  if (filters.programIds.length) chips.push({ key: 'program', label: `ИТ-программа: ${selectedNames(filters.programIds, options.programs)}`, patch: { program: null, page: 1 } });
+  if (filters.productIds.length) chips.push({ key: 'product', label: `ИТ-продукт: ${selectedNames(filters.productIds, options.products)}`, patch: { product: null, page: 1 } });
   if (filters.city) chips.push({ key: 'city', label: `Город: ${filters.city}`, patch: { city: null, page: 1 } });
   if (filters.externalSource) chips.push({ key: 'external_source', label: filters.externalSource === 'lms' ? 'Источник: LMS' : 'Источник: сайт', patch: { external_source: null, page: 1 } });
   if (filters.responsibleIds.length) chips.push({ key: 'responsible', label: `Ответственный: ${selectedNames(filters.responsibleIds, options.responsibles)}`, patch: { responsible: null, page: 1 } });
@@ -503,7 +497,7 @@ export function UniversitiesList() {
   const columns = useMemo<ColumnDef<UniversityListItem>[]>(() => [
     { accessorKey: 'name', header: 'ВУЗ', cell: ({ row }) => <Link className={styles.universityLink} href={`/universities/${row.original.id}`}>{row.original.name}</Link> },
     { id: 'responsible', accessorFn: (row) => row.responsible?.name ?? '', enableSorting: UNIVERSITY_LIST_CAPABILITIES.sorts.responsible, header: 'Ответственный', cell: ({ row }) => row.original.responsible?.name ?? '—' },
-    { id: 'programs', accessorFn: (row) => row.programsCount, enableSorting: UNIVERSITY_LIST_CAPABILITIES.sorts.programs, header: 'Программы', cell: ({ row }) => <ProgramsCell item={row.original} /> },
+    { id: 'programs', accessorFn: (row) => row.programsCount, enableSorting: UNIVERSITY_LIST_CAPABILITIES.sorts.programs, header: 'ИТ-программы', cell: ({ row }) => <ProgramsCell item={row.original} /> },
     { id: 'stage', accessorFn: (row) => row.currentStage.name, enableSorting: UNIVERSITY_LIST_CAPABILITIES.sorts.stage, header: 'Текущий этап', cell: ({ row }) => <StageBadge item={row.original} /> },
     { id: 'last_interaction', accessorFn: (row) => row.lastInteractionAt, enableSorting: UNIVERSITY_LIST_CAPABILITIES.sorts.last_interaction, header: 'Последнее взаимодействие', cell: ({ row }) => row.original.availability?.lastInteraction === false ? '—' : <time dateTime={row.original.lastInteractionAt} title={formatFullDate(row.original.lastInteractionAt)}>{formatRelativeTime(row.original.lastInteractionAt)}</time> },
     { id: 'attention', enableSorting: false, header: 'Требует внимания', cell: ({ row }) => <AttentionIndicator active={row.original.attention} /> },
@@ -548,7 +542,9 @@ export function UniversitiesList() {
           <h1>ВУЗы</h1>
           <p className={styles.description}>Учебные заведения, программы и задачи, требующие внимания команды.</p>
         </div>
-        <Tabs items={[{ id: 'cards', label: 'Карточки' }, { id: 'table', label: 'Таблица' }]} activeId={view} onChange={(id) => selectView(id as UniversityView)} label="Представление вузов" prefix="university-view" />
+        <div className={styles.headerActions}>
+          <Tabs items={[{ id: 'cards', label: 'Карточки' }, { id: 'table', label: 'Таблица' }]} activeId={view} onChange={(id) => selectView(id as UniversityView)} label="Представление вузов" prefix="university-view" />
+        </div>
       </header>
       <div className={styles.filterArea}>
         <FilterToolbar label="Фильтры списка вузов" collapsible controls={() => <Filters state={state} options={filterOptions} catalogsLoading={catalogsQuery.isPending} catalogsUnavailable={catalogsQuery.isError} searchInput={searchInput} setSearchInput={setSearchInput} onPatch={goToState} />} onReset={resetFilters} resetDisabled={!hasFilters} mobileCount={activeFilterCount} activeFilters={universityActiveFilters(state.filters, filterOptions, goToState)} />

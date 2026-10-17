@@ -221,7 +221,7 @@ def _load_interaction_rows(db, university_id: uuid.UUID) -> list[dict]:
             Meeting.outcome.label("extra1"),
             Meeting.next_action.label("extra2"),
         )
-        .where(Meeting.university_id == university_id)
+        .where(Meeting.university_id == university_id, Meeting.meeting_at.is_not(None))
         .order_by(Meeting.meeting_at.desc())
         .limit(MEETINGS_LIMIT)
         .subquery("tl_meetings")
