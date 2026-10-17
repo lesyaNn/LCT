@@ -35,15 +35,29 @@
                     <input type="hidden" id="id-hidden-input" name="credentialId" <#if auth.selectedCredential?has_content>value="${auth.selectedCredential}"</#if>/>
                     <@buttons.loginButton />
                 </form>
-                  <div class="rtk-demo-login">
-                    <button id="rtk-demo-toggle" class="rtk-demo-button" type="button" aria-expanded="false" aria-controls="rtk-demo-roles">Демо-вход</button>
-                    <div id="rtk-demo-roles" class="rtk-demo-roles" hidden>
-                      <p>Выберите роль для демонстрации:</p>
-                      <button type="button" data-demo-role="admin">Администратор</button>
-                      <button type="button" data-demo-role="manager">Руководитель</button>
-                      <button type="button" data-demo-role="user">Пользователь</button>
+                <#if !usernameHidden??>
+                  <section class="rtk-demo-login" aria-labelledby="rtk-demo-title">
+                    <h2 id="rtk-demo-title">Демо-вход</h2>
+                    <div id="rtk-demo-roles" class="rtk-demo-roles" role="radiogroup" aria-label="Демо-роль">
+                      <label class="rtk-demo-role">
+                        <input type="radio" name="rtk-demo-role" data-demo-role="admin" />
+                        <span class="rtk-demo-role-icon" aria-hidden="true"><i class="fas fa-shield-alt"></i></span>
+                        <span class="rtk-demo-role-name">Администратор</span>
+                      </label>
+                      <label class="rtk-demo-role">
+                        <input type="radio" name="rtk-demo-role" data-demo-role="manager" />
+                        <span class="rtk-demo-role-icon" aria-hidden="true"><i class="fas fa-users"></i></span>
+                        <span class="rtk-demo-role-name">Руководитель</span>
+                      </label>
+                      <label class="rtk-demo-role">
+                        <input type="radio" name="rtk-demo-role" data-demo-role="user" />
+                        <span class="rtk-demo-role-icon" aria-hidden="true"><i class="fas fa-user"></i></span>
+                        <span class="rtk-demo-role-name">Пользователь</span>
+                      </label>
                     </div>
-                  </div>
+                    <p id="rtk-demo-hint" class="rtk-demo-hint" role="status" hidden>Данные подставлены. Нажмите «Войти», чтобы войти в систему.</p>
+                  </section>
+                </#if>
             </#if>
             </div>
         </div>
