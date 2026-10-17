@@ -69,7 +69,7 @@ python -m scripts.assistant bootstrap
 python -m scripts.assistant check
 ```
 
-Путь к статьям по умолчанию вычисляется относительно репозитория. При отдельной поставке образа backend нужно явно подключить каталог инструкций через `ASSISTANT_DOCS_ROOT`, как это сделано в compose overlay.
+Путь к статьям по умолчанию вычисляется относительно репозитория. В базовом Docker Compose каталог инструкций подключён к backend через `ASSISTANT_DOCS_ROOT`; при отдельной поставке образа backend его также нужно подключить явно.
 
 ## Контракт для frontend
 

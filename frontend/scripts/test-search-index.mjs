@@ -37,6 +37,8 @@ assert.equal(searchStaticIndex('договор ИТМО', regular).entityTerm, '
 assert.equal(searchStaticIndex('WORKFLOW', regular).entityTerm, null);
 assert.ok(titles('запуска', admin).includes('Запустить Workflow'));
 assert.equal(searchStaticIndex('ИТМО', regular).entityTerm, 'итмо');
+assert.equal(searchStaticIndex('история', regular).results[0].href, '/docs?article=user-guide%2Fhistory');
+assert.ok(titles('истор', regular).includes('История изменений'));
 assert.equal(titles('запустить', admin)[0], 'Запустить Workflow');
 assert.ok(!titles('запустить', regular).includes('Запустить Workflow'));
 for (const term of ['задача', 'комментарий', 'файл', 'договор', 'лицензия', 'история', 'срок', 'отчёт', 'отчет', 'отчетт', 'запустт']) {

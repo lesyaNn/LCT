@@ -70,9 +70,7 @@ function BucketTooltip({ active, payload, unit }: BucketTooltipProps) {
  * One bar chart per dimension.
  *
  * The bar length is the count and the axis starts at zero, so a bucket can
- * never be visually inflated; the long tail is already folded into a single
- * "Прочее" bucket by the backend, which is stated in the caption rather than
- * silently dropped.
+ * never be visually inflated. Long lists scroll inside a fixed-height card.
  */
 function StatBarChart({ slice }: { slice: ReportStatSlice }) {
   if (!slice.buckets.length) return <EmptyState title="Нет данных для выбранных условий" headingLevel={3} />;
@@ -80,20 +78,21 @@ function StatBarChart({ slice }: { slice: ReportStatSlice }) {
   const data = slice.buckets;
   return (
     <>
-      <div className={styles.statChart} style={{ height: Math.max(220, data.length * 44 + 32) }} role="img" aria-label={`${slice.title}. Всего: ${formatCount(slice.total)} ${unitWord}.`}>
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
-            <CartesianGrid stroke="var(--rtk-color-border)" strokeDasharray="3 3" horizontal={false} />
-            <XAxis type="number" allowDecimals={false} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} />
-            <YAxis type="category" dataKey="label" width={160} tickFormatter={(value: string) => value.length > 22 ? `${value.slice(0, 21)}…` : value} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} interval={0} />
-            <Tooltip content={<BucketTooltip unit={slice.unit} />} cursor={{ fill: 'var(--rtk-color-surface-hover)' }} position={{ x: 8, y: 8 }} />
-            <Bar dataKey="count" fill="var(--rtk-color-brand)" radius={[0, 4, 4, 0]} isAnimationActive={false} />
-          </BarChart>
-        </ResponsiveContainer>
+      <div className={styles.statChartViewport} data-chart-scroll role="region" aria-label={`Категории графика «${slice.title}»`} tabIndex={0}>
+        <div className={styles.statChart} style={{ height: Math.max(220, data.length * 44 + 32) }} role="img" aria-label={`${slice.title}. Всего: ${formatCount(slice.total)} ${unitWord}.`}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
+              <CartesianGrid stroke="var(--rtk-color-border)" strokeDasharray="3 3" horizontal={false} />
+              <XAxis type="number" allowDecimals={false} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} />
+              <YAxis type="category" dataKey="label" width={160} tickFormatter={(value: string) => value.length > 22 ? `${value.slice(0, 21)}…` : value} tick={{ fill: 'var(--rtk-color-text-secondary)', fontSize: 11 }} tickLine={false} axisLine={false} interval={0} />
+              <Tooltip content={<BucketTooltip unit={slice.unit} />} cursor={{ fill: 'var(--rtk-color-surface-hover)' }} position={{ x: 8, y: 8 }} />
+              <Bar dataKey="count" fill="var(--rtk-color-brand)" radius={[0, 4, 4, 0]} isAnimationActive={false} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </div>
       <p className={styles.statCaption}>
         Всего: {formatCount(slice.total)} {unitWord}
-        {data.some((item) => item.label === 'Прочее') ? ' (часть значений объединена в «Прочее»)' : ''}
       </p>
     </>
   );

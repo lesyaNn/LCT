@@ -532,14 +532,15 @@ def _summarize(
     if action == "WORKFLOW_TRANSITION":
         old_map = old if isinstance(old, dict) else {}
         new_map = new if isinstance(new, dict) else {}
-        from_stage = old_map.get("stage_name") or _resolve_reference(
-            old_map.get("stage_id"), None, names, "предыдущий этап")
-        to_stage = new_map.get("stage_name") or _resolve_reference(
-            new_map.get("stage_id"), None, names, "следующий этап")
+        from_stage = _payload_name(old_map, "stage_name") or _resolve_reference(
+            old_map.get("stage_id"), None, names, "—")
+        to_stage = _payload_name(new_map, "stage_name") or _resolve_reference(
+            new_map.get("stage_id"), None, names, "—")
         comment = new_map.get("comment")
         comment_text = comment.strip() if isinstance(comment, str) and comment.strip() else None
         where = f" {quote(uni)}" if uni else ""
-        title = f"Перевёл{where} с этапа {quote(from_stage)} на этап {quote(to_stage)}"
+        title = (f"Изменил этап Workflow{where}" if "—" in (from_stage, to_stage)
+                 else f"Перевёл{where} с этапа {quote(from_stage)} на этап {quote(to_stage)}")
         changes = [
             {"field": "stage_name", "label": "Этап",
              "old": str(from_stage), "new": str(to_stage)},

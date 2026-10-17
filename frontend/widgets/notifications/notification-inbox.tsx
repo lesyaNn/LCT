@@ -1,8 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Notification, NotificationFilter, notificationTarget, notificationTime, notificationsRepository, notifyInboxChanged } from '@/shared/lib/notifications-repository';
+import { useAuth } from '@/shared/auth/AuthProvider';
+import { canAccessRoute } from '@/shared/config/navigation';
+import { normalizeApiError } from '@/shared/lib/api-errors';
+import { notificationTarget, notificationTime, type Notification, type NotificationFilter } from '@/shared/lib/notifications-repository';
+import { useNotifications } from '@/widgets/topbar/notifications-state';
 import styles from './notifications.module.css';
 
 const filters: { value: NotificationFilter; label: string }[] = [
@@ -14,62 +18,51 @@ const PAGE_SIZE = 20;
 
 export function NotificationInbox() {
   const router = useRouter();
+  const { user } = useAuth();
   const [filter, setFilter] = useState<NotificationFilter>('all');
   const [page, setPage] = useState(0);
-  const [items, setItems] = useState<Notification[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
+  const pendingReads = useRef(new Set<string>());
+  const { items, total, unreadCount, loading, error, refresh, markRead, markAllRead, markingAll } = useNotifications({ filter, limit: PAGE_SIZE, offset: page * PAGE_SIZE });
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    const result = await notificationsRepository.list(filter, PAGE_SIZE, page * PAGE_SIZE);
-    if (result.ok) { setItems(result.data.items); setTotal(result.data.total); setError(''); }
-    else setError('Не удалось загрузить уведомления. Попробуйте ещё раз.');
-    setLoading(false);
-  }, [filter, page]);
-
-  useEffect(() => {
-    const initial = window.setTimeout(() => void refresh(), 0);
-    return () => window.clearTimeout(initial);
-  }, [refresh]);
-  useEffect(() => {
-    const timer = window.setInterval(() => void refresh(), 45_000);
-    return () => window.clearInterval(timer);
-  }, [refresh]);
-
-  async function openItem(item: Notification) {
+  function openItem(item: Notification) {
+    if (pendingReads.current.has(item.id)) return;
     if (!item.is_read) {
-      const result = await notificationsRepository.markRead(item.id);
-      if (!result.ok) { setError('Не удалось отметить уведомление прочитанным.'); return; }
-      notifyInboxChanged();
+      pendingReads.current.add(item.id);
+      void markRead(item.id)
+        .then(() => setActionError(''))
+        .catch((cause: unknown) => setActionError(normalizeApiError(cause, { fallbackMessage: 'Не удалось отметить уведомление прочитанным.' }).message))
+        .finally(() => pendingReads.current.delete(item.id));
     }
-    router.push(notificationTarget(item));
+    const target = notificationTarget(item);
+    const path = target?.split('?')[0];
+    if (target && path && user && canAccessRoute(path, user)) router.push(target);
   }
 
-  async function markAll() {
-    const result = await notificationsRepository.markAllRead();
-    if (!result.ok) { setError('Не удалось отметить уведомления прочитанными.'); return; }
-    notifyInboxChanged();
-    if (filter === 'unread') setPage(0);
-    void refresh();
+  function markAll() {
+    void markAllRead()
+      .then(() => {
+        setActionError('');
+        if (filter === 'unread') setPage(0);
+      })
+      .catch((cause: unknown) => setActionError(normalizeApiError(cause, { fallbackMessage: 'Не удалось отметить уведомления прочитанными.' }).message));
   }
 
   return <section className={styles.page} aria-labelledby="notifications-title">
     <div className={styles.pageHeading}><div><h1 id="notifications-title">Уведомления</h1><p>Важные события по вашей работе с ВУЗами.</p></div>
-      <button type="button" className={styles.markAll} onClick={() => void markAll()}>Отметить все как прочитанные</button>
+      <button type="button" className={styles.markAll} disabled={unreadCount === 0 || markingAll} onClick={markAll}>Отметить все как прочитанные</button>
     </div>
     <div className={styles.filters} role="group" aria-label="Фильтр уведомлений">{filters.map((option) =>
       <button key={option.value} type="button" aria-pressed={filter === option.value} className={filter === option.value ? styles.activeFilter : ''}
         onClick={() => { setFilter(option.value); setPage(0); }}>{option.label}</button>)}</div>
-    {error && <p className={styles.error} role="alert">{error} <button type="button" onClick={() => void refresh()}>Повторить</button></p>}
+    {(error || actionError) && <p className={styles.error} role="alert">{actionError || error} <button type="button" onClick={() => { setActionError(''); void refresh(); }}>Повторить</button></p>}
     {loading ? <p className={styles.empty} role="status">Загружаем уведомления…</p> : items.length ? <ul className={styles.inboxList}>{items.map((item) => <li key={item.id}>
-      <button type="button" className={`${styles.inboxItem} ${!item.is_read ? styles.unread : ''}`} onClick={() => void openItem(item)}>
+      <button type="button" className={`${styles.inboxItem} ${!item.is_read ? styles.unread : ''}`} onClick={() => openItem(item)}>
         <span className={`${styles.priority} ${styles[item.priority.toLowerCase()]}`} aria-hidden="true" />
         <span className={styles.inboxText}><strong>{item.title}</strong><span>{item.message}</span><small>{notificationTime(item.created_at)}</small></span>
         {!item.is_read && <span className={styles.newLabel}>Новое</span>}
       </button>
-    </li>)}</ul> : <p className={styles.empty}>Здесь пока нет уведомлений.</p>}
+    </li>)}</ul> : !error && <p className={styles.empty}>Здесь пока нет уведомлений.</p>}
     {total > PAGE_SIZE && <nav className={styles.pagination} aria-label="Страницы уведомлений">
       <button type="button" disabled={page === 0} onClick={() => setPage((value) => value - 1)}>Назад</button>
       <span>Страница {page + 1} из {Math.ceil(total / PAGE_SIZE)}</span>

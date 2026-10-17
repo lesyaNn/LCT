@@ -434,8 +434,8 @@ def test_sql_migration_single_head_chain():
         (ups if m.group(2) == "up" else downs).add(m.group(1))
     assert ups == downs, f"unpaired migrations: up^down={ups ^ downs}"
     assert "000044_assistant_conversations" in ups
-    assert sorted(ups)[-1] == "000046_notification_email_delivery"
-    assert len(ups) == 46
+    assert sorted(ups)[-1] == "000046_workflow_meeting_drafts"
+    assert len(ups) == 48
 
 
 @pytest.mark.skipif(

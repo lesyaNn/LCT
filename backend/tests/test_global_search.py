@@ -7,6 +7,7 @@ from sqlalchemy.dialects import postgresql
 
 from app.core.security import CurrentUser
 from app.modules import search as module
+from app.modules.assistant.knowledge import KnowledgeBase
 
 
 class EmptyDb:
@@ -59,6 +60,31 @@ def test_router_query_limit_and_whitespace():
     assert module.global_search(q=" ", db=EmptyDb(), user=CurrentUser(roles={"admin"})) == module.SearchResults()
 
 
+def test_documentation_content_search_respects_roles_and_skips_record_queries(monkeypatch, tmp_path):
+    root = tmp_path / "docs"
+    (root / "user-guide").mkdir(parents=True)
+    (root / "admin-guide").mkdir(parents=True)
+    (root / "user-guide" / "history.md").write_text(
+        "---\nsection: user-guide\nslug: history\ntitle: История изменений\n---\n\n"
+        "Маршрут действий доступен в истории вуза.", encoding="utf-8",
+    )
+    (root / "admin-guide" / "users.md").write_text(
+        "---\nsection: admin-guide\nslug: users\ntitle: Пользователи\n---\n\n"
+        "Сбросить пароль пользователя.", encoding="utf-8",
+    )
+    knowledge = KnowledgeBase(root, tmp_path / "index.json", "test")
+    monkeypatch.setattr(module, "get_knowledge", lambda _settings: knowledge)
+    db = EmptyDb()
+    regular = CurrentUser(roles={"user"})
+    found = module.search(db, regular, "маршр", records_q="")
+    assert [(hit.title, hit.href) for hit in found.documentation] == [
+        ("История изменений", "/docs?article=user-guide%2Fhistory")
+    ]
+    assert module.search(db, regular, "пароль", records_q="").documentation == []
+    assert module.search(db, CurrentUser(roles={"admin"}), "пароль", records_q="").documentation[0].title == "Пользователи"
+    assert db.statements == []
+
+
 def test_documents_and_contracts_can_match_visible_university_name(monkeypatch):
     db = EmptyDb()
     monkeypatch.setattr(module, "list_universities", lambda _db, **kwargs: ([], 0))
@@ -84,7 +110,7 @@ def test_http_query_bounds_and_normalized_response(monkeypatch):
     app.include_router(module.router)
     app.dependency_overrides[get_current_user] = lambda: CurrentUser(roles={"admin"})
     app.dependency_overrides[get_db] = lambda: EmptyDb()
-    monkeypatch.setattr(module, "search", lambda _db, _user, q: module.SearchResults(
+    monkeypatch.setattr(module, "search", lambda _db, _user, q, _records_q: module.SearchResults(
         universities=[module.SearchHit(id=uuid.uuid4(), title=q)]
     ))
     client = TestClient(app)

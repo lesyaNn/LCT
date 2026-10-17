@@ -3,6 +3,7 @@
 .labeled > span { font-size: 11px; font-weight: 600; line-height: 14px; min-height: 14px; }
 .root .trigger { align-items: center; background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border-strong); border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-primary); cursor: pointer; display: flex; gap: var(--rtk-space-2); height: 46px; justify-content: space-between; min-height: 46px; padding: 6px 12px; text-align: left; width: 100%; }
 .root .trigger[aria-expanded="true"] { border-color: var(--rtk-color-brand); box-shadow: 0 0 0 3px var(--atmr-accent-container-default); outline: none; }
+.root .trigger[data-invalid="true"] { border-color: var(--rtk-color-danger); }
 .root .trigger:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
 .summaryText { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .summaryText strong { font-size: 12px; font-weight: 700; }
@@ -10,23 +11,30 @@
 .labeled .summaryText small { font-size: 12px; }
 .disabled { opacity: .55; }
 .disabled .trigger { cursor: not-allowed; }
-.menu { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border-strong); border-radius: var(--rtk-radius-small); box-shadow: var(--rtk-shadow-elevation-2); display: flex; flex-direction: column; gap: 4px; overflow: auto; overscroll-behavior: contain; padding: 8px; position: fixed; z-index: 110; }
-.menu label { align-items: center; border-radius: var(--rtk-radius-small); cursor: pointer; display: flex; font-size: 12px; gap: 8px; justify-content: space-between; min-height: 36px; padding: 8px 10px; }
-.menu label:hover { background: var(--rtk-color-surface-hover); }
+.menu { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border-strong); border-radius: var(--rtk-radius-small); box-shadow: var(--rtk-shadow-elevation-2); display: flex; flex-direction: column; gap: 4px; overflow: hidden; padding: 8px; position: fixed; z-index: 110; }
+.options { min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.option { align-items: center; background: transparent; border: 0; border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-primary); cursor: pointer; display: flex; font: inherit; font-size: 12px; gap: 8px; justify-content: space-between; min-height: 36px; padding: 8px 10px; text-align: left; width: 100%; }
+.option:hover, .option:focus-visible { background: var(--rtk-color-surface-hover); }
+.option:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: -2px; }
+.option[aria-selected="true"] { color: var(--rtk-color-brand); }
 .optionContent { display: flex; flex: 1 1 auto; flex-direction: column; gap: 2px; min-width: 0; }
 .optionContent strong { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .optionContent small { color: var(--rtk-color-text-tertiary); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.optionCheck { accent-color: var(--rtk-color-brand); flex: 0 0 16px; height: 16px; margin: 0; width: 16px; }
+.checkbox { align-items: center; border: 1px solid var(--rtk-color-border-strong); border-radius: var(--rtk-radius-small); display: inline-flex; flex: 0 0 16px; height: 16px; justify-content: center; width: 16px; }
+.checkbox.checked { background: var(--rtk-color-brand); border-color: var(--rtk-color-brand); color: var(--rtk-color-surface); }
 .hint { color: var(--rtk-color-text-secondary); font-size: 11px; line-height: 1.4; margin: 4px 8px 2px; }
 .selected { display: flex; flex-wrap: wrap; gap: 4px; }
 .chip { align-items: center; background: var(--atmr-accent-container-default); border: 1px solid var(--rtk-color-border); border-radius: 999px; color: var(--rtk-color-brand); cursor: pointer; display: inline-flex; font-size: 11px; gap: 4px; max-width: 100%; padding: 4px 8px; }
 .chip:hover { background: var(--atmr-accent-container-hover); }
-.search { align-items: center; border-bottom: 1px solid var(--rtk-color-border); display: flex; gap: 8px; padding: 2px 4px 8px; }
+.clear { align-self: flex-start; background: transparent; border: 0; border-radius: var(--rtk-radius-small); color: var(--rtk-color-brand); cursor: pointer; font: inherit; font-size: 12px; padding: 6px 8px; }
+.clear:hover, .clear:focus-visible { background: var(--rtk-color-surface-hover); }
+.search { align-items: center; border: 1px solid var(--rtk-color-border-strong); border-radius: var(--rtk-radius-small); display: flex; flex: 0 0 auto; gap: 8px; padding: 2px 8px; }
+.search:focus-within { border-color: var(--rtk-color-brand); box-shadow: 0 0 0 3px var(--atmr-accent-container-default); }
 .search svg { color: var(--rtk-color-text-tertiary); flex: 0 0 auto; }
-.search input { background: transparent; border: 0; color: var(--rtk-color-text-primary); min-width: 0; outline: none; width: 100%; }
+.search input { background: transparent; border: 0; color: var(--rtk-color-text-primary); min-height: 34px; min-width: 0; outline: none; width: 100%; }
 .state { color: var(--rtk-color-text-secondary); font-size: 12px; margin: 4px; }
 @media (max-width: 768px) {
   .root .trigger { min-height: 48px; }
-  .menu label { min-height: 44px; }
+  .option { min-height: 44px; }
   .search input { min-height: 44px; }
 }

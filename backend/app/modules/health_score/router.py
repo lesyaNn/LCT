@@ -1,8 +1,9 @@
 """Operational university Health Score endpoints backed by the analytics batch loader."""
-from datetime import datetime, timezone
+import logging
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from app.core.permissions import require_permission
@@ -10,11 +11,35 @@ from app.core.policies import get_data_scope
 from app.core.security import CurrentUser
 from app.db.session import get_db
 from app.models.catalog import ITProgram, University
+from app.models.health_score_observation import HealthScoreObservation
 from app.modules.analytics.integration import Selection
 from app.modules.analytics.repository import load_data
 from app.modules.analytics.service import build_matrix
+from app.modules.health_score.history import record_observation
 
 router = APIRouter(prefix="/universities", tags=["Analytics"])
+logger = logging.getLogger(__name__)
+
+def _history(db: Session, university_id: UUID, score: int | None, level: str, now: datetime):
+    """Record a real score when it changes, then return recent backend observations."""
+    try:
+        record_observation(db, university_id, score, level, now)
+        observations = db.scalars(
+            select(HealthScoreObservation)
+            .where(
+                HealthScoreObservation.university_id == university_id,
+                HealthScoreObservation.calculated_at >= now - timedelta(days=731),
+            )
+            .order_by(HealthScoreObservation.calculated_at.desc())
+        ).all()
+        return [
+            {"date": item.calculated_at.isoformat(), "score": item.score, "level": item.level}
+            for item in reversed(observations)
+        ]
+    except SQLAlchemyError:
+        logger.exception("Failed to persist or load Health Score history for university %s", university_id)
+        db.rollback()
+        return [{"date": now.isoformat(), "score": score, "level": level}] if score is not None else []
 
 def _health(university_id: UUID, db: Session, user: CurrentUser):
     if db.scalar(select(University.id).where(University.id == university_id)) is None:
@@ -54,19 +79,8 @@ def _health(university_id: UUID, db: Session, user: CurrentUser):
         positive.append("Нет критических просрочек")
     if started and not missing_responsible:
         positive.append("Ответственные назначены")
-    history = []
-    try:
-        snapshots = db.execute(text("""
-            SELECT period_day, score, status
-            FROM health_score_snapshots
-            WHERE university_id = :university_id
-            ORDER BY period_day DESC
-            LIMIT 24
-        """), {"university_id": str(university_id)}).mappings()
-        history = [{"date": item["period_day"], "score": item["score"], "level": {"green": "stable", "yellow": "attention", "red": "critical"}.get(item["status"], item["status"])} for item in reversed(list(snapshots))]
-    except SQLAlchemyError:
-        # Older installations may not have applied the optional snapshots migration yet.
-        history = []
+    now = datetime.now(timezone.utc)
+    history = _history(db, university_id, row.health_score, row.health_level, now)
     return {
         "university_id": university_id, "score": row.health_score, "level": row.health_level,
         "started_programs": row.started_programs, "active_workflows": row.active_workflows,
@@ -75,7 +89,7 @@ def _health(university_id: UUID, db: Session, user: CurrentUser):
         "positive_factors": [{"label": label} for label in dict.fromkeys(positive)],
         "history": history,
         "programs": programs,
-        "calculated_at": datetime.now(timezone.utc),
+        "calculated_at": now,
     }
 
 @router.get("/{university_id}/health-score", summary="Текущий Health Score ВУЗа")

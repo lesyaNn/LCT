@@ -8,7 +8,7 @@ export function formatDateTimeRu(isoDate: string): string {
   return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
 }
 
-export function formatRelativeDateRu(isoDate: string, now = new Date()): string {
+export function formatRelativeDateRu(isoDate: string, now = new Date(), style: 'long' | 'compact' = 'long'): string {
   const date = new Date(isoDate);
   if (Number.isNaN(date.getTime())) return 'Дата не указана';
   const diffMs = now.getTime() - date.getTime();
@@ -16,11 +16,18 @@ export function formatRelativeDateRu(isoDate: string, now = new Date()): string 
   const sameDay = date.toLocaleDateString('ru-RU') === now.toLocaleDateString('ru-RU');
   const time = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(date);
   if (diffMinutes < 1 && diffMs >= 0) return 'только что';
-  if (diffMinutes < 60 && diffMinutes >= 0) return `${diffMinutes} ${pluralizeMinutes(diffMinutes)} назад`;
+  if (diffMinutes < 60 && diffMinutes >= 0) return style === 'compact' ? `${diffMinutes} мин назад` : `${diffMinutes} ${pluralizeMinutes(diffMinutes)} назад`;
+  if (style === 'compact' && sameDay && diffMinutes < 24 * 60 && diffMinutes >= 60) {
+    const hours = Math.floor(diffMinutes / 60);
+    const remainder10 = hours % 10;
+    const remainder100 = hours % 100;
+    const unit = remainder10 === 1 && remainder100 !== 11 ? 'час' : remainder10 >= 2 && remainder10 <= 4 && (remainder100 < 10 || remainder100 >= 20) ? 'часа' : 'часов';
+    return `${hours} ${unit} назад`;
+  }
   if (sameDay) return `сегодня в ${time}`;
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
-  if (date.toLocaleDateString('ru-RU') === yesterday.toLocaleDateString('ru-RU')) return `вчера в ${time}`;
+  if (date.toLocaleDateString('ru-RU') === yesterday.toLocaleDateString('ru-RU')) return style === 'compact' ? `Вчера, ${time}` : `вчера в ${time}`;
   return formatDateTimeRu(isoDate);
 }
 

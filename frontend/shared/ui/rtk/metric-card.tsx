@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import { StatusBadge } from './status-badge';
 import styles from './metric-card.module.css';
 
@@ -12,7 +12,7 @@ interface MetricIndicator {
 
 interface MetricCardProps {
   label: string;
-  value: number | string;
+  value: ReactNode;
   icon?: ComponentType<{ fill?: string; size?: number }>;
   indicators?: MetricIndicator[];
   centered?: boolean;

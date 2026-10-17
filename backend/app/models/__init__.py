@@ -33,6 +33,7 @@ from app.models.catalog import (  # noqa: F401
     VendorContact,
 )
 from app.models.external import ExternalApplication, ExternalSyncState  # noqa: F401
+from app.models.health_score_observation import HealthScoreObservation  # noqa: F401
 from app.models.report_job import (  # noqa: F401
     REPORT_JOB_STATUSES,
     STATUS_BUILDING,
@@ -71,6 +72,7 @@ __all__ = [
     "AssistantConversation",
     "AssistantTurn",
     "University",
+    "HealthScoreObservation",
     "ITDirection",
     "ITProgram",
     "Vendor",

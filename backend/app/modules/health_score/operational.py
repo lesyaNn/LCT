@@ -1,12 +1,13 @@
 """Deterministic operational Health Score for university/program workflows."""
 from __future__ import annotations
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 from typing import Any
 from app.modules.workflow_instances.overdue import compute_overdue
 from app.services.license_status import derive_license_status
 
 # Centralized, reviewable penalties. Progress is deliberately not a factor.
+BASE_SCORE = 100
 PENALTIES = {
     "workflow_overdue": 25,
     "responsible_missing": 15,
@@ -15,6 +16,7 @@ PENALTIES = {
     "license_expires_soon": 10,
 }
 TASK_PENALTY_CAP = 20
+UNIVERSITY_SCORE_CAPS = {"critical": 59, "attention": 84}
 LEVELS = ((85, "stable"), (60, "attention"), (0, "critical"))
 
 @dataclass(frozen=True)
@@ -44,8 +46,8 @@ def health_level(score: int | None) -> str:
 
 def calculate_workflow_health(*, instance: Any, stage: Any | None, tasks: list[Any], licenses: list[Any], today: date) -> OperationalHealth:
     if instance.status == "completed":
-        return OperationalHealth(100, "stable", started=True, completed=True)
-    score = 100
+        return OperationalHealth(BASE_SCORE, "stable", started=True, completed=True)
+    score = BASE_SCORE
     factors: list[HealthFactor] = []
     if stage is not None:
         late, days = compute_overdue(stage.due_date, stage.completed_at, today)

@@ -57,6 +57,7 @@ from app.models.workflow_instances import (
 )
 from app.models.workflow_templates import WorkflowStage
 from app.modules.audit.service import AuditAction, AuditService, context_for
+from app.modules.meetings.service import ensure_workflow_meeting
 from app.modules.workflow_instances.service import get_instance_or_404
 from app.modules.workflow_transitions.schemas import (
     WorkflowCommentCreate,
@@ -195,6 +196,7 @@ def transition_instance(
     target.started_at = now
     instance.current_instance_stage_id = target.id
     instance.current_stage_id = target.template_stage_id
+    ensure_workflow_meeting(db, instance, target, actor)
     db.add(
         WorkflowStageTransition(
             instance_id=instance.id,
@@ -345,6 +347,7 @@ def rollback_instance(
     current.started_at = None
     instance.current_instance_stage_id = target.id
     instance.current_stage_id = target.template_stage_id
+    ensure_workflow_meeting(db, instance, target, actor)
     db.add(
         WorkflowStageTransition(
             instance_id=instance.id,

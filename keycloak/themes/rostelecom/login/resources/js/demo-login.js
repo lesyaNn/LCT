@@ -4,26 +4,42 @@ document.addEventListener('DOMContentLoaded', () => {
     manager: { username: 'manager', password: 'manager123' },
     user: { username: 'user', password: 'user123' },
   };
-  const toggle = document.getElementById('rtk-demo-toggle');
   const roles = document.getElementById('rtk-demo-roles');
-  if (!toggle || !roles) return;
+  const toggle = document.getElementById('rtk-demo-toggle');
+  const hint = document.getElementById('rtk-demo-hint');
+  const username = document.getElementById('username');
+  const password = document.getElementById('password');
+  if (!toggle || !roles || !username || !password) return;
 
-  toggle.addEventListener('click', () => {
-    roles.hidden = !roles.hidden;
-    toggle.setAttribute('aria-expanded', String(!roles.hidden));
-  });
-  roles.querySelectorAll('[data-demo-role]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const account = demoAccounts[button.dataset.demoRole];
-      const username = document.getElementById('username');
-      const password = document.getElementById('password');
-      if (!account || !username || !password) return;
+  const setRolesOpen = (open) => {
+    roles.hidden = !open;
+    toggle.setAttribute('aria-expanded', String(open));
+  };
+  toggle.addEventListener('click', () => setRolesOpen(roles.hidden));
+
+  let filling = false;
+  const clearDemoSelection = () => {
+    if (filling) return;
+    const selected = roles.querySelector('[data-demo-role]:checked');
+    if (selected) selected.checked = false;
+    if (hint) hint.hidden = true;
+  };
+  username.addEventListener('input', clearDemoSelection);
+  password.addEventListener('input', clearDemoSelection);
+
+  roles.querySelectorAll('[data-demo-role]').forEach((radio) => {
+    radio.addEventListener('change', () => {
+      if (!radio.checked) return;
+      const account = demoAccounts[radio.dataset.demoRole];
+      if (!account) return;
+      filling = true;
       username.value = account.username;
       password.value = account.password;
       username.dispatchEvent(new Event('input', { bubbles: true }));
       password.dispatchEvent(new Event('input', { bubbles: true }));
-      roles.hidden = true;
-      toggle.setAttribute('aria-expanded', 'false');
+      filling = false;
+      setRolesOpen(false);
+      if (hint) hint.hidden = false;
       document.getElementById('kc-login')?.focus();
     });
   });

@@ -1,5 +1,6 @@
 'use client';
 
+import DocumentText from '@atomaro/icons/24/document/DocumentText';
 import { Controller, type Control } from 'react-hook-form';
 import { REPORT_FORMATS, REPORTS_API_CAPABILITIES } from '@/shared/lib/reports-repository';
 import type { ReportFormSchema } from './report-form-schema';
@@ -22,9 +23,12 @@ export function ReportFormatField({ control }: ReportFormatFieldProps) {
   return (
     <section className={styles.formSection} aria-labelledby="report-format-heading">
       <div className={styles.sectionHeading}>
-        <div>
-          <h3 id="report-format-heading">Формат</h3>
-          <p>Выберите формат файла отчёта.</p>
+        <div className={styles.headingWithIcon}>
+          <DocumentText size={18} fill="currentColor" aria-hidden="true" />
+          <div>
+            <h3 id="report-format-heading">Формат</h3>
+            <p>Выберите формат файла отчёта.</p>
+          </div>
         </div>
       </div>
       <Controller

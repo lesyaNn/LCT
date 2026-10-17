@@ -334,15 +334,16 @@ def lexical_ranking(query: str, chunks: list[Chunk]) -> list[tuple[Chunk, float]
         score = 0.0
         length = sum(document.values())
         for term in terms:
-            frequency = document[term]
+            # A short query prefix should still find a longer word in an article.
+            frequency = sum(count for word, count in document.items() if word.startswith(term))
             if not frequency:
                 continue
-            containing = sum(term in doc for doc in documents)
+            containing = sum(any(word.startswith(term) for word in doc) for doc in documents)
             idf = math.log(1 + (len(documents) - containing + 0.5) / (containing + 0.5))
             score += (
                 idf * frequency * 2.2 / (frequency + 1.2 * (0.25 + 0.75 * length / max(average, 1)))
             )
-        if score >= 0.5:
+        if score > 0:
             ranked.append((chunk, score))
     return sorted(ranked, key=lambda item: (-item[1], item[0].id))
 

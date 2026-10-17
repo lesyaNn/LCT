@@ -275,7 +275,7 @@ function AnalyticsGrid({ data }: { data: DashboardAnalytics }) {
   const hasLaunches = data.launchDynamics.some((item) => item.actual > 0 || item.planned > 0);
   return (
     <div className={styles.grid}>
-      <div className={styles.funnelWide}><ChartCard title="Воронка этапов" description="Сколько взаимодействий дошли до этапа или дальше. За всё время." exportSlug="stage-funnel" exportTestId="chart-export-stage-funnel" canExport={false}>
+      <div className={styles.funnelWide}><ChartCard title="Воронка этапов" description="Сколько взаимодействий дошли до этапа или дальше. За всё время." exportSlug="stage-funnel" exportTestId="chart-export-stage-funnel" canExport={data.stageFunnel.length > 0}>
         {data.stageFunnel.length ? <StageFunnelChart data={data.stageFunnel} /> : <EmptyChart />}
       </ChartCard></div>
       <ChartCard title="Программы по статусам" description="Текущее распределение программ в реестре." exportSlug="programs" exportTestId="chart-export-programs" canExport={programStatuses.length > 0}>
@@ -284,19 +284,19 @@ function AnalyticsGrid({ data }: { data: DashboardAnalytics }) {
       <ChartCard title="Динамика запусков" description="Фактические и планируемые запуски за последние 12 месяцев." exportSlug="dynamics" exportTestId="chart-export-dynamics" canExport={hasLaunches}>
         {hasLaunches ? <LaunchDynamicsChart data={data.launchDynamics} /> : <EmptyChart />}
       </ChartCard>
-      <ChartCard title="Динамика по месяцам" description="События, смены этапов и завершённые Workflow за месяц. За всё время." exportSlug="monthly-events" exportTestId="chart-export-monthly-events" canExport={false}>
+      <ChartCard title="Динамика по месяцам" description="События, смены этапов и завершённые Workflow за месяц. За всё время." exportSlug="monthly-events" exportTestId="chart-export-monthly-events" canExport={data.monthlyEvents.length > 0}>
         {data.monthlyEvents.length ? <MonthlyEventsChart data={data.monthlyEvents} /> : <EmptyChart />}
       </ChartCard>
-      <ChartCard title="Топ-10 ВУЗов по числу взаимодействий" description="Встречи и заметки, сохранённые в CRM." exportSlug="top-universities" exportTestId="chart-export-top-universities" canExport={false}>
+      <ChartCard title="Топ-10 ВУЗов по числу взаимодействий" description="Встречи и заметки, сохранённые в CRM." exportSlug="top-universities" exportTestId="chart-export-top-universities" canExport={data.topUniversities.length > 0}>
         {data.topUniversities.length ? <TopUniversitiesChart data={data.topUniversities} /> : <EmptyChart />}
       </ChartCard>
-      <ChartCard title="Нагрузка по ответственным" description="Workflow, назначенные ответственному: в работе и завершённые." exportSlug="responsible-workload" exportTestId="chart-export-responsible-workload" canExport={false}>
+      <ChartCard title="Нагрузка по ответственным" description="Workflow, назначенные ответственному: в работе и завершённые." exportSlug="responsible-workload" exportTestId="chart-export-responsible-workload" canExport={data.responsibleWorkload.length > 0}>
         {data.responsibleWorkload.length ? <ResponsibleWorkloadChart data={data.responsibleWorkload} /> : <EmptyChart />}
       </ChartCard>
-      <div className={styles.priorityPanel}><ChartCard title="Приоритетные задачи" description="Элементы, требующие первоочередного внимания." exportSlug="attention" exportTestId="chart-export-attention" canExport={false}>
+      <div className={styles.priorityPanel}><ChartCard title="Приоритетные задачи" description="Элементы, требующие первоочередного внимания." exportSlug="attention" exportTestId="chart-export-attention" canExport={data.attentionItems.length > 0}>
         {data.attentionItems.length ? <AttentionList data={data.attentionItems} /> : <EmptyChart />}
       </ChartCard></div>
-      <div className={styles.attentionWide}><ChartCard title="ВУЗы × программы" description="Состояние взаимодействий по доступным программам." exportSlug="university-program-matrix" exportTestId="chart-export-matrix" canExport={false}><UniversityProgramMatrix matrix={data.matrix} /></ChartCard></div>
+      <div className={styles.attentionWide}><ChartCard title="ВУЗы × программы" description="Состояние взаимодействий по доступным программам." exportSlug="university-program-matrix" exportTestId="chart-export-matrix" canExport={data.matrix.rows.length > 0 && data.matrix.columns.length > 0}><UniversityProgramMatrix matrix={data.matrix} /></ChartCard></div>
     </div>
   );
 }

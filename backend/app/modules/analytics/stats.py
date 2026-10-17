@@ -140,10 +140,6 @@ class _Aliases:
 class ReportStatsService:
     """SQL aggregation for the report statistics (never row-by-row)."""
 
-    #: Max bars per dimension; the tail is folded into one bucket so a chart
-    #: never becomes an unreadable wall of slivers.
-    MAX_BUCKETS = 10
-
     @staticmethod
     def build(
         db: Session,
@@ -290,9 +286,7 @@ class ReportStatsService:
             .group_by(bucket)
             .order_by(func.count().desc(), bucket.asc())
         ).all()
-        buckets = ReportStatsService._fold_tail(
-            [StatBucket(str(r[0]), int(r[1])) for r in rows]
-        )
+        buckets = [StatBucket(str(r[0]), int(r[1])) for r in rows]
         return StatSlice(
             dimension=dimension,
             title=DIMENSION_TITLES[dimension],
@@ -321,9 +315,7 @@ class ReportStatsService:
             .group_by(Responsible.full_name)
             .order_by(count_unis.desc(), Responsible.full_name.asc())
         ).all()
-        buckets = ReportStatsService._fold_tail(
-            [StatBucket(str(r[0]), int(r[1])) for r in rows]
-        )
+        buckets = [StatBucket(str(r[0]), int(r[1])) for r in rows]
         return StatSlice(
             dimension="by_responsible",
             title=DIMENSION_TITLES["by_responsible"],
@@ -331,16 +323,6 @@ class ReportStatsService:
             total=sum(b.count for b in buckets),
             buckets=tuple(buckets),
         )
-
-    @staticmethod
-    def _fold_tail(buckets: list[StatBucket]) -> list[StatBucket]:
-        """Keep the top ``MAX_BUCKETS``; fold the rest into one honest bucket."""
-        if len(buckets) <= ReportStatsService.MAX_BUCKETS:
-            return buckets
-        head = buckets[: ReportStatsService.MAX_BUCKETS]
-        rest = buckets[ReportStatsService.MAX_BUCKETS :]
-        return [*head, StatBucket("Прочее", sum(b.count for b in rest))]
-
 
 @dataclass(frozen=True)
 class _RowSelection:

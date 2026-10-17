@@ -8,7 +8,7 @@ from app.modules.analytics.repository import AnalyticsData
 from app.modules.analytics.schemas import Matrix, Overview
 from app.modules.workflow_instances.overdue import compute_overdue
 from app.services.license_status import derive_license_status
-from app.modules.health_score.operational import aggregate_health, calculate_workflow_health, health_level
+from app.modules.health_score.operational import UNIVERSITY_SCORE_CAPS, aggregate_health, calculate_workflow_health, health_level
 
 LEGEND = {
     "not_used": "Программа не ведётся в вузе",
@@ -245,10 +245,10 @@ def build_matrix(data: AnalyticsData, *, today: date) -> Matrix:
         level = health_level(score)
         if "critical" in levels:
             level = "critical"
-            score = min(score, 59) if score is not None else score
+            score = min(score, UNIVERSITY_SCORE_CAPS["critical"]) if score is not None else score
         elif "attention" in levels and level == "stable":
             level = "attention"
-            score = min(score, 84) if score is not None else score
+            score = min(score, UNIVERSITY_SCORE_CAPS["attention"]) if score is not None else score
         row_health[university.id] = (score, level, started, active_workflows, total)
     return Matrix.model_validate({"rows": [{"id": i.id, "name": i.name, "city": i.city,
         "health_score": row_health[i.id][0], "health_level": row_health[i.id][1],

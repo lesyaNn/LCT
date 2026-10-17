@@ -7,13 +7,15 @@ from pydantic import BaseModel
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.core.permissions import user_permissions
+from app.core.permissions import effective_role, user_permissions
 from app.core.policies import apply_university_scope
 from app.core.security import CurrentUser, get_current_user
 from app.db.session import get_db
 from app.models.catalog import Contract, ITProduct, ITProgram, Responsible, University, UniversityResponsible
 from app.models.interactions import Document, UniversityProduct
 from app.models.workflow_instances import InstanceStage, WorkflowInstance
+from app.config import settings
+from app.modules.assistant.knowledge import get_knowledge, lexical_ranking
 from app.modules.catalog.repository import like_pattern, list_universities
 
 router = APIRouter(prefix="/search", tags=["search"])
@@ -32,6 +34,13 @@ class WorkflowHit(SearchHit):
     stage: str | None = None
 
 
+class DocumentationHit(BaseModel):
+    id: str
+    title: str
+    subtitle: str
+    href: str
+
+
 class SearchResults(BaseModel):
     universities: list[SearchHit] = []
     workflows: list[WorkflowHit] = []
@@ -39,18 +48,20 @@ class SearchResults(BaseModel):
     contracts: list[SearchHit] = []
     products: list[SearchHit] = []
     responsibles: list[SearchHit] = []
+    documentation: list[DocumentationHit] = []
 
 
-def search(db: Session, user: CurrentUser, q: str) -> SearchResults:
+def search(db: Session, user: CurrentUser, q: str, records_q: str | None = None) -> SearchResults:
     term = q.strip()
     if len(term) < 2:
         return SearchResults()
     permissions = user_permissions(user)
-    pattern = like_pattern(term)
+    record_term = term if records_q is None else records_q.strip()
+    pattern = like_pattern(record_term)
     result = SearchResults()
-    if "university.read" in permissions:
+    if len(record_term) >= 2 and "university.read" in permissions:
         rows, _ = list_universities(
-            db, page=1, page_size=LIMIT, search=term, city=None,
+            db, page=1, page_size=LIMIT, search=record_term, city=None,
             responsible_id=None, sort_by="name", sort_order="asc", user=user,
         )
         result.universities = [SearchHit(id=row.id, title=row.name, subtitle=row.city) for row in rows]
@@ -84,7 +95,7 @@ def search(db: Session, user: CurrentUser, q: str) -> SearchResults:
         )
         result.responsibles = [SearchHit(id=id, title=name, subtitle=university_name, university_id=university_id)
                               for id, name, university_id, university_name in db.execute(responsibles.order_by(Responsible.full_name, UniversityResponsible.university_id).limit(LIMIT))]
-    if "workflow.read" in permissions:
+    if len(record_term) >= 2 and "workflow.read" in permissions:
         workflows = apply_university_scope(
             select(WorkflowInstance.id, WorkflowInstance.status, WorkflowInstance.university_id,
                    University.name, ITProgram.name, InstanceStage.name)
@@ -100,6 +111,21 @@ def search(db: Session, user: CurrentUser, q: str) -> SearchResults:
                                         university_id=university_id, status=status, stage=stage_name)
                             for id, status, university_id, university_name, program_name, stage_name
                             in db.execute(workflows.order_by(University.name, WorkflowInstance.id).limit(LIMIT))]
+    if "assistant.use" in permissions:
+        ranked = lexical_ranking(term, get_knowledge(settings).snapshot().visible(effective_role(user)))
+        seen: set[str] = set()
+        for chunk, _ in ranked:
+            if chunk.article_id in seen:
+                continue
+            seen.add(chunk.article_id)
+            result.documentation.append(DocumentationHit(
+                id=chunk.article_id,
+                title=chunk.title,
+                subtitle=" ".join(chunk.text.split())[:150],
+                href=chunk.url,
+            ))
+            if len(result.documentation) == LIMIT:
+                break
     return result
 
 
@@ -107,8 +133,9 @@ def search(db: Session, user: CurrentUser, q: str) -> SearchResults:
     "",
     response_model=SearchResults,
     summary="Глобальный поиск по CRM",
-    description="Ищет вузы, workflow, документы, договоры, продукты и ответственных по строке q (минимум 2 символа, до 5 совпадений на раздел). Состав выдачи зависит от прав university.read и workflow.read.",
+    description="Ищет доступные записи CRM и материалы документации по строке q (минимум 2 символа, до 5 совпадений на раздел). Состав выдачи зависит от прав пользователя.",
 )
 def global_search(q: str = Query(default="", max_length=100), db: Session = Depends(get_db),
-                  user: CurrentUser = Depends(get_current_user)) -> SearchResults:
-    return search(db, user, q)
+                  user: CurrentUser = Depends(get_current_user),
+                  records_q: str | None = Query(default=None, max_length=100)) -> SearchResults:
+    return search(db, user, q, records_q)

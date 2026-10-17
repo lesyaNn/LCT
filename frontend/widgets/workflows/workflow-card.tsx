@@ -22,7 +22,7 @@ export function WorkflowCard({ item, dragHandle }: { item: WorkflowOverviewItem;
     <Link className={styles.cardHitArea} href={href} aria-label={`Открыть Workflow: ${item.universityName}${item.programName ? ` — ${item.programName}` : ''}`} onKeyDown={(event) => {
       if (event.key === ' ') { event.preventDefault(); event.currentTarget.click(); }
     }} />
-    <div className={styles.cardTop}><strong className={styles.cardTitle}>{item.universityName}</strong><div className={styles.cardTopActions}>{dragHandle}<WorkflowArchiveAction instanceId={item.instanceId} universityId={item.universityId} active={item.status !== 'completed'} /></div></div>
+    <div className={styles.cardTop}><strong className={styles.cardTitle}>{item.universityName}</strong><div className={styles.cardTopActions}>{dragHandle}<WorkflowArchiveAction instanceId={item.instanceId} universityId={item.universityId} active={item.status !== 'completed'} label="Удалить workflow" /></div></div>
     {item.programName ? <p className={styles.program}>{item.programName}</p> : null}
     <p className={styles.stageName}>{item.stage.name}</p>
     <StatusBadge intent={item.status === 'completed' ? 'success' : item.status === 'overdue' ? 'orange' : 'brand'}>{statusLabel(item.status)}</StatusBadge>

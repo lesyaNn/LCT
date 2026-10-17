@@ -119,6 +119,7 @@ services:
       UPLOAD_ALLOWED_EXTENSIONS: ${UPLOAD_ALLOWED_EXTENSIONS:-pdf,png,jpg,jpeg,doc,docx,xls,xlsx,zip,gz,gzip,rar}
       EXTERNAL_ADAPTER_MODE: ${EXTERNAL_ADAPTER_MODE:-disabled}
       REPORTS_ROOT: /app/reports
+      ASSISTANT_DOCS_ROOT: /app/assistant-docs
       # Dev-2 analytics boundary: Dev-1 filter adapter (non-empty filters
       # in /analytics/* stop returning 503 FILTER_PROVIDER_NOT_CONFIGURED).
       P4_FILTER_PROVIDER: ${P4_FILTER_PROVIDER:-app.modules.analytics.dev1_provider:provider}
@@ -129,6 +130,7 @@ services:
       - workflow-storage:/app/storage
       # P4-06-01 generated reports persist across container recreation.
       - reports-storage:/app/reports
+      - ./frontend/public/docs:/app/assistant-docs:ro
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)\""]
       interval: 15s
@@ -142,7 +144,8 @@ services:
   worker:
     # P4-06-01: dedicated background worker (no BackgroundTasks in the API).
     # Owns report/import execution: atomic claim (SKIP LOCKED) -> run ->
-    # ready, up to 3 attempts, then failed. Shares the backend image.
+    # ready, up to 3 attempts, then failed; also records daily Health Score.
+    # Shares the backend image.
     build: ./backend
     restart: unless-stopped
     networks: [rtk-net]

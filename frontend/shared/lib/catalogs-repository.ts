@@ -216,10 +216,10 @@ export interface CatalogReferenceData {
 
 export const catalogDefinitions: ReadonlyArray<{ id: CatalogType; label: string; singular: string; searchPlaceholder: string }> = [
   { id: 'universities', label: 'Вузы', singular: 'ВУЗ', searchPlaceholder: 'Название или город' },
-  { id: 'directions', label: 'Направления', singular: 'направление', searchPlaceholder: 'Название или код' },
+  { id: 'directions', label: 'ИТ-направления', singular: 'ИТ-направление', searchPlaceholder: 'Название или код направления' },
   { id: 'programs', label: 'ИТ-программы', singular: 'ИТ-программу', searchPlaceholder: 'Название программы' },
   { id: 'vendors', label: 'Вендоры', singular: 'вендора', searchPlaceholder: 'Название вендора' },
-  { id: 'products', label: 'Продукты', singular: 'продукт', searchPlaceholder: 'Название продукта' },
+  { id: 'products', label: 'ИТ-продукты', singular: 'ИТ-продукт', searchPlaceholder: 'Название продукта' },
   { id: 'agreements', label: 'Договоры и лицензии', singular: 'договор или лицензию', searchPlaceholder: 'Номер договора или лицензии' },
   { id: 'responsibles', label: 'Ответственные', singular: 'ответственного', searchPlaceholder: 'ФИО или email' },
 ] as const;

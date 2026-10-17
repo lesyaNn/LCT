@@ -1,0 +1,33 @@
+.section { display: flex; flex-direction: column; gap: var(--rtk-space-4); min-width: 0; }
+.toolbar { display: flex; justify-content: flex-end; min-height: 36px; }
+.grid { display: grid; gap: var(--rtk-space-4); grid-auto-rows: 1fr; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 300px)); }
+.card { background: var(--rtk-color-surface); border-radius: var(--rtk-radius-medium); box-shadow: var(--rtk-shadow-elevation-1); display: flex; flex-direction: column; gap: var(--rtk-space-3); min-width: 0; padding: var(--rtk-space-4); }
+.cardHeader { align-items: flex-start; display: flex; gap: var(--rtk-space-3); min-width: 0; }
+.identity { flex: 1; min-width: 0; padding-top: var(--rtk-space-1); }
+.identity h3 { font-size: 14px; line-height: 1.3; margin: 0; overflow-wrap: anywhere; }
+.identity p { color: var(--rtk-color-text-secondary); font-size: 12px; line-height: 1.35; margin: var(--rtk-space-1) 0 0; overflow-wrap: anywhere; }
+.cardHeader .removeButton { flex: 0 0 auto; height: 32px; margin: -6px -6px 0 0; width: 32px; }
+.badgeRow { display: flex; }
+.contacts { display: flex; flex-direction: column; gap: var(--rtk-space-2); min-width: 0; }
+.contacts a { align-items: flex-start; color: var(--rtk-color-brand); display: flex; font-size: 12px; gap: var(--rtk-space-2); line-height: 1.35; min-width: 0; overflow-wrap: anywhere; text-decoration: none; }
+.contacts a:hover { text-decoration: underline; }
+.contacts a:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
+.contacts svg { flex: 0 0 auto; }
+.assignmentForm { display: flex; flex-direction: column; gap: var(--rtk-space-4); }
+.assignmentIntro, .assignmentHint { color: var(--rtk-color-text-secondary); font-size: 13px; line-height: 1.45; margin: 0; }
+.primaryOption { align-items: flex-start; cursor: pointer; display: flex; gap: var(--rtk-space-3); }
+.primaryOption input { accent-color: var(--rtk-color-brand); flex: 0 0 auto; height: 18px; margin: 1px 0 0; width: 18px; }
+.primaryOption input:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
+.primaryOption span { display: flex; flex-direction: column; gap: var(--rtk-space-1); }
+.primaryOption strong { font-size: 13px; }
+.primaryOption small { color: var(--rtk-color-text-secondary); font-size: 12px; line-height: 1.4; }
+.reasonField { display: flex; flex-direction: column; gap: var(--rtk-space-2); font-size: 13px; font-weight: 600; }
+.reasonField textarea { width: 100%; }
+.assignmentError { color: var(--rtk-color-danger); font-size: 12px; margin: 0; }
+.actions { border-top: 1px solid var(--rtk-color-border); display: flex; gap: var(--rtk-space-2); justify-content: flex-end; padding-top: var(--rtk-space-4); }
+.actions button { min-width: 120px; }
+@media (max-width: 768px) {
+  .cardHeader .removeButton { height: 44px; width: 44px; }
+  .actions { flex-direction: column-reverse; }
+  .actions button { width: 100%; }
+}

@@ -112,6 +112,7 @@ class UniversityProduct(UUIDPKMixin, TimestampMixin, Base):
 class Meeting(UUIDPKMixin, TimestampMixin, Base):
     __tablename__ = "meetings"
     __table_args__ = (
+        UniqueConstraint("workflow_instance_stage_id", name="uq_meetings_workflow_instance_stage_id"),
         Index("ix_meetings_university_id", "university_id"),
         Index("ix_meetings_meeting_at", "meeting_at"),
         Index("ix_meetings_univ_meeting_at", "university_id", "meeting_at"),
@@ -122,7 +123,12 @@ class Meeting(UUIDPKMixin, TimestampMixin, Base):
                    ondelete="CASCADE"),
         nullable=False,
     )
-    meeting_type: Mapped[str] = mapped_column(String(32), nullable=False, default="online")
+    workflow_instance_stage_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("instance_stages.id", name="fk_meetings_workflow_instance_stage_id_instance_stages", ondelete="SET NULL"),
+        nullable=True,
+        default=None,
+    )
+    meeting_type: Mapped[str | None] = mapped_column(String(32), nullable=True, default=None)
     subject: Mapped[str] = mapped_column(String(1024), nullable=False)
     participants: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB().with_variant(GenericJSON(), "sqlite"), nullable=False, default=list
@@ -132,10 +138,11 @@ class Meeting(UUIDPKMixin, TimestampMixin, Base):
     next_action_due: Mapped[date | None] = mapped_column(
         Date, nullable=True, default=None
     )
-    meeting_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    meeting_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_by_keycloak_sub: Mapped[str] = mapped_column(String(256), nullable=False)
 
     university: Mapped["University"] = relationship(back_populates="meetings")
+    workflow_stage = relationship("InstanceStage", foreign_keys=[workflow_instance_stage_id], lazy="selectin")
     document_links: Mapped[list["MeetingDocument"]] = relationship(
         back_populates="meeting", cascade="all, delete-orphan"
     )

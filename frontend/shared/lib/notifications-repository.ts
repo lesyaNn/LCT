@@ -1,4 +1,5 @@
 import { apiFetch } from './api-client';
+import type { NotificationItem, NotificationType } from '@/shared/types/notification';
 
 export type Notification = {
   id: string;
@@ -18,28 +19,47 @@ export type NotificationFilter = 'all' | 'unread' | 'attention';
 export type NotificationPage = { items: Notification[]; total: number; limit: number; offset: number };
 
 export const notificationsRepository = {
-  list: (filter: NotificationFilter = 'all', limit = 20, offset = 0) =>
-    apiFetch<NotificationPage>(`/api/v1/notifications?filter=${filter}&limit=${limit}&offset=${offset}`),
-  unreadCount: () => apiFetch<{ count: number }>('/api/v1/notifications/unread-count'),
+  list: (filter: NotificationFilter = 'all', limit = 20, offset = 0, signal?: AbortSignal) =>
+    apiFetch<NotificationPage>(`/api/v1/notifications?filter=${filter}&limit=${limit}&offset=${offset}`, { signal }),
+  unreadCount: (signal?: AbortSignal) => apiFetch<{ count: number }>('/api/v1/notifications/unread-count', { signal }),
   markRead: (id: string) => apiFetch<void>(`/api/v1/notifications/${encodeURIComponent(id)}/read`, { method: 'PATCH' }),
   markAllRead: () => apiFetch<{ updated: number }>('/api/v1/notifications/read-all', { method: 'POST' }),
 };
 
-export function notificationTarget(item: Notification): string {
-  if (item.entity_type === 'workflow') return `/workflows/${encodeURIComponent(item.entity_id)}`;
-  if (item.entity_type === 'university') return `/universities/${encodeURIComponent(item.entity_id)}`;
-  if (item.entity_type === 'contract') return item.university_id ? `/universities/${encodeURIComponent(item.university_id)}?tab=documents` : '/universities';
-  if (item.entity_type === 'license') return item.university_id ? `/universities/${encodeURIComponent(item.university_id)}?tab=licenses` : '/universities';
-  if (item.entity_type === 'import_job') return `/admin/import?job=${encodeURIComponent(item.entity_id)}`;
-  return '/notifications';
+export function notificationTarget(item: Notification): string | null {
+  if (item.entity_type === 'workflow' && item.entity_id) return `/workflows/${encodeURIComponent(item.entity_id)}`;
+  if (item.entity_type === 'university' && item.entity_id) return `/universities/${encodeURIComponent(item.entity_id)}`;
+  if (item.entity_type === 'contract' && item.university_id) return `/universities/${encodeURIComponent(item.university_id)}?tab=documents`;
+  if (item.entity_type === 'license' && item.university_id) return `/universities/${encodeURIComponent(item.university_id)}?tab=licenses`;
+  if (item.entity_type === 'import_job') return '/admin/import';
+  return null;
+}
+
+const presentationTypes: Record<string, NotificationType> = {
+  assignment: 'workflow',
+  workflow_stage_changed: 'stage',
+  workflow_rollback: 'workflow',
+  overdue: 'stage',
+  deadline_approaching: 'stage',
+  contract_expiry: 'license',
+  license_expiry: 'license',
+  import_error: 'report',
+};
+
+export function notificationPresentation(item: Notification): NotificationItem {
+  return {
+    id: item.id,
+    type: presentationTypes[item.type] ?? 'comment',
+    title: item.title,
+    description: item.message,
+    createdAt: item.created_at,
+    read: item.is_read,
+    target: notificationTarget(item) ?? undefined,
+  };
 }
 
 export function notificationTime(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.valueOf())) return '';
   return new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
-}
-
-export function notifyInboxChanged() {
-  window.dispatchEvent(new Event('notifications:changed'));
 }

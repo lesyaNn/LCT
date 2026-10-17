@@ -1,4 +1,4 @@
-"""Backend endpoints for the stage-3 action; frontend owns the button."""
+"""Backend endpoints for visited Workflow meeting stages."""
 
 import logging
 from typing import Annotated
@@ -35,21 +35,21 @@ Writer = Annotated[CurrentUser, Depends(WRITE)]
 @router.get(
     "/instances/{instance_id}/meeting-agenda",
     response_model=MeetingAgenda,
-    summary="Данные повестки встречи на этапе 3",
+    summary="Данные повестки этапа встречи",
 )
-def get_agenda(instance_id: UUID, response: Response, db: Database, user: Reader) -> MeetingAgenda:
+def get_agenda(instance_id: UUID, response: Response, db: Database, user: Reader, stage_id: UUID | None = None) -> MeetingAgenda:
     response.headers["Cache-Control"] = "no-store"
-    return service.build_agenda(db, instance_id, user)
+    return service.build_agenda(db, instance_id, user, stage_id)
 
 
 @router.get(
     "/instances/{instance_id}/meeting-agenda.pdf",
     response_class=Response,
     responses={200: {"content": {"application/pdf": {}}, "description": "Одностраничный A4 PDF"}},
-    summary="Скачать PDF-повестку встречи на этапе 3",
+    summary="Скачать PDF-повестку этапа встречи",
 )
-def download_agenda(instance_id: UUID, db: Database, user: Reader) -> Response:
-    agenda = service.build_agenda(db, instance_id, user)
+def download_agenda(instance_id: UUID, db: Database, user: Reader, stage_id: UUID | None = None) -> Response:
+    agenda = service.build_agenda(db, instance_id, user, stage_id)
     try:
         content = generate_agenda_pdf(agenda)
     except Exception as exc:

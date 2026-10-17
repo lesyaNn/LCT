@@ -142,8 +142,8 @@ function AuditFilters({ query, result, options, onPatch, onReset }: { query: Aud
         aria-label="Поиск по журналу"
         onChange={(event) => onPatch({ search: event.target.value })}
       /></label>
-      <MultiSelect labelPlacement="outside" label="Сотрудник" values={query.filters.userIds} options={users} disabled={!capabilities?.users || !options} onChange={(values) => onPatch({ userIds: values })} />
-      <MultiSelect labelPlacement="outside" label="ВУЗ" values={query.filters.universityIds} options={universities} disabled={!capabilities?.universities || !options} onChange={(values) => onPatch({ universityIds: values })} />
+      <MultiSelect labelPlacement="outside" label="Сотрудник" values={query.filters.userIds} options={users} searchable disabled={!capabilities?.users || !options} onChange={(values) => onPatch({ userIds: values })} />
+      <MultiSelect labelPlacement="outside" label="ВУЗ" values={query.filters.universityIds} options={universities} searchable disabled={!capabilities?.universities || !options} onChange={(values) => onPatch({ universityIds: values })} />
       <MultiSelect labelPlacement="outside" label="Что произошло" values={query.filters.actions} options={actionOptions} disabled={!capabilities?.actions} onChange={(values) => onPatch({ actions: values })} />
       <MultiSelect labelPlacement="outside" label="Раздел" values={query.filters.sections} options={sectionOptions} disabled={!capabilities?.entityTypes} onChange={(values) => onPatch({ sections: values })} />
     </>;

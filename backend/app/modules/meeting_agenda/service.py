@@ -11,8 +11,9 @@ from app.core.policies import ensure_university_visible
 from app.core.security import CurrentUser
 from app.models.catalog import ITDirection, ITProduct, ITProgram, License, University
 from app.models.enums import EXPIRY_WARNING_DAYS
-from app.models.interactions import UniversityProgram
+from app.models.interactions import Meeting, UniversityProgram
 from app.models.workflow_instances import InstanceStage, WorkflowComment, WorkflowInstance
+from app.modules.meeting_agenda.eligibility import is_meeting_stage
 from app.modules.meeting_agenda.schemas import (
     AgendaLicense,
     AgendaProgram,
@@ -23,7 +24,6 @@ from app.modules.meeting_agenda.schemas import (
 from app.schemas.errors import ErrorCode
 
 PREVIEW_LIMIT = 100
-MEETING_STAGE_ORDER = 3
 
 
 def _section(db: Session, statement, dto, *, transform=None):
@@ -41,7 +41,7 @@ def _section(db: Session, statement, dto, *, transform=None):
     return AgendaSection[dto](items=items, total=total, omitted=max(0, total - len(items)))
 
 
-def build_agenda(db: Session, instance_id: UUID, user: CurrentUser) -> MeetingAgenda:
+def build_agenda(db: Session, instance_id: UUID, user: CurrentUser, stage_id: UUID | None = None) -> MeetingAgenda:
     # Fetch only the scope key before authorization. In particular, don't load
     # comments through WorkflowInstance's selectin relationships before the gate.
     instance = (
@@ -60,21 +60,32 @@ def build_agenda(db: Session, instance_id: UUID, user: CurrentUser) -> MeetingAg
     ensure_university_visible(instance["university_id"], user)
     stage = (
         db.execute(
-            select(InstanceStage.id, InstanceStage.name, InstanceStage.order_index).where(
-                InstanceStage.id == instance["current_instance_stage_id"],
+            select(InstanceStage.id, InstanceStage.name, InstanceStage.order_index,
+                   InstanceStage.template_stage_id, InstanceStage.started_at).where(
+                InstanceStage.id == (stage_id or instance["current_instance_stage_id"]),
                 InstanceStage.instance_id == instance_id,
             )
         )
         .mappings()
         .one_or_none()
     )
+    # Rollback clears started_at on stages it reopens. A linked meeting is the
+    # durable proof that this stage was visited and its agenda remains available.
+    linked_meeting = None
+    if stage_id is not None and stage is not None and stage["started_at"] is None:
+        linked_meeting = (
+            db.execute(select(Meeting.id).where(Meeting.workflow_instance_stage_id == stage_id))
+            .mappings()
+            .one_or_none()
+        )
     if (
-        instance["status"] != "active"
-        or stage is None
-        or stage["order_index"] != MEETING_STAGE_ORDER
+        stage is None
+        or (stage["started_at"] is None and linked_meeting is None)
+        or not is_meeting_stage(stage["name"], stage["template_stage_id"])
+        or (stage_id is None and instance["status"] != "active")
     ):
         raise BusinessException(
-            ErrorCode.CONFLICT, details={"reason": "meeting_agenda_requires_stage_3"}
+            ErrorCode.CONFLICT, details={"reason": "meeting_agenda_requires_meeting_stage"}
         )
     university_id = instance["university_id"]
     university = (
@@ -132,13 +143,13 @@ def build_agenda(db: Session, instance_id: UUID, user: CurrentUser) -> MeetingAg
             WorkflowComment.id.label("comment_id"),
             WorkflowComment.instance_id,
             WorkflowComment.stage_id,
+            WorkflowComment.author_keycloak_sub,
             WorkflowComment.content,
             WorkflowComment.created_at,
         )
-        .join(WorkflowInstance, WorkflowInstance.id == WorkflowComment.instance_id)
         .where(
-            WorkflowInstance.university_id == university_id,
-            WorkflowInstance.status != "archived",
+            WorkflowComment.instance_id == instance_id,
+            WorkflowComment.stage_id == stage["template_stage_id"],
             WorkflowComment.question_status == "open",
         )
         .order_by(WorkflowComment.created_at, WorkflowComment.id)

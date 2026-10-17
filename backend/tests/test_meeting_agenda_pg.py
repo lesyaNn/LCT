@@ -19,7 +19,7 @@ from app.core.security import CurrentUser, get_current_user
 from app.models.catalog import ITDirection, ITProduct, ITProgram, License, University, Vendor
 from app.models.interactions import UniversityProgram
 from app.models.workflow_instances import InstanceStage, WorkflowComment, WorkflowInstance
-from app.models.workflow_templates import WorkflowTemplate
+from app.models.workflow_templates import WorkflowStage, WorkflowTemplate
 from app.modules.audit.models import AuditEvent
 from app.modules.audit.service import AuditContext, get_audit_db
 from app.modules.meeting_agenda.router import router
@@ -67,6 +67,10 @@ def graph():
             ]
         )
         db.flush()
+        meeting_template_stage = WorkflowStage(template_id=template.id, name="Встреча", order_index=3)
+        db.add(meeting_template_stage)
+        db.flush()
+        ids["template_stage"] = meeting_template_stage.id
         product = ITProduct(vendor_id=vendor.id, name="Продукт")
         db.add(product)
         for status in ("active", "launched", "planned", "archived"):
@@ -98,7 +102,8 @@ def graph():
         db.flush()
         db.add(
             InstanceStage(
-                id=ids["stage"], instance_id=ids["instance"], name="Встреча", order_index=3
+                id=ids["stage"], instance_id=ids["instance"], template_stage_id=ids["template_stage"],
+                name="Встреча", order_index=3, started_at=datetime.now(UTC),
             )
         )
         db.flush()
@@ -135,6 +140,7 @@ def graph():
                 WorkflowComment(
                     id=ids[key],
                     instance_id=ids[instance],
+                    stage_id=ids["template_stage"] if instance == "instance" else None,
                     author_keycloak_sub="author",
                     content=key,
                     question_status=status,
@@ -173,7 +179,6 @@ def test_real_dataset_boundaries_and_no_foreign_rows(graph):
     assert {r["content"] for r in data["open_questions"]["items"]} == {
         "question",
         "old_question",
-        "other_question",
     }
     assert all(
         data[key]["omitted"] == 0 for key in ("programs", "expiring_licenses", "open_questions")
@@ -187,7 +192,7 @@ def test_real_status_lifecycle_creation_and_audit(graph):
     assert ordinary.status_code == 201, ordinary.text
     assert ordinary.json()["question_status"] == "none"
     question = client.post(
-        f"{base}/comments", json={"content": "Обсудить сроки", "is_question": True}
+        f"{base}/comments", json={"content": "Обсудить сроки", "stage_id": str(ids["template_stage"]), "is_question": True}
     )
     assert question.status_code == 201 and question.json()["question_status"] == "open"
     url = f"/api/v1/workflow/comments/{ids['old_question']}/question-status"
@@ -252,7 +257,7 @@ def test_real_pdf_and_export_audit(graph):
                 AuditEvent.entity_id == ids["instance"], AuditEvent.action == "REPORT_GENERATE"
             )
         ).one()
-        assert event.new_value["open_question_count"] == 3
+        assert event.new_value["open_question_count"] == 2
         assert event.user_id == "author"
 
 
