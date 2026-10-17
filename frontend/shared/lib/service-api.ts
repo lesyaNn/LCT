@@ -4,6 +4,7 @@ export type ApiOperation = {
   path: string;
   summary: string;
   tags: string[];
+  authentication_required?: boolean;
   required_permissions: string[];
   allowed_roles: string[];
   role_allowed: boolean;
@@ -113,10 +114,8 @@ export function mediaExample(media: Media, document: OpenApiDocument): unknown {
 }
 
 export function operationCurl(operation: ApiOperation, media?: Media, document?: OpenApiDocument): string {
-  const lines = [
-    `curl --request ${operation.method} 'https://crm.example${operation.path}'`,
-    "  --header 'Authorization: Bearer <ACCESS_TOKEN>'",
-  ];
+  const lines = [`curl --request ${operation.method} 'https://crm.example${operation.path}'`];
+  if (operation.authentication_required !== false) lines.push("  --header 'Authorization: Bearer <ACCESS_TOKEN>'");
   const example = media && document ? mediaExample(media, document) : undefined;
   if (example !== undefined) {
     lines.push("  --header 'Content-Type: application/json'");

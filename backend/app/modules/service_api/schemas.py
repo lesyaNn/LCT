@@ -9,6 +9,7 @@ class Operation(BaseModel):
     path: str
     summary: str
     tags: list[str]
+    authentication_required: bool
     required_permissions: list[str]
     allowed_roles: list[str]
     role_allowed: bool

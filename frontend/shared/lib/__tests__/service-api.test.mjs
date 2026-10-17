@@ -47,6 +47,7 @@ test('curl never includes a real credential and quotes apostrophes in JSON', () 
   assert.ok(curl.includes("O'\\''Brien"));
   assert.ok(curl.includes(" \\\n  --header"));
   assert.ok(!operationCurl(operations[0]).includes('--data-raw'));
+  assert.ok(!operationCurl({ ...operations[0], authentication_required: false }).includes('Authorization'));
 });
 
 test('prose formatting does not alter paths or technical hyphens', () => {

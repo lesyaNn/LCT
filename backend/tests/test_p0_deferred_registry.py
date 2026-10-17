@@ -123,6 +123,7 @@ def test_mounted_routers_are_only_the_production_contract():
     allowed = (
         "/api/v1/service-api",  # Read-only catalog of mounted methods.
         "/api/v1/openapi.json",  # Authenticated alias through the frontend API proxy.
+        "/api/v1/public/licenses/",  # Public license verification from the current main.
         "/api/v1/auth",
         "/api/v1/notifications",
         "/api/v1/assistant",

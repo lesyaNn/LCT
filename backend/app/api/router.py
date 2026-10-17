@@ -10,6 +10,7 @@ unmounted; see ``docs/DEFERRED_MODULES.md`` for their reactivation requirements.
 """
 
 from fastapi import APIRouter
+from app.modules.license_passports.router import router as license_passports_router
 
 from app.modules.assistant.router import router as assistant_router
 from app.modules.service_api.router import router as service_api_router
@@ -38,6 +39,7 @@ from app.modules.health_score.router import router as health_score_router
 from app.modules.notifications.router import router as notifications_router
 
 v1 = APIRouter(prefix="/api/v1")
+v1.include_router(license_passports_router)
 v1.include_router(service_api_router)
 v1.include_router(assistant_router)
 v1.include_router(auth_router)

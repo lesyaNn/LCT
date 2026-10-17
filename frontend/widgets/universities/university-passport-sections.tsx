@@ -39,6 +39,7 @@ import {
 import { PassportDataTable, PassportTableSkeleton, type PassportMobileField, type PassportTableColumn } from './passport-data-table';
 import { MeetingMutationForm, ProductAssignmentForm } from './passport-mutation-forms';
 import { MeetingAgendaPdfAction } from './workflow-meeting-agenda';
+import { LicensePassportAction } from './license-passport-action';
 import styles from './university-passport-sections.module.css';
 import { PassportDocumentsSection } from './passport-documents-section';
 
@@ -112,6 +113,7 @@ function LicensesSection({ id }: { id: string }) {
     { id: 'status', label: 'Статус', render: (row) => <LicenseStatusBadge status={row.status} /> },
     { id: 'transfer', label: 'Передача', render: (row) => row.transfer },
     { id: 'contract', label: 'Договор', render: (row) => <details className={styles.inlineDetails}><summary>Подробнее</summary><span>{row.contract}</span></details> },
+    { id: 'passport', label: 'Паспорт лицензии', render: (row) => <LicensePassportAction key={row.id} universityId={id} license={row} /> },
   ];
   const mobileFields: PassportMobileField<UniversityLicenseRow>[] = [
     { label: 'ИТ-продукт', render: (row) => <strong className={styles.primaryCell}>{row.product}</strong> },
@@ -120,6 +122,7 @@ function LicensesSection({ id }: { id: string }) {
     { label: 'Истекает', render: (row) => formatDate(row.expiresAt) },
     { label: 'Статус', render: (row) => <LicenseStatusBadge status={row.status} /> },
     { label: 'Договор', render: (row) => <details className={styles.inlineDetails}><summary>Подробнее</summary><span>{row.contract}</span></details> },
+    { label: 'Паспорт лицензии', render: (row) => <LicensePassportAction key={row.id} universityId={id} license={row} /> },
   ];
   if (query.isPending) return <section className={styles.section} aria-label="Лицензии"><PassportTableSkeleton /></section>;
   if (!query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;

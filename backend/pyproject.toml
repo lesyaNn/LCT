@@ -35,6 +35,9 @@ build-backend = "setuptools.build_meta"
 include = ["app*", "scripts*"]
 exclude = ["var*", "tests*", "alembic*", "migrations*"]
 
+[tool.setuptools.package-data]
+app = ["assets/*.png", "assets/*.md"]
+
 [tool.ruff]
 line-length = 100
 

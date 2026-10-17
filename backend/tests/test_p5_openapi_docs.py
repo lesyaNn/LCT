@@ -111,6 +111,9 @@ def test_all_business_operations_are_documented_and_secure():
             assert operation["summary"].strip()
             assert operation["description"].strip()
             assert operation["tags"]
+            if (method, path) == ("get", "/api/v1/public/licenses/{license_id}/verification"):
+                assert not operation.get("security")
+                continue
             assert operation.get("security") == [{"KeycloakLogin": []}]
             for code in ("401", "403", "422"):
                 response = operation["responses"][code]

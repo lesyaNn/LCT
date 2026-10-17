@@ -58,7 +58,8 @@ function OperationDetails({ operation, document }: { operation: ApiOperation; do
   const json = spec.requestBody?.content?.['application/json'];
   return <div className={styles.operationBody}>
     <p>{readableDescription(spec.description)}</p>
-    <p>Роли: <strong>{operation.allowed_roles.join(', ') || 'Нет разрешённых ролей'}</strong></p>
+    <p>Авторизация: <strong>{operation.authentication_required === false ? 'Не требуется, публичный метод' : 'Bearer JWT'}</strong></p>
+    {operation.authentication_required !== false ? <p>Роли: <strong>{operation.allowed_roles.join(', ') || 'Нет разрешённых ролей'}</strong></p> : null}
     {operation.required_permissions.length ? <p>Права: <code>{operation.required_permissions.join(', ')}</code></p> : null}
     <p className={styles.hint}>Это проверка роли. Доступ к вузу, авторство, статус объекта и другие условия проверяются при вызове.</p>
     {spec.parameters?.length ? <><h3>Параметры</h3><div className={styles.tableWrap}><table><thead><tr><th>Имя</th><th>Где передать</th><th>Тип</th><th>Обязательно</th><th>Описание</th></tr></thead><tbody>{spec.parameters.map(parameter => <tr key={`${parameter.in}-${parameter.name}`}><td><code>{parameter.name}</code></td><td>{parameter.in}</td><td><code>{schemaType(parameter.schema, document)}</code></td><td>{parameter.required ? 'Да' : 'Нет'}</td><td>{readableDescription(parameter.description)}{parameter.schema?.default !== undefined ? <p>По умолчанию {JSON.stringify(parameter.schema.default)}</p> : null}</td></tr>)}</tbody></table></div></> : null}
@@ -145,7 +146,7 @@ export function ApiDocumentationPage({ guide }: { guide: string }) {
         </div>
         <label className={styles.checkbox}><input type="checkbox" checked={allowedOnly} onChange={event => setAllowedOnly(event.target.checked)} />Только разрешённые моей роли</label><p role="status">Найдено методов: {operations.length}</p>
         <div className={styles.operationList}>{operations.map(operation => <div className={styles.operation} key={operation.operation_id}>
-          <button className={styles.operationHeader} type="button" aria-expanded={expanded === operation.operation_id} aria-controls={`operation-${operation.operation_id}`} onClick={() => setExpanded(value => value === operation.operation_id ? null : operation.operation_id)}><span className={styles.method} data-method={operation.method}>{operation.method}</span><code>{operation.path}</code><span>{readableDescription(operation.summary)}</span><small>{operation.deprecated ? 'Устаревает' : operation.role_allowed ? 'Роль разрешена' : 'Нет прав роли'}</small></button>
+          <button className={styles.operationHeader} type="button" aria-expanded={expanded === operation.operation_id} aria-controls={`operation-${operation.operation_id}`} onClick={() => setExpanded(value => value === operation.operation_id ? null : operation.operation_id)}><span className={styles.method} data-method={operation.method}>{operation.method}</span><code>{operation.path}</code><span>{readableDescription(operation.summary)}</span><small>{operation.deprecated ? 'Устаревает' : operation.authentication_required === false ? 'Публичный метод' : operation.role_allowed ? 'Роль разрешена' : 'Нет прав роли'}</small></button>
           {expanded === operation.operation_id ? <div id={`operation-${operation.operation_id}`}><OperationDetails operation={operation} document={document} /></div> : null}
         </div>)}</div>{!operations.length ? <p>По этим условиям ничего не найдено. Измените фильтр.</p> : null}
       </> : null}

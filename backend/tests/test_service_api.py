@@ -139,6 +139,23 @@ def test_catalog_does_not_leak_previous_callers_access(context):
     )
 
 
+def test_public_license_verification_keeps_its_explicit_anonymous_contract(context):
+    client, _ = context
+    catalog = client.get("/api/v1/service-api").json()
+    public_path = "/api/v1/public/licenses/{license_id}/verification"
+    public = next(op for op in catalog["operations"] if op["path"] == public_path)
+    assert public["authentication_required"] is False
+    assert public["role_allowed"] is True
+    assert public["allowed_roles"] == []
+    assert public["required_permissions"] == []
+    schema = client.get("/api/v1/openapi.json").json()
+    assert not schema["paths"][public_path]["get"].get("security")
+    protected_path = "/api/v1/universities/{university_id}/licenses/{license_id}/passport.pdf"
+    protected = schema["paths"][protected_path]["get"]
+    assert protected["security"] == [{"KeycloakLogin": []}]
+    assert protected["x-authentication-required"] is True
+
+
 @pytest.mark.parametrize(
     "audience,roles,expected",
     [

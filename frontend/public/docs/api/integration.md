@@ -197,6 +197,8 @@ curl --request DELETE 'https://crm.example/api/v1/universities/<UNIVERSITY_ID>' 
 
 Оба метода возвращают HTTP 201 с созданной записью. Для изменения есть PATCH, для удаления DELETE. `status` и `days_to_expiry` рассчитывает сервер: передавать их вместо исходных полей не нужно. Чтобы прикрепить файл договора, используйте `/contracts/{contract_id}/file` с `multipart/form-data`.
 
+Паспорт лицензии формируется через `GET /api/v1/universities/{university_id}/licenses/{license_id}/passport.pdf` с авторизацией и доступом к вузу. Проверка по QR ведёт на публичный `GET /api/v1/public/licenses/{license_id}/verification`: этому запросу токен не нужен. В каталоге он отмечен как публичный, `authentication_required` равен `false`. Это отдельное исключение, оно не открывает без входа создание, изменение, удаление или скачивание паспорта лицензии.
+
 ## Встреча
 
 Тело `POST /api/v1/universities/{university_id}/meetings`:

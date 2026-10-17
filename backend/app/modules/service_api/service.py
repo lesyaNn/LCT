@@ -74,8 +74,10 @@ def enrich_openapi(app: FastAPI, schema: dict) -> None:
     for route, method in api_routes(app):
         operation = schema["paths"][route.path_format][method.lower()]
         access = access_for(route.dependant)
+        authentication_required = bool(operation.get("security"))
+        operation["x-authentication-required"] = authentication_required
         operation["x-required-permissions"] = sorted(access.permissions)
-        operation["x-allowed-roles"] = access.roles
+        operation["x-allowed-roles"] = access.roles if authentication_required else []
         example = REQUEST_EXAMPLES.get((route.path_format, method.lower()))
         if example is not None:
             operation["requestBody"]["content"]["application/json"]["example"] = example
@@ -87,6 +89,7 @@ def catalog(app: FastAPI, user: CurrentUser) -> ServiceApiCatalog:
     for route, method in api_routes(app):
         operation = schema["paths"][route.path_format][method.lower()]
         access = access_for(route.dependant)
+        authentication_required = bool(operation.get("security"))
         operations.append(
             Operation(
                 operation_id=operation["operationId"],
@@ -94,9 +97,10 @@ def catalog(app: FastAPI, user: CurrentUser) -> ServiceApiCatalog:
                 path=route.path_format,
                 summary=operation["summary"],
                 tags=operation.get("tags", []),
+                authentication_required=authentication_required,
                 required_permissions=sorted(access.permissions),
-                allowed_roles=access.roles,
-                role_allowed=access.permits(user),
+                allowed_roles=access.roles if authentication_required else [],
+                role_allowed=not authentication_required or access.permits(user),
                 deprecated=operation.get("deprecated", False),
             )
         )
