@@ -19,8 +19,8 @@
 .controls button { min-height: 36px; }
 .viewport { background: var(--rtk-color-surface-subtle); min-height: 280px; overflow: hidden; position: relative; }
 .svg { cursor: grab; display: block; height: clamp(320px, 40vw, 560px); touch-action: none; user-select: none; width: 100%; }
-.svg:active { cursor: grabbing; }
-.region { fill: var(--rtk-color-surface); stroke: var(--rtk-color-border-strong); stroke-linejoin: round; stroke-width: .8; transition: fill 150ms ease, stroke 150ms ease, stroke-width 150ms ease; vector-effect: non-scaling-stroke; }
+.svg[data-dragging='true'], .svg[data-dragging='true'] .region { cursor: grabbing; }
+.region { cursor: pointer; fill: var(--rtk-color-surface); pointer-events: fill; stroke: var(--rtk-color-border-strong); stroke-linejoin: round; stroke-width: .8; transition: fill 150ms ease, stroke 150ms ease; vector-effect: non-scaling-stroke; }
 .region[data-level='1'] { fill: color-mix(in srgb, var(--rtk-color-brand) 22%, var(--rtk-color-surface)); }
 .region[data-level='2'] { fill: color-mix(in srgb, var(--rtk-color-brand) 40%, var(--rtk-color-surface)); }
 .region[data-level='3'] { fill: color-mix(in srgb, var(--rtk-color-brand) 63%, var(--rtk-color-surface)); }

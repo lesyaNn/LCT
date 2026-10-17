@@ -32,35 +32,43 @@ NAMES = {
     "RU.93": "Забайкальский край",
     "UA.11": "Республика Крым",
     "UA.20": "Севастополь",
+    "UA.05": "Донецкая область",
+    "UA.14": "Луганская область",
+    "UA.26": "Запорожская область",
+    "UA.08": "Херсонская область",
 }
+ADDED_REGION_CODES = {"UA.05", "UA.14", "UA.26", "UA.08"}
 
 
 def sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def city_regions(cities_zip: Path, names_zip: Path) -> dict[str, str | None]:
+def city_regions(cities_zip: Path, names_zip: Path, ua_names_zip: Path) -> dict[str, str | None]:
     candidates: dict[str, set[str]] = defaultdict(set)
     codes_by_id: dict[str, str] = {}
     with ZipFile(cities_zip) as archive, archive.open("cities500.txt") as member:
         for line in io.TextIOWrapper(member, encoding="utf-8"):
             row = line.rstrip("\n").split("\t")
-            if len(row) != 19 or row[8] != "RU" or row[6] != "P" or not row[10]:
+            if len(row) != 19 or row[6] != "P" or not row[10]:
                 continue
-            code = f"RU.{row[10]}"
+            code = f"{row[8]}.{row[10]}"
+            if row[8] != "RU" and code not in ADDED_REGION_CODES:
+                continue
             codes_by_id[row[0]] = code
             for name in {row[1], row[2]}:
                 if key := normalize_city(name):
                     candidates[key].add(code)
-    with ZipFile(names_zip) as archive, archive.open("RU.txt") as member:
-        for line in io.TextIOWrapper(member, encoding="utf-8"):
-            row = line.rstrip("\n").split("\t")
-            if len(row) < 8 or row[1] not in codes_by_id or row[2] != "ru" or row[7] == "1":
-                continue
-            if len(row) > 9 and row[9].strip():
-                continue
-            if key := normalize_city(row[3]):
-                candidates[key].add(codes_by_id[row[1]])
+    for archive_path, filename in ((names_zip, "RU.txt"), (ua_names_zip, "UA.txt")):
+        with ZipFile(archive_path) as archive, archive.open(filename) as member:
+            for line in io.TextIOWrapper(member, encoding="utf-8"):
+                row = line.rstrip("\n").split("\t")
+                if len(row) < 8 or row[1] not in codes_by_id or row[2] != "ru" or row[7] == "1":
+                    continue
+                if len(row) > 9 and row[9].strip():
+                    continue
+                if key := normalize_city(row[3]):
+                    candidates[key].add(codes_by_id[row[1]])
     # Conventional city abbreviations are explicit aliases, never fuzzy matches.
     candidates["мск"].add("RU.48")
     candidates["спб"].add("RU.66")
@@ -92,17 +100,18 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("cities", type=Path)
     parser.add_argument("names", type=Path)
+    parser.add_argument("ua_names", type=Path)
     parser.add_argument("geometry", type=Path)
+    parser.add_argument("--source-sha256", help="SHA-256 of the original Natural Earth GeoJSON before topology-preserving simplification")
     args = parser.parse_args()
-    city_codes = city_regions(args.cities, args.names)
+    city_codes = city_regions(args.cities, args.names, args.ua_names)
     geo = json.loads(args.geometry.read_text(encoding="utf-8"))
     regions = []
     for feature in geo["features"]:
         props = feature["properties"]
-        if props.get("admin") != "Russia":
-            continue
         code = props.get("gn_a1_code")
-        if not code:
+        is_russian_region = props.get("admin") == "Russia" and code not in (None, "RU.")
+        if not (is_russian_region or code in ADDED_REGION_CODES):
             continue
         regions.append({
             "code": code,
@@ -115,13 +124,17 @@ def main() -> None:
         "source_sha256": sha(args.cities),
         "names_source": "https://download.geonames.org/export/dump/alternatenames/RU.zip",
         "names_sha256": sha(args.names),
+        "ua_names_source": "https://download.geonames.org/export/dump/alternatenames/UA.zip",
+        "ua_names_sha256": sha(args.ua_names),
         "license": "CC BY 4.0, https://www.geonames.org/",
         "cities": city_codes,
     }, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     MAP_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     MAP_OUTPUT.write_text(json.dumps({
-        "source": "https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_50m_admin_1_states_provinces.geojson",
-        "source_sha256": sha(args.geometry),
+        "source": "https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_10m_admin_1_states_provinces.geojson",
+        "source_sha256": args.source_sha256 or sha(args.geometry),
+        "processed_sha256": sha(args.geometry),
+        "processing": "Mapshaper 0.7.88, 15% topology-preserving simplification, keep-shapes, clean",
         "license": "Natural Earth public domain, https://www.naturalearthdata.com/about/terms-of-use/",
         "viewBox": "0 0 1160 450",
         "regions": regions,

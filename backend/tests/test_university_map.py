@@ -27,6 +27,12 @@ def test_city_region_uses_exact_unambiguous_geonames_codes():
     assert city_region_code("Ростов-на-Дону") == "RU.61"
     assert city_region_code("Екатеринбург") == "RU.71"
     assert city_region_code("Киров") is None
+    assert city_region_code("Донецк") is None
+    assert city_region_code("Донецк", "Донецкий национальный технический университет") == "UA.05"
+    assert city_region_code("Луганск") == "UA.14"
+    assert city_region_code("Мариуполь") == "UA.05"
+    assert city_region_code("Запорожье") == "UA.26"
+    assert city_region_code("Херсон") == "UA.08"
     assert city_region_code("Несуществующий город") is None
 
 
@@ -37,6 +43,8 @@ def test_geometry_has_matching_regions_and_license_metadata():
     assert len(regions) >= 80
     assert regions["RU.48"]["name"] == "Москва"
     assert regions["RU.61"]["name"] == "Ростовская область"
+    assert {"UA.05", "UA.08", "UA.14", "UA.26"} <= regions.keys()
+    assert len(regions) == len(geometry["regions"]) == 89
     assert all(item["path"].startswith("M") for item in regions.values())
     assert "naturalearthdata.com" in geometry["license"]
 

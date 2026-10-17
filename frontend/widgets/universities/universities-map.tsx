@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState, type PointerEvent, type WheelEvent } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type WheelEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import MapIcon from '@atomaro/icons/24/navigation/Map';
 import BookOpen from '@atomaro/icons/24/culture/BookOpen';
@@ -44,6 +44,21 @@ function clampTransform(next: Transform): Transform {
     y: Math.max(-HEIGHT * (scale - 1) - 45, Math.min(45, next.y)),
   };
 }
+
+function transformAttribute({ x, y, scale }: Transform): string {
+  return `translate(${x} ${y}) scale(${scale})`;
+}
+
+const RegionPaths = memo(function RegionPaths({ regions, byRegion, selected }: {
+  regions: MapRegion[];
+  byRegion: Map<string, RegionStats>;
+  selected: string | null;
+}) {
+  return regions.map((region) => {
+    const stats = byRegion.get(region.code) ?? EMPTY;
+    return <path key={region.code} data-region-code={region.code} data-level={level(stats.universities.length)} data-selected={selected === region.code || undefined} d={region.path} fillRule="evenodd" className={styles.region} role="button" tabIndex={0} aria-label={`${region.name}: ${stats.universities.length} вузов`} />;
+  });
+});
 
 function RegionDetails({ title, stats, onClose, hideHeader = false }: { title: string; stats: RegionStats; onClose: () => void; hideHeader?: boolean }) {
   const [limit, setLimit] = useState(30);
@@ -91,20 +106,44 @@ export function UniversitiesMap({ filters, scopeKey }: { filters: UniversityFilt
   });
   const viewportRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
-  const dragRef = useRef<{ x: number; y: number; code: string | null; moved: boolean } | null>(null);
-  const [transform, setTransform] = useState<Transform>(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
-    ? { scale: 1.8, x: -50, y: -216 } : { scale: 1, x: 0, y: 0 });
+  const mapGroupRef = useRef<SVGGElement>(null);
+  const frameRef = useRef<number | null>(null);
+  const transformRef = useRef<Transform>({ scale: 1, x: 0, y: 0 });
+  const dragRef = useRef<{ x: number; y: number; pixelsPerUnit: number; code: string | null; moved: boolean } | null>(null);
+  const hoverCodeRef = useRef<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [hover, setHover] = useState<{ code: string; x: number; y: number } | null>(null);
   const [mobile, setMobile] = useState(false);
 
+  const applyTransform = useCallback((next: Transform) => {
+    transformRef.current = clampTransform(next);
+    if (frameRef.current !== null) return;
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = null;
+      mapGroupRef.current?.setAttribute('transform', transformAttribute(transformRef.current));
+    });
+  }, []);
+
   useEffect(() => {
     const media = window.matchMedia('(max-width: 768px)');
-    const update = () => setMobile(media.matches);
+    const update = () => {
+      setMobile(media.matches);
+      applyTransform(media.matches ? { scale: 1.8, x: -50, y: -216 } : { scale: 1, x: 0, y: 0 });
+    };
     update();
     media.addEventListener('change', update);
-    return () => media.removeEventListener('change', update);
-  }, []);
+    return () => {
+      media.removeEventListener('change', update);
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
+    };
+  }, [applyTransform]);
+
+  useEffect(() => {
+    if (geometryQuery.data && dataQuery.data) applyTransform(transformRef.current);
+  }, [applyTransform, geometryQuery.data, dataQuery.data]);
 
   const regions = geometryQuery.data?.regions;
   const regionNames = useMemo(() => new Map(regions?.map((item) => [item.code, item.name]) ?? []), [regions]);
@@ -136,11 +175,12 @@ export function UniversitiesMap({ filters, scopeKey }: { filters: UniversityFilt
     const matrix = svg?.getScreenCTM();
     return matrix ? new DOMPoint(clientX, clientY).matrixTransform(matrix.inverse()) : { x: WIDTH / 2, y: HEIGHT / 2 };
   };
-  const zoom = (factor: number, x = WIDTH / 2, y = HEIGHT / 2) => setTransform((current) => {
+  const zoom = (factor: number, x = WIDTH / 2, y = HEIGHT / 2) => {
+    const current = transformRef.current;
     const scale = Math.min(5, Math.max(1, current.scale * factor));
     const ratio = scale / current.scale;
-    return clampTransform({ scale, x: x - (x - current.x) * ratio, y: y - (y - current.y) * ratio });
-  });
+    applyTransform({ scale, x: x - (x - current.x) * ratio, y: y - (y - current.y) * ratio });
+  };
   const onWheel = (event: WheelEvent<SVGSVGElement>) => {
     event.preventDefault();
     const point = svgPoint(event.clientX, event.clientY);
@@ -149,20 +189,30 @@ export function UniversitiesMap({ filters, scopeKey }: { filters: UniversityFilt
   const onPointerDown = (event: PointerEvent<SVGSVGElement>) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     const target = event.target as Element;
-    dragRef.current = { x: event.clientX, y: event.clientY, code: target.closest('[data-region-code]')?.getAttribute('data-region-code') ?? null, moved: false };
+    dragRef.current = { x: event.clientX, y: event.clientY, pixelsPerUnit: svgRef.current?.getScreenCTM()?.a || 1, code: target.closest('[data-region-code]')?.getAttribute('data-region-code') ?? null, moved: false };
     event.currentTarget.setPointerCapture(event.pointerId);
+    event.currentTarget.dataset.dragging = 'true';
+    hoverCodeRef.current = null;
     setHover(null);
   };
   const onPointerMove = (event: PointerEvent<SVGSVGElement>) => {
     const drag = dragRef.current;
-    if (!drag) return;
+    if (!drag) {
+      if (event.pointerType === 'mouse') {
+        const code = (event.target as Element).closest('[data-region-code]')?.getAttribute('data-region-code') ?? null;
+        if (code !== hoverCodeRef.current) {
+          if (code) showHover(code, event.clientX, event.clientY);
+          else clearHover();
+        }
+      }
+      return;
+    }
     const deltaX = event.clientX - drag.x;
     const deltaY = event.clientY - drag.y;
     if (Math.abs(deltaX) + Math.abs(deltaY) > 3) drag.moved = true;
     if (drag.moved) {
-      const matrix = svgRef.current?.getScreenCTM();
-      const pixelsPerUnit = matrix?.a || 1;
-      setTransform((current) => clampTransform({ ...current, x: current.x + deltaX / pixelsPerUnit, y: current.y + deltaY / pixelsPerUnit }));
+      const current = transformRef.current;
+      applyTransform({ ...current, x: current.x + deltaX / drag.pixelsPerUnit, y: current.y + deltaY / drag.pixelsPerUnit });
       drag.x = event.clientX;
       drag.y = event.clientY;
     }
@@ -170,13 +220,20 @@ export function UniversitiesMap({ filters, scopeKey }: { filters: UniversityFilt
   const onPointerUp = (event: PointerEvent<SVGSVGElement>) => {
     const drag = dragRef.current;
     dragRef.current = null;
+    delete event.currentTarget.dataset.dragging;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     if (drag && !drag.moved && drag.code) setSelected(drag.code);
   };
   const showHover = (code: string, clientX: number, clientY: number) => {
     const rect = viewportRef.current?.getBoundingClientRect();
     if (!rect) return;
+    hoverCodeRef.current = code;
     setHover({ code, x: Math.min(rect.width - 160, Math.max(150, clientX - rect.left)), y: Math.min(rect.height - 104, Math.max(8, clientY - rect.top + 12)) });
+  };
+  const clearHover = () => {
+    if (hoverCodeRef.current === null) return;
+    hoverCodeRef.current = null;
+    setHover(null);
   };
   const selectFromPicker = (code: string) => {
     if (!code) return;
@@ -185,14 +242,14 @@ export function UniversitiesMap({ filters, scopeKey }: { filters: UniversityFilt
       .find((item) => item.getAttribute('data-region-code') === code);
     if (!path) return;
     const box = path.getBBox();
-    const scale = Math.max(transform.scale, 2);
-    setTransform(clampTransform({ scale, x: WIDTH / 2 - (box.x + box.width / 2) * scale, y: HEIGHT / 2 - (box.y + box.height / 2) * scale }));
+    const scale = Math.max(transformRef.current.scale, 2);
+    applyTransform({ scale, x: WIDTH / 2 - (box.x + box.width / 2) * scale, y: HEIGHT / 2 - (box.y + box.height / 2) * scale });
   };
 
   if (geometryQuery.isPending || dataQuery.isPending) return <div className={styles.loading} role="status">Загружаем карту вузов…</div>;
   if (geometryQuery.isError || dataQuery.isError) return <RouteErrorState onRetry={() => { void geometryQuery.refetch(); void dataQuery.refetch(); }} />;
 
-  return <section className={styles.mapSection} aria-label="Карта вузов России">
+  return <section className={styles.mapSection} aria-label="География вузов по регионам">
     <div className={styles.kpis}>
       <div><MapIcon size={20} fill="currentColor" /><span>Регионов с вузами</span><strong>{byRegion.size}</strong></div>
       <div><BookOpen size={20} fill="currentColor" /><span>Вузов</span><strong>{dataQuery.data.length}</strong></div>
@@ -212,17 +269,14 @@ export function UniversitiesMap({ filters, scopeKey }: { filters: UniversityFilt
           <div className={styles.controls} aria-label="Масштаб карты">
             <Button size="s" variant="ghost" onClick={() => zoom(1.3)} aria-label="Увеличить карту"><ZoomIn size={18} fill="currentColor" /></Button>
             <Button size="s" variant="ghost" onClick={() => zoom(1 / 1.3)} aria-label="Уменьшить карту"><ZoomOut size={18} fill="currentColor" /></Button>
-            <Button size="s" variant="ghost" onClick={() => setTransform({ scale: 1, x: 0, y: 0 })}>Сбросить</Button>
+            <Button size="s" variant="ghost" onClick={() => applyTransform({ scale: 1, x: 0, y: 0 })}>Сбросить</Button>
           </div>
           </div>
         </div>
         <div className={styles.viewport} ref={viewportRef}>
-          <svg ref={svgRef} className={styles.svg} viewBox={geometryQuery.data.viewBox} role="img" aria-label="Интерактивная карта регионов России" onWheel={onWheel} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { dragRef.current = null; }} onPointerLeave={() => setHover(null)}>
-            <g transform={`translate(${transform.x} ${transform.y}) scale(${transform.scale})`}>
-              {regions?.map((region) => {
-                const stats = byRegion.get(region.code) ?? EMPTY;
-                return <path key={region.code} data-region-code={region.code} data-level={level(stats.universities.length)} data-selected={selected === region.code || undefined} d={region.path} fillRule="evenodd" className={styles.region} role="button" tabIndex={0} aria-label={`${region.name}: ${stats.universities.length} вузов`} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelected(region.code); } }} onFocus={(event) => { const rect = event.currentTarget.getBoundingClientRect(); showHover(region.code, rect.left + rect.width / 2, rect.top); }} onBlur={() => setHover(null)} onPointerEnter={(event) => { if (event.pointerType === 'mouse') showHover(region.code, event.clientX, event.clientY); }} onPointerLeave={() => setHover(null)} />;
-              })}
+          <svg ref={svgRef} className={styles.svg} viewBox={geometryQuery.data.viewBox} role="img" aria-label="Интерактивная карта регионов и территорий" onWheel={onWheel} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={(event) => { dragRef.current = null; delete event.currentTarget.dataset.dragging; }} onPointerLeave={clearHover} onKeyDown={(event) => { if (event.key !== 'Enter' && event.key !== ' ') return; const code = (event.target as Element).closest('[data-region-code]')?.getAttribute('data-region-code'); if (code) { event.preventDefault(); setSelected(code); } }} onFocus={(event) => { const target = (event.target as Element).closest('[data-region-code]'); const code = target?.getAttribute('data-region-code'); if (target && code) { const rect = target.getBoundingClientRect(); showHover(code, rect.left + rect.width / 2, rect.top); } }} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) clearHover(); }}>
+            <g ref={mapGroupRef} transform="translate(0 0) scale(1)">
+              <RegionPaths regions={regions ?? []} byRegion={byRegion} selected={selected} />
             </g>
           </svg>
           {hover ? <div className={styles.tooltip} role="tooltip" style={{ left: hover.x, top: hover.y }}><strong>{regionNames.get(hover.code)}</strong>{hoveredStats.universities.length ? <><span>Вузов: {hoveredStats.universities.length}</span><span>Программ запущено: {hoveredStats.launched}</span><span>Вузов с активным Workflow: {hoveredStats.activeWorkflow}</span></> : <span>Нет вузов по выбранным условиям</span>}</div> : null}
@@ -234,7 +288,7 @@ export function UniversitiesMap({ filters, scopeKey }: { filters: UniversityFilt
         </div>
         {unmapped.universities.length > 0 ? <button type="button" className={styles.unmapped} onClick={() => setSelected('unmapped')}>Без определённого региона: {unmapped.universities.length} вузов · Показать</button> : null}
         {dataQuery.data.length === 0 ? <p className={styles.noResults}>По выбранным условиям вузов не найдено. Измените фильтры, чтобы увидеть их на карте.</p> : null}
-        <p className={styles.attribution}>Границы: <a href="https://www.naturalearthdata.com/" target="_blank" rel="noreferrer">Natural Earth</a> · Города: <a href="https://www.geonames.org/" target="_blank" rel="noreferrer">GeoNames</a> (CC BY 4.0)</p>
+        <p className={styles.attribution}>Границы: <a href="https://www.naturalearthdata.com/" target="_blank" rel="noreferrer">Natural Earth</a> · Города: <a href="https://www.geonames.org/" target="_blank" rel="noreferrer">GeoNames</a> (CC BY 4.0). Статус и границы ряда территорий оспариваются; картографическая классификация Natural Earth не означает всеобщего признания.</p>
       </div>
       {selected && !mobile ? <aside className={styles.sidePanel}><RegionDetails key={`${selected}-${JSON.stringify(filters)}`} title={selectedTitle} stats={selectedStats} onClose={() => setSelected(null)} /></aside> : null}
     </div>

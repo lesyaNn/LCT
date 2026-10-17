@@ -350,7 +350,7 @@ def list_universities_map(
             "id": uni_id,
             "name": name,
             "city": city_name,
-            "region_code": city_region_code(city_name),
+            "region_code": city_region_code(city_name, name),
             "programs_count": sum(counts.get(uni_id, {}).values()),
             "launched_programs": counts.get(uni_id, {}).get("launched", 0),
             "active_programs": counts.get(uni_id, {}).get("active", 0),

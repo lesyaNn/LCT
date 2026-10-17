@@ -55,10 +55,8 @@ import { UniversitiesMap } from './universities-map';
 
 const DEFAULT_PAGE_SIZE = 8;
 const PAGE_SIZE_OPTIONS = [8, 12, 20];
-const VIEW_STORAGE_KEY = 'universities.view.v1';
-type UniversityView = 'cards' | 'table';
-type UniversitySurface = 'list' | 'map';
-const SURFACE_STORAGE_KEY = 'universities.surface.v1';
+type UniversityView = 'cards' | 'table' | 'map';
+const VIEW_TABS = [{ id: 'cards', label: 'Карточки' }, { id: 'table', label: 'Таблица' }, { id: 'map', label: 'Карта' }] as const;
 
 type SearchParamsLike = {
   get: (name: string) => string | null;
@@ -433,8 +431,6 @@ export function UniversitiesList() {
   const state = useMemo(() => parseUrlState(searchParams), [searchParams]);
   const [searchInput, setSearchInput] = useState(state.filters.search);
   const [view, setView] = useState<UniversityView>('cards');
-  const [surface, setSurface] = useState<UniversitySurface>('list');
-  const [surfaceReady, setSurfaceReady] = useState(false);
   const storageRestoredRef = useRef(false);
   const storageReadyRef = useRef(false);
   const pendingStoredFiltersRef = useRef<UniversityFilters | null>(null);
@@ -444,19 +440,6 @@ export function UniversitiesList() {
   }, [pathname, router, searchParams]);
 
   useEffect(() => setSearchInput(state.filters.search), [state.filters.search]);
-  useEffect(() => {
-    if (window.localStorage.getItem(VIEW_STORAGE_KEY) === 'table') setView('table');
-    if (window.localStorage.getItem(SURFACE_STORAGE_KEY) === 'map') setSurface('map');
-    setSurfaceReady(true);
-  }, []);
-  const selectView = (next: UniversityView) => {
-    setView(next);
-    window.localStorage.setItem(VIEW_STORAGE_KEY, next);
-  };
-  const selectSurface = (next: UniversitySurface) => {
-    setSurface(next);
-    window.localStorage.setItem(SURFACE_STORAGE_KEY, next);
-  };
   useEffect(() => {
     if (searchInput === state.filters.search) return undefined;
     const timeout = window.setTimeout(() => goToState({ search: searchInput, page: 1 }), 300);
@@ -494,7 +477,7 @@ export function UniversitiesList() {
     queryKey: [...universitiesListQueryKey(state), scopeKey],
     queryFn: ({ signal }) => getUniversities(state, signal),
     placeholderData: keepPreviousData,
-    enabled: Boolean(scopeKey) && surfaceReady && surface === 'list',
+    enabled: Boolean(scopeKey) && view !== 'map',
     staleTime: 5 * 60_000,
   });
   const catalogsQuery = useQuery({
@@ -554,17 +537,16 @@ export function UniversitiesList() {
           <h1>ВУЗы</h1>
           <p className={styles.description}>Учебные заведения, программы и задачи, требующие внимания команды.</p>
         </div>
-        {surfaceReady && surface === 'list' ? <div className={styles.headerActions}>
-          <Tabs items={[{ id: 'cards', label: 'Карточки' }, { id: 'table', label: 'Таблица' }]} activeId={view} onChange={(id) => selectView(id as UniversityView)} label="Представление вузов" prefix="university-view" />
-        </div> : null}
+        <div className={styles.headerActions}>
+          <Tabs items={VIEW_TABS} activeId={view} onChange={(id) => setView(id as UniversityView)} label="Представление вузов" prefix="university-view" />
+        </div>
       </header>
       <div className={styles.filterArea}>
         <FilterToolbar label="Фильтры вузов" collapsible controls={() => <Filters state={state} options={filterOptions} catalogsLoading={catalogsQuery.isPending} catalogsUnavailable={catalogsQuery.isError} searchInput={searchInput} setSearchInput={setSearchInput} onPatch={goToState} />} onReset={resetFilters} resetDisabled={!hasFilters} mobileCount={activeFilterCount} activeFilters={universityActiveFilters(state.filters, filterOptions, goToState)} />
         {catalogsQuery.isError ? <RouteErrorState compact onRetry={() => void catalogsQuery.refetch()} /> : null}
         {stagesQuery.isError ? <RouteErrorState compact onRetry={() => void stagesQuery.refetch()} /> : null}
       </div>
-      {surfaceReady ? <Tabs items={[{ id: 'list', label: 'Список' }, { id: 'map', label: 'Карта' }]} activeId={surface} onChange={(id) => selectSurface(id as UniversitySurface)} label="Режим просмотра вузов" prefix="university-surface" /> : null}
-      {!surfaceReady ? <TableSkeleton rows={6} columns={7} label="Загрузка вузов" /> : surface === 'map' ? <UniversitiesMap filters={state.filters} scopeKey={scopeKey} /> : query.isPending ? view === 'cards' ? <CardsSkeleton /> : <TableSkeleton rows={6} columns={7} label="Загрузка списка вузов" /> : !query.data ? <RouteErrorState onRetry={() => void query.refetch()} /> : query.data.total === 0 ? <EmptyState icon={<Search size={20} fill="currentColor" />} title={hasFilters ? 'По выбранным условиям ВУЗы не найдены' : 'Вузы пока не добавлены'} description={hasFilters ? 'Измените условия поиска или сбросьте фильтры.' : 'Когда появятся записи, они будут отображены в этом списке.'} primaryAction={hasFilters ? { label: 'Сбросить фильтры', onClick: resetFilters, variant: 'secondary' } : undefined} /> : (
+      {view === 'map' ? <UniversitiesMap filters={state.filters} scopeKey={scopeKey} /> : query.isPending ? view === 'cards' ? <CardsSkeleton /> : <TableSkeleton rows={6} columns={7} label="Загрузка списка вузов" /> : !query.data ? <RouteErrorState onRetry={() => void query.refetch()} /> : query.data.total === 0 ? <EmptyState icon={<Search size={20} fill="currentColor" />} title={hasFilters ? 'По выбранным условиям ВУЗы не найдены' : 'Вузы пока не добавлены'} description={hasFilters ? 'Измените условия поиска или сбросьте фильтры.' : 'Когда появятся записи, они будут отображены в этом списке.'} primaryAction={hasFilters ? { label: 'Сбросить фильтры', onClick: resetFilters, variant: 'secondary' } : undefined} /> : (
         <>
           {query.isFetching ? <p className={styles.fetching} role="status">Обновляем список…</p> : null}
           {view === 'cards' ? <UniversityCards items={query.data.items} /> : <TableShell><DesktopTable table={table} /></TableShell>}
