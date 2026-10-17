@@ -1,14 +1,27 @@
 'use client';
 
-import { useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import Filter from '@atomaro/icons/24/action/Filter';
 import { Button } from './button';
 import { Drawer } from './drawer';
 import { ActiveFilters, type ActiveFilterItem } from './active-filters';
 import styles from './filter-surface.module.css';
 
-export function FilterSurface({ children, className, label = 'Фильтры', mobileDrawer = true }: { children: ReactNode; className?: string; label?: string; mobileDrawer?: boolean }) {
+function useMobileFilterDrawer(enabled = true) {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!enabled || typeof window.matchMedia !== 'function') return;
+    const viewport = window.matchMedia('(max-width: 768px)');
+    const closeOnDesktop = () => { if (!viewport.matches) setOpen(false); };
+    viewport.addEventListener('change', closeOnDesktop);
+    closeOnDesktop();
+    return () => viewport.removeEventListener('change', closeOnDesktop);
+  }, [enabled]);
+  return [open, setOpen] as const;
+}
+
+export function FilterSurface({ children, className, label = 'Фильтры', mobileDrawer = true }: { children: ReactNode; className?: string; label?: string; mobileDrawer?: boolean }) {
+  const [open, setOpen] = useMobileFilterDrawer(mobileDrawer);
   if (!mobileDrawer) return <section className={[styles.root, className].filter(Boolean).join(' ')} aria-label={label}>{children}</section>;
   return <><section className={[styles.root, styles.desktop, className].filter(Boolean).join(' ')} aria-label={label}>{children}</section><Button className={styles.mobileTrigger} variant="secondary" size="s" type="button" onClick={() => setOpen(true)}><Filter size={16} fill="currentColor" />Фильтры</Button>{open ? <Drawer title="Фильтры" onClose={() => setOpen(false)}><div className={styles.mobileContent}>{children}</div><div className={styles.actions}><Button variant="primary" size="s" type="button" onClick={() => setOpen(false)}>Показать результаты</Button></div></Drawer> : null}</>;
 }
@@ -27,7 +40,7 @@ export function FilterToolbar({ label, controls, periodControls, onReset, resetD
   compact?: boolean;
   activeFilters?: ActiveFilterItem[];
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useMobileFilterDrawer();
   const [expanded, setExpanded] = useState(true);
   const panelId = useId();
   const reset = onReset && !resetDisabled ? <Button variant="ghost" size="s" type="button" onClick={onReset}>Сбросить</Button> : null;

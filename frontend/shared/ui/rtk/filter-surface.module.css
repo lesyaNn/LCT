@@ -12,8 +12,9 @@
 .panel[hidden] { display: none; }
 .collapseTrigger { margin-bottom: var(--rtk-space-3); }
 .actions { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); justify-content: flex-end; margin-top: var(--rtk-space-3); }
-.mobileTrigger { display: none; }
+/* Override Button's display regardless of CSS module insertion order. */
+.mobileTrigger.mobileTrigger { display: none; }
 .mobileContent { min-width: 0; }
 .mobileGrid { grid-template-columns: 1fr; }
 .mobileGrid:has(> :only-child) { grid-template-columns: 1fr; }
-@media (max-width: 768px) { .desktop { display: none; } .mobileTrigger { display: inline-flex; justify-self: start; } .mobileGrid { grid-template-columns: 1fr; } .actions { justify-content: stretch; } .actions > * { flex: 1 1 auto; } }
+@media (max-width: 768px) { .desktop { display: none; } .mobileTrigger.mobileTrigger { align-self: flex-start; display: inline-flex; justify-self: start; max-width: 100%; width: fit-content; } .mobileGrid { grid-template-columns: 1fr; } .actions { justify-content: stretch; } .actions > * { flex: 1 1 auto; } }
