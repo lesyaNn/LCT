@@ -8,7 +8,7 @@ import styles from './drawer.module.css';
 let openDrawers = 0;
 let previousBodyOverflow = '';
 
-export function Drawer({ title, children, onClose, side = 'right', labelledBy, closeLabel = 'Закрыть' }: { title: string; children: ReactNode; onClose: () => void; side?: 'left' | 'right'; labelledBy?: string; closeLabel?: string }) {
+export function Drawer({ title, children, footer, onClose, side = 'right', labelledBy, closeLabel = 'Закрыть', className = '' }: { title: string; children: ReactNode; footer?: ReactNode; onClose: () => void; side?: 'left' | 'right'; labelledBy?: string; closeLabel?: string; className?: string }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const generatedTitleId = useId();
   const titleId = labelledBy ?? `rtk-drawer-title-${generatedTitleId}`;
@@ -40,5 +40,5 @@ export function Drawer({ title, children, onClose, side = 'right', labelledBy, c
   }, [mounted]);
 
   if (!mounted) return null;
-  return createPortal(<div className={styles.overlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><aside className={`${styles.drawer} ${styles[side]}`} role="dialog" aria-modal="true" aria-labelledby={titleId}><div className={styles.header}><h2 id={titleId}>{title}</h2><button ref={closeRef} className={styles.close} type="button" aria-label={closeLabel} onClick={onClose}><CloseLarge size={20} fill="currentColor" /></button></div><div className={styles.body}>{children}</div></aside></div>, document.body);
+  return createPortal(<div className={styles.overlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><aside className={`${styles.drawer} ${styles[side]} ${className}`} role="dialog" aria-modal="true" aria-labelledby={titleId}><div className={styles.header}><h2 id={titleId}>{title}</h2><button ref={closeRef} className={styles.close} type="button" aria-label={closeLabel} onClick={onClose}><CloseLarge size={20} fill="currentColor" /></button></div><div className={styles.body}>{children}</div>{footer ? <div className={styles.footer}>{footer}</div> : null}</aside></div>, document.body);
 }

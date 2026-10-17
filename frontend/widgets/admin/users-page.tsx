@@ -30,9 +30,13 @@ import {
 } from '@/shared/lib/users-repository';
 import type { UserRole } from '@/shared/types/user';
 import { Button } from '@/shared/ui/rtk/button';
+import { Avatar } from '@/shared/ui/rtk/avatar';
 import { Drawer } from '@/shared/ui/rtk/drawer';
 import { EmptyState } from '@/shared/ui/empty-state';
-import { Input, Select } from '@/shared/ui/rtk/form-controls';
+import { Input, Select, Switch } from '@/shared/ui/rtk/form-controls';
+import { Icon } from '@/shared/ui/rtk/icon';
+import Lock from '@atomaro/icons/24/action/Lock';
+import InformationStroke from '@atomaro/icons/24/alert/InformationStroke';
 import { FilterToolbar } from '@/shared/ui/rtk/filter-surface';
 import { FilterField, SearchField } from '@/shared/ui/rtk/filter-field';
 import { Modal } from '@/shared/ui/rtk/modal';
@@ -115,6 +119,9 @@ export function UsersPage() {
   const [invite, setInvite] = useState<InviteAdminUserInput>({ name: '', username: '', email: '', role: 'user', scope: { kind: 'universities', universityIds: [] } });
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteFieldErrors, setInviteFieldErrors] = useState<Partial<Record<InviteField, string>>>({});
+  const updateSubmitting = useRef(false);
+  const blockSubmitting = useRef(false);
+  const resetSubmitting = useRef(false);
   const inviteSubmitting = useRef(false);
 
   useEffect(() => { const timer = window.setTimeout(() => setDebouncedSearch(search), 250); return () => window.clearTimeout(timer); }, [search]);
@@ -126,6 +133,7 @@ export function UsersPage() {
   const scopeOptionsQuery = useQuery({ queryKey: queryKeys.users.scopeOptions, queryFn: listUserScopeOptions, staleTime: 5 * 60_000 });
   const scopeOptions = canManageUsers ? (scopeOptionsQuery.data ?? []) : (scopeOptionsQuery.data ?? []).filter((option) => currentUser?.scope.universityIds.includes(option.id));
   const selectedUser = detailQuery.data ?? query.data?.items.find((item) => item.id === selectedUserId) ?? null;
+  const selectedUserInitials = selectedUser?.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toLocaleUpperCase('ru-RU') || '—';
   const isSelf = Boolean(selectedUser && currentUser && selectedUser.id === currentUser.id);
   const pageCount = Math.max(1, Math.ceil((query.data?.total ?? 0) / pageSize));
 
@@ -144,6 +152,7 @@ export function UsersPage() {
       setToast({ intent: 'success', title: canManageUsers ? 'Данные пользователя сохранены' : 'Назначения вузов сохранены' });
       if (!canManageUsers) setSelectedUserId(null);
     },
+    onSettled: () => { updateSubmitting.current = false; },
   });
 
   const blockMutation = useMutation({
@@ -158,12 +167,14 @@ export function UsersPage() {
       setBlockTarget(null);
       setToast({ intent: 'success', title: updated.status === 'blocked' ? 'Пользователь заблокирован' : 'Пользователь разблокирован' });
     },
+    onSettled: () => { blockSubmitting.current = false; },
   });
 
   const resetMutation = useMutation({
     mutationFn: (id: string) => resetAdminUserPassword(id),
     onSuccess: () => { setResetTarget(null); setToast({ intent: 'success', title: 'Письмо для сброса пароля отправлено' }); },
     onError: (cause) => setResetError(normalizeApiError(cause, { fallbackMessage: 'Keycloak не отправил письмо. Повторите попытку позже.' }).message),
+    onSettled: () => { resetSubmitting.current = false; },
   });
 
   const inviteMutation = useMutation({
@@ -190,9 +201,10 @@ export function UsersPage() {
     if (nextRole === 'admin') setEditorScope([]);
   };
   const saveUser = () => {
-    if (!selectedUser) return;
+    if (!selectedUser || updateSubmitting.current || updateMutation.isPending) return;
     if (!canManageUsers && editorRole !== selectedUser.role) { setEditorError('Изменение роли недоступно.'); return; }
     if (isSelf && editorRole !== selectedUser.role) { setEditorError('Нельзя снять с себя роль администратора.'); return; }
+    updateSubmitting.current = true;
     updateMutation.mutate({ id: selectedUser.id, input: { role: editorRole, scope: normalizeScopeForRole(editorRole, editorRole === 'admin' ? { kind: 'all' } : { kind: 'universities', universityIds: editorScope }) } });
   };
   const submitInvite = () => {
@@ -212,20 +224,26 @@ export function UsersPage() {
   };
 
   const renderDrawer = selectedUser ? (
-    <Drawer title={canManageUsers ? 'Настройки пользователя' : 'Назначение вузов'} onClose={closeUser}>
+    <Drawer title={canManageUsers ? 'Настройки пользователя' : 'Назначение вузов'} className={styles.settingsDrawer} onClose={closeUser} footer={<div className={styles.userSettingsActions}>
+      {canManageUsers ? <Button className={styles.resetPasswordButton} variant="secondary" size="s" type="button" disabled={detailQuery.isError || !USERS_API_CAPABILITIES.passwordReset || resetMutation.isPending} onClick={() => { setResetError(null); setResetTarget(selectedUser); }}><Lock size={16} fill="currentColor" />Сбросить пароль</Button> : null}
+      <div className={styles.userSettingsActionGroup}><Button variant="ghost" size="s" type="button" disabled={updateMutation.isPending || blockMutation.isPending} onClick={closeUser}>Отмена</Button><Button variant="primary" size="s" type="button" loading={updateMutation.isPending} disabled={!USERS_API_CAPABILITIES.updateRoleAndScope || detailQuery.isError || updateMutation.isPending || (editorRole !== 'admin' && (scopeOptionsQuery.isPending || scopeOptionsQuery.isError)) || (isSelf && editorRole !== selectedUser.role)} onClick={saveUser}>Сохранить</Button></div>
+    </div>}>
       <div className={styles.drawerForm}>
         <div className={styles.drawerIntro}>
-          <strong>{selectedUser.name}</strong>
-          <span>{selectedUser.username} · {selectedUser.email}</span>
-          <span>Текущий статус: {statusLabel(selectedUser.status)}</span>
+          <Avatar initials={selectedUserInitials} size="l" />
+          <div className={styles.drawerIdentity}>
+            <strong>{selectedUser.name}</strong>
+            <span>{selectedUser.username} · {selectedUser.email}</span>
+            <StatusBadge intent={statusIntent(selectedUser.status)}>{statusLabel(selectedUser.status)}</StatusBadge>
+          </div>
         </div>
         {canManageUsers ? (
-          <label className={styles.field}>
+          <div className={styles.field}>
             <span>Роль</span>
-            <RoleSelect value={editorRole} onChange={changeRole} self={isSelf} />
+            <div className={styles.roleSelectRow}><span className={styles.roleIcon} aria-hidden="true"><Icon name={editorRole === 'admin' ? 'audit' : editorRole === 'manager' ? 'admin' : 'user'} size={20} /></span><RoleSelect value={editorRole} onChange={changeRole} self={isSelf} /></div>
             {isSelf ? <small id="self-role-hint" className={styles.muted}>Нельзя снять с себя роль администратора.</small> : null}
-            <small className={styles.roleDescription}>{userRoleDescriptions[editorRole]}</small>
-          </label>
+            <small className={styles.roleDescription}><InformationStroke size={18} fill="currentColor" aria-hidden="true" />{userRoleDescriptions[editorRole]}</small>
+          </div>
         ) : null}
         <div className={styles.field}>
           <span>{canManageUsers ? 'Скоуп данных' : 'Доступные ВУЗы'}</span>
@@ -235,21 +253,11 @@ export function UsersPage() {
             : <small className={styles.muted}>{!canManageUsers && !editorScope.length ? 'Нет назначений в вашем контуре.' : scopeDescription({ kind: 'universities', universityIds: editorScope }, scopeOptions)}</small>}
           {canManageUsers && editorRole !== 'admin' && !editorScope.length ? <p className={styles.warning}>Пользователь не увидит ни одного ВУЗа.</p> : null}
         </div>
+        {canManageUsers ? <div className={styles.statusField}><span>Статус</span><div><Switch checked={selectedUser.status === 'active'} onChange={(active) => { if (active !== (selectedUser.status === 'active')) setBlockTarget(selectedUser); }} label="Активен" testId="block-button" disabled={isSelf || detailQuery.isError || !USERS_API_CAPABILITIES.block || blockMutation.isPending || updateMutation.isPending} /><strong>{statusLabel(selectedUser.status)}</strong></div><small>{selectedUser.status === 'active' ? 'При отключении пользователь потеряет доступ к CRM.' : 'При включении пользователь снова получит доступ к CRM.'}</small>{isSelf ? <small className={styles.muted}>Свою учётную запись отключить нельзя.</small> : null}</div> : null}
         {detailQuery.isError ? <p className={styles.formError} role="alert">Не удалось обновить данные пользователя.</p> : null}
         {scopeOptionsQuery.isError ? <p className={styles.formError} role="alert">Не удалось загрузить каталог ВУЗов.</p> : null}
         {editorError ? <p className={styles.formError} role="alert">{editorError}</p> : null}
         {!USERS_API_CAPABILITIES.updateRoleAndScope ? <IntegrationBlocker>{canManageUsers ? 'Изменение роли и области доступа пока недоступно.' : 'Назначение вузов пока недоступно.'}</IntegrationBlocker> : null}
-        <div className={styles.drawerActions}>
-          <Button variant="primary" type="button" loading={updateMutation.isPending} disabled={!USERS_API_CAPABILITIES.updateRoleAndScope || detailQuery.isError || updateMutation.isPending || (editorRole !== 'admin' && (scopeOptionsQuery.isPending || scopeOptionsQuery.isError)) || (isSelf && editorRole !== selectedUser.role)} onClick={saveUser}>Сохранить</Button>
-          {canManageUsers ? <>
-            <Tooltip content={isSelf ? 'Нельзя заблокировать собственную учётную запись.' : !USERS_API_CAPABILITIES.block ? 'Блокировка пока недоступна.' : null}>
-              <Button data-testid="block-button" className={styles.dangerAction} variant="secondary" type="button" disabled={isSelf || detailQuery.isError || !USERS_API_CAPABILITIES.block || blockMutation.isPending} onClick={() => setBlockTarget(selectedUser)}>{selectedUser.status === 'blocked' ? 'Разблокировать' : 'Заблокировать'}</Button>
-            </Tooltip>
-            <Tooltip content={!USERS_API_CAPABILITIES.passwordReset ? 'Сброс пароля пока недоступен.' : null}>
-              <Button variant="ghost" type="button" disabled={detailQuery.isError || !USERS_API_CAPABILITIES.passwordReset || resetMutation.isPending} onClick={() => { setResetError(null); setResetTarget(selectedUser); }}>Сбросить пароль</Button>
-            </Tooltip>
-          </> : null}
-        </div>
       </div>
     </Drawer>
   ) : null;
@@ -290,5 +298,5 @@ export function UsersPage() {
       </form>
     </Drawer>
   ) : null}
-  {canManageUsers && blockTarget ? <Modal title={blockTarget.status === 'blocked' ? 'Разблокировать пользователя?' : 'Заблокировать пользователя?'} onClose={() => { if (!blockMutation.isPending) setBlockTarget(null); }}><div className={styles.modalContent}><p>{blockTarget.name} {blockTarget.status === 'blocked' ? 'снова получит доступ к CRM.' : 'потеряет доступ к CRM.'}</p><div className={styles.modalActions}><Button variant={blockTarget.status === 'blocked' ? 'primary' : 'danger'} type="button" loading={blockMutation.isPending} disabled={blockMutation.isPending} onClick={() => blockMutation.mutate({ id: blockTarget.id, blocked: blockTarget.status !== 'blocked' })}>{blockTarget.status === 'blocked' ? 'Разблокировать' : 'Заблокировать'}</Button><Button variant="ghost" type="button" disabled={blockMutation.isPending} onClick={() => setBlockTarget(null)}>Отмена</Button></div></div></Modal> : null}{canManageUsers && resetTarget ? <Modal title="Сбросить пароль пользователя?" onClose={() => { if (!resetMutation.isPending) setResetTarget(null); }}><div className={styles.modalContent}><p>Keycloak отправит пользователю письмо со ссылкой для установки нового пароля.</p>{resetError ? <p className={styles.formError} role="alert">{resetError}</p> : null}<div className={styles.modalActions}><Button variant="primary" type="button" loading={resetMutation.isPending} disabled={resetMutation.isPending} onClick={() => resetMutation.mutate(resetTarget.id)}>Отправить письмо</Button><Button variant="ghost" type="button" disabled={resetMutation.isPending} onClick={() => setResetTarget(null)}>Отмена</Button></div></div></Modal> : null}{toast ? <div className={styles.toastViewport}><Toast intent={toast.intent} title={toast.title} message={toast.message} onClose={() => setToast(null)} /></div> : null}</div>;
+  {canManageUsers && blockTarget ? <Modal title={blockTarget.status === 'blocked' ? 'Разблокировать пользователя?' : 'Заблокировать пользователя?'} onClose={() => { if (!blockMutation.isPending) setBlockTarget(null); }}><div className={styles.modalContent}><p>{blockTarget.name} {blockTarget.status === 'blocked' ? 'снова получит доступ к CRM.' : 'потеряет доступ к CRM.'}</p><div className={styles.modalActions}><Button variant={blockTarget.status === 'blocked' ? 'primary' : 'danger'} type="button" loading={blockMutation.isPending} disabled={blockMutation.isPending} onClick={() => { if (blockSubmitting.current) return; blockSubmitting.current = true; blockMutation.mutate({ id: blockTarget.id, blocked: blockTarget.status !== 'blocked' }); }}>{blockTarget.status === 'blocked' ? 'Разблокировать' : 'Заблокировать'}</Button><Button variant="ghost" type="button" disabled={blockMutation.isPending} onClick={() => setBlockTarget(null)}>Отмена</Button></div></div></Modal> : null}{canManageUsers && resetTarget ? <Modal title="Сбросить пароль пользователя?" onClose={() => { if (!resetMutation.isPending) setResetTarget(null); }}><div className={styles.modalContent}><p>Keycloak отправит пользователю письмо со ссылкой для установки нового пароля.</p>{resetError ? <p className={styles.formError} role="alert">{resetError}</p> : null}<div className={styles.modalActions}><Button variant="primary" type="button" loading={resetMutation.isPending} disabled={resetMutation.isPending} onClick={() => { if (resetSubmitting.current) return; resetSubmitting.current = true; resetMutation.mutate(resetTarget.id); }}>Отправить письмо</Button><Button variant="ghost" type="button" disabled={resetMutation.isPending} onClick={() => setResetTarget(null)}>Отмена</Button></div></div></Modal> : null}{toast ? <div className={styles.toastViewport}><Toast intent={toast.intent} title={toast.title} message={toast.message} onClose={() => setToast(null)} /></div> : null}</div>;
 }

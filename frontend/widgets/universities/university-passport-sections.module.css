@@ -21,11 +21,15 @@
 .fileNameButton:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
 .fileError { color: var(--rtk-color-danger); display: block; font-size: 11px; }
 .documentForm { display: flex; flex-direction: column; gap: var(--rtk-space-4); }
+.documentInlineForm { background: var(--rtk-color-surface-subtle); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); gap: var(--rtk-space-3); min-width: 0; padding: var(--rtk-space-4); }
+.documentInlineFields { display: grid; gap: var(--rtk-space-3); grid-template-columns: repeat(2, minmax(0, 1fr)); min-width: 0; }
+.filePickerInput { height: 1px; opacity: 0; pointer-events: none; position: absolute; width: 1px; }
 .documentForm label { display: flex; flex-direction: column; gap: var(--rtk-space-2); font-size: 13px; font-weight: 600; }
 .documentFileField { display: flex; flex-direction: column; gap: var(--rtk-space-2); font-size: 13px; font-weight: 600; }
 .selectedDocument { align-items: center; background: var(--rtk-color-surface-subtle); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); display: flex; gap: var(--rtk-space-2); min-width: 0; padding: var(--rtk-space-1) var(--rtk-space-2); }
 .selectedDocument > span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .documentFormActions { display: flex; justify-content: flex-end; gap: var(--rtk-space-2); }
+@media (max-width: 600px) { .documentInlineFields { grid-template-columns: minmax(0, 1fr); } .documentInlineForm .documentFormActions { flex-wrap: wrap; } }
 .iconAction { align-items: center; background: transparent; border: 0; color: var(--rtk-color-brand); cursor: pointer; display: inline-flex; justify-content: center; min-height: 32px; min-width: 32px; padding: var(--rtk-space-1); }
 .iconAction:hover { color: var(--rtk-color-brand-hover); }
 .iconAction:disabled { color: var(--rtk-color-text-tertiary); cursor: not-allowed; }
