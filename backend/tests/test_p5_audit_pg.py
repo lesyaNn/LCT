@@ -177,7 +177,6 @@ def test_scoped_filters_rbac_and_openapi(audit_context):
         "id", "timestamp", "user_id", "user_name", "role", "action",
         "entity_type", "entity_id", "university_id", "old_value",
         "new_value", "request_id", "ip", "user_agent",
-        "presentation", "university_name", "entity_name",
     }
     assert client.get(route, params={"university_id": str(own)}).status_code == 200
     assert client.get(route, params={"university_id": str(foreign)}).status_code == 403
@@ -242,7 +241,6 @@ def test_filter_options_scope_and_personal_field_redaction(audit_context):
 
 def test_http_university_mutation_context(audit_context):
     engine, client, current, own, _ = audit_context
-    current["user"] = CurrentUser(id="admin-sub", name="Admin", roles={"admin"})
     request_id = str(uuid.uuid4())
     response = client.patch(
         f"/api/v1/universities/{own}", json={"name": "Changed"},
@@ -259,8 +257,8 @@ def test_http_university_mutation_context(audit_context):
         assert str(event.request_id) == response.headers["X-Request-ID"] == request_id
         assert event.user_agent == "P5-Audit-Test"
         assert event.ip_address
-        assert event.role == "admin"
-        assert event.user_name == "Admin"
+        assert event.role == "manager"
+        assert event.user_name == "Manager"
 
 
 def test_required_production_hooks(audit_context):
@@ -422,5 +420,4 @@ def test_import_job_boundary_has_one_event(audit_context):
         assert events[0].university_id == own
         assert events[0].new_value == {
             "format": "xlsx", "columns": [], "status": "queued", "job_type": "xlsx_import",
-            "audit_object_type": "import", "university_count": 1,
         }

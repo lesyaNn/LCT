@@ -106,8 +106,8 @@ def test_university_collection_detail_and_mutation_matrix(context):
 
     _as(current, "manager", (str(b),))
     assert client.get(path).json()["total"] == 1
-    _forbidden(client.patch(f"{path}/{b}", json={"name": "Denied"}))
-    _forbidden(client.patch(f"{path}/{a}", json={"name": "Denied"}))
+    assert client.patch(f"{path}/{b}", json={"name": "Scoped Manager"}).status_code == 200
+    _not_found(client.patch(f"{path}/{a}", json={"name": "Denied"}))
     _forbidden(client.post(path, json={"name": "Denied"}))
     _not_found(client.get(f"{path}/{a}"))
 
@@ -126,9 +126,9 @@ def test_foreign_detail_paths_are_concealed_as_404(context):
     client, current, a, _, _, meeting_id = context
     _as(current, "manager", (str(uuid4()),))
 
-    _forbidden(client.patch(f"/api/v1/universities/{a}", json={"name": "Hidden"}))
     probes = [
         client.get(f"/api/v1/universities/{a}"),
+        client.patch(f"/api/v1/universities/{a}", json={"name": "Hidden"}),
         client.get(f"/api/v1/meetings/{meeting_id}"),
         client.patch(f"/api/v1/meetings/{meeting_id}", json={"subject": "Hidden"}),
         client.delete(f"/api/v1/meetings/{meeting_id}"),

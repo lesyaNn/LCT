@@ -12,7 +12,6 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.modules.audit.service import get_audit_db
 from app.core.permissions import require_permission
 from app.core.policies import ensure_university_access
 from app.core.security import CurrentUser
@@ -127,7 +126,7 @@ def upload_university_document(
     document_type: DocumentType = Form(...),
     title: str = Form(min_length=1, max_length=1024),
     file: UploadFile = File(...),
-    db: Session = Depends(get_audit_db),
+    db: Session = Depends(get_db),
     storage: StorageBackend = Depends(get_storage),
     user: CurrentUser = Depends(require_permission("university.edit")),
 ) -> DocumentShort:
