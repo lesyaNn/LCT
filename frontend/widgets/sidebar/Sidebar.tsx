@@ -37,10 +37,11 @@ export function Sidebar({ user, pathname, collapsed, mobileOpen = false, onToggl
 
 function SidebarContent({ user, pathname, collapsed, mobile = false, onToggleCollapse, onCloseMobile }: SidebarProps & { mobile?: boolean }) {
   const visibleItems = getVisibleNavigationItems(user);
-  const items = visibleItems.filter((item) => item.href !== '/admin' && !item.href.startsWith('/admin/'));
-  const adminItems = visibleItems.filter((item) => item.href.startsWith('/admin/'));
+  const items = visibleItems.filter((item) => item.href !== '/admin' && !item.href.startsWith('/admin/') && item.href !== '/api');
+  const adminItems = visibleItems.filter((item) => item.href.startsWith('/admin/') || item.href === '/api');
   const [adminOpen, setAdminOpen] = useState(false);
-  const adminExpanded = adminOpen || pathname.startsWith('/admin');
+  const adminActive = pathname.startsWith('/admin') || pathname === '/api';
+  const adminExpanded = adminOpen || adminActive;
   const activeHref = items
     .filter((item) => pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(`${item.href}/`)))
     .sort((left, right) => right.href.length - left.href.length)[0]?.href;
@@ -74,10 +75,10 @@ function SidebarContent({ user, pathname, collapsed, mobile = false, onToggleCol
           );
         })}
         {adminItems.length ? <>
-          <button className={`${styles.navItem} ${pathname.startsWith('/admin') ? styles.active : ''}`} type="button" onClick={() => setAdminOpen((value) => !value)} aria-expanded={adminExpanded} title={collapsed && !mobile ? 'Администрирование' : undefined}>
+          <button className={`${styles.navItem} ${adminActive ? styles.active : ''}`} type="button" onClick={() => setAdminOpen((value) => !value)} aria-expanded={adminExpanded} title={collapsed && !mobile ? 'Администрирование' : undefined}>
             <Icon name="admin" size={20} />
             {(!collapsed || mobile) && <><span>Администрирование</span><Icon name={adminExpanded ? 'chevron-down' : 'chevron-right'} size={16} /></>}
-            {pathname.startsWith('/admin') && <span className={styles.activeMarker} aria-hidden="true" />}
+            {adminActive && <span className={styles.activeMarker} aria-hidden="true" />}
           </button>
           {adminExpanded && (!collapsed || mobile) ? <div className={styles.subnav} aria-label="Разделы администрирования">
             {adminItems.map((item) => {
