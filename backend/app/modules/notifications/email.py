@@ -20,6 +20,7 @@ from app.config import settings
 from app.models.notification import Notification
 from app.models.notification_delivery import NotificationDelivery
 from app.modules.notifications.address import outbound_email
+from app.modules.notifications.email_templates import LOGO_CID, logo_bytes, render_html_message
 
 logger = logging.getLogger("rtk")
 HEARTBEAT_INTERVAL_SECONDS = 30
@@ -51,7 +52,7 @@ def target_path(notification: Notification) -> str:
 
 
 def render_message(notification: Notification) -> tuple[str, str]:
-    """Plain text only; no user supplied HTML or technical identifiers in prose."""
+    """Canonical plain text, also used to build the HTML alternative."""
     subject = notification.title.strip() or "Уведомление CRM"
     body = f"{subject}\n\n{notification.message.strip()}"
     origin = settings.frontend_origin.rstrip("/")
@@ -74,6 +75,11 @@ def send_email(recipient: str, subject: str, body: str) -> None:
     message["From"] = formataddr((settings.smtp_from_name, sender))
     message["To"] = recipient
     message.set_content(body)
+    message.add_alternative(render_html_message(subject, body), subtype="html")
+    message.get_payload()[-1].add_related(
+        logo_bytes(), maintype="image", subtype="png", cid=f"<{LOGO_CID}>",
+        disposition="inline", filename="rostelecom-email.png",
+    )
     context = ssl.create_default_context()
     smtp_class = smtplib.SMTP_SSL if settings.smtp_security == "ssl" else smtplib.SMTP
     with smtp_class(settings.smtp_host, settings.smtp_port,

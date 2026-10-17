@@ -38,7 +38,7 @@ include = ["app*", "scripts*"]
 exclude = ["var*", "tests*", "alembic*", "migrations*"]
 
 [tool.setuptools.package-data]
-app = ["assets/*.png", "assets/*.md", "assets/*.json"]
+app = ["assets/*.png", "assets/*.md", "assets/*.json", "modules/notifications/templates/*.html"]
 
 [tool.ruff]
 line-length = 100
