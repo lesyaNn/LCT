@@ -12,6 +12,8 @@ import {
 import { useAuth } from '@/shared/auth/AuthProvider';
 import { Button, ButtonLink } from '@/shared/ui/rtk/button';
 import { Input, Select } from '@/shared/ui/rtk/form-controls';
+import { Tabs } from '@/shared/ui/rtk/tabs';
+import { TabbedSurface } from '@/shared/ui/rtk/tabbed-surface';
 import styles from './api-documentation-page.module.css';
 
 function Code({ value }: { value: unknown }) {
@@ -122,17 +124,11 @@ export function ApiDocumentationPage({ guide }: { guide: string }) {
   }
 
   return <section className={styles.page}>
-    <div className={styles.toolbar}><p>Базовый путь <code>/api/v1</code>{catalog ? ` · Версия ${catalog.version} · Методов ${catalog.operation_count}` : ''}</p><div className={styles.actions}><Button disabled={!document} onClick={downloadSchema}>Скачать OpenAPI</Button><ButtonLink href="/docs?article=api%2Fintegration">Открыть инструкцию</ButtonLink></div></div>
-    <p className={styles.hint}>Справочник загружается с текущего бэкенда. Просмотр документации не создаёт и не удаляет данные CRM.</p>
-    {error ? <div className={styles.notice} role="alert"><p>{error}</p><Button onClick={() => setAttempt(value => value + 1)}>Повторить загрузку</Button></div> : !catalog ? <p role="status">Загрузка контракта API…</p> : null}
-    <div className={styles.tabs} role="tablist" aria-label="Разделы API">{tabs.map((item, index) => <button type="button" id={`api-tab-${item.id}`} role="tab" aria-selected={tab === item.id} aria-controls={`api-panel-${item.id}`} tabIndex={tab === item.id ? 0 : -1} key={item.id} onClick={() => setTab(item.id)} onKeyDown={event => {
-      if (!['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(event.key)) return;
-      event.preventDefault();
-      const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length;
-      setTab(tabs[next].id);
-      window.document.getElementById(`api-tab-${tabs[next].id}`)?.focus();
-    }}>{item.label}</button>)}</div>
-    <div id={`api-panel-${tab}`} role="tabpanel" aria-labelledby={`api-tab-${tab}`}>
+    <div className={styles.toolbar}><p>Базовый путь <code>/api/v1</code>{catalog ? ` · Версия ${catalog.version} · Методов ${catalog.operation_count}` : ''}</p><div className={styles.actions}><Button variant="primary" disabled={!document} onClick={downloadSchema}>Скачать OpenAPI</Button><ButtonLink variant="orange" href="/docs?article=api%2Fintegration">Открыть инструкцию</ButtonLink></div></div>
+    <TabbedSurface tabs={<Tabs items={tabs} activeId={tab} onChange={setTab} label="Разделы API" prefix="api-tab" panelPrefix="api-panel" />} contentClassName={styles.tabContent}>
+      <p className={styles.hint}>Справочник загружается с текущего бэкенда. Просмотр документации не создаёт и не удаляет данные CRM.</p>
+      {error ? <div className={styles.notice} role="alert"><p>{error}</p><Button onClick={() => setAttempt(value => value + 1)}>Повторить загрузку</Button></div> : !catalog ? <p role="status">Загрузка контракта API…</p> : null}
+      <div className={styles.panel} id={`api-panel-${tab}`} role="tabpanel" aria-labelledby={`api-tab-${tab}`}>
       {tab === 'guide' ? <article className={styles.markdown}><ReactMarkdown remarkPlugins={[remarkGfm]} components={{
         table: ({ children, ...props }) => <div className={styles.tableWrap}><table {...props}>{children}</table></div>,
         pre: ({ children }) => <pre className={styles.code}>{children}</pre>,
@@ -156,6 +152,7 @@ export function ApiDocumentationPage({ guide }: { guide: string }) {
         <h2>Коды ошибок</h2><p>Проверяйте error.code. Для обращения к поддержке сохраните error.request_id. Не сохраняйте токен или тело запроса в журнал ошибок.</p><Code value={{ error: { code: 'NOT_FOUND', message: 'Запрашиваемый ресурс не найден.', request_id: '11111111-1111-4111-8111-111111111111', details: {} } }} />
         <div className={styles.tableWrap}><table><thead><tr><th>HTTP</th><th>Код</th><th>Сообщение</th></tr></thead><tbody>{catalog.errors.map(item => <tr key={item.code}><td>{item.status}</td><td><code>{item.code}</code></td><td>{readableDescription(item.message)}</td></tr>)}</tbody></table></div>
       </> : null}
-    </div>
+      </div>
+    </TabbedSurface>
   </section>;
 }

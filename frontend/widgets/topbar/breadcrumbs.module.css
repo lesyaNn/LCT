@@ -3,4 +3,5 @@
 .entry:not(:last-child) { color: var(--rtk-color-text-tertiary); }
 .entry:last-child { color: var(--rtk-color-text-primary); font-weight: 600; }
 .entry a, .entry > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.entry a { text-decoration: none; }
 .entry a:hover { color: var(--rtk-color-brand); }

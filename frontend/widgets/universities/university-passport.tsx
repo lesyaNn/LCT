@@ -88,9 +88,9 @@ function PassportHeader({ passport, onTabChange }: { passport: UniversityPasspor
         <div className={styles.titleBlock}>
           <h1>{passport.name}</h1>
           <p className={styles.city}>{passport.city}</p>
-          <UniversityLocalClock city={passport.city} timeZone={passport.timeZone} />
         </div>
         <div className={styles.headerSide}>
+          <UniversityLocalClock city={passport.city} timeZone={passport.timeZone} />
           <div className={styles.headerActions} aria-label="Действия с вузом">
             <Button variant="primary" size="s" type="button" onClick={() => onTabChange('workflow')}><Checklist size={16} fill="currentColor" />Workflow</Button>
           </div>

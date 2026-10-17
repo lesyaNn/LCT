@@ -235,7 +235,7 @@ function StageBadge({ item }: { item: UniversityListItem }) {
 
 function ProgramsCell({ item }: { item: UniversityListItem }) {
   if (item.availability?.programs === false) return <span>—</span>;
-  return <strong className={styles.programCount}>{item.programsCount}</strong>;
+  return <span className={styles.programCount}>{item.programsCount}</span>;
 }
 
 function AttentionIndicator({ active }: { active: boolean }) {

@@ -80,3 +80,9 @@
 }
 .copyValue { align-items: center; display: flex; gap: var(--rtk-space-2); min-width: 0; overflow-wrap: anywhere; }
 .copyValue strong { min-width: 0; }
+.copyAction { flex: 0 0 32px; height: 32px; opacity: 0; pointer-events: none; transition: opacity 160ms ease; }
+.copyValue:hover .copyAction, .copyValue:focus-within .copyAction { opacity: 1; pointer-events: auto; }
+.copyValue .copyButton { height: 32px; width: 32px; }
+@media (max-width: 768px) { .copyAction { flex-basis: 44px; height: 44px; } .copyValue .copyButton { height: 44px; width: 44px; } }
+@media (hover: none) { .copyAction { opacity: 1; pointer-events: auto; } }
+@media (prefers-reduced-motion: reduce) { .copyAction { transition: none; } }

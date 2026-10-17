@@ -9,7 +9,8 @@
 .heading { color: var(--rtk-color-text-secondary); font-size: 11px; font-weight: 700; letter-spacing: .06em; padding: 8px 10px 4px; text-transform: uppercase; }
 .option { align-items: center; background: transparent; border: 0; border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-primary); cursor: pointer; display: flex; gap: 10px; padding: 9px 10px; text-align: left; width: 100%; }
 .option:hover, .selected { background: var(--rtk-color-surface-hover); }
-.option span { display: flex; flex-direction: column; min-width: 0; }
+.optionIcon { align-items: center; display: inline-flex; flex: 0 0 24px; height: 24px; justify-content: center; }
+.optionText { display: flex; flex-direction: column; min-width: 0; }
 .option strong, .option small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .option strong { font-size: 13px; font-weight: 600; }
 .option small { color: var(--rtk-color-text-secondary); font-size: 12px; margin-top: 2px; }

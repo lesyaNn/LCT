@@ -66,7 +66,8 @@ def test_documentation_content_search_respects_roles_and_skips_record_queries(mo
     (root / "admin-guide").mkdir(parents=True)
     (root / "user-guide" / "history.md").write_text(
         "---\nsection: user-guide\nslug: history\ntitle: История изменений\n---\n\n"
-        "Маршрут действий доступен в истории вуза.", encoding="utf-8",
+        "## Маршрут действий\n\nМаршрут действий доступен в **истории** [вуза](/docs).",
+        encoding="utf-8",
     )
     (root / "admin-guide" / "users.md").write_text(
         "---\nsection: admin-guide\nslug: users\ntitle: Пользователи\n---\n\n"
@@ -80,6 +81,7 @@ def test_documentation_content_search_respects_roles_and_skips_record_queries(mo
     assert [(hit.title, hit.href) for hit in found.documentation] == [
         ("История изменений", "/docs?article=user-guide%2Fhistory")
     ]
+    assert found.documentation[0].subtitle == "Маршрут действий Маршрут действий доступен в истории вуза."
     assert module.search(db, regular, "пароль", records_q="").documentation == []
     assert module.search(db, CurrentUser(roles={"admin"}), "пароль", records_q="").documentation[0].title == "Пользователи"
     assert db.statements == []

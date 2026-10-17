@@ -85,6 +85,7 @@ test('reader sees university clock, copies contact methods and contract number',
   await expect.poll(() => copied(page)).toHaveLength(3);
   await page.screenshot({ path: testInfo.outputPath('contacts-mobile.png'), fullPage: true });
   await page.goto(`/universities/${universityId}?tab=documents`);
+  await page.getByText('ДГ-2026/001', { exact: true }).hover();
   await page.getByRole('button', { name: 'Копировать номер договора ДГ-2026/001' }).click();
   await expect.poll(() => copied(page)).toEqual(['ДГ-2026/001']);
   expect(checks.mutations).toEqual([]);

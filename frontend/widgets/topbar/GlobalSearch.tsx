@@ -103,7 +103,7 @@ export function GlobalSearch({ user }: { user: AuthUser }) {
       : options.length === 0 && !loading ? <p className={styles.message}>{error ? 'Не удалось выполнить поиск' : 'Ничего не найдено'}</p>
       : <>{groups.map((group) => group.items.length ? <div key={group.label} className={styles.group}><div className={styles.heading}>{group.label}</div>{group.items.map((option) => {
         const index = options.findIndex((item) => item.key === option.key);
-        return <button type="button" role="option" aria-selected={active === index} id={`${listId}-${index}`} className={`${styles.option} ${active === index ? styles.selected : ''}`} key={option.key} onMouseEnter={() => setActive(index)} onClick={() => choose(option)}><Icon name={option.icon} size={18} /><span><strong>{option.title}</strong><small>{option.subtitle}</small></span></button>;
+        return <button type="button" role="option" aria-selected={active === index} id={`${listId}-${index}`} className={`${styles.option} ${active === index ? styles.selected : ''}`} key={option.key} onMouseEnter={() => setActive(index)} onClick={() => choose(option)}><span className={styles.optionIcon}><Icon name={option.icon} size={option.icon === 'docs' ? 22 : 20} /></span><span className={styles.optionText}><strong>{option.title}</strong><small>{option.subtitle}</small></span></button>;
       })}</div> : null)}{loading ? <p className={styles.message} role="status">Поиск...</p> : null}</>}
   </div> : null;
 

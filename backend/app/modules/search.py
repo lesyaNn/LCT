@@ -1,5 +1,7 @@
 """Small, permission-scoped search over user-facing CRM records."""
 
+import html
+import re
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
@@ -49,6 +51,17 @@ class SearchResults(BaseModel):
     products: list[SearchHit] = []
     responsibles: list[SearchHit] = []
     documentation: list[DocumentationHit] = []
+
+
+def documentation_snippet(markdown: str) -> str:
+    """Show readable Markdown text without changing what the search index matches."""
+    text = re.sub(r"(?m)^[ \t]{0,3}(?:#{1,6}[ \t]+|>[ \t]?|[-*+][ \t]+|\d+[.)][ \t]+)", "", markdown)
+    text = re.sub(r"(?m)^[ \t]*(?:`{3,}[^\n]*|[-*_]{3,})[ \t]*$", "", text)
+    text = re.sub(r"!\[([^]]*)\]\([^)]+\)", r"\1", text)
+    text = re.sub(r"\[([^]]+)\]\([^)]+\)", r"\1", text)
+    text = text.replace("**", "").replace("__", "").replace("`", "")
+    text = re.sub(r"(?<!\w)[*_](?=\w)|(?<=\w)[*_](?!\w)", "", text)
+    return " ".join(html.unescape(text).split())[:150]
 
 
 def search(db: Session, user: CurrentUser, q: str, records_q: str | None = None) -> SearchResults:
@@ -120,8 +133,8 @@ def search(db: Session, user: CurrentUser, q: str, records_q: str | None = None)
             seen.add(chunk.article_id)
             result.documentation.append(DocumentationHit(
                 id=chunk.article_id,
-                title=chunk.title,
-                subtitle=" ".join(chunk.text.split())[:150],
+                title=documentation_snippet(chunk.title),
+                subtitle=documentation_snippet(chunk.text),
                 href=chunk.url,
             ))
             if len(result.documentation) == LIMIT:
