@@ -17,6 +17,11 @@ from app.modules.meeting_agenda.schemas import MeetingAgenda
 PDF_ROWS = 4
 _font_lock = threading.Lock()
 _DASHES = str.maketrans({char: "-" for char in "\u2010\u2011\u2012\u2013\u2014\u2212"})
+_BRAND_PURPLE = colors.HexColor("#7700FF")
+_BRAND_PURPLE_SOFT = colors.HexColor("#F5EBFF")
+_BRAND_PURPLE_BORDER = colors.HexColor("#E2D0F5")
+_TEXT_PRIMARY = colors.HexColor("#261B33")
+_TEXT_MUTED = colors.HexColor("#6D6477")
 
 
 def _text(value: str) -> str:
@@ -32,7 +37,7 @@ def _paragraph(
         fontName=FONT_BOLD if bold else FONT_REGULAR,
         fontSize=size,
         leading=size * 1.35,
-        textColor=colors.HexColor("#172b3a"),
+        textColor=_TEXT_PRIMARY,
         splitLongWords=True,
     )
     text = _text(text)
@@ -74,7 +79,7 @@ def generate_agenda_pdf(agenda: MeetingAgenda) -> bytes:
         paragraph, measured = _paragraph(text, w, h, **kwargs)
         paragraph.drawOn(canvas, x, top - measured)
 
-    canvas.setFillColor(colors.HexColor("#163c52"))
+    canvas.setFillColor(_BRAND_PURPLE)
     canvas.rect(0, height - 35, width, 35, fill=1, stroke=0)
     canvas.setFillColor(colors.white)
     canvas.setFont(FONT_BOLD, 10)
@@ -99,7 +104,7 @@ def generate_agenda_pdf(agenda: MeetingAgenda) -> bytes:
     )
 
     def section(top, title, rows, total, empty):
-        canvas.setFillColor(colors.HexColor("#edf4f7"))
+        canvas.setFillColor(_BRAND_PURPLE_SOFT)
         canvas.roundRect(margin, top - 25, content_width, 25, 4, fill=1, stroke=0)
         draw(f"{title} ({total})", margin + 10, top - 5, content_width - 20, 18, bold=True, size=10)
         y = top - 34
@@ -147,7 +152,7 @@ def generate_agenda_pdf(agenda: MeetingAgenda) -> bytes:
         agenda.open_questions.total,
         "Нет комментариев, отмеченных как открытые вопросы.",
     )
-    canvas.setStrokeColor(colors.HexColor("#b8c8d1"))
+    canvas.setStrokeColor(_BRAND_PURPLE_BORDER)
     canvas.line(margin, 39, width - margin, 39)
     draw(
         "Внутренний документ. Длинные записи сокращены многоточием. Подробности в CRM.",
@@ -158,7 +163,7 @@ def generate_agenda_pdf(agenda: MeetingAgenda) -> bytes:
         size=7,
     )
     canvas.setFont(FONT_REGULAR, 8)
-    canvas.setFillColor(colors.HexColor("#647887"))
+    canvas.setFillColor(_TEXT_MUTED)
     canvas.drawRightString(width - margin, 22, "1 / 1")
     canvas.showPage()
     canvas.save()
