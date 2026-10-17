@@ -82,7 +82,7 @@ async function request<T>(path: string, options: ApiOptions, token?: string): Pr
  * transport without moving tokens into browser storage.
  */
 export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<ApiResult<T>> {
-  const keycloak = isKeycloakMode() ? await ensureKeycloak() : null;
+  const keycloak = !options.anonymous && isKeycloakMode() ? await ensureKeycloak() : null;
   let token: string | undefined;
 
   if (!options.anonymous) {
