@@ -2,6 +2,7 @@
 .dialog { background: var(--rtk-color-surface); border-radius: var(--rtk-radius-medium); box-shadow: var(--rtk-shadow-elevation-2); display: flex; flex-direction: column; max-height: min(90vh, 760px); max-width: 100%; min-width: min(320px, 100%); overflow: hidden; }
 .m { width: min(520px, 100%); }
 .l { width: min(880px, 100%); }
+.xl { width: min(1120px, 100%); max-height: min(92vh, 900px); }
 .full { height: min(90vh, 760px); }
 .header { align-items: center; border-bottom: 1px solid var(--rtk-color-border); display: flex; flex: 0 0 auto; flex-wrap: nowrap; gap: var(--rtk-space-3); justify-content: space-between; padding: var(--rtk-space-4) var(--rtk-space-5); width: 100%; }
 .header h2 { flex: 1 1 auto; font-size: 18px; margin: 0; min-width: 0; overflow-wrap: anywhere; }

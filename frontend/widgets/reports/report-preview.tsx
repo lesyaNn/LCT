@@ -5,7 +5,6 @@ import { EmptyState } from '@/shared/ui/empty-state';
 import { TableShell } from '@/shared/ui/rtk/table-shell';
 import { TableSkeleton } from '@/shared/ui/skeleton';
 import {
-  REPORT_PREVIEW_LIMIT,
   reportColumnDefinitions,
   type ReportPreview,
 } from '@/shared/lib/reports-repository';
@@ -16,8 +15,9 @@ const columnLabel = (id: string) =>
 
 /** A value as it arrives from the API, rendered without guessing a format. */
 function renderCell(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  if (typeof value === 'boolean') return value ? 'да' : 'нет';
+  if (value === null || value === undefined || value === '') return '';
+  if (typeof value === 'boolean') return value ? '1' : '0';
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return `${value.slice(8, 10)}.${value.slice(5, 7)}.${value.slice(0, 4)}`;
   return String(value);
 }
 
@@ -25,8 +25,6 @@ interface ReportPreviewTableProps {
   preview?: ReportPreview;
   pending: boolean;
   error: unknown;
-  /** True once the user has chosen any parameter. */
-  dirty: boolean;
   onRetry: () => void;
 }
 
@@ -37,19 +35,7 @@ interface ReportPreviewTableProps {
  * export size, so the user can tell that the report is larger than the page
  * they are looking at. The export itself is never built from these rows.
  */
-export function ReportPreviewTable({ preview, pending, error, dirty, onRetry }: ReportPreviewTableProps) {
-  const titleId = 'report-preview-heading';
-
-  if (!dirty && !pending && !preview) {
-    return (
-      <EmptyState
-        title="Выборка ещё не задана"
-        description="Укажите период или выберите вузы, направления, продукты и ответственных — здесь появится предпросмотр."
-        headingLevel={3}
-      />
-    );
-  }
-
+export function ReportPreviewTable({ preview, pending, error, onRetry }: ReportPreviewTableProps) {
   if (error) {
     return (
       <EmptyState
@@ -66,7 +52,7 @@ export function ReportPreviewTable({ preview, pending, error, dirty, onRetry }: 
     return (
       <EmptyState
         title="По выбранным параметрам ничего не найдено"
-        description="Проверьте период взаимодействия и фильтры: вуз попадает в отчёт, если у него было хотя бы одно взаимодействие внутри периода."
+        description="Измените период и откройте предпросмотр снова."
         headingLevel={3}
       />
     );
@@ -78,25 +64,22 @@ export function ReportPreviewTable({ preview, pending, error, dirty, onRetry }: 
   const truncated = preview.total > shown;
 
   return (
-    <section className={styles.previewSurface} aria-labelledby={titleId}>
-      <div className={styles.sectionHeading}>
-        <div>
-          <h3 id={titleId}>Предпросмотр выборки</h3>
-          <p>
-            {truncated
-              ? `Показаны первые ${shown} из ${preview.total} строк. В файл попадут все ${preview.total}.`
-              : `Всего строк: ${preview.total}.`}
-          </p>
-        </div>
+    <div className={styles.previewSurface}>
+      <div className={styles.previewTableMeta}>
+        <p>
+          {truncated
+            ? `Показаны первые ${shown} из ${preview.total} строк. В файл попадут все ${preview.total}.`
+            : `Всего строк: ${preview.total}.`}
+        </p>
         {pending ? <span className={styles.previewRefreshing}>Обновляем…</span> : null}
       </div>
       {truncated ? (
         <p className={styles.previewNotice}>
           <InformationStroke size={16} fill="currentColor" aria-hidden="true" />
-          Предпросмотр ограничен {preview.previewLimit || REPORT_PREVIEW_LIMIT} строками — это ограничение только экрана, экспорт содержит всю выборку.
+          Показано начало файла. Остальные {preview.total - shown} строк будут в сформированном отчёте.
         </p>
       ) : null}
-      <TableShell ariaLabel="Предпросмотр отчёта">
+      <TableShell ariaLabel="Предпросмотр отчёта" className={styles.previewTableShell}>
         <div className={styles.previewScroll}>
           <table>
             <caption className={styles.visuallyHidden}>Первые строки отчёта по текущим параметрам</caption>
@@ -119,6 +102,6 @@ export function ReportPreviewTable({ preview, pending, error, dirty, onRetry }: 
           </table>
         </div>
       </TableShell>
-    </section>
+    </div>
   );
 }

@@ -6,6 +6,7 @@
   border-radius: var(--rtk-radius-small);
   color: var(--rtk-color-text-primary);
   min-height: 46px;
+  min-width: 0;
   padding: 8px 12px;
   line-height: 1.45;
   box-shadow: none;
