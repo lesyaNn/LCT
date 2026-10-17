@@ -159,3 +159,22 @@ def download_university_document(
     if path is None:
         raise HTTPException(status_code=404, detail="Document file unavailable")
     return FileResponse(path, media_type=document.mime_type or "application/octet-stream", filename=document.file_name)
+
+
+@router.get("/{university_id}/passport/documents/{document_id}/preview", summary="Предпросмотр документа вуза")
+def preview_university_document(
+    university_id: uuid.UUID, document_id: uuid.UUID,
+    offset: int = Query(default=0, ge=0, le=9900),
+    db: Session = Depends(get_db), storage: StorageBackend = Depends(get_storage),
+    user: CurrentUser = Depends(require_permission("university.read")),
+):
+    from app.modules.workflow_attachments.preview import preview_response
+    ensure_university_access(university_id, user)
+    document = db.get(Document, document_id)
+    if document is None or document.university_id != university_id or not document.file_path:
+        raise HTTPException(404, "Document not found")
+    path = document_storage_path(document.file_path)
+    if path is not None:
+        return preview_response(storage, document.file_path, document.file_name or "document", offset,
+                                source_factory=lambda: path.open("rb"))
+    return preview_response(storage, document.file_path, document.file_name or "document", offset)
