@@ -19,7 +19,7 @@ USER_PERMISSIONS = frozenset({
 })
 MANAGER_PERMISSIONS = USER_PERMISSIONS | frozenset({
     "university.edit", "university_responsible.manage", "analytics.extended",
-    "audit.read", "import.write",
+    "audit.read", "import.write", "user_university.manage",
 })
 ADMIN_PERMISSIONS = MANAGER_PERMISSIONS | frozenset({
     "university.create", "university.delete", "workflow_template.manage",

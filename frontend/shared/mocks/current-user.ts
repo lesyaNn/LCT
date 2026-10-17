@@ -7,7 +7,7 @@ const role: UserRole = configuredRole === 'user' || configuredRole === 'manager'
 
 const mockPermissions: Record<UserRole, string[]> = {
   user: ['analytics.read', 'catalog.read', 'import.read', 'reports.create', 'reports.read', 'university.read', 'workflow.read'],
-  manager: ['analytics.read', 'analytics.extended', 'audit.read', 'catalog.read', 'import.read', 'import.write', 'reports.create', 'reports.read', 'university.edit', 'university.read', 'workflow.read'],
+  manager: ['analytics.read', 'analytics.extended', 'audit.read', 'catalog.read', 'import.read', 'import.write', 'reports.create', 'reports.read', 'university.edit', 'university.read', 'user_university.manage', 'workflow.read'],
   admin: ['*'],
 };
 

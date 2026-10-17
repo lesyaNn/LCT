@@ -10,6 +10,7 @@ export const navigationItems: NavigationItem[] = [
   { label: 'Аудит', href: '/audit', icon: 'audit', requiredPermission: 'audit.read' },
   { label: 'Администрирование', href: '/admin', icon: 'admin', requiredPermission: 'admin.users' },
   { label: 'Пользователи и права', href: '/admin/users', icon: 'admin', requiredPermission: 'admin.users' },
+  { label: 'Пользователи и вузы', href: '/university-assignments', icon: 'admin', requiredPermission: 'user_university.manage', hiddenWithPermission: 'admin.users' },
   { label: 'Управление каталогами', href: '/admin/catalogs', icon: 'admin', requiredPermission: 'university.edit' },
   { label: 'Импорт каталогов', href: '/admin/import', icon: 'admin', requiredPermission: 'import.write' },
   { label: 'Шаблоны Workflow', href: '/admin/workflow/templates', icon: 'workflow', requiredPermission: 'workflow_template.manage' },
@@ -26,6 +27,7 @@ export const routeLabels: Record<string, string> = {
   audit: 'Аудит',
   admin: 'Администрирование',
   users: 'Пользователи и права',
+  'university-assignments': 'Пользователи и вузы',
   catalogs: 'Управление каталогами',
   docs: 'Документация',
   'api-testing': 'Тестирование API',
@@ -37,7 +39,8 @@ export const detailRouteLabels: Record<string, string> = {
 };
 
 function canAccessNavigationItem(item: NavigationItem, user: AuthUser): boolean {
-  return !item.requiredPermission || hasPermission(user, item.requiredPermission);
+  return (!item.requiredPermission || hasPermission(user, item.requiredPermission))
+    && (!item.hiddenWithPermission || !hasPermission(user, item.hiddenWithPermission));
 }
 
 export function getVisibleNavigationItems(user: AuthUser): NavigationItem[] {

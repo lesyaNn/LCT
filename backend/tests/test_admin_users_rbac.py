@@ -17,6 +17,9 @@ from app.modules.audit.models import AuditEvent
 ADMIN_ID = "00000000-0000-4000-8000-000000000001"
 USER_ID = "00000000-0000-4000-8000-000000000002"
 SECOND_ADMIN_ID = "00000000-0000-4000-8000-000000000003"
+MANAGER_ID = "00000000-0000-4000-8000-000000000004"
+FOREIGN_USER_ID = "00000000-0000-4000-8000-000000000005"
+EMPTY_USER_ID = "00000000-0000-4000-8000-000000000006"
 
 
 class FakeKeycloak:
@@ -141,6 +144,78 @@ def test_list_search_filter_pagination_detail_and_permissions(context):
     assert client.get("/api/v1/admin/users").status_code == 403
     actor.roles = {"admin"}
     kc.roles[ADMIN_ID] = {"user"}
+    assert client.get("/api/v1/admin/users").status_code == 403
+
+
+def test_manager_assigns_only_own_universities_without_admin_actions(context):
+    client, kc, actor, engine = context
+    with Session(engine) as db:
+        own = University(name="Manager own")
+        foreign = University(name="Manager foreign")
+        db.add_all([own, foreign])
+        db.commit()
+        own_id, foreign_id = str(own.id), str(foreign.id)
+    kc.records[MANAGER_ID] = {
+        "id": MANAGER_ID, "username": "manager", "email": "manager@example.test",
+        "enabled": True, "attributes": {"university_ids": [own_id]},
+    }
+    kc.roles[MANAGER_ID] = {"manager"}
+    kc.records[USER_ID]["attributes"] = {"university_ids": [own_id, foreign_id]}
+    for user_id, name, ids in (
+        (FOREIGN_USER_ID, "foreign", [foreign_id]),
+        (EMPTY_USER_ID, "unassigned", []),
+    ):
+        kc.records[user_id] = {
+            "id": user_id, "username": name, "email": f"{name}@example.test",
+            "enabled": True, "attributes": {"university_ids": ids},
+        }
+        kc.roles[user_id] = {"user"}
+    actor.id, actor.roles, actor.university_ids = MANAGER_ID, {"manager"}, (foreign_id,)
+
+    listed = client.get("/api/v1/admin/users")
+    assert listed.status_code == 200, listed.text
+    assert listed.json()["total"] == 2
+    assert {item["id"] for item in listed.json()["items"]} == {USER_ID, EMPTY_USER_ID}
+    assert client.get(f"/api/v1/admin/users/{USER_ID}").json()["scope"]["university_ids"] == [own_id]
+    assert client.get(f"/api/v1/admin/users/{FOREIGN_USER_ID}").status_code == 404
+    assert client.get(f"/api/v1/admin/users/{ADMIN_ID}").status_code == 404
+
+    own_scope = {"kind": "universities", "university_ids": [own_id]}
+    assert client.patch(f"/api/v1/admin/users/{FOREIGN_USER_ID}", json={
+        "role": "user", "scope": own_scope,
+    }).status_code == 404
+    assert client.patch(f"/api/v1/admin/users/{USER_ID}", json={
+        "role": "manager", "scope": own_scope,
+    }).status_code == 403
+    assert client.patch(f"/api/v1/admin/users/{USER_ID}", json={
+        "role": "user", "scope": {"kind": "universities", "university_ids": [foreign_id]},
+    }).status_code == 403
+    assert client.post(f"/api/v1/admin/users/{USER_ID}/block", json={"blocked": True}).status_code == 403
+    assert client.post(f"/api/v1/admin/users/{USER_ID}/password-reset").status_code == 403
+    assert client.post("/api/v1/admin/users/invite", json={}).status_code == 403
+    assert kc.roles[USER_ID] == {"user"}
+
+    removed = client.patch(f"/api/v1/admin/users/{USER_ID}", json={
+        "role": "user", "scope": {"kind": "universities", "university_ids": []},
+    })
+    assert removed.status_code == 200, removed.text
+    assert removed.json()["scope"]["university_ids"] == []
+    assert kc.records[USER_ID]["attributes"]["university_ids"] == [foreign_id]
+    assert client.get(f"/api/v1/admin/users/{USER_ID}").status_code == 404
+    assigned = client.patch(f"/api/v1/admin/users/{EMPTY_USER_ID}", json={
+        "role": "user", "scope": own_scope,
+    })
+    assert assigned.status_code == 200, assigned.text
+    assert assigned.json()["scope"]["university_ids"] == [own_id]
+    assert kc.records[EMPTY_USER_ID]["attributes"]["university_ids"] == [own_id]
+    assert kc.roles[EMPTY_USER_ID] == {"user"}
+
+    kc.records[MANAGER_ID]["attributes"] = {"university_ids": []}
+    assert client.get("/api/v1/admin/users").json()["items"] == []
+    assert client.patch(f"/api/v1/admin/users/{EMPTY_USER_ID}", json={
+        "role": "user", "scope": own_scope,
+    }).status_code == 403
+    kc.records[MANAGER_ID]["enabled"] = False
     assert client.get("/api/v1/admin/users").status_code == 403
 
 
