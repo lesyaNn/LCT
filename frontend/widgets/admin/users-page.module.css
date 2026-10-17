@@ -43,9 +43,10 @@
 .field { display: flex; flex-direction: column; gap: var(--rtk-space-1); min-width: 0; }
 .field > span { color: var(--rtk-color-text-secondary); font-size: 12px; font-weight: 650; }
 .controlTooltip > span, .controlTooltip > span > span { display: flex; width: 100%; }
-.roleSelectRow { min-width: 0; position: relative; }
+.roleSelectRow { min-width: 0; position: relative; width: 100%; }
 .roleSelectRow .roleIcon { color: var(--rtk-color-text-secondary); display: flex; left: var(--rtk-space-3); pointer-events: none; position: absolute; top: 50%; transform: translateY(-50%); z-index: 1; }
-.roleSelectRow select { padding-left: 42px; }
+.roleSelectRow [data-testid="role-select"] { padding-left: 42px; }
+.roleSelectRow [data-testid="role-select"] small { color: var(--rtk-color-text-primary); font-size: 12px; }
 .scopeEditor { display: flex; flex-direction: column; gap: var(--rtk-space-2); min-width: 0; }
 .scopeEditor > div { min-width: 0; }
 .roleDescription { align-items: flex-start; background: var(--rtk-color-brand-soft); border-radius: var(--rtk-radius-small); color: var(--rtk-color-brand); display: flex; font-size: 12px; gap: var(--rtk-space-2); line-height: 1.45; padding: var(--rtk-space-3); }

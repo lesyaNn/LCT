@@ -29,7 +29,11 @@ import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { EmptyState } from '@/shared/ui/empty-state';
 import { Button } from '@/shared/ui/rtk/button';
 import { SearchField } from '@/shared/ui/rtk/filter-field';
+import { Icon } from '@/shared/ui/rtk/icon';
 import { Toast, type ToastIntent } from '@/shared/ui/rtk/toast';
+import AttachmentLinkBreak from '@atomaro/icons/24/action/AttachmentLinkBreak';
+import LinkIcon from '@atomaro/icons/24/action/Link';
+import SearchIcon from '@atomaro/icons/24/action/Search';
 import {
   autoLayout,
   createSimNodes,
@@ -238,7 +242,6 @@ function NetworkCanvas({ data }: { data: NetworkGraphData }) {
   const canAssign = Boolean(
     currentUser && hasPermission(currentUser, 'admin.users') && USERS_API_CAPABILITIES.updateRoleAndScope,
   );
-  const managerView = Boolean(currentUser && hasPermission(currentUser, 'user_university.manage') && !hasPermission(currentUser, 'admin.users'));
 
   const nodeById = useMemo(() => new Map<string, NetworkNode>(data.nodes.map((node) => [node.id, node])), [data]);
 
@@ -809,11 +812,12 @@ function NetworkCanvas({ data }: { data: NetworkGraphData }) {
     <>
       <div className={styles.toolbar}>
         <div className={styles.searchBlock}>
+          <SearchIcon className={styles.searchIcon} size={20} fill="currentColor" aria-hidden="true" />
           <SearchField
-            label="Поиск узла"
+            label="Поиск сотрудника или вуза"
             value={search}
             onChange={setSearch}
-            placeholder="Имя сотрудника или название вуза"
+            placeholder="Поиск сотрудника или вуза..."
           />
           {suggestions.length > 0 ? (
             <ul className={styles.suggestions} role="listbox" aria-label="Найденные узлы">
@@ -834,39 +838,40 @@ function NetworkCanvas({ data }: { data: NetworkGraphData }) {
             </ul>
           ) : null}
         </div>
-        <div className={styles.actions}>
-          <Button type="button" size="s" onClick={() => fitView()} aria-label="Центрировать граф">
-            Центрировать
-          </Button>
-          <Button
-            type="button"
-            size="s"
-            onClick={() => zoomAt(sizeRef.current.w / 2, sizeRef.current.h / 2, 1.25)}
-            aria-label="Приблизить граф"
-          >
-            +
-          </Button>
-          <Button
-            type="button"
-            size="s"
-            onClick={() => zoomAt(sizeRef.current.w / 2, sizeRef.current.h / 2, 0.8)}
-            aria-label="Отдалить граф"
-          >
-            −
-          </Button>
-          <Button type="button" size="s" onClick={handleReset} aria-label="Сбросить расположение узлов">
-            Сбросить вид
-          </Button>
+        <div className={styles.summaryRow}>
+          <div className={styles.stats} aria-live="polite">
+            <span className={`${styles.chip} ${styles.chipActive}`}>Все <strong>{data.nodes.length}</strong></span>
+            <span className={styles.chip}><Icon name="user" size={16} />Сотрудники <strong>{data.usersCount}</strong></span>
+            <span className={styles.chip}><Icon name="university" size={16} />Вузы <strong>{data.universitiesCount}</strong></span>
+            <span className={styles.chip}><LinkIcon size={16} fill="currentColor" aria-hidden="true" />Связи <strong>{data.linksCount}</strong></span>
+            <span className={styles.chip} title={data.scope === 'own' ? 'Показаны только ваши вузы' : 'Показаны доступные вам сотрудники и вузы'}><Icon name="audit" size={16} />Показаны доступные <strong>{data.nodes.length}</strong></span>
+            <span className={styles.chip}><AttachmentLinkBreak size={16} fill="currentColor" aria-hidden="true" />Без связей <strong>{data.isolatedCount}</strong></span>
+          </div>
+          <div className={styles.actions}>
+            <Button type="button" size="s" onClick={() => fitView()} aria-label="Центрировать граф">
+              Центрировать
+            </Button>
+            <Button
+              type="button"
+              size="s"
+              onClick={() => zoomAt(sizeRef.current.w / 2, sizeRef.current.h / 2, 1.25)}
+              aria-label="Приблизить граф"
+            >
+              +
+            </Button>
+            <Button
+              type="button"
+              size="s"
+              onClick={() => zoomAt(sizeRef.current.w / 2, sizeRef.current.h / 2, 0.8)}
+              aria-label="Отдалить граф"
+            >
+              −
+            </Button>
+            <Button type="button" size="s" onClick={handleReset} aria-label="Сбросить расположение узлов">
+              Сбросить вид
+            </Button>
+          </div>
         </div>
-      </div>
-
-      <div className={styles.stats} aria-live="polite">
-        <span className={styles.chip}>Сотрудники: <strong>{data.usersCount}</strong></span>
-        <span className={styles.chip}>Вузы: <strong>{data.universitiesCount}</strong></span>
-        <span className={styles.chip}>Связи: <strong>{data.linksCount}</strong></span>
-        {data.scope === 'own' ? <span className={styles.chip}>Показаны только ваши вузы</span> : null}
-        {data.scope === 'full' && managerView ? <span className={styles.chip}>Показаны доступные вам пользователи и вузы</span> : null}
-        {data.isolatedCount > 0 ? <span className={styles.chip}>Без связей: <strong>{data.isolatedCount}</strong></span> : null}
       </div>
 
       <div className={styles.stage} ref={wrapRef}>
