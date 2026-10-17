@@ -86,9 +86,8 @@
 .previewAnalytics { display: flex; flex-direction: column; gap: var(--rtk-space-5); }
 .previewAnalyticsIntro { align-items: flex-start; display: flex; justify-content: space-between; }
 .previewAnalyticsIntro > svg { color: var(--rtk-color-brand); flex: 0 0 auto; }
-.previewAnalyticsIntro h3 { font-size: 20px; margin: var(--rtk-space-1) 0; }
+.previewAnalyticsIntro h3 { font-size: 20px; margin: 0 0 var(--rtk-space-1); }
 .previewAnalyticsIntro p { color: var(--rtk-color-text-secondary); font-size: 13px; line-height: 1.5; margin: 0; }
-.previewEyebrow { color: var(--rtk-color-brand); font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
 .previewAnalyticsCharts { display: flex; flex-direction: column; gap: var(--rtk-space-4); }
 .previewSectionHeading { display: flex; flex-direction: column; gap: 2px; }
 .previewSectionHeading p { color: var(--rtk-color-text-secondary); font-size: 11px; margin: 0; }

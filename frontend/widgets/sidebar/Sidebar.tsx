@@ -88,7 +88,7 @@ function SidebarContent({ user, pathname, collapsed, mobile = false, onToggleCol
           </div> : null}
         </> : null}
         {apiTestingItem ? <Link
-          className={`${styles.navItem} ${pathname === apiTestingItem.href ? styles.active : ''}`}
+          className={`${styles.navItem} ${styles.apiNavItem} ${pathname === apiTestingItem.href ? styles.active : ''}`}
           href={apiTestingItem.href}
           onClick={mobile ? onCloseMobile : undefined}
           title={collapsed && !mobile ? apiTestingItem.label : undefined}

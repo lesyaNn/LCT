@@ -1,12 +1,14 @@
 .section { display: flex; flex-direction: column; gap: var(--rtk-space-3); min-width: 0; }
-.heading { align-items: center; display: flex; gap: var(--rtk-space-3); justify-content: space-between; }
-.headingActions { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-1); }
-.collapseButton svg { transition: transform 160ms ease; }
-.collapseButton[aria-expanded='true'] svg { transform: rotate(180deg); }
+.heading { margin: 0; }
+.headingToggle { align-items: center; background: transparent; border: 0; border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-primary); cursor: pointer; display: flex; font: inherit; font-size: 15px; font-weight: 700; gap: var(--rtk-space-2); min-height: 36px; padding: 0 var(--rtk-space-2); text-align: left; width: 100%; }
+.headingToggle:hover { background: var(--rtk-color-surface-hover); }
+.headingToggle:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
+.headingToggle > svg:first-child { color: var(--rtk-color-brand); flex: 0 0 auto; }
+.collapseChevron { color: var(--rtk-color-text-secondary); flex: 0 0 auto; margin-left: auto; transition: transform 160ms ease; }
+.headingToggle[aria-expanded='true'] .collapseChevron { transform: rotate(180deg); }
 .body { display: flex; flex-direction: column; gap: var(--rtk-space-3); min-width: 0; }
 .body[hidden] { display: none; }
-.heading h3 { align-items: center; display: inline-flex; font-size: 15px; gap: var(--rtk-space-2); margin: 0; }
-.heading h3 svg { color: var(--rtk-color-brand); flex: 0 0 auto; }
+.bodyActions { display: flex; justify-content: flex-end; }
 .count { color: var(--rtk-color-text-tertiary); font-size: 12px; font-weight: 500; }
 .commentList { list-style: none; margin: 0; padding: 0; }
 .commentItem { border-bottom: 1px solid var(--rtk-color-border); padding: var(--rtk-space-3) 0; }
@@ -54,4 +56,4 @@
 .skeleton span:nth-child(3) { width: 64%; }
 @keyframes commentsShimmer { from { opacity: .55; } 50% { opacity: 1; } to { opacity: .55; } }
 @media (max-width: 480px) { .commentHeader { align-items: flex-start; flex-wrap: wrap; } .commentText, .questionActions { margin-left: 0; } .editorFooter { align-items: flex-start; flex-direction: column; } .editorActions { width: 100%; } .editorActions > button { flex: 1 1 auto; } }
-@media (prefers-reduced-motion: reduce) { .skeleton span { animation: none; } .collapseButton svg { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .skeleton span { animation: none; } .collapseChevron { transition: none; } }
