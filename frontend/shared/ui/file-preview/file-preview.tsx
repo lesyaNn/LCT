@@ -126,7 +126,7 @@ function FilePreviewContent({ children, path, name, size, version = '' }: FilePr
       top = rect.bottom + gap + height <= window.innerHeight - 12 ? rect.bottom + gap : Math.max(12, rect.top - height - gap);
     }
     setPosition({ left, top, width, height });
-  }, [category, data?.width, data?.height]);
+  }, [category, data]);
 
   useLayoutEffect(() => { if (visible) updatePosition(); }, [visible, updatePosition]);
   useEffect(() => {
@@ -151,7 +151,6 @@ function FilePreviewContent({ children, path, name, size, version = '' }: FilePr
     if (!visible || !user) return;
     const request = new AbortController();
     controller.current = request;
-    setData(null); setError(''); setImageReady(false);
     const timeout = setTimeout(() => { request.abort(); setError('Время ожидания истекло. Повторите попытку или скачайте файл.'); }, 15_000);
     void apiFetch<Preview>(`${path}?offset=${page * 100}`, { signal: request.signal }).then((result) => {
       if (request.signal.aborted) return;
@@ -178,7 +177,7 @@ function FilePreviewContent({ children, path, name, size, version = '' }: FilePr
       <div className={styles.body} aria-busy={loading}>
         <div className={`${styles.skeleton} ${styles[category]} ${!loading ? styles.skeletonDone : ''}`} aria-hidden={!loading} role="status" aria-label="Загрузка предпросмотра">{Array.from({ length: category === 'image' ? 1 : 8 }, (_, index) => <span key={index} />)}</div>
         <div className={`${styles.result} ${loading ? styles.resultLoading : ''}`}>
-        {error ? <div role="alert"><p>{error}</p><button type="button" onClick={() => setRetry((value) => value + 1)}>Повторить</button></div> : null}
+        {error ? <div role="alert"><p>{error}</p><button type="button" onClick={() => { setData(null); setError(''); setImageReady(false); setRetry((value) => value + 1); }}>Повторить</button></div> : null}
         {data?.kind === 'image' && !error ? <ZoomableImage src={data.src!} name={name} width={data.width!} height={data.height!} onLoad={() => setImageReady(true)} onError={() => setError('Не удалось отобразить страницу или изображение. Файл можно скачать.')} /> : null}
         {data?.kind === 'document' ? <article className={styles.content}>{data.blocks?.map((block, index) => block.style === 'heading' ? <h3 key={index}>{block.text}</h3> : <p key={index}>{block.style === 'list' ? '• ' : ''}{block.text}</p>)}</article> : null}
         {data?.kind === 'table' ? <><p>{data.sheet}</p><div className={styles.tableScroll}><table><thead><tr><th scope="col">№</th>{data.rows?.[0]?.map((_, index) => <th key={index} scope="col">{String.fromCharCode(65 + index)}</th>)}</tr></thead><tbody>{data.rows?.map((row, index) => <tr key={index}><th scope="row">{index + 1}</th>{row.map((cell, column) => <td key={column}>{cell}</td>)}</tr>)}</tbody></table></div></> : null}
