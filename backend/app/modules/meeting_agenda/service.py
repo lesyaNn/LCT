@@ -132,6 +132,7 @@ def build_agenda(db: Session, instance_id: UUID, user: CurrentUser) -> MeetingAg
             WorkflowComment.id.label("comment_id"),
             WorkflowComment.instance_id,
             WorkflowComment.stage_id,
+            WorkflowComment.author_keycloak_sub,
             WorkflowComment.content,
             WorkflowComment.created_at,
         )

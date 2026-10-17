@@ -37,6 +37,7 @@ class AgendaQuestion(BaseModel):
     comment_id: UUID
     instance_id: UUID
     stage_id: UUID | None
+    author_keycloak_sub: str | None = None
     content: str
     created_at: datetime
 

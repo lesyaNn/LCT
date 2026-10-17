@@ -759,7 +759,7 @@ export interface MeetingAgenda {
   warning_days: number;
   programs: { items: { program_id: string; name: string; direction: string; status: 'active' | 'launched'; launch_date: string | null }[]; total: number; omitted: number };
   expiring_licenses: { items: { license_id: string; license_number: string; product: string; expires_at: string; days_left: number }[]; total: number; omitted: number };
-  open_questions: { items: { comment_id: string; instance_id: string; stage_id: string | null; content: string; created_at: string }[]; total: number; omitted: number };
+  open_questions: { items: { comment_id: string; instance_id: string; stage_id: string | null; author_keycloak_sub?: string | null; content: string; created_at: string }[]; total: number; omitted: number };
 }
 
 export const meetingAgendaQueryKey = (instanceId: string) => [...workflowQueryKey(instanceId), 'meeting-agenda'] as const;

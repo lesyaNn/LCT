@@ -41,7 +41,6 @@ import { ListSkeleton, Skeleton, SkeletonGroup } from '@/shared/ui/skeleton';
 import { Toast } from '@/shared/ui/rtk/toast';
 import { Modal } from '@/shared/ui/rtk/modal';
 import { WorkflowComments } from './workflow-comments';
-import { WorkflowMeetingAgenda } from './workflow-meeting-agenda';
 import { WorkflowStageTasks } from './workflow-stage-tasks';
 import { AttachmentRow, WorkflowAttachments } from './workflow-attachments';
 import { WorkflowCreateModal } from './workflow-create-modal';
@@ -223,8 +222,7 @@ function WorkflowStageDetails({ stage, stages, workflow, instanceId, universityI
         {stage.completedAt ? <div><dt>Завершён</dt><dd><time dateTime={stage.completedAt}>{formatDateTimeRu(stage.completedAt)}</time></dd></div> : null}
       </dl></section> : null}
       <WorkflowStageTasks stage={stage} instanceId={instanceId} canEdit={editableStage} state={tasksState} />
-      {activeStage && stage.orderIndex === 3 && isRealWorkflowMode() ? <WorkflowMeetingAgenda instanceId={instanceId} /> : null}
-      <WorkflowComments instanceId={instanceId} stageId={stage.templateStageId ?? stage.id} comments={stage.comments} readOnly={!canManage || !activeStage} allowQuestionStatus={workflow.status !== 'archived'} onNotify={onNotify} />
+      <WorkflowComments instanceId={instanceId} stageId={stage.templateStageId ?? stage.id} comments={stage.comments} readOnly={!canManage || !activeStage} onNotify={onNotify} />
       {attachmentsState?.loading ? <ListSkeleton items={2} /> : attachmentsState?.error ? <ErrorState title="Не удалось загрузить вложения" headingLevel={3} onRetry={attachmentsState.retry} /> : stage.attachments.length ? <><WorkflowAttachments instanceId={instanceId} stageId={stage.id} attachments={stage.attachments} uploadEnabled={false} readOnly={!canManage || !activeStage} onNotify={onNotify} />{attachmentsState?.hasMore ? <Button variant="ghost" size="s" type="button" loading={attachmentsState.loadingMore} onClick={attachmentsState.loadMore}>Загрузить ещё вложения</Button> : null}</> : null}
       <WorkflowHistorySection idPrefix={idPrefix} instanceId={instanceId} events={historyEvents} stages={stages} userId={userId ?? undefined} userName={historyActorName} state={historyState} />
       <StageActionPanel stage={stage} stages={stages} instanceId={instanceId} universityId={universityId} userId={userId} canManage={editableStage} allowedTargets={allowedTargets} rollbackTargets={rollbackTargets} onTransitionOpen={onTransitionOpen} onTransitionClose={onTransitionClose} onTransitionSuccess={onTransitionSuccess} onNotify={onNotify} />
