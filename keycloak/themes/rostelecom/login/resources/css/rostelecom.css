@@ -360,7 +360,7 @@ html.login-pf,
 .rtk-demo-role input:focus-visible { outline: none; }
 .rtk-demo-role-icon { align-items: center; background: color-mix(in srgb, var(--rtk-color-brand-secondary) 12%, white); border-radius: 9px; color: var(--rtk-color-brand-secondary); display: inline-flex; flex: 0 0 34px; font-size: 17px; height: 34px; justify-content: center; width: 34px; }
 .rtk-demo-role-name { color: var(--rtk-ink); font-size: 13px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
-.rtk-demo-hint { color: var(--rtk-muted); font-size: 12px; line-height: 1.4; margin: 10px 0 0; }
+.rtk-demo-hint { color: var(--rtk-muted); font-size: 12px; line-height: 1.4; margin: 10px 0 0; text-align: center; }
 .rtk-demo-hint[hidden] { display: none; }
 
 @media (max-width: 520px) {

@@ -55,7 +55,7 @@
                         <span class="rtk-demo-role-name">Пользователь</span>
                       </label>
                     </div>
-                    <p id="rtk-demo-hint" class="rtk-demo-hint" role="status" hidden>Данные подставлены. Нажмите «Войти», чтобы войти в систему.</p>
+                    <p id="rtk-demo-hint" class="rtk-demo-hint" role="status" hidden>Данные подставлены. Нажмите «Вход», чтобы войти в систему.</p>
                   </section>
                 </#if>
             </#if>
