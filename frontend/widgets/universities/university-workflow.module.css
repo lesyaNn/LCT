@@ -71,7 +71,6 @@
 .stageItem { position: relative; }
 .stageItem:not(:last-child)::after { background: var(--rtk-color-border); bottom: -1px; content: ''; left: 18px; position: absolute; top: 43px; width: 1px; }
 .stageButton { align-items: start; background: transparent; border: 1px solid transparent; border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-primary); cursor: pointer; display: grid; gap: var(--rtk-space-3); grid-template-columns: 36px minmax(0, 1fr); padding: var(--rtk-space-3); position: relative; text-align: left; width: 100%; z-index: 1; }
-.stageItemEditable .stageButton { padding-right: 42px; }
 .stageButton:hover { background: var(--rtk-color-surface-hover); }
 .stageButton:focus-visible { border-color: var(--rtk-color-brand); outline: 2px solid var(--rtk-color-brand); outline-offset: 1px; }
 .stageItemSelected .stageButton { background: var(--rtk-color-surface-subtle); border-left: 3px solid var(--rtk-color-border); }
@@ -105,13 +104,7 @@
 .stageSummary > span { align-items: center; display: inline-flex; gap: 4px; }
 .stageSummary > [data-empty='true'] { opacity: .65; }
 .stageSummary svg { color: var(--rtk-color-text-secondary); }
-.stageRenameList .stageRenameButton { position: absolute; right: var(--rtk-space-2); top: var(--rtk-space-2); z-index: 2; }
-.stageRenameForm { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); min-width: 0; }
-.stageRenameForm input { flex: 1 1 180px; min-width: 0; }
-.stageRenameList .stageRenameForm { margin: 0 var(--rtk-space-3) var(--rtk-space-3) 48px; position: relative; z-index: 2; }
-.stageRenameHeader { min-width: 0; }
-.stageRenameHeader .stageRenameForm { min-width: min(100%, 320px); }
-.stageRenameError { color: var(--rtk-color-danger); flex-basis: 100%; font-size: 12px; }
+.stageRenameError { color: var(--rtk-color-danger); font-size: 12px; }
 .globalResources { composes: surface from '../../shared/ui/rtk/section-surface.module.css'; }
 .globalResources > .historyDisclosure { border: 0; }
 .globalResources > .historyDisclosure > summary { padding: 0; }
@@ -207,7 +200,6 @@
 @keyframes workflowDetailsReveal { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 900px) { .layout, .skeletonLayout { grid-template-columns: 1fr; } }
 @media (max-width: 480px) { .stagesPanel, .detailPanel, .overallProgress { padding: var(--rtk-space-4); } .detailHeader { flex-direction: column; } .stageButton { gap: var(--rtk-space-2); grid-template-columns: 36px minmax(0, 1fr); min-height: 52px; padding: var(--rtk-space-2); } .stageMarker { height: 36px; width: 36px; } .stageItem:not(:last-child)::after { left: 18px; top: 44px; } .stageMeta { align-items: flex-start; flex-direction: column; gap: var(--rtk-space-1); } .progressLabel { align-items: flex-start; flex-direction: column; gap: var(--rtk-space-1); } .taskList label { min-height: 44px; } .stageActionButtons { align-items: stretch; flex-direction: column; } .stageActionButtons > button { width: 100%; } .completionSummary time { margin-left: 0; width: 100%; } }
-@media (max-width: 480px) { .stageItemEditable .stageButton { padding-right: 42px; } }
 @media (max-width: 480px) { .instancesHeader { align-items: stretch; flex-direction: column; } .instancesHeader > button { width: 100%; } }
 @media (max-width: 480px) { .toastViewport { bottom: var(--rtk-space-3); left: var(--rtk-space-3); max-height: calc(100vh - 2 * var(--rtk-space-3)); max-width: none; right: var(--rtk-space-3); } .toastViewport > * { max-width: none; } }
 @media (prefers-reduced-motion: reduce) { .progressTrack span, .taskProgress span, .skeletonStages span, .skeletonDetails span, .skeletonHeader span, .detailPanel { animation: none; transition: none; } }

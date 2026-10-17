@@ -1,7 +1,7 @@
 'use client';
 
 import type { ComponentType, FormEvent } from 'react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Attachment from '@atomaro/icons/24/action/Attachment';
@@ -113,11 +113,12 @@ function StageSummary({ stage }: { stage: UniversityWorkflowStage }) {
   return <div className={styles.stageSummary} aria-label="Сводка этапа">{items.map(({ key, icon: Icon, label, value, empty }) => <span key={key} data-empty={empty} aria-label={`${label}: ${value}`} title={`${label}: ${value}`}><Icon size={14} fill="currentColor" aria-hidden="true" /><span>{value}</span></span>)}</div>;
 }
 
-function StageRenameAction({ stage, placement, onSave }: { stage: UniversityWorkflowStage; placement: 'list' | 'header'; onSave: (stageId: string, name: string) => Promise<void> }) {
+function StageRenameAction({ stage, onSave }: { stage: UniversityWorkflowStage; onSave: (stageId: string, name: string) => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(stage.name);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
   const close = () => { if (!pending) { setOpen(false); setError(''); } };
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -135,21 +136,26 @@ function StageRenameAction({ stage, placement, onSave }: { stage: UniversityWork
       setPending(false);
     }
   };
-  return <div className={placement === 'list' ? styles.stageRenameList : styles.stageRenameHeader}>
-    {open ? <form className={styles.stageRenameForm} onSubmit={submit}>
-      <Input autoFocus aria-label={`Новое название этапа ${stage.name}`} value={value} maxLength={512} disabled={pending} onChange={(event) => setValue(event.target.value)} onKeyDown={(event) => { if (event.key === 'Escape') close(); }} />
-      <Button variant="primary" size="s" type="submit" loading={pending} disabled={pending || !value.trim()}>Сохранить</Button>
-      <Button variant="ghost" size="s" type="button" disabled={pending} onClick={close}>Отмена</Button>
-      {error ? <span className={styles.stageRenameError} role="alert">{error}</span> : null}
-    </form> : <Tooltip content="Переименовать этап"><IconButton className={styles.stageRenameButton} icon={<Edit size={16} fill="currentColor" />} label={`Переименовать этап ${stage.name}`} size={16} onClick={() => { setValue(stage.name); setError(''); setOpen(true); }} /></Tooltip>}
-  </div>;
+  return <>
+    <Tooltip content="Переименовать этап"><IconButton icon={<Edit size={16} fill="currentColor" />} label={`Переименовать этап ${stage.name}`} size={16} onClick={() => { setValue(stage.name); setError(''); setOpen(true); }} /></Tooltip>
+    {open ? <Modal title="Название этапа" onClose={close} initialFocusRef={inputRef}>
+      <form className={styles.editForm} onSubmit={submit}>
+        <label>Название этапа<Input ref={inputRef} value={value} maxLength={512} disabled={pending} onChange={(event) => setValue(event.target.value)} /></label>
+        {error ? <span className={styles.stageRenameError} role="alert">{error}</span> : null}
+        <div className={styles.editActions}>
+          <Button variant="ghost" size="s" type="button" disabled={pending} onClick={close}>Отмена</Button>
+          <Button variant="primary" size="s" type="submit" loading={pending} disabled={pending || !value.trim() || value.trim() === stage.name}>Сохранить</Button>
+        </div>
+      </form>
+    </Modal> : null}
+  </>;
 }
 
-function WorkflowStageItem({ stage, selected, detailsId, onSelect, canRename, onRename }: { stage: UniversityWorkflowStage; selected: boolean; detailsId: string; onSelect: () => void; canRename: boolean; onRename: (stageId: string, name: string) => Promise<void> }) {
+function WorkflowStageItem({ stage, selected, detailsId, onSelect }: { stage: UniversityWorkflowStage; selected: boolean; detailsId: string; onSelect: () => void }) {
   const semantics = workflowStageStatusSemantics[stage.status];
   const titleClass = semantics.titleDecoration === 'strike' ? styles.stageTitleMuted : undefined;
   return (
-    <li className={`${styles.stageItem} ${selected ? styles.stageItemSelected : ''} ${semantics.muted ? styles.stageItemMuted : ''} ${canRename ? styles.stageItemEditable : ''}`}>
+    <li className={`${styles.stageItem} ${selected ? styles.stageItemSelected : ''} ${semantics.muted ? styles.stageItemMuted : ''}`}>
       <button className={`${styles.stageButton} ${semantics.emphasis === 'current' ? styles.stageButtonCurrent : ''} ${semantics.emphasis === 'error' ? styles.stageButtonError : ''}`} type="button" aria-expanded={selected} aria-controls={detailsId} aria-current={stage.status === 'current' ? 'step' : undefined} data-testid={stage.status === 'current' ? 'workflow-current-stage' : undefined} onClick={onSelect}>
         <span className={`${styles.stageMarker} ${styles[`status-${stage.status}`]}`} aria-hidden="true"><StageStatusIcon status={stage.status} /></span>
         <span className={styles.stageContent}>
@@ -159,7 +165,6 @@ function WorkflowStageItem({ stage, selected, detailsId, onSelect, canRename, on
           <StageSummary stage={stage} />
         </span>
       </button>
-      {canRename ? <StageRenameAction stage={stage} placement="list" onSave={onRename} /> : null}
     </li>
   );
 }
@@ -250,7 +255,7 @@ function WorkflowStageDetails({ stage, stages, workflow, instanceId, universityI
   const hasFacts = Boolean(stage.deadline || stage.responsible || stage.startedAt || stage.completedAt);
   return (
     <section className={`${styles.detailPanel} ${styles[`detail-${stage.status}`]}`} aria-labelledby={headingId} id={idPrefix}>
-      <div className={styles.detailHeader}><div className={styles.detailTitle}><h2 id={headingId}>{stage.name}</h2>{canRename ? <StageRenameAction stage={stage} placement="header" onSave={onRename} /> : null}</div><StatusBadge intent={semantics.intent} icon={<StageStatusIcon status={stage.status} />}>{semantics.label}</StatusBadge></div>
+      <div className={styles.detailHeader}><div className={styles.detailTitle}><h2 id={headingId}>{stage.name}</h2>{canRename ? <StageRenameAction stage={stage} onSave={onRename} /> : null}</div><StatusBadge intent={semantics.intent} icon={<StageStatusIcon status={stage.status} />}>{semantics.label}</StatusBadge></div>
       <CompletionSummary stage={stage} />
       {!activeStage && stage.status !== 'completed' && stage.status !== 'skipped' ? <p className={styles.futureNotice}>Этап ещё не начат. Он станет доступен после завершения предыдущего.</p> : null}
       {hasFacts || editableStage ? <section className={styles.detailSection} aria-labelledby={`${idPrefix}-overview-title`}><div className={styles.detailSectionHeading}><h3 id={`${idPrefix}-overview-title`}><InformationStroke size={18} fill="currentColor" />Основная информация</h3></div><dl className={styles.detailFacts}>
@@ -419,7 +424,7 @@ export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride 
     <div className={styles.layout}>
       <section className={styles.stagesPanel} aria-labelledby={`${idPrefix}-stages-title`}>
         <div className={styles.panelHeading}><div><h2 id={`${idPrefix}-stages-title`}>Этапы Workflow</h2></div><span className={styles.totalLabel}>{stages.length} этапов</span></div>
-        <ol className={styles.stageList}>{stages.map((stage) => <WorkflowStageItem key={stage.id} stage={stage} selected={stage.id === selectedStage.id} detailsId={detailsId} onSelect={() => setSelectedId(stage.id)} canRename={canRename} onRename={renameStage} />)}</ol>
+        <ol className={styles.stageList}>{stages.map((stage) => <WorkflowStageItem key={stage.id} stage={stage} selected={stage.id === selectedStage.id} detailsId={detailsId} onSelect={() => setSelectedId(stage.id)} />)}</ol>
       </section>
       <WorkflowStageDetails key={selectedStage.id} stage={selectedStage} stages={stages} workflow={query.data} instanceId={instanceId} universityId={query.data.universityId} userId={user?.id} canManage={canManage} canRename={canRename} onRename={renameStage} idPrefix={detailsId} onTransitionOpen={() => setSelectedId(selectedStage.id)} onTransitionClose={() => setSelectedId(null)} onTransitionSuccess={() => setSelectedId(null)} onNotify={notify} tasksState={realWorkflow ? { loading: tasksQuery.isPending, error: tasksQuery.isError && !tasksQuery.data, retry: () => void tasksQuery.refetch(), hasMore: tasksQuery.hasNextPage, loadingMore: tasksQuery.isFetchingNextPage, loadMore: () => void tasksQuery.fetchNextPage() } : undefined} attachmentsState={realWorkflow ? { loading: historyQuery.isPending, error: historyQuery.isError && !historyQuery.data, retry: () => void historyQuery.refetch() } : undefined} historyState={realWorkflow ? { loading: historyQuery.isPending, error: historyQuery.isError && !historyQuery.data, retry: () => void historyQuery.refetch() } : undefined} historyEvents={historyEvents} historyActorName={user?.name} allowedTargets={allowedTargets} rollbackTargets={rollbackTargets} />
     </div>
