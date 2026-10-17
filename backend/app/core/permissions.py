@@ -17,11 +17,12 @@ USER_PERMISSIONS = frozenset({
     "workflow.attachment.delete", "workflow.task.read", "workflow.task.update",
     "reports.read", "reports.create", "analytics.read", "import.read",
 })
-MANAGER_PERMISSIONS = USER_PERMISSIONS | frozenset({
+MANAGER_PERMISSIONS = (USER_PERMISSIONS - {"import.read"}) | frozenset({
     "university.edit", "university_responsible.manage", "analytics.extended",
-    "audit.read", "import.write", "user_university.manage",
+    "audit.read", "user_university.manage",
 })
 ADMIN_PERMISSIONS = MANAGER_PERMISSIONS | frozenset({
+    "catalog.manage", "import.read", "import.write",
     "university.create", "university.delete", "workflow_template.manage",
     "admin.users", "admin.settings", "*",
 })
@@ -42,10 +43,10 @@ def effective_role(user: CurrentUser) -> str:
 
 
 def user_permissions(user: CurrentUser) -> set[str]:
-    perms: set[str] = set()
-    for role in user.roles or set():
-        perms.update(ROLE_PERMISSIONS.get(role, ()))
-    return perms
+    roles = user.roles or set()
+    if not roles & PUBLIC_ROLE_NAMES:
+        return set()
+    return set(ROLE_PERMISSIONS[effective_role(user)])
 
 
 def require_permission(permission: str):

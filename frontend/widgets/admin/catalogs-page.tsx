@@ -125,7 +125,7 @@ function itemContacts(item: CatalogItem | undefined): CatalogContact[] | undefin
 }
 
 function CatalogActions({ item, canWrite, busy, onEdit, onDelete }: { item: CatalogItem; canWrite: boolean; busy: boolean; onEdit: () => void; onDelete: () => void }) {
-  const writeHint = canWrite ? null : 'Изменять каталоги может только администратор или менеджер.';
+  const writeHint = canWrite ? null : 'Изменять каталоги может только администратор.';
   const editLabel = `Изменить ${item.name}`;
   const deleteLabel = `Удалить ${item.name}`;
   return <div className={styles.rowActions}>
@@ -168,7 +168,7 @@ export function CatalogsPage() {
   const [deleteTarget, setDeleteTarget] = useState<CatalogItem | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ intent: ToastIntent; title: string; message?: string } | null>(null);
-  const canWrite = canMutateCatalog(user?.role);
+  const canWrite = canMutateCatalog(user);
 
   useEffect(() => { const timer = window.setTimeout(() => setDebouncedSearch(search), 250); return () => window.clearTimeout(timer); }, [search]);
 

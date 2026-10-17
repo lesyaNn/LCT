@@ -231,7 +231,7 @@ def list_import_jobs(
         .order_by(ReportJob.created_at.desc(), ReportJob.id.desc())
         .limit(100)
     )
-    if not _is_admin(user) and "manager" not in set(user.roles or ()):
+    if not _is_admin(user):
         stmt = stmt.where(ReportJob.actor_sub == (user.id or ""))
     return [_read_model(job) for job in db.scalars(stmt).all()]
 

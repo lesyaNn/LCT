@@ -48,7 +48,7 @@ ARTICLES = {
     "roles/user.md": None,
     "roles/manager.md": "analytics.extended",
     "roles/admin.md": "admin.users",
-    "admin-guide/catalogs.md": "university.edit",
+    "admin-guide/catalogs.md": "catalog.manage",
     "admin-guide/import.md": "import.write",
     "admin-guide/users.md": "admin.users",
     "admin-guide/workflow-templates.md": "workflow_template.manage",

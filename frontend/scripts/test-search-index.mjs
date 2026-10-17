@@ -25,7 +25,7 @@ const { navigationItems, getVisibleNavigationItems, canAccessRoute } = load(reso
 const user = (role, permissions) => ({ rawRoles: [role], permissions });
 const regular = user('user', ['university.read', 'workflow.read', 'workflow.change_status', 'workflow.task.update', 'workflow.comment.create', 'workflow.attachment.create', 'reports.read']);
 const admin = user('admin', ['*']);
-const manager = user('manager', [...regular.permissions, 'university_responsible.manage', 'audit.read', 'university.edit', 'import.write', 'user_university.manage']);
+const manager = user('manager', [...regular.permissions, 'university_responsible.manage', 'audit.read', 'university.edit', 'user_university.manage']);
 const titles = (query, account) => searchStaticIndex(query, account).results.map((item) => item.title);
 
 assert.equal(titles('дедлайн', regular)[0], 'Установить дедлайн');
@@ -44,13 +44,19 @@ assert.ok(!titles('запустить', regular).includes('Запустить Wo
 for (const term of ['задача', 'комментарий', 'файл', 'договор', 'лицензия', 'история', 'срок', 'отчёт', 'отчет', 'отчетт', 'запустт']) {
   assert.ok(titles(term, regular).length, `No result for ${term}`);
 }
-assert.ok(titles('импорт', manager).includes('Импорт каталогов'));
+assert.ok(!titles('импорт', manager).includes('Импорт каталогов'));
+assert.ok(titles('импорт', admin).includes('Импорт каталогов'));
 assert.ok(titles('аудит', manager).includes('Аудит'));
 assert.ok(getVisibleNavigationItems(manager).some((item) => item.href === '/admin/university-assignments'));
 assert.ok(!getVisibleNavigationItems(admin).some((item) => item.href === '/admin/university-assignments'));
 assert.ok(canAccessRoute('/admin', manager));
 assert.ok(canAccessRoute('/admin/university-assignments', manager));
 assert.ok(!canAccessRoute('/admin/users', manager));
+for (const path of ['/admin/catalogs', '/admin/import']) {
+  assert.ok(!getVisibleNavigationItems(manager).some((item) => item.href === path));
+  assert.ok(!canAccessRoute(path, manager));
+  assert.ok(canAccessRoute(path, admin));
+}
 assert.ok(titles('приглашение', admin).includes('Пригласить пользователя'));
 if (navigationItems.some((item) => item.href === '/api-testing')) {
   assert.ok(titles('api', admin).includes('Тестирование API'));

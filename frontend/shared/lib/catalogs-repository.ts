@@ -1,4 +1,5 @@
-import type { UserRole } from '@/shared/types/user';
+import type { AuthUser } from '@/shared/types/user';
+import { hasPermission } from './access-control';
 import { ApiRequestError } from './api-errors';
 import { apiDownload, apiFetch, apiUploadFormData } from './api-client';
 import { fromDataSource } from './data-source';
@@ -235,11 +236,10 @@ export const catalogQueryKeys = {
 export const CATALOG_API_CAPABILITIES = {
   /** Every catalog entity is hard-deletable; the backend answers 409 when still referenced. */
   hardDelete: true,
-  mutationRoles: ['admin', 'manager'] as UserRole[],
 } as const;
 
-export function canMutateCatalog(role: UserRole | undefined): boolean {
-  return Boolean(role && CATALOG_API_CAPABILITIES.mutationRoles.includes(role));
+export function canMutateCatalog(user: AuthUser | null | undefined): boolean {
+  return hasPermission(user, 'catalog.manage');
 }
 
 export function catalogDefinition(type: CatalogType) {

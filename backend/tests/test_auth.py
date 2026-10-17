@@ -106,9 +106,9 @@ def test_me_manager_permissions(client):
         "workflow.change_status", "workflow.comment.create", "workflow.comment.update",
         "workflow.attachment.read", "workflow.attachment.create",
         "workflow.attachment.delete", "workflow.task.read", "workflow.task.update",
-        "reports.read", "reports.create", "analytics.read", "import.read",
+        "reports.read", "reports.create", "analytics.read",
         "university.edit", "university_responsible.manage", "analytics.extended",
-        "audit.read", "import.write",
+        "audit.read", "user_university.manage",
     })
 
 

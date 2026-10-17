@@ -11,7 +11,7 @@ export const navigationItems: NavigationItem[] = [
   { label: 'Администрирование', href: '/admin', icon: 'admin', requiredPermission: 'user_university.manage' },
   { label: 'Пользователи и права', href: '/admin/users', icon: 'admin', requiredPermission: 'admin.users' },
   { label: 'Пользователи и вузы', href: '/admin/university-assignments', icon: 'admin', requiredPermission: 'user_university.manage', hiddenWithPermission: 'admin.users' },
-  { label: 'Управление каталогами', href: '/admin/catalogs', icon: 'admin', requiredPermission: 'university.edit' },
+  { label: 'Управление каталогами', href: '/admin/catalogs', icon: 'admin', requiredPermission: 'catalog.manage' },
   { label: 'Импорт каталогов', href: '/admin/import', icon: 'admin', requiredPermission: 'import.write' },
   { label: 'Шаблоны Workflow', href: '/admin/workflow/templates', icon: 'workflow', requiredPermission: 'workflow_template.manage' },
   { label: 'Тестирование API', href: '/api-testing', icon: 'api', requiredPermission: 'admin.settings' },
