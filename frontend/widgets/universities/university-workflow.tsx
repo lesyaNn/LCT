@@ -50,6 +50,7 @@ import { WorkflowCreateModal } from './workflow-create-modal';
 import { PassportWorkflowCard } from './passport-workflow-card';
 import { WorkflowTransitionModal, type WorkflowTransitionNotification } from './workflow-transition-modal';
 import { WorkflowRollbackModal } from './workflow-rollback-modal';
+import { PassportSectionHeader } from './passport-section-header';
 import styles from './university-workflow.module.css';
 
 export type WorkflowViewMode = 'page' | 'embedded';
@@ -452,12 +453,7 @@ export function UniversityWorkflow({ id }: { id: string }) {
   if (!instancesQuery.data || !programsQuery.data) return <RouteErrorState compact onRetry={() => { void instancesQuery.refetch(); void programsQuery.refetch(); }} />;
 
   return <div className={styles.programWorkflow}>
-    <div className={styles.instancesHeader}>
-      <div className={styles.instancesTitle}>
-        <h2>Workflow вуза</h2><StatusBadge intent="neutral" showIndicator={false}>{instances.length}</StatusBadge>
-      </div>
-      {canCreate ? <Button variant="primary" size="s" type="button" onClick={() => setCreateOpen(true)}>Создать Workflow</Button> : null}
-    </div>
+    <PassportSectionHeader title="Workflow вуза" count={instances.length} actions={canCreate ? <Button variant="primary" size="s" type="button" onClick={() => setCreateOpen(true)}>Создать Workflow</Button> : undefined} />
     <div className={styles.passportWorkflowCards}>{instances.map((item) => <PassportWorkflowCard key={item.id} instance={item} />)}{unstartedPrograms.map((program) => <PassportWorkflowCard key={program.id} programName={program.name} onLaunch={canCreate ? () => setLaunchProgramId(program.id) : undefined} />)}{!instances.length && !unstartedPrograms.length ? <EmptyState title="Workflow ещё не созданы" description="Процессы появятся после создания первого Workflow." /> : null}</div>
     {createOpen || launchProgramId !== null ? (
       <WorkflowCreateModal

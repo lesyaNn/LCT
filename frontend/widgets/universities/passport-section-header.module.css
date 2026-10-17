@@ -1,0 +1,5 @@
+.header { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); justify-content: space-between; min-height: 36px; min-width: 0; }
+.title { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); min-width: 0; }
+.title h2 { font-size: 18px; letter-spacing: -.02em; margin: 0; }
+.actions { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); margin-left: auto; min-width: 0; }
+@media (max-width: 768px) { .header { align-items: stretch; flex-direction: column; } .actions { margin-left: 0; } }

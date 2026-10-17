@@ -25,6 +25,7 @@ import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { TableSkeleton } from '@/shared/ui/skeleton';
 import { AuditDiff, hasAuditDiff } from '@/widgets/audit/audit-diff';
 import { AttachmentRow } from './workflow-attachments';
+import { PassportSectionHeader } from './passport-section-header';
 import styles from './university-history.module.css';
 
 const eventTypes: Array<UniversityHistoryEventType | 'all'> = ['all', 'workflow', 'document', 'meeting', 'note', 'audit'];
@@ -84,5 +85,5 @@ export function UniversityHistory({ id }: { id: string }) {
   });
   const resetFilters = () => setFilters({ type: 'all', dateFrom: '', dateTo: '', userId: '', entityId: '' });
 
-  return <div className={styles.page}>{filterSupported ? <HistoryFilters filters={filters} options={options} onChange={onChange} onReset={resetFilters} /> : null}{query.isPending ? <TableSkeleton rows={6} columns={5} label="Загрузка истории университета" /> : !query.data ? <RouteErrorState compact onRetry={() => void query.refetch()} /> : query.data.length ? <HistoryTable events={query.data} /> : <EmptyState icon={<HistoryAction size={22} fill="currentColor" />} title={filtered ? 'По заданным фильтрам события не найдены' : 'Событий пока нет'} description={filtered ? 'Измените условия поиска или сбросьте фильтры.' : 'История появится после первого события.'} primaryAction={filtered ? { label: 'Сбросить фильтры', onClick: resetFilters, variant: 'secondary' } : undefined} />}</div>;
+  return <div className={styles.page}><PassportSectionHeader title="История" count={query.isPlaceholderData ? undefined : query.data?.length} />{filterSupported ? <HistoryFilters filters={filters} options={options} onChange={onChange} onReset={resetFilters} /> : null}{query.isPending ? <TableSkeleton rows={6} columns={5} label="Загрузка истории университета" /> : !query.data ? <RouteErrorState compact onRetry={() => void query.refetch()} /> : query.data.length ? <HistoryTable events={query.data} /> : <EmptyState icon={<HistoryAction size={22} fill="currentColor" />} title={filtered ? 'По заданным фильтрам события не найдены' : 'Событий пока нет'} description={filtered ? 'Измените условия поиска или сбросьте фильтры.' : 'История появится после первого события.'} primaryAction={filtered ? { label: 'Сбросить фильтры', onClick: resetFilters, variant: 'secondary' } : undefined} />}</div>;
 }

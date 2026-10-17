@@ -1,8 +1,4 @@
 .section { display: flex; flex-direction: column; gap: var(--rtk-space-4); min-width: 0; }
-.sectionHeader { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); justify-content: space-between; min-width: 0; }
-.sectionTitle { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); min-width: 0; }
-.sectionTitle h2 { font-size: 18px; letter-spacing: -.02em; margin: 0; }
-.toolbar { display: flex; justify-content: flex-end; }
 .grid { display: grid; gap: var(--rtk-space-4); grid-auto-rows: 1fr; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 300px)); }
 .card { background: var(--rtk-color-surface); border-radius: var(--rtk-radius-medium); box-shadow: var(--rtk-shadow-elevation-1); display: flex; flex-direction: column; gap: var(--rtk-space-3); min-width: 0; padding: var(--rtk-space-4); }
 .cardHeader { align-items: flex-start; display: flex; gap: var(--rtk-space-3); min-width: 0; }

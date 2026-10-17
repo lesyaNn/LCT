@@ -3,7 +3,6 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useState, useSyncExternalStore } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import Checklist from '@atomaro/icons/24/action/Checklist';
 import StatisticsBoard from '@atomaro/icons/24/business/StatisticsBoard';
 import Calendar from '@atomaro/icons/24/communication/Calendar';
 import HistoryAction from '@atomaro/icons/24/communication/HistoryAction';
@@ -81,7 +80,7 @@ function parseTab(value: string | null): PassportTabId {
   return value && tabIds.has(value as PassportTabId) ? value as PassportTabId : 'overview';
 }
 
-function PassportHeader({ passport, onTabChange }: { passport: UniversityPassport; onTabChange: (tab: PassportTabId) => void }) {
+function PassportHeader({ passport }: { passport: UniversityPassport }) {
   return (
     <header className={styles.header}>
       <div className={styles.headerMain}>
@@ -91,9 +90,6 @@ function PassportHeader({ passport, onTabChange }: { passport: UniversityPasspor
         </div>
         <div className={styles.headerSide}>
           <UniversityLocalClock city={passport.city} timeZone={passport.timeZone} />
-          <div className={styles.headerActions} aria-label="Действия с вузом">
-            <Button variant="primary" size="s" type="button" onClick={() => onTabChange('workflow')}><Checklist size={16} fill="currentColor" />Workflow</Button>
-          </div>
         </div>
       </div>
     </header>
@@ -217,7 +213,7 @@ export function UniversityPassport({ id }: { id: string }) {
 
   return (
     <div className={styles.page}>
-      <PassportHeader passport={passport} onTabChange={selectTab} />
+      <PassportHeader passport={passport} />
       <TabbedSurface contentClassName={styles.passportContent} tabs={!mobileLayout ? <Tabs items={tabDefinitions} activeId={activeTab} onChange={(id) => selectTab(id as PassportTabId)} label="Разделы паспорта вуза" prefix="passport-tab" /> : undefined}>
       {!mobileLayout ? <div className={`${styles.desktopPanel} ${activeTab === 'overview' || activeTab === 'health' || activeTab === 'meetings' ? styles.flushPanel : ''}`} id="passport-panel" role="tabpanel" aria-labelledby={`passport-tab-${activeTab}`}>{renderContent(activeTab)}</div> : null}
       {mobileLayout ? <div className={styles.mobileAccordion} aria-label="Разделы паспорта вуза">

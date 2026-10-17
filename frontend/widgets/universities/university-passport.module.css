@@ -10,7 +10,7 @@
 .eyebrow { margin: 0 0 var(--rtk-space-2); }
 .titleBlock h1 { font-size: clamp(26px, 3vw, 40px); letter-spacing: -.035em; line-height: 1.12; margin: 0; max-width: 900px; overflow-wrap: anywhere; }
 .city { color: var(--rtk-color-text-secondary); font-size: 16px; margin: var(--rtk-space-2) 0 0; }
-.headerSide { align-items: flex-start; display: flex; flex: 0 1 420px; flex-direction: column; gap: var(--rtk-space-3); min-width: 0; }
+.headerSide { flex: 0 1 420px; min-width: 0; }
 .healthSummary { composes: surface from '../../shared/ui/rtk/section-surface.module.css'; min-width: 220px; padding: var(--rtk-space-4); }
 .healthSummaryTop { align-items: flex-start; display: flex; gap: var(--rtk-space-3); justify-content: space-between; }
 .overline { color: var(--rtk-color-text-tertiary); display: block; letter-spacing: .04em; }
@@ -19,8 +19,6 @@
 .meter-green { background: var(--rtk-color-success); }
 .meter-yellow { background: var(--rtk-color-warning); }
 .meter-red { background: var(--rtk-color-danger); }
-.headerActions { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); }
-.headerActions button { align-items: center; display: inline-flex; gap: var(--rtk-space-2); }
 .desktopTabs { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-bottom: 0; border-radius: var(--rtk-radius-medium) var(--rtk-radius-medium) 0 0; padding: 0 var(--rtk-space-2); position: sticky; top: var(--topbar-height); z-index: 10; }
 .tabList { display: flex; gap: var(--rtk-space-1); max-width: 100%; overflow-x: auto; padding-inline: var(--rtk-space-1); scrollbar-width: thin; }
 .tab,
@@ -97,9 +95,7 @@
 @media (max-width: 768px) {
   .headerMain { align-items: stretch; flex-direction: column; gap: var(--rtk-space-4); }
   .titleBlock, .headerSide { flex: none; width: 100%; }
-  .headerSide { align-items: flex-start; }
   .healthSummary { min-width: 0; }
-  .headerActions { justify-content: flex-start; }
   .desktopTabs,
   .desktopPanel { display: none; }
   .mobileAccordion { display: flex; flex-direction: column; gap: var(--rtk-space-2); }
@@ -124,7 +120,6 @@
   .workflowCard,
   .timelineCard { padding: var(--rtk-space-4); }
   .progressLabel { align-items: flex-start; flex-direction: column; }
-  .headerActions button { flex: 1; justify-content: center; }
 }
 
 @media (prefers-reduced-motion: reduce) {

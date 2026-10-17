@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Calendar from '@atomaro/icons/24/communication/Calendar';
@@ -40,14 +40,11 @@ import { PassportDataTable, PassportTableSkeleton, type PassportMobileField, typ
 import { MeetingMutationForm, ProductAssignmentForm } from './passport-mutation-forms';
 import { MeetingAgendaPdfAction } from './workflow-meeting-agenda';
 import { LicensePassportAction } from './license-passport-action';
+import { PassportSectionHeader } from './passport-section-header';
 import styles from './university-passport-sections.module.css';
 import { PassportDocumentsSection } from './passport-documents-section';
 
 const formatDate = formatDateRu;
-
-function SectionToolbar({ title, children }: { title?: string; children?: ReactNode }) {
-  return <div className={styles.sectionToolbar}>{title ? <h2>{title}</h2> : null}{children ? <div className={styles.toolbarControls}>{children}</div> : null}</div>;
-}
 
 const productStatusLabels: Record<UniversityProductStatus, string> = {
   planned: 'Запланирован',
@@ -87,7 +84,7 @@ function ProductsSection({ id }: { id: string }) {
   if (query.isPending) return <section className={styles.section} aria-label="ИТ-продукты"><PassportTableSkeleton /></section>;
   if (!query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
 
-  return <section className={styles.section} aria-label="ИТ-продукты">{canAttach ? <SectionToolbar><Button variant="primary" size="s" type="button" onClick={() => setAssignmentOpen(true)}>Добавить ИТ-продукт</Button></SectionToolbar> : null}<PassportDataTable rows={query.data} columns={columns} mobileFields={mobileFields} emptyMessage="Нет подключённых ИТ-продуктов" />{assignmentOpen ? <ProductAssignmentForm universityId={id} existingProductIds={query.data.map((product) => product.id)} onClose={() => setAssignmentOpen(false)} onSaved={() => { setAssignmentOpen(false); setSaved(true); }} /> : null}{saved ? <div className={styles.toastViewport}><Toast intent="success" title="ИТ-продукт добавлен" onClose={() => setSaved(false)} /></div> : null}</section>;
+  return <section className={styles.section} aria-label="ИТ-продукты"><PassportSectionHeader title="ИТ-продукты" count={query.data.length} actions={canAttach ? <Button variant="primary" size="s" type="button" onClick={() => setAssignmentOpen(true)}>Добавить ИТ-продукт</Button> : undefined} /><PassportDataTable rows={query.data} columns={columns} mobileFields={mobileFields} emptyMessage="Нет подключённых ИТ-продуктов" />{assignmentOpen ? <ProductAssignmentForm universityId={id} existingProductIds={query.data.map((product) => product.id)} onClose={() => setAssignmentOpen(false)} onSaved={() => { setAssignmentOpen(false); setSaved(true); }} /> : null}{saved ? <div className={styles.toastViewport}><Toast intent="success" title="ИТ-продукт добавлен" onClose={() => setSaved(false)} /></div> : null}</section>;
 }
 
 export { ProductsSection };
@@ -126,7 +123,7 @@ function LicensesSection({ id }: { id: string }) {
   ];
   if (query.isPending) return <section className={styles.section} aria-label="Лицензии"><PassportTableSkeleton /></section>;
   if (!query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
-  return <section className={styles.section} aria-label="Лицензии"><FilterToolbar embedded compact label="Фильтры лицензий" controls={() => <FilterField label="Статус"><Select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as UniversityLicenseStatus | 'all')}><option value="all">Все статусы</option>{Object.entries(licenseStatusLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</Select></FilterField>} activeFilters={statusFilter === 'all' ? [] : [{ id: 'status', label: `Статус: ${licenseStatusLabels[statusFilter]}`, onRemove: () => setStatusFilter('all') }]} mobileCount={statusFilter === 'all' ? 0 : 1} /><PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Лицензии пока не добавлены" /></section>;
+  return <section className={styles.section} aria-label="Лицензии"><PassportSectionHeader title="Лицензии" count={rows.length} /><FilterToolbar embedded compact label="Фильтры лицензий" controls={() => <FilterField label="Статус"><Select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as UniversityLicenseStatus | 'all')}><option value="all">Все статусы</option>{Object.entries(licenseStatusLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</Select></FilterField>} activeFilters={statusFilter === 'all' ? [] : [{ id: 'status', label: `Статус: ${licenseStatusLabels[statusFilter]}`, onRemove: () => setStatusFilter('all') }]} mobileCount={statusFilter === 'all' ? 0 : 1} /><PassportDataTable rows={rows} columns={columns} mobileFields={mobileFields} emptyMessage="Лицензии пока не добавлены" /></section>;
 }
 
 function DocumentsSection({ id }: { id: string }) {
@@ -164,7 +161,7 @@ function MeetingsSection({ id, canAdd }: { id: string; canAdd: boolean }) {
   if (query.isPending) return <section className={styles.section} aria-label="Встречи"><PassportTableSkeleton /></section>;
   if (!query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
   return <section className={`${styles.section} ${styles.meetingSurface}`} aria-label="Встречи">
-    {canWrite ? <SectionToolbar><Button variant="primary" size="s" type="button" onClick={() => setEditor(null)}><Calendar size={16} fill="currentColor" />Добавить встречу</Button></SectionToolbar> : null}
+    <PassportSectionHeader title="Встречи" count={query.data.total} actions={canWrite ? <Button variant="primary" size="s" type="button" onClick={() => setEditor(null)}><Calendar size={16} fill="currentColor" />Добавить встречу</Button> : undefined} />
     {query.data.items.length ? <ol className={styles.meetingTimeline}>{query.data.items.map((meeting) => <li className={styles.meetingItem} key={meeting.id}><div className={styles.meetingMarker} aria-hidden="true" /><article className={styles.meetingContent}>
       <div className={styles.meetingMeta}>
         {meeting.occurredAt ? <time dateTime={meeting.occurredAt}>{formatDateTimeRu(meeting.occurredAt)}</time> : <span>Дата не назначена</span>}
