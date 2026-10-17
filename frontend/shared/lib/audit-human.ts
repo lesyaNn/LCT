@@ -527,8 +527,8 @@ function summarize(event: AuditEvent): AuditSummary {
     if (!label) return { ...base, title: 'Изменение данных', section: getAuditEntityLabel(entity), objectName: event.entity.label || null, changes: changeRows(oldObj, newObj), note: null };
     const objName = payloadName(newObj, 'name', 'full_name', 'subject', 'original_filename', 'file_name') ?? payloadName(oldObj, 'name', 'full_name', 'subject', 'original_filename', 'file_name') ?? (entity === 'university' ? uni : null);
     const sectionMap: Record<string, string> = {
-      university: 'ВУЗы', direction: 'Направления', program: 'Программы', vendor: 'Производители',
-      product: 'Продукты', responsible: 'Ответственные', meeting: 'Встречи',
+      university: 'ВУЗы', direction: 'ИТ-направления', program: 'ИТ-программы', vendor: 'Производители',
+      product: 'ИТ-продукты', responsible: 'Ответственные', meeting: 'Встречи',
     };
     if (!objName) {
       const fallback = action === 'DELETE'

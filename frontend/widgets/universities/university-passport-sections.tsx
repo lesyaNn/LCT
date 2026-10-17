@@ -69,22 +69,22 @@ function ProductsSection({ id }: { id: string }) {
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: universityProductsQueryKey(id), queryFn: () => getUniversityProducts(id, queryClient), staleTime: 30_000 });
   const columns: PassportTableColumn<UniversityProductRow>[] = [
-    { id: 'name', label: 'Продукт', sortable: true, sortValue: (row) => row.name, render: (row) => <><strong className={styles.primaryCell}>{row.name}</strong><span className={styles.secondaryCell}>{row.version}</span></> },
+    { id: 'name', label: 'ИТ-продукт', sortable: true, sortValue: (row) => row.name, render: (row) => <><strong className={styles.primaryCell}>{row.name}</strong><span className={styles.secondaryCell}>{row.version}</span></> },
     { id: 'vendor', label: 'Поставщик', sortable: true, sortValue: (row) => row.vendor, render: (row) => row.vendor },
     { id: 'status', label: 'Статус', sortable: true, sortValue: (row) => productStatusLabels[row.status], render: (row) => <ProductStatusBadge status={row.status} /> },
     { id: 'license', label: 'Лицензия', sortable: true, sortValue: (row) => row.expiresAt, render: (row) => <ProductLicense row={row} /> },
   ];
   const mobileFields: PassportMobileField<UniversityProductRow>[] = [
-    { label: 'Продукт', render: (row) => <><strong className={styles.primaryCell}>{row.name}</strong><span className={styles.secondaryCell}>{row.version}</span></> },
+    { label: 'ИТ-продукт', render: (row) => <><strong className={styles.primaryCell}>{row.name}</strong><span className={styles.secondaryCell}>{row.version}</span></> },
     { label: 'Поставщик', render: (row) => row.vendor },
     { label: 'Статус', render: (row) => <ProductStatusBadge status={row.status} /> },
     { label: 'Лицензия', render: (row) => <ProductLicense row={row} /> },
   ];
 
-  if (query.isPending) return <section className={styles.section} aria-label="Продукты"><PassportTableSkeleton /></section>;
+  if (query.isPending) return <section className={styles.section} aria-label="ИТ-продукты"><PassportTableSkeleton /></section>;
   if (!query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
 
-  return <section className={styles.section} aria-label="Продукты">{canAttach ? <SectionToolbar><Button variant="primary" size="s" type="button" onClick={() => setAssignmentOpen(true)}>Добавить продукт</Button></SectionToolbar> : null}<PassportDataTable rows={query.data} columns={columns} mobileFields={mobileFields} emptyMessage="Нет подключённых продуктов" />{assignmentOpen ? <ProductAssignmentForm universityId={id} existingProductIds={query.data.map((product) => product.id)} onClose={() => setAssignmentOpen(false)} onSaved={() => { setAssignmentOpen(false); setSaved(true); }} /> : null}{saved ? <div className={styles.toastViewport}><Toast intent="success" title="Продукт добавлен" onClose={() => setSaved(false)} /></div> : null}</section>;
+  return <section className={styles.section} aria-label="ИТ-продукты">{canAttach ? <SectionToolbar><Button variant="primary" size="s" type="button" onClick={() => setAssignmentOpen(true)}>Добавить ИТ-продукт</Button></SectionToolbar> : null}<PassportDataTable rows={query.data} columns={columns} mobileFields={mobileFields} emptyMessage="Нет подключённых ИТ-продуктов" />{assignmentOpen ? <ProductAssignmentForm universityId={id} existingProductIds={query.data.map((product) => product.id)} onClose={() => setAssignmentOpen(false)} onSaved={() => { setAssignmentOpen(false); setSaved(true); }} /> : null}{saved ? <div className={styles.toastViewport}><Toast intent="success" title="ИТ-продукт добавлен" onClose={() => setSaved(false)} /></div> : null}</section>;
 }
 
 export { ProductsSection };
@@ -102,7 +102,7 @@ function LicensesSection({ id }: { id: string }) {
   const query = useQuery({ queryKey: universityLicensesQueryKey(id), queryFn: () => getUniversityLicenses(id, queryClient), staleTime: 30_000 });
   const rows = useMemo(() => (query.data?.filter((row) => statusFilter === 'all' || row.status === statusFilter) ?? []).sort((left, right) => left.expiresAt.localeCompare(right.expiresAt)), [query.data, statusFilter]);
   const columns: PassportTableColumn<UniversityLicenseRow>[] = [
-    { id: 'product', label: 'Продукт', sortable: true, sortValue: (row) => row.product, render: (row) => <strong className={styles.primaryCell}>{row.product}</strong> },
+    { id: 'product', label: 'ИТ-продукт', sortable: true, sortValue: (row) => row.product, render: (row) => <strong className={styles.primaryCell}>{row.product}</strong> },
     { id: 'vendor', label: 'Вендор', sortable: true, sortValue: (row) => row.vendor, render: (row) => row.vendor },
     { id: 'licenseNumber', label: '№ лицензии', render: (row) => row.licenseNumber },
     { id: 'signedAt', label: 'Подписана', sortable: true, sortValue: (row) => row.signedAt, render: (row) => formatDate(row.signedAt) },
@@ -112,7 +112,7 @@ function LicensesSection({ id }: { id: string }) {
     { id: 'contract', label: 'Договор', render: (row) => <details className={styles.inlineDetails}><summary>Подробнее</summary><span>{row.contract}</span></details> },
   ];
   const mobileFields: PassportMobileField<UniversityLicenseRow>[] = [
-    { label: 'Продукт', render: (row) => <strong className={styles.primaryCell}>{row.product}</strong> },
+    { label: 'ИТ-продукт', render: (row) => <strong className={styles.primaryCell}>{row.product}</strong> },
     { label: 'Вендор', render: (row) => row.vendor },
     { label: 'Лицензия', render: (row) => row.licenseNumber },
     { label: 'Истекает', render: (row) => formatDate(row.expiresAt) },

@@ -17,7 +17,7 @@ export interface ChatMessage {
 function restoredMessages(turns: AssistantTurn[]): ChatMessage[] {
   return turns.flatMap((turn) => [
     { id: `${turn.turn_id}:question`, role: 'user' as const, text: turn.question, createdAt: turn.created_at },
-    { id: `${turn.turn_id}:answer`, role: 'assistant' as const, text: turn.answer, createdAt: turn.created_at, sources: turn.sources },
+    ...(turn.answer?.trim() ? [{ id: `${turn.turn_id}:answer`, role: 'assistant' as const, text: turn.answer, createdAt: turn.created_at, sources: turn.sources }] : []),
   ]);
 }
 
@@ -126,6 +126,10 @@ export function useAssistantChat(userId: string, pathname: string) {
         const result = await assistantRepository.chat(question, assistantPage(pathname), currentId, currentRevision);
         if (!result.ok) {
           setMessages((current) => current.map((item) => item.id === localId ? { ...item, error: assistantError(result) } : item));
+          return;
+        }
+        if (!result.data?.answer?.trim()) {
+          setMessages((current) => current.map((item) => item.id === localId ? { ...item, error: 'Помощник вернул пустой ответ. Попробуйте ещё раз.' } : item));
           return;
         }
         setConversationId(result.data.conversation_id);

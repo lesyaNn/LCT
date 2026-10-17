@@ -78,7 +78,7 @@ export function GlobalSearch({ user }: { user: AuthUser }) {
     { label: 'Workflow', items: results.workflows.map((hit) => ({ key: `w-${hit.id}`, title: hit.title, subtitle: hit.subtitle || 'Workflow', href: `/workflows/${hit.id}`, icon: 'workflow' })) },
     { label: 'Документы', items: results.documents.map((hit) => ({ key: `d-${hit.id}`, title: hit.title, subtitle: hit.subtitle || 'Документ', href: `/universities/${hit.university_id}?tab=documents`, icon: 'docs' })) },
     { label: 'Договоры', items: results.contracts.map((hit) => ({ key: `c-${hit.id}`, title: hit.title, subtitle: hit.subtitle || 'Договор', href: `/universities/${hit.university_id}?tab=documents`, icon: 'docs' })) },
-    { label: 'Продукты', items: results.products.map((hit) => ({ key: `p-${hit.id}-${hit.university_id}`, title: hit.title, subtitle: hit.subtitle || 'Продукт', href: `/universities/${hit.university_id}?tab=products`, icon: 'admin' })) },
+    { label: 'ИТ-продукты', items: results.products.map((hit) => ({ key: `p-${hit.id}-${hit.university_id}`, title: hit.title, subtitle: hit.subtitle || 'ИТ-продукт', href: `/universities/${hit.university_id}?tab=products`, icon: 'admin' })) },
     { label: 'Ответственные', items: results.responsibles.map((hit) => ({ key: `r-${hit.id}-${hit.university_id}`, title: hit.title, subtitle: hit.subtitle || 'Ответственный', href: `/universities/${hit.university_id}?tab=responsibles`, icon: 'admin' })) },
     { label: 'Разделы', items: staticSearch.results.filter((item) => item.kind === 'navigation') },
   ];

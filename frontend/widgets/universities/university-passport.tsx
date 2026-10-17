@@ -63,7 +63,7 @@ function isMobileLayout() {
 const tabDefinitions = [
   { id: 'overview', label: 'Обзор' },
   { id: 'health', label: 'Health Score' },
-  { id: 'products', label: 'Продукты' },
+  { id: 'products', label: 'ИТ-продукты' },
   { id: 'licenses', label: 'Лицензии' },
   { id: 'documents', label: 'Документы' },
   { id: 'meetings', label: 'Встречи' },

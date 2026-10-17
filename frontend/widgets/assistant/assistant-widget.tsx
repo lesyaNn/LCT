@@ -66,19 +66,23 @@ function Message({ message, user, onRetry, sending }: { message: ChatMessage; us
 export function AssistantWidget({ user, pathname, open, onOpen, onClose }: { user: AuthUser; pathname: string; open: boolean; onOpen: () => void; onClose: () => void }) {
   const [input, setInput] = useState('');
   const [showHint, setShowHint] = useState(false);
+  const [showLauncher, setShowLauncher] = useState(false);
   const { messages, restoring, restoreError, sending, sendMessage, retry, retryRestore } = useAssistantChat(user.id, pathname);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const hintKey = `crm-ai-assistant-hint:v1:${user.id}`;
+  const launcherKey = `crm-ai-assistant-launcher-hidden:v1:${user.id}`;
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
-      try { setShowHint(window.localStorage.getItem(hintKey) !== 'seen'); }
-      catch { setShowHint(true); }
+      try {
+        setShowHint(window.localStorage.getItem(hintKey) !== 'seen');
+        setShowLauncher(window.localStorage.getItem(launcherKey) !== 'hidden');
+      } catch { setShowHint(true); setShowLauncher(true); }
     });
     return () => cancelAnimationFrame(frame);
-  }, [hintKey]);
+  }, [hintKey, launcherKey]);
 
   useEffect(() => {
     if (!open) return;
@@ -124,19 +128,28 @@ export function AssistantWidget({ user, pathname, open, onOpen, onClose }: { use
     onOpen();
   }
 
+  function dismissLauncher() {
+    setShowLauncher(false);
+    dismissHint();
+    try { window.localStorage.setItem(launcherKey, 'hidden'); } catch { /* Keep the current session dismissed. */ }
+  }
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (sendMessage(input)) setInput('');
   }
 
   return <div ref={rootRef} className={styles.root}>
-    {!open && <div className={styles.closed}>
+    {!open && showLauncher && <div className={styles.closed}>
       {showHint && <div className={styles.hint} role="status">
         <Image src={robot} alt="" width={58} height={58} />
         <button className={styles.hintContent} type="button" onClick={openChat}><strong>Есть вопросы?</strong><span>Спросите ИИ-помощника</span></button>
         <IconButton icon="close" label="Закрыть подсказку" size={16} className={styles.hintClose} onClick={dismissHint} />
       </div>}
-      <button type="button" className={styles.launcher} aria-label="Открыть ИИ-помощника" aria-expanded={false} onClick={openChat}><Chat size={28} fill="currentColor" /></button>
+      <span className={styles.launcherWrap}>
+        <IconButton icon="close" label="Скрыть плавающую кнопку ИИ-помощника" size={14} className={styles.launcherClose} onClick={dismissLauncher} />
+        <button type="button" className={styles.launcher} aria-label="Открыть ИИ-помощника" aria-expanded={false} onClick={openChat}><Chat size={28} fill="currentColor" /></button>
+      </span>
     </div>}
 
     {open && <section className={styles.panel} role="dialog" aria-modal="false" aria-labelledby="assistant-title">
@@ -153,9 +166,9 @@ export function AssistantWidget({ user, pathname, open, onOpen, onClose }: { use
         </div>
         <div className={styles.quickQuestions} aria-label="Быстрые вопросы">{quickQuestions.map((question) => <Button key={question} type="button" variant="secondary" className={styles.quickButton} disabled={sending || restoring} onClick={() => sendMessage(question)}>{question}<Icon name="chevron-right" size={17} /></Button>)}</div>
         {restoring && <p className={styles.info} role="status">Загружаем диалог…</p>}
-        {restoreError && <div className={styles.restoreError} role="alert"><span>Не удалось загрузить предыдущий диалог: {restoreError}</span><Button type="button" variant="ghost" size="s" onClick={retryRestore}>Повторить</Button></div>}
+        {restoreError && <div className={styles.restoreError} role="alert"><span>Не удалось загрузить предыдущий диалог: {restoreError}</span><Button type="button" variant="ghost" size="s" disabled={sending} onClick={retryRestore}>Повторить</Button></div>}
         {messages.map((message) => <Message key={message.id} message={message} user={user} onRetry={retry} sending={sending} />)}
-        {sending && <div className={styles.messageRow} role="status"><div className={styles.messageAvatar}><Image src={robot} alt="" width={43} height={43} /></div><p className={styles.info}>Помощник печатает<span className={styles.dots}>…</span></p></div>}
+        {sending && <p className={styles.info} role="status">Помощник печатает<span className={styles.dots}>…</span></p>}
       </div>
 
       <form className={styles.composer} onSubmit={submit}>

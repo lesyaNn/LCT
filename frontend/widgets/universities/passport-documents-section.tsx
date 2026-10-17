@@ -68,7 +68,7 @@ export function PassportDocumentsSection({ id }: { id: string }) {
     { id: 'status', label: 'Статус', render: (row) => <StatusBadge intent={row.status === 'terminated' || row.status === 'expired' ? 'danger' : row.status === 'draft' ? 'neutral' : 'success'}>{effectiveStatusNames[row.status] ?? row.status}</StatusBadge> },
     { id: 'signed', label: 'Подписан', render: (row) => formatDateRu(row.signedAt) },
     { id: 'expires', label: 'Действует до', render: (row) => row.expiresAt ? formatDateRu(row.expiresAt) : '—' },
-    { id: 'product', label: 'Продукт', render: (row) => row.productName || '—' },
+    { id: 'product', label: 'ИТ-продукт', render: (row) => row.productName || '—' },
     { id: 'file', label: 'Файл', render: (row) => row.fileName ? <button className={styles.fileNameButton} type="button" onClick={() => void getFile(row)}>{row.fileName}</button> : '—' },
     ...(canEditContract ? [{ id: 'actions', label: 'Действия', render: (row: ContractCatalogItem) => <div className={styles.documentFormActions}><Tooltip content="Редактировать"><IconButton icon={<Edit size={18} fill="currentColor" />} label="Редактировать" onClick={() => openEdit(row)} /></Tooltip><Button variant="ghost" size="s" type="button" onClick={() => openFile(row)}>{row.fileName ? 'Заменить файл' : 'Прикрепить файл'}</Button>{row.fileName ? <Button variant="ghost" size="s" type="button" onClick={() => void removeFile(row)}>Удалить файл</Button> : null}</div> }] : []),
   ];

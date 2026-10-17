@@ -66,9 +66,9 @@ const contactCatalogTypes: ReadonlyArray<CatalogType> = ['products', 'vendors'];
 function secondaryFields(item: CatalogItem, universityNames: ReadonlyMap<string, string>): Array<{ label: string; value: string }> {
   if (item.type === 'universities') return [{ label: 'Город', value: item.city || '—' }];
   if (item.type === 'directions') return [{ label: 'Код', value: item.code }];
-  if (item.type === 'programs') return [{ label: 'Направление', value: item.directionName || '—' }, { label: 'Описание', value: item.description || '—' }];
+  if (item.type === 'programs') return [{ label: 'ИТ-направление', value: item.directionName || '—' }, { label: 'Описание', value: item.description || '—' }];
   if (item.type === 'vendors') return [];
-  if (item.type === 'products') return [{ label: 'Вендор', value: item.vendorName || '—' }, { label: 'Программа', value: item.programName || '—' }, { label: 'Версия', value: item.version || '—' }];
+  if (item.type === 'products') return [{ label: 'Вендор', value: item.vendorName || '—' }, { label: 'ИТ-программа', value: item.programName || '—' }, { label: 'Версия', value: item.version || '—' }];
   if (item.type === 'agreements') return agreementFields(item);
   return [{ label: 'Email', value: item.email }, { label: 'Роль', value: item.role || '—' }, { label: 'ВУЗы', value: item.universityIds.length ? item.universityIds.map((id) => universityNames.get(id) ?? '—').join(', ') : 'Нет' }];
 }
@@ -82,7 +82,7 @@ function agreementFields(item: AgreementCatalogItem): Array<{ label: string; val
   if (item.kind === 'contracts') {
     return [
       ...base,
-      { label: 'Продукт', value: item.productName || '—' },
+      { label: 'ИТ-продукт', value: item.productName || '—' },
       { label: 'Подписан', value: item.signedAt || '—' },
       { label: 'Окончание', value: item.expiresAt || 'Бессрочно' },
       { label: 'Статус', value: agreementStatusLabels[item.status] },
@@ -92,9 +92,9 @@ function agreementFields(item: AgreementCatalogItem): Array<{ label: string; val
   }
   return [
     ...base,
-    { label: 'Продукт', value: item.productName || '—' },
+    { label: 'ИТ-продукт', value: item.productName || '—' },
     { label: 'Договор', value: item.contractNumber || '—' },
-    { label: 'Программа', value: item.programName || '—' },
+    { label: 'ИТ-программа', value: item.programName || '—' },
     { label: 'Подписан', value: item.signedAt || '—' },
     { label: 'Окончание', value: item.expiresAt || 'Бессрочно' },
     { label: 'Статус', value: agreementStatusLabels[item.status] },
@@ -105,13 +105,13 @@ function agreementFields(item: AgreementCatalogItem): Array<{ label: string; val
 function tableHeaders(type: CatalogType, kind: AgreementKind): string[] {
   if (type === 'universities') return ['Название', 'Город'];
   if (type === 'directions') return ['Название', 'Код'];
-  if (type === 'programs') return ['Название', 'Направление', 'Описание'];
+  if (type === 'programs') return ['Название', 'ИТ-направление', 'Описание'];
   if (type === 'vendors') return ['Название'];
-  if (type === 'products') return ['Название', 'Вендор', 'Программа', 'Версия'];
+  if (type === 'products') return ['Название', 'Вендор', 'ИТ-программа', 'Версия'];
   if (type === 'agreements') {
     return kind === 'contracts'
-      ? ['Номер договора', 'ВУЗ', 'Вендор', 'Продукт', 'Подписан', 'Окончание', 'Статус', 'Передача', 'Лицензий']
-      : ['Номер лицензии', 'ВУЗ', 'Вендор', 'Продукт', 'Договор', 'Программа', 'Подписан', 'Окончание', 'Статус', 'Передача'];
+      ? ['Номер договора', 'ВУЗ', 'Вендор', 'ИТ-продукт', 'Подписан', 'Окончание', 'Статус', 'Передача', 'Лицензий']
+      : ['Номер лицензии', 'ВУЗ', 'Вендор', 'ИТ-продукт', 'Договор', 'ИТ-программа', 'Подписан', 'Окончание', 'Статус', 'Передача'];
   }
   return ['ФИО', 'Email', 'Роль', 'ВУЗы'];
 }
@@ -219,7 +219,7 @@ export function CatalogsPage() {
   const busyId = deleteMutation.isPending ? deleteMutation.variables?.item.id : undefined;
 
   return <div className={styles.page}>
-    <header className={styles.pageHeader}><div><h1>Управление каталогами</h1><p>Управляйте основными справочниками CRM.</p></div></header>
+    <header className={styles.pageHeader}><div><h1>Управление каталогами</h1><p>ИТ-направления, ИТ-программы и ИТ-продукты находятся в отдельных вкладках. Прокрутите строку вкладок, чтобы увидеть все.</p></div></header>
     <TabbedSurface tabs={<Tabs items={catalogDefinitions} activeId={type} onChange={(id) => chooseType(id as CatalogType)} label="Каталоги" prefix="catalog-tab" />}>
       <div data-testid="catalog-tabs">
         <section id="catalog-panel" role="tabpanel" aria-labelledby={`catalog-tab-${type}`} className={styles.panel}>

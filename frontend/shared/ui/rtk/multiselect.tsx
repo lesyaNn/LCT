@@ -9,7 +9,7 @@ import Search from '@atomaro/icons/24/action/Search';
 import styles from './multiselect.module.css';
 
 export interface MultiSelectOption { id: string; name: string; description?: string }
-type MenuPosition = { left: number; top: number; width: number; maxHeight: number };
+type MenuPosition = { left: number; top?: number; bottom?: number; width: number; maxHeight: number };
 type SelectProps = {
   id?: string; testId?: string; ariaInvalid?: boolean; ariaDescribedBy?: string;
   label: string; options: MultiSelectOption[]; values: string[]; onChange: (values: string[]) => void;
@@ -49,7 +49,7 @@ export function MultiSelect({ id, testId, ariaInvalid, ariaDescribedBy, label, o
       const above = rect.top - margin - gap;
       const opensAbove = below < 280 && above > below;
       const maxHeight = Math.max(80, Math.min(320, opensAbove ? above : below));
-      setPosition({ left: Math.max(margin, Math.min(rect.left, window.innerWidth - margin - Math.min(rect.width, window.innerWidth - margin * 2))), top: opensAbove ? rect.top - gap - maxHeight : rect.bottom + gap, width: Math.min(rect.width, window.innerWidth - margin * 2), maxHeight });
+      setPosition({ left: Math.max(margin, Math.min(rect.left, window.innerWidth - margin - Math.min(rect.width, window.innerWidth - margin * 2))), ...(opensAbove ? { bottom: window.innerHeight - rect.top + gap } : { top: rect.bottom + gap }), width: Math.min(rect.width, window.innerWidth - margin * 2), maxHeight });
     };
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node;

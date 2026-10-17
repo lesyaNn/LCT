@@ -161,21 +161,21 @@ export function WorkflowCreateModal({ universityId, initialProgramId, onClose, o
           ) : null}
 
           <div className={styles.field}>
-            <SearchableSelect label="Направление" labelPlacement="outside" value={activeDirectionId} onChange={(value) => { setDirectionId(value); setProgramId(''); setProductId(''); }} options={directionOptions} placeholder="Выберите направление" />
-            {!directionOptions.length && directionsQuery.isSuccess ? <em>Направления в каталоге отсутствуют.</em> : null}
+            <SearchableSelect label="ИТ-направление" labelPlacement="outside" value={activeDirectionId} onChange={(value) => { setDirectionId(value); setProgramId(''); setProductId(''); }} options={directionOptions} placeholder="Выберите ИТ-направление" />
+            {!directionOptions.length && directionsQuery.isSuccess ? <em>ИТ-направления в каталоге отсутствуют.</em> : null}
           </div>
 
           <div className={styles.field}>
-            <SearchableSelect label="Программа обучения" labelPlacement="outside" value={activeProgramId} disabled={!activeDirectionId} onChange={(value) => { setProgramId(value); setProductId(''); }} options={programOptions} placeholder="Выберите программу" />
+            <SearchableSelect label="ИТ-программа" labelPlacement="outside" value={activeProgramId} disabled={!activeDirectionId} onChange={(value) => { setProgramId(value); setProductId(''); }} options={programOptions} placeholder="Выберите ИТ-программу" />
             {activeDirectionId && catalogProgramsQuery.isPending ? <em>Загрузка программ…</em> : null}
-            {activeDirectionId && !catalogProgramsQuery.isPending && !programOptions.length ? <em>{canAttachProgram ? 'В этом направлении пока нет программ в каталоге.' : 'В этом направлении нет программ, привязанных к ВУЗу.'}</em> : null}
+            {activeDirectionId && !catalogProgramsQuery.isPending && !programOptions.length ? <em>{canAttachProgram ? 'В этом ИТ-направлении пока нет программ в каталоге.' : 'В этом ИТ-направлении нет программ, привязанных к ВУЗу.'}</em> : null}
           </div>
 
           <div className={styles.field}>
-            <SearchableSelect label="Продукт" labelPlacement="outside" value={activeProductId} disabled={!activeProgramId} onChange={setProductId} options={productOptions.map((product) => ({ id: product.id, name: wizardProductLabel(product) }))} placeholder="Выберите продукт (необязательно)" />
-            {!activeProgramId ? <em>Сначала выберите программу обучения.</em> : null}
+            <SearchableSelect label="ИТ-продукт" labelPlacement="outside" value={activeProductId} disabled={!activeProgramId} onChange={setProductId} options={productOptions.map((product) => ({ id: product.id, name: wizardProductLabel(product) }))} placeholder="Выберите ИТ-продукт (необязательно)" />
+            {!activeProgramId ? <em>Сначала выберите ИТ-программу.</em> : null}
             {activeProgramId && productsQuery.isPending ? <em>Загрузка продуктов…</em> : null}
-            {activeProgramId && !productsQuery.isPending && !productOptions.length ? <em>В направлении пока нет продуктов — продукт можно выбрать позже.</em> : null}
+            {activeProgramId && !productsQuery.isPending && !productOptions.length ? <em>В ИТ-направлении пока нет продуктов — ИТ-продукт можно выбрать позже.</em> : null}
           </div>
 
           <div className={styles.field}>
