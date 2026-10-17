@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/shared/auth/AuthProvider';
 import { hasPermission } from '@/shared/lib/access-control';
@@ -51,6 +51,7 @@ import styles from './users-page.module.css';
 
 const pageSize = 8;
 type UsersView = 'table' | 'graph';
+type InviteField = 'name' | 'username' | 'email';
 const viewTabs = [{ id: 'table', label: 'Список' }, { id: 'graph', label: 'Граф связей' }] as const;
 const roleOptions: Array<{ value: UserRole; label: string }> = [
   { value: 'user', label: userRoleLabels.user },
@@ -106,13 +107,15 @@ export function UsersPage() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [blockTarget, setBlockTarget] = useState<AdminUser | null>(null);
   const [resetTarget, setResetTarget] = useState<AdminUser | null>(null);
+  const [resetError, setResetError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ intent: ToastIntent; title: string; message?: string } | null>(null);
   const [editorRole, setEditorRole] = useState<UserRole>('user');
   const [editorScope, setEditorScope] = useState<string[]>([]);
   const [editorError, setEditorError] = useState<string | null>(null);
   const [invite, setInvite] = useState<InviteAdminUserInput>({ name: '', username: '', email: '', role: 'user', scope: { kind: 'universities', universityIds: [] } });
   const [inviteError, setInviteError] = useState<string | null>(null);
-  const [inviteEmailError, setInviteEmailError] = useState<string | null>(null);
+  const [inviteFieldErrors, setInviteFieldErrors] = useState<Partial<Record<InviteField, string>>>({});
+  const inviteSubmitting = useRef(false);
 
   useEffect(() => { const timer = window.setTimeout(() => setDebouncedSearch(search), 250); return () => window.clearTimeout(timer); }, [search]);
   const listQuery: AdminUserListQuery = useMemo(() => ({ search: debouncedSearch, role: canManageUsers ? role : 'user', page, pageSize }), [canManageUsers, debouncedSearch, page, role]);
@@ -160,7 +163,7 @@ export function UsersPage() {
   const resetMutation = useMutation({
     mutationFn: (id: string) => resetAdminUserPassword(id),
     onSuccess: () => { setResetTarget(null); setToast({ intent: 'success', title: 'Письмо для сброса пароля отправлено' }); },
-    onError: (cause) => setToast({ intent: 'error', title: 'Сброс пароля недоступен', message: normalizeApiError(cause, { fallbackMessage: 'Попробуйте позже.' }).message }),
+    onError: (cause) => setResetError(normalizeApiError(cause, { fallbackMessage: 'Keycloak не отправил письмо. Повторите попытку позже.' }).message),
   });
 
   const inviteMutation = useMutation({
@@ -168,14 +171,16 @@ export function UsersPage() {
     onSuccess: (result) => {
       setInviteOpen(false);
       setInvite({ name: '', username: '', email: '', role: 'user', scope: { kind: 'universities', universityIds: [] } });
+      setInviteFieldErrors({});
       void queryClient.invalidateQueries({ queryKey: adminUsersQueryKeys.all });
       setToast({ intent: result.status === 'email_sent' ? 'success' : 'info', title: 'Учётная запись создана', message: result.status === 'email_sent' ? 'Письмо для установки пароля отправлено.' : 'Письмо не отправлено: проверьте настройку почты Keycloak.' });
     },
     onError: (cause) => {
       const error = normalizeApiError(cause, { fallbackMessage: 'Не удалось пригласить пользователя.' });
-      setInviteEmailError(error.fieldErrors.find((field) => field.field === 'email')?.message ?? null);
-      setInviteError(error.message);
+      setInviteFieldErrors(Object.fromEntries(error.fieldErrors.filter((field) => ['name', 'username', 'email'].includes(field.field)).map((field) => [field.field, field.message])));
+      setInviteError(error.status === 409 ? 'Пользователь с таким email или login уже существует.' : error.status === 403 ? 'Недостаточно прав для приглашения пользователя.' : error.fieldErrors.some((field) => field.field.startsWith('scope.')) ? 'Проверьте выбранные ВУЗы.' : error.message);
     },
+    onSettled: () => { inviteSubmitting.current = false; },
   });
 
   const openUser = (item: AdminUser) => { queryClient.setQueryData(detailKey(item.id), item); setSelectedUserId(item.id); setEditorRole(item.role); setEditorScope(scopeValues(item.scope)); setEditorError(null); };
@@ -191,13 +196,19 @@ export function UsersPage() {
     updateMutation.mutate({ id: selectedUser.id, input: { role: editorRole, scope: normalizeScopeForRole(editorRole, editorRole === 'admin' ? { kind: 'all' } : { kind: 'universities', universityIds: editorScope }) } });
   };
   const submitInvite = () => {
-    if (invite.role !== 'admin' && (scopeOptionsQuery.isPending || scopeOptionsQuery.isError)) { setInviteError('Сначала загрузите каталог ВУЗов.'); return; }
+    if (inviteSubmitting.current || inviteMutation.isPending) return;
+    const name = invite.name.trim();
+    const username = invite.username.trim();
     const emailResult = emailField(256).safeParse(invite.email);
-    if (!emailResult.success) { setInviteEmailError(emailResult.error.issues[0]?.message ?? 'Введите корректный email'); return; }
-    if (!invite.name.trim() || !invite.username.trim()) { setInviteError('Заполните ФИО и login.'); return; }
-    setInviteEmailError(null);
+    const fieldErrors: Partial<Record<InviteField, string>> = {};
+    if (name.length < 2 || name.length > 256) fieldErrors.name = 'Укажите ФИО от 2 до 256 символов.';
+    if (username.length < 2 || username.length > 128 || !/^[A-Za-z0-9._@-]+$/.test(username)) fieldErrors.username = 'Login: 2–128 символов, латиница, цифры, точка, _, @ или -.';
+    if (!emailResult.success) fieldErrors.email = emailResult.error.issues[0]?.message ?? 'Введите корректный email.';
+    setInviteFieldErrors(fieldErrors);
+    if (Object.keys(fieldErrors).length || !emailResult.success) { setInviteError('Исправьте ошибки в форме.'); return; }
     setInviteError(null);
-    inviteMutation.mutate({ ...invite, name: invite.name.trim(), username: invite.username.trim(), email: invite.email.trim(), scope: normalizeScopeForRole(invite.role, invite.scope) });
+    inviteSubmitting.current = true;
+    inviteMutation.mutate({ ...invite, name, username, email: emailResult.data, scope: normalizeScopeForRole(invite.role, invite.scope) });
   };
 
   const renderDrawer = selectedUser ? (
@@ -231,11 +242,11 @@ export function UsersPage() {
         <div className={styles.drawerActions}>
           <Button variant="primary" type="button" loading={updateMutation.isPending} disabled={!USERS_API_CAPABILITIES.updateRoleAndScope || detailQuery.isError || updateMutation.isPending || (editorRole !== 'admin' && (scopeOptionsQuery.isPending || scopeOptionsQuery.isError)) || (isSelf && editorRole !== selectedUser.role)} onClick={saveUser}>Сохранить</Button>
           {canManageUsers ? <>
-            <Tooltip content={isSelf ? 'Нельзя заблокировать собственную учётную запись.' : !USERS_API_CAPABILITIES.block ? 'Блокировка пока недоступна.' : ''}>
+            <Tooltip content={isSelf ? 'Нельзя заблокировать собственную учётную запись.' : !USERS_API_CAPABILITIES.block ? 'Блокировка пока недоступна.' : null}>
               <Button data-testid="block-button" className={styles.dangerAction} variant="secondary" type="button" disabled={isSelf || detailQuery.isError || !USERS_API_CAPABILITIES.block || blockMutation.isPending} onClick={() => setBlockTarget(selectedUser)}>{selectedUser.status === 'blocked' ? 'Разблокировать' : 'Заблокировать'}</Button>
             </Tooltip>
-            <Tooltip content={!USERS_API_CAPABILITIES.passwordReset ? 'Сброс пароля пока недоступен.' : ''}>
-              <Button variant="ghost" type="button" disabled={detailQuery.isError || !USERS_API_CAPABILITIES.passwordReset || resetMutation.isPending} onClick={() => setResetTarget(selectedUser)}>Сбросить пароль</Button>
+            <Tooltip content={!USERS_API_CAPABILITIES.passwordReset ? 'Сброс пароля пока недоступен.' : null}>
+              <Button variant="ghost" type="button" disabled={detailQuery.isError || !USERS_API_CAPABILITIES.passwordReset || resetMutation.isPending} onClick={() => { setResetError(null); setResetTarget(selectedUser); }}>Сбросить пароль</Button>
             </Tooltip>
           </> : null}
         </div>
@@ -243,5 +254,41 @@ export function UsersPage() {
     </Drawer>
   ) : null;
 
-  return <div className={styles.page}><header className={styles.pageHeader}><div><h1>{canManageUsers ? 'Пользователи и права' : 'Пользователи и вузы'}</h1>{canManageUsers ? <p className={styles.description}>Управляйте ролями, статусом и доступом к контуру ВУЗов.</p> : null}</div></header><TabbedSurface><div className={styles.panel}><Tabs items={viewTabs} activeId={view} onChange={(id) => setView(id === 'graph' ? 'graph' : 'table')} label="Представление страницы" />{view === 'table' ? <><FilterToolbar embedded label="Фильтры пользователей" controls={() => <><SearchField label="Поиск по ФИО, login или email" value={search} onChange={(value) => { setSearch(value); setPage(1); }} placeholder="Найти пользователя" />{canManageUsers ? <FilterField label="Роль"><Select value={role} onChange={(event) => { setRole(event.target.value as UserRole | 'all'); setPage(1); }}><option value="all">Все роли</option>{roleOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</Select></FilterField> : null}</>} actions={canManageUsers ? <Button variant="primary" type="button" disabled={!USERS_API_CAPABILITIES.invite} onClick={() => { setInviteError(null); setInviteEmailError(null); setInviteOpen(true); }}>Создать приглашение</Button> : undefined} onReset={() => { setSearch(''); setRole('all'); setPage(1); }} resetDisabled={!search && role === 'all'} mobileCount={Number(Boolean(search)) + Number(canManageUsers && role !== 'all')} activeFilters={[...(search ? [{ id: 'search', label: `Поиск: ${search}`, onRemove: () => { setSearch(''); setPage(1); } }] : []), ...(canManageUsers && role !== 'all' ? [{ id: 'role', label: `Роль: ${roleOptions.find((option) => option.value === role)?.label ?? role}`, onRemove: () => { setRole('all'); setPage(1); } }] : [])]} /><section className={styles.surface} data-testid="users-table" aria-labelledby="users-table-heading"><div className={styles.surfaceHeader}><div><h2 id="users-table-heading">Все пользователи</h2><p>{query.data ? `Найдено: ${query.data.total}` : 'Загрузка…'}</p></div></div>{query.isPending ? <TableSkeleton rows={5} columns={canManageUsers ? 6 : 5} label="Загрузка пользователей" /> : !query.data ? <div className={styles.empty}><RouteErrorState compact onRetry={() => void query.refetch()} /></div> : query.data?.items.length ? <><TableShell ariaLabel="Пользователи"><div className={styles.desktopTable}><table className={tableStyles.table}><thead><tr><th>ФИО / login</th><th>Email</th>{canManageUsers ? <th>Роль</th> : null}<th>{canManageUsers ? 'Скоуп' : 'Вузы'}</th><th>Статус</th><th>Действия</th></tr></thead><tbody>{query.data.items.map((item) => <UserRow user={item} options={scopeOptions} onOpen={openUser} showRole={canManageUsers} key={item.id} />)}</tbody></table></div><div className={styles.mobileList}>{query.data.items.map((item) => <UserCard user={item} onOpen={openUser} showRole={canManageUsers} key={item.id} />)}</div></TableShell><div className={styles.pagination}><span>Страница {page} из {pageCount}</span><Button variant="ghost" size="s" type="button" disabled={page <= 1 || query.isFetching} onClick={() => setPage((value) => value - 1)}>Назад</Button><Button variant="secondary" size="s" type="button" disabled={page >= pageCount || query.isFetching} onClick={() => setPage((value) => value + 1)}>Вперёд</Button></div></> : <div className={styles.empty}><EmptyState title="Пользователи не найдены" description={canManageUsers ? 'Измените поисковый запрос или фильтр роли.' : 'Измените поисковый запрос.'} /></div>}</section></> : <section className={styles.surface} aria-labelledby="users-graph-heading"><div className={styles.surfaceHeader}><div><h2 id="users-graph-heading">Граф связей</h2><p>{canManageUsers ? 'Сотрудники и вузы, которые они ведут. Нажмите на узел, чтобы увидеть детали и назначить вуз.' : 'Доступные вам сотрудники и вузы. Нажмите на узел, чтобы увидеть связи.'}</p></div></div><NetworkGraph showIntro={false} /></section>}</div></TabbedSurface>{renderDrawer}{canManageUsers && inviteOpen ? <Drawer title="Создать приглашение" onClose={() => { if (!inviteMutation.isPending) setInviteOpen(false); }}><div className={styles.drawerForm}><label className={styles.field}><span>ФИО</span><Input value={invite.name} onChange={(event) => setInvite((current) => ({ ...current, name: event.target.value }))} placeholder="Например, Ольга Соколова" /></label><label className={styles.field}><span>Login</span><Input value={invite.username} onChange={(event) => setInvite((current) => ({ ...current, username: event.target.value }))} placeholder="olga.sokolova" /></label><label className={styles.field}><span>Email</span><Input type="email" value={invite.email} aria-invalid={Boolean(inviteEmailError)} onChange={(event) => { setInviteEmailError(null); setInvite((current) => ({ ...current, email: event.target.value })); }} placeholder="olga@example.ru" />{inviteEmailError ? <small className={styles.formError} role="alert">{inviteEmailError}</small> : null}</label><label className={styles.field}><span>Роль</span><RoleSelect value={invite.role} onChange={(nextRole) => setInvite((current) => ({ ...current, role: nextRole, scope: normalizeScopeForRole(nextRole, current.scope) }))} self={false} /></label><div className={styles.field}><span>Скоуп данных</span><ScopeEditor role={invite.role} values={scopeValues(invite.scope)} options={scopeOptions} onChange={(values) => setInvite((current) => ({ ...current, scope: { kind: 'universities', universityIds: values } }))} disabled={invite.role === 'admin'} />{invite.role !== 'admin' && !(invite.scope.kind === 'all') && !scopeValues(invite.scope).length ? <p className={styles.warning}>Пользователь не увидит ни одного ВУЗа.</p> : null}</div>{inviteError ? <p className={styles.formError} role="alert">{inviteError}</p> : null}<div className={styles.drawerActions}><Button variant="primary" type="button" loading={inviteMutation.isPending} disabled={inviteMutation.isPending} onClick={submitInvite}>Создать приглашение</Button><Button variant="ghost" type="button" disabled={inviteMutation.isPending} onClick={() => setInviteOpen(false)}>Отмена</Button></div></div></Drawer> : null}{canManageUsers && blockTarget ? <Modal title={blockTarget.status === 'blocked' ? 'Разблокировать пользователя?' : 'Заблокировать пользователя?'} onClose={() => { if (!blockMutation.isPending) setBlockTarget(null); }}><div className={styles.modalContent}><p>{blockTarget.name} {blockTarget.status === 'blocked' ? 'снова получит доступ к CRM.' : 'потеряет доступ к CRM.'}</p><div className={styles.modalActions}><Button variant={blockTarget.status === 'blocked' ? 'primary' : 'danger'} type="button" loading={blockMutation.isPending} disabled={blockMutation.isPending} onClick={() => blockMutation.mutate({ id: blockTarget.id, blocked: blockTarget.status !== 'blocked' })}>{blockTarget.status === 'blocked' ? 'Разблокировать' : 'Заблокировать'}</Button><Button variant="ghost" type="button" disabled={blockMutation.isPending} onClick={() => setBlockTarget(null)}>Отмена</Button></div></div></Modal> : null}{canManageUsers && resetTarget ? <Modal title="Сбросить пароль пользователя?" onClose={() => { if (!resetMutation.isPending) setResetTarget(null); }}><div className={styles.modalContent}><p>Keycloak отправит пользователю письмо со ссылкой для установки нового пароля.</p><div className={styles.modalActions}><Button variant="primary" type="button" loading={resetMutation.isPending} disabled={resetMutation.isPending} onClick={() => resetMutation.mutate(resetTarget.id)}>Отправить письмо</Button><Button variant="ghost" type="button" disabled={resetMutation.isPending} onClick={() => setResetTarget(null)}>Отмена</Button></div></div></Modal> : null}{toast ? <div className={styles.toastViewport}><Toast intent={toast.intent} title={toast.title} message={toast.message} onClose={() => setToast(null)} /></div> : null}</div>;
+  return <div className={styles.page}><header className={styles.pageHeader}><div><h1>{canManageUsers ? 'Пользователи и права' : 'Пользователи и вузы'}</h1>{canManageUsers ? <p className={styles.description}>Управляйте ролями, статусом и доступом к контуру ВУЗов.</p> : null}</div></header><TabbedSurface><div className={styles.panel}><Tabs items={viewTabs} activeId={view} onChange={(id) => setView(id === 'graph' ? 'graph' : 'table')} label="Представление страницы" />{view === 'table' ? <><FilterToolbar embedded label="Фильтры пользователей" controls={() => <><SearchField label="Поиск по ФИО, login или email" value={search} onChange={(value) => { setSearch(value); setPage(1); }} placeholder="Найти пользователя" />{canManageUsers ? <FilterField label="Роль"><Select value={role} onChange={(event) => { setRole(event.target.value as UserRole | 'all'); setPage(1); }}><option value="all">Все роли</option>{roleOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</Select></FilterField> : null}</>} actions={canManageUsers ? <Button variant="primary" type="button" disabled={!USERS_API_CAPABILITIES.invite} onClick={() => { setInviteError(null); setInviteFieldErrors({}); setInviteOpen(true); }}>Создать приглашение</Button> : undefined} onReset={() => { setSearch(''); setRole('all'); setPage(1); }} resetDisabled={!search && role === 'all'} mobileCount={Number(Boolean(search)) + Number(canManageUsers && role !== 'all')} activeFilters={[...(search ? [{ id: 'search', label: `Поиск: ${search}`, onRemove: () => { setSearch(''); setPage(1); } }] : []), ...(canManageUsers && role !== 'all' ? [{ id: 'role', label: `Роль: ${roleOptions.find((option) => option.value === role)?.label ?? role}`, onRemove: () => { setRole('all'); setPage(1); } }] : [])]} /><section className={styles.surface} data-testid="users-table" aria-labelledby="users-table-heading"><div className={styles.surfaceHeader}><div><h2 id="users-table-heading">Все пользователи</h2><p>{query.data ? `Найдено: ${query.data.total}` : 'Загрузка…'}</p></div></div>{query.isPending ? <TableSkeleton rows={5} columns={canManageUsers ? 6 : 5} label="Загрузка пользователей" /> : !query.data ? <div className={styles.empty}><RouteErrorState compact onRetry={() => void query.refetch()} /></div> : query.data?.items.length ? <><TableShell ariaLabel="Пользователи"><div className={styles.desktopTable}><table className={tableStyles.table}><thead><tr><th>ФИО / login</th><th>Email</th>{canManageUsers ? <th>Роль</th> : null}<th>{canManageUsers ? 'Скоуп' : 'Вузы'}</th><th>Статус</th><th>Действия</th></tr></thead><tbody>{query.data.items.map((item) => <UserRow user={item} options={scopeOptions} onOpen={openUser} showRole={canManageUsers} key={item.id} />)}</tbody></table></div><div className={styles.mobileList}>{query.data.items.map((item) => <UserCard user={item} onOpen={openUser} showRole={canManageUsers} key={item.id} />)}</div></TableShell><div className={styles.pagination}><span>Страница {page} из {pageCount}</span><Button variant="ghost" size="s" type="button" disabled={page <= 1 || query.isFetching} onClick={() => setPage((value) => value - 1)}>Назад</Button><Button variant="secondary" size="s" type="button" disabled={page >= pageCount || query.isFetching} onClick={() => setPage((value) => value + 1)}>Вперёд</Button></div></> : <div className={styles.empty}><EmptyState title="Пользователи не найдены" description={canManageUsers ? 'Измените поисковый запрос или фильтр роли.' : 'Измените поисковый запрос.'} /></div>}</section></> : <section className={styles.surface} aria-labelledby="users-graph-heading"><div className={styles.surfaceHeader}><div><h2 id="users-graph-heading">Граф связей</h2><p>{canManageUsers ? 'Сотрудники и вузы, которые они ведут. Нажмите на узел, чтобы увидеть детали и назначить вуз.' : 'Доступные вам сотрудники и вузы. Нажмите на узел, чтобы увидеть связи.'}</p></div></div><NetworkGraph showIntro={false} /></section>}</div></TabbedSurface>{renderDrawer}{canManageUsers && inviteOpen ? (
+    <Drawer title="Создать приглашение" onClose={() => { if (!inviteMutation.isPending) setInviteOpen(false); }}>
+      <form className={styles.drawerForm} onSubmit={(event) => { event.preventDefault(); submitInvite(); }} noValidate>
+        <label className={styles.field}>
+          <span>ФИО</span>
+          <Input value={invite.name} aria-invalid={Boolean(inviteFieldErrors.name)} onChange={(event) => { setInvite((current) => ({ ...current, name: event.target.value })); setInviteFieldErrors((current) => ({ ...current, name: undefined })); setInviteError(null); }} placeholder="Например, Ольга Соколова" />
+          {inviteFieldErrors.name ? <small className={styles.formError} role="alert">{inviteFieldErrors.name}</small> : null}
+        </label>
+        <label className={styles.field}>
+          <span>Login</span>
+          <Input value={invite.username} aria-invalid={Boolean(inviteFieldErrors.username)} onChange={(event) => { setInvite((current) => ({ ...current, username: event.target.value })); setInviteFieldErrors((current) => ({ ...current, username: undefined })); setInviteError(null); }} placeholder="olga.sokolova" />
+          {inviteFieldErrors.username ? <small className={styles.formError} role="alert">{inviteFieldErrors.username}</small> : null}
+        </label>
+        <label className={styles.field}>
+          <span>Email</span>
+          <Input type="email" value={invite.email} aria-invalid={Boolean(inviteFieldErrors.email)} onChange={(event) => { setInvite((current) => ({ ...current, email: event.target.value })); setInviteFieldErrors((current) => ({ ...current, email: undefined })); setInviteError(null); }} placeholder="olga@example.ru" />
+          {inviteFieldErrors.email ? <small className={styles.formError} role="alert">{inviteFieldErrors.email}</small> : null}
+        </label>
+        <label className={styles.field}>
+          <span>Роль</span>
+          <RoleSelect value={invite.role} onChange={(nextRole) => setInvite((current) => ({ ...current, role: nextRole, scope: normalizeScopeForRole(nextRole, current.scope) }))} self={false} />
+        </label>
+        <div className={styles.field}>
+          <span>Скоуп данных</span>
+          <ScopeEditor role={invite.role} values={scopeValues(invite.scope)} options={scopeOptions} onChange={(values) => setInvite((current) => ({ ...current, scope: { kind: 'universities', universityIds: values } }))} disabled={invite.role === 'admin'} />
+          {invite.role !== 'admin' && scopeOptionsQuery.isError ? <small className={styles.formError} role="alert">Не удалось загрузить список ВУЗов. Приглашение можно создать без назначений.</small> : null}
+          {invite.role !== 'admin' && invite.scope.kind !== 'all' && !scopeValues(invite.scope).length ? <p className={styles.warning}>Пользователь не увидит ни одного ВУЗа.</p> : null}
+        </div>
+        {inviteError ? <p className={styles.formError} role="alert">{inviteError}</p> : null}
+        <div className={styles.drawerActions}>
+          <Button variant="primary" type="submit" loading={inviteMutation.isPending} disabled={inviteMutation.isPending}>Создать приглашение</Button>
+          <Button variant="ghost" type="button" disabled={inviteMutation.isPending} onClick={() => setInviteOpen(false)}>Отмена</Button>
+        </div>
+      </form>
+    </Drawer>
+  ) : null}
+  {canManageUsers && blockTarget ? <Modal title={blockTarget.status === 'blocked' ? 'Разблокировать пользователя?' : 'Заблокировать пользователя?'} onClose={() => { if (!blockMutation.isPending) setBlockTarget(null); }}><div className={styles.modalContent}><p>{blockTarget.name} {blockTarget.status === 'blocked' ? 'снова получит доступ к CRM.' : 'потеряет доступ к CRM.'}</p><div className={styles.modalActions}><Button variant={blockTarget.status === 'blocked' ? 'primary' : 'danger'} type="button" loading={blockMutation.isPending} disabled={blockMutation.isPending} onClick={() => blockMutation.mutate({ id: blockTarget.id, blocked: blockTarget.status !== 'blocked' })}>{blockTarget.status === 'blocked' ? 'Разблокировать' : 'Заблокировать'}</Button><Button variant="ghost" type="button" disabled={blockMutation.isPending} onClick={() => setBlockTarget(null)}>Отмена</Button></div></div></Modal> : null}{canManageUsers && resetTarget ? <Modal title="Сбросить пароль пользователя?" onClose={() => { if (!resetMutation.isPending) setResetTarget(null); }}><div className={styles.modalContent}><p>Keycloak отправит пользователю письмо со ссылкой для установки нового пароля.</p>{resetError ? <p className={styles.formError} role="alert">{resetError}</p> : null}<div className={styles.modalActions}><Button variant="primary" type="button" loading={resetMutation.isPending} disabled={resetMutation.isPending} onClick={() => resetMutation.mutate(resetTarget.id)}>Отправить письмо</Button><Button variant="ghost" type="button" disabled={resetMutation.isPending} onClick={() => setResetTarget(null)}>Отмена</Button></div></div></Modal> : null}{toast ? <div className={styles.toastViewport}><Toast intent={toast.intent} title={toast.title} message={toast.message} onClose={() => setToast(null)} /></div> : null}</div>;
 }

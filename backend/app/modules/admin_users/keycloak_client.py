@@ -104,7 +104,8 @@ class KeycloakAdminClient:
         except httpx.HTTPError as exc:
             raise BusinessException(ErrorCode.EXTERNAL_SOURCE_UNAVAILABLE) from exc
         if response.status_code == 409:
-            raise ConflictError(field="email")
+            # Keycloak reports the same status for duplicate email and username.
+            raise ConflictError()
         if response.status_code != 201:
             raise BusinessException(ErrorCode.EXTERNAL_SOURCE_UNAVAILABLE)
         user_id = response.headers.get("Location", "").rstrip("/").rsplit("/", 1)[-1]

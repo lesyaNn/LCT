@@ -8,7 +8,9 @@ export function Tooltip({ content, children }: { content: ReactNode; children: R
   const id = useId();
   const hostRef = useRef<HTMLSpanElement>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+  const hasContent = typeof content === 'string' ? Boolean(content.trim()) : content !== null && content !== undefined && content !== false;
   const show = () => {
+    if (!hasContent) return;
     const rect = hostRef.current?.getBoundingClientRect();
     if (!rect) return;
     const halfWidth = Math.min(140, (window.innerWidth - 24) / 2);
@@ -18,7 +20,7 @@ export function Tooltip({ content, children }: { content: ReactNode; children: R
     });
   };
   return <span className={styles.host} ref={hostRef} onMouseEnter={show} onMouseLeave={() => setPosition(null)} onFocusCapture={show} onBlurCapture={() => setPosition(null)}>
-    <span aria-describedby={id}>{children}</span>
-    {position && typeof document !== 'undefined' ? createPortal(<span className={styles.tooltip} id={id} role="tooltip" style={{ left: position.left, top: position.top }}>{content}</span>, document.body) : null}
+    <span aria-describedby={hasContent ? id : undefined}>{children}</span>
+    {hasContent && position && typeof document !== 'undefined' ? createPortal(<span className={styles.tooltip} id={id} role="tooltip" style={{ left: position.left, top: position.top }}>{content}</span>, document.body) : null}
   </span>;
 }

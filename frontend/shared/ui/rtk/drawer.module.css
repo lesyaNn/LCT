@@ -1,13 +1,13 @@
 .overlay { background: color-mix(in srgb, var(--rtk-color-text-primary) 36%, transparent); inset: 0; position: fixed; z-index: 100; }
-.drawer { background: var(--rtk-color-surface); bottom: 0; box-shadow: var(--rtk-shadow-elevation-2); display: flex; flex-direction: column; max-width: 100%; position: absolute; top: 0; width: min(420px, 92vw); }
+.drawer { background: var(--rtk-color-surface); bottom: 0; box-shadow: var(--rtk-shadow-elevation-2); display: flex; flex-direction: column; max-width: 100%; min-width: 0; position: absolute; top: 0; width: min(420px, 92vw); }
 .right { animation: drawer-in-right 160ms ease-out; right: 0; }
 .left { animation: drawer-in-left 160ms ease-out; left: 0; }
-.header { align-items: center; border-bottom: 1px solid var(--rtk-color-border); display: flex; gap: var(--rtk-space-3); justify-content: space-between; padding: var(--rtk-space-4) var(--rtk-space-5); }
-.header h2 { font-size: 18px; margin: 0; overflow-wrap: anywhere; }
+.header { align-items: center; border-bottom: 1px solid var(--rtk-color-border); display: flex; gap: var(--rtk-space-3); justify-content: space-between; min-width: 0; padding: var(--rtk-space-4) var(--rtk-space-5); }
+.header h2 { flex: 1 1 auto; font-size: 18px; margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .close { align-items: center; background: transparent; border: 0; border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-secondary); cursor: pointer; display: inline-flex; flex: 0 0 auto; height: 44px; justify-content: center; width: 44px; }
 .close:hover { background: var(--rtk-color-surface-hover); color: var(--rtk-color-text-primary); }
 .close:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
-.body { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: var(--rtk-space-4) var(--rtk-space-5) var(--rtk-space-6); }
+.body { flex: 1 1 auto; min-height: 0; min-width: 0; overflow: auto; overscroll-behavior: contain; padding: var(--rtk-space-4) var(--rtk-space-5) var(--rtk-space-6); }
 @keyframes drawer-in-right { from { transform: translateX(12px); opacity: .6; } to { transform: translateX(0); opacity: 1; } }
 @keyframes drawer-in-left { from { transform: translateX(-12px); opacity: .6; } to { transform: translateX(0); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .right, .left { animation: none; } }

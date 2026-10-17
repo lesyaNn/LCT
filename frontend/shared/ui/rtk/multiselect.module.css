@@ -1,11 +1,12 @@
-.root { min-width: 0; position: relative; }
+.root { min-width: 0; position: relative; width: 100%; }
 .labeled { color: var(--rtk-color-text-secondary); display: flex; flex-direction: column; gap: var(--rtk-space-1); min-width: 0; }
 .labeled > span { font-size: 11px; font-weight: 600; line-height: 14px; min-height: 14px; }
-.root .trigger { align-items: center; background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border-strong); border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-primary); cursor: pointer; display: flex; gap: var(--rtk-space-2); height: 46px; justify-content: space-between; min-height: 46px; padding: 6px 12px; text-align: left; width: 100%; }
+.root .trigger { align-items: center; background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border-strong); border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-primary); cursor: pointer; display: flex; gap: var(--rtk-space-2); height: 46px; justify-content: space-between; min-height: 46px; min-width: 0; padding: 6px 12px; text-align: left; width: 100%; }
+.root .trigger > svg { flex: 0 0 auto; }
 .root .trigger[aria-expanded="true"] { border-color: var(--rtk-color-brand); box-shadow: 0 0 0 3px var(--atmr-accent-container-default); outline: none; }
 .root .trigger[data-invalid="true"] { border-color: var(--rtk-color-danger); }
 .root .trigger:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
-.summaryText { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.summaryText { display: flex; flex: 1 1 auto; flex-direction: column; gap: 2px; min-width: 0; }
 .summaryText strong { font-size: 12px; font-weight: 700; }
 .summaryText small { color: var(--rtk-color-text-secondary); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .labeled .summaryText small { font-size: 12px; }
@@ -23,8 +24,10 @@
 .checkbox { align-items: center; border: 1px solid var(--rtk-color-border-strong); border-radius: var(--rtk-radius-small); display: inline-flex; flex: 0 0 16px; height: 16px; justify-content: center; width: 16px; }
 .checkbox.checked { background: var(--rtk-color-brand); border-color: var(--rtk-color-brand); color: var(--rtk-color-surface); }
 .hint { color: var(--rtk-color-text-secondary); font-size: 11px; line-height: 1.4; margin: 4px 8px 2px; }
-.selected { display: flex; flex-wrap: wrap; gap: 4px; }
-.chip { align-items: center; background: var(--atmr-accent-container-default); border: 1px solid var(--rtk-color-border); border-radius: 999px; color: var(--rtk-color-brand); cursor: pointer; display: inline-flex; font-size: 11px; gap: 4px; max-width: 100%; padding: 4px 8px; }
+.selected { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.chip { align-items: center; background: var(--atmr-accent-container-default); border: 1px solid var(--rtk-color-border); border-radius: 999px; color: var(--rtk-color-brand); cursor: pointer; display: inline-flex; font-size: 11px; gap: 4px; max-width: 100%; min-width: 0; padding: 4px 8px; }
+.chipText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip > svg { flex: 0 0 auto; }
 .chip:hover { background: var(--atmr-accent-container-hover); }
 .clear { align-self: flex-start; background: transparent; border: 0; border-radius: var(--rtk-radius-small); color: var(--rtk-color-brand); cursor: pointer; font: inherit; font-size: 12px; padding: 6px 8px; }
 .clear:hover, .clear:focus-visible { background: var(--rtk-color-surface-hover); }
