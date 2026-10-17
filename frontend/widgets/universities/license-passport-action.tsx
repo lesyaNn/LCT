@@ -68,7 +68,7 @@ export function LicensePassportAction({ universityId, license }: { universityId:
       <Button type="button" size="s" variant="ghost" onClick={() => setPreview(true)}>Открыть PDF</Button>
       <ButtonAnchor href={url} download={`license-passport-${license.id}.pdf`} size="s">Скачать PDF</ButtonAnchor>
     </div></> : null}
-    {preview && url ? <Modal title="Паспорт лицензии" size="l" onClose={() => setPreview(false)}>
+    {preview && url ? <Modal title="Паспорт лицензии" size="l" fullHeight onClose={() => setPreview(false)}>
       <div className={styles.preview}>
         <iframe title={`Паспорт лицензии ${license.licenseNumber}`} src={url} />
         <p className={styles.hint}>Если браузер не показывает PDF, скачайте документ для просмотра и печати.</p>
