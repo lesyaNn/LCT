@@ -11,6 +11,7 @@ from app.config import Settings
 from app.core.errors import BusinessException
 from app.modules.assistant.knowledge import Chunk, KnowledgeBase, direct_faq, faq_text, retrieve
 from app.modules.assistant.provider import Ollama
+from app.modules.assistant.quick_replies import QUICK_REPLY_VERSION, match_quick_reply
 from app.modules.assistant.repository import Conversations
 from app.modules.assistant.schemas import ChatIn, ChatOut, ModelAnswer, StatusOut
 from app.schemas.errors import ErrorCode
@@ -160,6 +161,22 @@ class Assistant:
     def chat(self, data: ChatIn, role: str, conversations: Conversations) -> ChatOut:
         if not self.config.assistant_enabled:
             raise BusinessException(ErrorCode.ASSISTANT_DISABLED)
+        quick = match_quick_reply(data.message)
+        if quick is not None:
+            prepared = conversations.prepare(data)
+            result = ChatOut(
+                conversation_id=prepared.id,
+                turn_id=uuid.uuid4(),
+                revision=prepared.revision + 1,
+                answer=quick.answer,
+                basis="insufficient" if quick.clarification else "documentation",
+                sources=[] if quick.clarification else [quick.source()],
+                knowledge_version=QUICK_REPLY_VERSION,
+                retrieval_mode="lexical",
+                model=None,
+                created_at=datetime.now(UTC),
+            )
+            return conversations.save(prepared, data.message, result)
         slot = _slots(self.config.assistant_max_concurrent)
         if not slot.acquire(blocking=False):
             raise BusinessException(ErrorCode.ASSISTANT_BUSY, details={"retry_after_seconds": 5})

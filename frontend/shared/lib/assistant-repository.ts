@@ -19,6 +19,16 @@ export interface AssistantTurn {
 
 export type AssistantChatReply = Omit<AssistantTurn, 'question'>;
 
+export interface AssistantQuickReply {
+  id: string;
+  question: string;
+}
+
+export interface AssistantQuickReplies {
+  version: string;
+  items: AssistantQuickReply[];
+}
+
 interface Conversation {
   id: string;
   revision: number;
@@ -56,6 +66,8 @@ export function assistantPage(pathname: string): AssistantPage | undefined {
 const base = '/api/v1/assistant';
 
 export const assistantRepository = {
+  quickReplies: (): Promise<ApiResult<AssistantQuickReplies>> =>
+    apiFetch(`${base}/quick-replies`),
   latestConversation: (): Promise<ApiResult<ConversationPage>> =>
     apiFetch(`${base}/conversations?page=1&page_size=1`),
   history: (id: string, page: number): Promise<ApiResult<TurnPage>> =>

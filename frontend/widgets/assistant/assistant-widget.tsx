@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useQuery } from '@tanstack/react-query';
 import Chat from '@atomaro/icons/24/communication/Chat';
 import Send from '@atomaro/icons/24/action/Send';
 import { Avatar } from '@/shared/ui/rtk/avatar';
@@ -13,12 +14,11 @@ import { Icon } from '@/shared/ui/rtk/icon';
 import { IconButton } from '@/shared/ui/rtk/icon-button';
 import { TextArea } from '@/shared/ui/rtk/form-controls';
 import type { AuthUser } from '@/shared/types/user';
-import type { AssistantSource } from '@/shared/lib/assistant-repository';
+import { assistantRepository, type AssistantSource } from '@/shared/lib/assistant-repository';
 import { useAssistantChat, type ChatMessage } from './use-assistant-chat';
 import styles from './assistant-widget.module.css';
 
 const robot = '/images/rostelecom_robot_flat.svg';
-const quickQuestions = ['Как выгрузить отчёт?', 'Что означает статус?', 'Где просроченные этапы?', 'Как добавить вуз?'];
 
 function supportedHref(href: string | undefined): string | null {
   if (!href) return null;
@@ -50,7 +50,7 @@ function MarkdownAnswer({ text }: { text: string }) {
   }}>{text}</ReactMarkdown></div>;
 }
 
-function Message({ message, user, onRetry, sending }: { message: ChatMessage; user: AuthUser; onRetry: (message: ChatMessage) => void; sending: boolean }) {
+function Message({ message, user, onRetry, onNotHelpful, sending }: { message: ChatMessage; user: AuthUser; onRetry: (message: ChatMessage) => void; onNotHelpful?: () => void; sending: boolean }) {
   const isUser = message.role === 'user';
   const time = new Date(message.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
   return <div className={`${styles.messageRow} ${isUser ? styles.userRow : ''}`}>
@@ -58,6 +58,7 @@ function Message({ message, user, onRetry, sending }: { message: ChatMessage; us
     <div className={`${styles.bubble} ${isUser ? styles.userBubble : styles.assistantBubble}`}>
       {isUser ? <p className={styles.userText}>{message.text}</p> : <><MarkdownAnswer text={message.text} />{message.sources && <SourceLinks sources={message.sources} />}</>}
       <time className={styles.time} dateTime={message.createdAt}>{time}</time>
+      {!isUser && onNotHelpful && <Button className={styles.feedbackButton} type="button" variant="ghost" size="s" disabled={sending} onClick={onNotHelpful}>Ответ не подходит</Button>}
       {message.error && <div className={styles.messageError} role="alert"><span>{message.error}</span><Button type="button" variant="ghost" size="s" disabled={sending} onClick={() => onRetry(message)}>Повторить</Button></div>}
     </div>
   </div>;
@@ -67,7 +68,20 @@ export function AssistantWidget({ user, pathname, open, onOpen, onClose }: { use
   const [input, setInput] = useState('');
   const [showHint, setShowHint] = useState(false);
   const [showLauncher, setShowLauncher] = useState(false);
+  const [allQuestions, setAllQuestions] = useState(false);
   const { messages, restoring, restoreError, sending, sendMessage, retry, retryRestore } = useAssistantChat(user.id, pathname);
+  const quickReplies = useQuery({
+    queryKey: ['assistant', 'quick-replies', user.id], enabled: open, staleTime: 300_000,
+    queryFn: async () => {
+      const response = await assistantRepository.quickReplies();
+      if (!response.ok || !Array.isArray(response.data?.items)) throw new Error('Quick replies unavailable');
+      return response.data.items;
+    },
+  });
+  const questions = quickReplies.data ?? [];
+  const notHelpful = questions.find(question => question.id === 'answer-not-helpful');
+  const lastMessage = messages.at(-1);
+  const showFeedback = lastMessage?.role === 'assistant' && messages.at(-2)?.text !== notHelpful?.question;
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -164,10 +178,15 @@ export function AssistantWidget({ user, pathname, open, onOpen, onClose }: { use
           <div className={styles.messageAvatar}><Image src={robot} alt="" width={43} height={43} /></div>
           <div className={`${styles.bubble} ${styles.assistantBubble} ${styles.greeting}`}><p>Здравствуйте! 👋<br />Я ваш помощник системы ИТ Школа Ростелекома. Могу подсказать, как работать с разделами, помочь найти нужные данные и ответить на вопросы по отчётам, статусам и настройкам.</p></div>
         </div>
-        <div className={styles.quickQuestions} aria-label="Быстрые вопросы">{quickQuestions.map((question) => <Button key={question} type="button" variant="secondary" className={styles.quickButton} disabled={sending || restoring} onClick={() => sendMessage(question)}>{question}<Icon name="chevron-right" size={17} /></Button>)}</div>
+        <div className={styles.quickMenu}>
+          <div className={styles.quickQuestions} id="assistant-quick-questions" aria-label="Быстрые вопросы">{(allQuestions ? questions : questions.slice(0, 4)).map(question => <Button key={question.id} type="button" variant="secondary" className={styles.quickButton} disabled={sending || restoring} onClick={() => sendMessage(question.question)}>{question.question}<Icon name="chevron-right" size={17} /></Button>)}</div>
+          {questions.length > 4 && <Button type="button" variant="ghost" size="s" aria-expanded={allQuestions} aria-controls="assistant-quick-questions" onClick={() => setAllQuestions(value => !value)}>{allQuestions ? 'Свернуть вопросы' : 'Все быстрые вопросы'}</Button>}
+          {quickReplies.isPending && <p className={styles.info}>Загружаем быстрые вопросы…</p>}
+          {quickReplies.isError && <p className={styles.info}>Быстрые вопросы недоступны. <Button type="button" variant="ghost" size="s" onClick={() => void quickReplies.refetch()}>Загрузить снова</Button></p>}
+        </div>
         {restoring && <p className={styles.info} role="status">Загружаем диалог…</p>}
         {restoreError && <div className={styles.restoreError} role="alert"><span>Не удалось загрузить предыдущий диалог: {restoreError}</span><Button type="button" variant="ghost" size="s" disabled={sending} onClick={retryRestore}>Повторить</Button></div>}
-        {messages.map((message) => <Message key={message.id} message={message} user={user} onRetry={retry} sending={sending} />)}
+        {messages.map((message) => <Message key={message.id} message={message} user={user} onRetry={retry} onNotHelpful={notHelpful && showFeedback && message.id === lastMessage?.id ? () => { sendMessage(notHelpful.question); } : undefined} sending={sending || restoring} />)}
         {sending && <p className={styles.info} role="status">Помощник печатает<span className={styles.dots}>…</span></p>}
       </div>
 

@@ -32,6 +32,8 @@
 .greeting p, .userText { margin: 0; white-space: pre-wrap; }
 .time { color: var(--rtk-color-text-tertiary); display: block; font-size: 11px; line-height: 1; margin-top: var(--rtk-space-2); text-align: right; }
 .quickQuestions { display: grid; gap: var(--rtk-space-2); grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0 0 var(--rtk-space-2); }
+.quickMenu { flex: 0 0 auto; }
+.feedbackButton { color: var(--rtk-color-brand) !important; font-size: 12px !important; margin-top: var(--rtk-space-2); }
 .quickButton { border-radius: var(--rtk-radius-medium) !important; font-size: 12px !important; justify-content: space-between !important; min-height: 48px !important; padding: var(--rtk-space-2) var(--rtk-space-3) !important; text-align: left; white-space: normal !important; width: 100%; }
 .quickButton > span { justify-content: space-between; min-width: 0; white-space: normal; width: 100%; }
 .quickButton svg { color: var(--rtk-color-brand); flex: 0 0 auto; }
