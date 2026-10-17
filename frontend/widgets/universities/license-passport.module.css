@@ -1,5 +1,14 @@
-.action { display: grid; gap: 8px; min-width: 190px; max-width: 300px; white-space: normal; }
-.buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.action { display: inline-flex; white-space: normal; }
+.trigger.trigger { color: var(--rtk-color-brand); border-color: color-mix(in srgb, var(--rtk-color-brand) 24%, transparent); background: color-mix(in srgb, var(--rtk-color-brand) 4%, var(--rtk-color-surface)); min-height: 36px; padding-inline: 16px; gap: 8px; }
+.trigger.trigger:hover:not(:disabled), .trigger.trigger[aria-expanded="true"] { background: color-mix(in srgb, var(--rtk-color-brand) 8%, var(--rtk-color-surface)); border-color: color-mix(in srgb, var(--rtk-color-brand) 35%, transparent); }
+.chevronOpen { transform: rotate(180deg); }
+.menu { position: fixed; z-index: 120; width: 260px; max-width: calc(100vw - 24px); max-height: calc(100dvh - 24px); overflow-y: auto; padding: 8px; background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: 14px; box-shadow: 0 12px 36px rgba(16, 24, 40, .12), 0 2px 6px rgba(16, 24, 40, .04); }
+.menuItem { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 42px; padding: 10px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--rtk-color-text-primary); font: inherit; font-size: 14px; line-height: 1.4; text-align: left; text-decoration: none; cursor: pointer; }
+.menuItem svg { flex-shrink: 0; }
+.menuItem:hover:not(:disabled), .menuItem:focus-visible { outline: none; background: var(--rtk-color-surface-hover); }
+.menuItem:disabled { opacity: .5; cursor: not-allowed; }
+.menuFooter { margin: 8px 4px 0; padding: 12px 6px 8px; border-top: 1px solid var(--rtk-color-border); }
+@media (max-width: 768px) { .trigger.trigger, .menuItem { min-height: 44px; } }
 .hint { margin: 0; color: var(--rtk-color-text-secondary); font-size: 12px; line-height: 1.5; }
 .error { margin: 0; color: var(--rtk-color-danger, #b42318); font-size: 13px; line-height: 1.5; }
 .preview { display: grid; gap: 10px; grid-template-rows: minmax(0, 1fr) auto auto; height: 100%; min-height: 0; }
