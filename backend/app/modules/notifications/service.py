@@ -175,27 +175,6 @@ def notify_user_university_assignment(
     )
 
 
-def notify_stage_change(db: Session, instance: WorkflowInstance, from_stage: InstanceStage,
-                        to_stage: InstanceStage, *, rollback: bool, reason: str,
-                        event_key: str) -> bool:
-    university = db.get(University, instance.university_id)
-    recipient = recipient_for_responsible(db, to_stage.responsible_id or instance.responsible_id)
-    if university is None:
-        return False
-    message = (f"Работа с {_school_label(university.name)} возвращена с этапа «{from_stage.name}» "
-               f"на этап «{to_stage.name}». Причина: {reason}" if rollback else
-               f"{_school_label(university.name)} переведён с этапа «{from_stage.name}» "
-               f"на этап «{to_stage.name}».")
-    return publish(
-        db, recipient_user_id=recipient, event_key=event_key,
-        type="workflow_rollback" if rollback else "workflow_stage_changed",
-        priority="WARNING" if rollback else "INFO",
-        title="Этап возвращён" if rollback else "Изменился этап работы",
-        message=message, entity_type="workflow", entity_id=instance.id,
-        university_id=instance.university_id,
-    )
-
-
 def notify_import_result(db: Session, job, *, failed: bool = False) -> bool:
     result = job.result if isinstance(job.result, dict) else {}
     errors = int(result.get("errors_total") or 0)
