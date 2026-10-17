@@ -6,7 +6,7 @@ Domain DB settings stay for the next stage but are unused at runtime.
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from pydantic import Field, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEV_BYPASS_ENVIRONMENTS = frozenset({"dev", "development", "local", "test", "testing"})
@@ -33,6 +33,26 @@ class Settings(BaseSettings):
     auth_dev_bypass: bool = False
 
     frontend_origin: str = "http://localhost:3000"
+
+    # Email is an optional delivery channel for persisted notifications.
+    email_notifications_enabled: bool = False
+    smtp_host: str = ""
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_username: str = ""
+    smtp_password: SecretStr = SecretStr("")
+    smtp_from_email: str = ""
+    smtp_from_name: str = "RTK EdTech CRM"
+    smtp_security: str = "starttls"  # starttls or ssl; plaintext is unsupported
+    smtp_timeout_seconds: float = Field(default=10, ge=1, le=60)
+    email_max_attempts: int = Field(default=5, ge=1, le=20)
+
+    @model_validator(mode="after")
+    def validate_email(self) -> "Settings":
+        if self.smtp_security not in {"starttls", "ssl"}:
+            raise ValueError("SMTP_SECURITY must be starttls or ssl")
+        if self.email_notifications_enabled and (not self.smtp_host or not self.smtp_from_email):
+            raise ValueError("SMTP_HOST and SMTP_FROM_EMAIL are required when email is enabled")
+        return self
 
     # --- Domain stage (NOT used by minimal auth stack) ---
     database_url: str = "sqlite:///./dev.db"

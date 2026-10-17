@@ -1,0 +1,245 @@
+"""Email is a delivery channel of the existing notification service."""
+
+import os
+import smtplib
+import uuid
+from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
+
+import pytest
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+import app.models  # noqa: F401
+from app.config import settings
+from app.models.catalog import Responsible, University
+from app.models.notification import Notification
+from app.models.notification_delivery import NotificationDelivery
+from app.modules.notifications import email, service
+
+
+@pytest.fixture()
+def database():
+    from tests.db_helpers import require_pg_engine
+
+    engine = require_pg_engine(os.getenv("TEST_DATABASE_URL", "sqlite://"))
+    try:
+        with Session(engine) as db:
+            yield db
+    finally:
+        engine.dispose()
+
+
+def _publish(db, sub="user-a", kind="assignment", target="university", university_id=None):
+    return service.publish(
+        db, recipient_user_id=sub, event_key=f"{kind}:{uuid.uuid4()}",
+        type=kind, priority="INFO", title="Назначена работа",
+        message="Уведомление о работе с университетом", entity_type=target,
+        entity_id=uuid.uuid4(), university_id=university_id,
+    )
+
+
+def test_email_content_and_targets(monkeypatch):
+    monkeypatch.setattr(settings, "frontend_origin", "https://crm.example.test")
+    uni = uuid.uuid4()
+    for target, suffix in (
+        ("contract", f"/universities/{uni}?tab=documents"),
+        ("license", f"/universities/{uni}?tab=licenses"),
+        ("workflow", "/workflows/"),
+        ("import_job", "/admin/import?job="),
+        ("university", "/universities/"),
+    ):
+        row = Notification(
+            recipient_user_id="user-a", event_key="test", type="assignment", priority="INFO",
+            title="Назначение", message="Русский текст", entity_type=target,
+            entity_id=str(uuid.uuid4()), university_id=uni,
+        )
+        subject, body = email.render_message(row)
+        assert subject == "Назначение"
+        assert "Русский текст" in body
+        assert f"https://crm.example.test{suffix}" in body
+        assert "JWT" not in body
+
+
+def test_smtp_error_is_categorized_without_raw_response():
+    secret = b"password=secret-token"
+    category, permanent = email._error_category(smtplib.SMTPResponseException(550, secret))
+    assert (category, permanent) == ("smtp_permanent", True)
+    assert "secret" not in category
+    assert email._error_category(TimeoutError(secret.decode())) == ("timeout", False)
+    assert email._error_category(smtplib.SMTPResponseException(451, secret)) == ("smtp_temporary", False)
+
+
+@pytest.mark.parametrize("security", ["starttls", "ssl"])
+def test_smtp_uses_verified_tls_without_network(monkeypatch, security):
+    events = []
+    context = object()
+    monkeypatch.setattr(settings, "smtp_security", security)
+    monkeypatch.setattr(settings, "smtp_host", "smtp.example.test")
+    monkeypatch.setattr(settings, "smtp_from_email", "crm@example.test")
+    monkeypatch.setattr(email.ssl, "create_default_context", lambda: context)
+
+    class FakeSMTP:
+        def __init__(self, host, port, **kwargs):
+            events.append((host, port, kwargs))
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            pass
+
+        def starttls(self, *, context):
+            events.append(("starttls", context))
+
+        def send_message(self, message):
+            events.append(("send", message["To"], message.get_content()))
+
+    monkeypatch.setattr(email.smtplib, "SMTP", FakeSMTP)
+    monkeypatch.setattr(email.smtplib, "SMTP_SSL", FakeSMTP)
+    email.send_email("user@example.test", "Назначение", "Русский текст")
+    assert events[-1] == ("send", "user@example.test", "Русский текст\n")
+    if security == "starttls":
+        assert ("starttls", context) in events
+    else:
+        assert events[0][2]["context"] is context
+
+
+def test_publish_enqueues_once_and_skips_missing_email(database, monkeypatch):
+    monkeypatch.setattr(settings, "email_notifications_enabled", True)
+    db = database
+    uni = University(name="Тестовый вуз", city="Москва")
+    db.add(uni)
+    db.flush()
+    db.add(Responsible(full_name="Ответственный", email="user@example.test",
+                       role="manager", keycloak_sub="user-a"))
+    db.flush()
+    assert service.publish(db, recipient_user_id="user-a", event_key="assignment:one",
+                           type="assignment", priority="INFO", title="Назначение",
+                           message="Работа назначена", entity_type="university",
+                           entity_id=uni.id, university_id=uni.id)
+    assert not service.publish(db, recipient_user_id="user-a", event_key="assignment:one",
+                               type="assignment", priority="INFO", title="Назначение",
+                               message="Работа назначена", entity_type="university",
+                               entity_id=uni.id, university_id=uni.id)
+    assert _publish(db, sub="unlinked", university_id=uni.id)
+    db.commit()
+    assert db.scalar(select(func.count()).select_from(Notification)) == 2
+    deliveries = db.scalars(select(NotificationDelivery)).all()
+    assert len(deliveries) == 1
+    assert deliveries[0].recipient == "user@example.test"
+
+
+@pytest.mark.parametrize("outcome,expected", [
+    (None, "sent"), (TimeoutError("raw secret"), "pending"),
+    (smtplib.SMTPResponseException(550, b"raw secret"), "failed"),
+])
+def test_worker_delivery_outcomes(database, monkeypatch, outcome, expected):
+    monkeypatch.setattr(settings, "email_notifications_enabled", True)
+    db = database
+    db.add(Responsible(full_name="Ответственный", email="user@example.test",
+                       role="manager", keycloak_sub="user-a"))
+    db.flush()
+    assert _publish(db)
+    db.commit()
+    captured = []
+
+    def sender(recipient, subject, body):
+        captured.append((recipient, subject, body))
+        if outcome:
+            raise outcome
+
+    assert email.run_email_delivery_once(db, sender=sender)
+    row = db.scalar(select(NotificationDelivery))
+    assert row.status == expected
+    assert row.attempts == 1
+    assert captured[0][0] == "user@example.test"
+    if expected == "sent":
+        assert row.sent_at is not None
+    else:
+        assert "secret" not in (row.last_error or "")
+    assert db.scalar(select(func.count()).select_from(Notification)) == 1
+
+
+def test_assignment_and_import_use_same_channel(database, monkeypatch):
+    monkeypatch.setattr(settings, "email_notifications_enabled", True)
+    db = database
+    university = University(name="Тестовый вуз", city="Москва")
+    responsible = Responsible(full_name="Ответственный", email="user@example.test",
+                              role="manager", keycloak_sub="user-a")
+    db.add_all([university, responsible])
+    db.flush()
+    assert service.notify_assignment(db, responsible.id, university.id,
+                                     event_key="assignment:email-test")
+    job = SimpleNamespace(id=uuid.uuid4(), actor_sub="user-a",
+                          result={"errors_total": 2, "total_rows": 3, "inserted": 1})
+    assert service.notify_import_result(db, job)
+    db.commit()
+    rows = db.scalars(select(NotificationDelivery)).all()
+    assert len(rows) == 2
+    assert {db.get(Notification, row.notification_id).type for row in rows} == {
+        "assignment", "import_error",
+    }
+
+
+def test_invalid_local_address_keeps_in_app(database, monkeypatch):
+    monkeypatch.setattr(settings, "email_notifications_enabled", True)
+    db = database
+    db.add(Responsible(full_name="Ответственный", email="invalid-address",
+                       role="manager", keycloak_sub="user-a"))
+    db.flush()
+    assert _publish(db)
+    db.commit()
+    assert db.scalar(select(func.count()).select_from(Notification)) == 1
+    assert db.scalar(select(func.count()).select_from(NotificationDelivery)) == 0
+
+
+def test_disabled_and_max_attempts(database, monkeypatch):
+    monkeypatch.setattr(settings, "email_notifications_enabled", True)
+    db = database
+    db.add(Responsible(full_name="Ответственный", email="user@example.test",
+                       role="manager", keycloak_sub="user-a"))
+    db.flush()
+    assert _publish(db)
+    db.commit()
+    monkeypatch.setattr(settings, "email_notifications_enabled", False)
+    assert not email.run_email_delivery_once(db, sender=lambda *_: pytest.fail("SMTP called"))
+    assert db.scalar(select(NotificationDelivery.status)) == "pending"
+    monkeypatch.setattr(settings, "email_notifications_enabled", True)
+    monkeypatch.setattr(settings, "email_max_attempts", 5)
+    row = db.scalar(select(NotificationDelivery))
+    row.attempts = 4
+    row.next_attempt_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+    db.commit()
+    assert email.run_email_delivery_once(db, sender=lambda *_: (_ for _ in ()).throw(TimeoutError()))
+    db.refresh(row)
+    assert (row.status, row.attempts) == ("failed", 5)
+
+
+def test_pg_constraints_cascade_and_claim_lease(database, monkeypatch):
+    monkeypatch.setattr(settings, "email_notifications_enabled", True)
+    db = database
+    db.add(Responsible(full_name="Ответственный", email="user@example.test",
+                       role="manager", keycloak_sub="user-a"))
+    db.flush()
+    assert _publish(db)
+    db.commit()
+    delivery = db.scalar(select(NotificationDelivery))
+    notification_id = delivery.notification_id
+    with pytest.raises(IntegrityError), db.begin_nested():
+        db.add(NotificationDelivery(notification_id=notification_id, channel="email",
+                                    recipient="other@example.test", status="pending"))
+        db.flush()
+    with pytest.raises(IntegrityError), db.begin_nested():
+        db.add(NotificationDelivery(notification_id=uuid.uuid4(), channel="email",
+                                    recipient="other@example.test", status="pending"))
+        db.flush()
+    db.rollback()
+    claim = email._claim(db, datetime.now(timezone.utc))
+    assert claim and claim[0] == delivery.id
+    with Session(db.bind) as other:
+        assert email._claim(other, datetime.now(timezone.utc)) is None
+    db.execute(Notification.__table__.delete().where(Notification.id == notification_id))
+    db.commit()
+    assert db.scalar(select(func.count()).select_from(NotificationDelivery)) == 0

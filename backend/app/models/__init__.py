@@ -43,6 +43,7 @@ from app.models.report_job import (  # noqa: F401
 )
 from app.models.report_template import ReportTemplate  # noqa: F401
 from app.models.notification import Notification  # noqa: F401
+from app.models.notification_delivery import NotificationDelivery  # noqa: F401
 from app.models.education import ProgramEducationStats  # noqa: F401
 from app.models.interactions import (  # noqa: F401
     Document,
@@ -104,4 +105,5 @@ __all__ = [
     "ReportJob",
     "ReportTemplate",
     "Notification",
+    "NotificationDelivery",
 ]

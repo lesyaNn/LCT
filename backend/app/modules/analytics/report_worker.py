@@ -89,6 +89,15 @@ def run_notification_scan_once() -> int:
         db.close()
 
 
+def run_email_delivery_once() -> bool:
+    """Deliver one due notification through the existing worker process."""
+    from app.db.session import SessionLocal
+    from app.modules.notifications.email import run_email_delivery_once as deliver
+
+    with SessionLocal() as db:
+        return deliver(db)
+
+
 def build_worker_user(job: ReportJob) -> CurrentUser:
     """Rehydrate the minimal actor the dataset layer expects.
 
@@ -317,6 +326,10 @@ def main(argv: list[str] | None = None) -> int:
             except Exception:
                 logger.exception("notification deadline scan failed")
                 next_notification_scan = time.monotonic() + 60
+        try:
+            run_email_delivery_once()
+        except Exception:
+            logger.exception("email delivery iteration failed")
         try:
             # Only report/import job execution here. The daily health-score
             # snapshot that used to run in this block was removed together
