@@ -63,7 +63,9 @@
 .progressLabel strong { font-size: 13px; }
 .progressTrack, .taskProgress { background: var(--rtk-color-surface-subtle); border-radius: 999px; height: 8px; overflow: hidden; }
 .progressTrack { margin-top: var(--rtk-space-3); }
-.progressTrack span, .taskProgress span { background: var(--rtk-color-brand-secondary); border-radius: inherit; display: block; height: 100%; transition: width 180ms ease; }
+.progressTrack span, .taskProgress span { border-radius: inherit; display: block; height: 100%; transition: width 180ms ease; }
+.progressTrack span { background: var(--rtk-color-brand); }
+.taskProgress span { background: var(--rtk-color-brand-secondary); }
 .layout { align-items: start; display: grid; gap: var(--rtk-space-5); grid-template-columns: minmax(360px, 1fr) minmax(0, 1.35fr); }
 .stagesPanel, .detailPanel { composes: surface from '../../shared/ui/rtk/section-surface.module.css'; min-width: 0; }
 .detailPanel { animation: workflowDetailsReveal 180ms ease both; }

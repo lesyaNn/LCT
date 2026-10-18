@@ -182,8 +182,8 @@ test('Workflow stage emphasis remains clear at responsive widths', async ({ page
         viewportWidth: innerWidth,
       };
     });
-    expect(initial.progress).toBe(initial.selectedLeft);
-    expect(initial.currentMarker).toBe(initial.progress.replace('rgb(', 'rgba(').replace(')', ', 0.1)'));
+    expect(initial.progress).toBe('rgb(119, 0, 255)');
+    expect(initial.currentMarker).toBe(initial.selectedLeft.replace('rgb(', 'rgba(').replace(')', ', 0.1)'));
     expect(initial.selectedTop).toBe('rgba(0, 0, 0, 0)');
     expect(initial.documentWidth).toBeLessThanOrEqual(initial.viewportWidth + 2);
     await stages.first().click();
@@ -193,7 +193,7 @@ test('Workflow stage emphasis remains clear at responsive widths', async ({ page
       left: getComputedStyle(button).borderLeftColor,
       top: getComputedStyle(button).borderTopColor,
     }));
-    expect(selectedOtherStage.left).toBe(initial.progress);
+    expect(selectedOtherStage.left).toBe(initial.selectedLeft);
     expect(selectedOtherStage.top).toBe('rgba(0, 0, 0, 0)');
     await current.click();
   }
