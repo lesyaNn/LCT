@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useId, useRef, type ReactNode } from 'react';
 import AttentionStroke from '@atomaro/icons/24/alert/AttentionStroke';
+import ErrorStroke from '@atomaro/icons/24/alert/ErrorStroke';
 import TimeStroke from '@atomaro/icons/24/alert/TimeStroke';
 import CheckSmall from '@atomaro/icons/24/navigation/CheckSmall';
 import {
@@ -214,10 +215,6 @@ const matrixStateLabel: Record<MatrixHealthState, string> = {
   HEALTHY: 'Стабильно', ATTENTION: 'Требует внимания', CRITICAL: 'Критично',
   NOT_STARTED: 'Не запущено', COMPLETED: 'Завершено', NOT_LINKED: 'Не используется',
 };
-const matrixStateMark: Record<MatrixHealthState, string> = {
-  HEALTHY: '●', ATTENTION: '!', CRITICAL: '!', NOT_STARTED: '○', COMPLETED: '✓', NOT_LINKED: '—',
-};
-
 function MatrixCellContent({ state }: { state: MatrixHealthState }) {
   if (state === 'NOT_LINKED') return <span className={styles.matrixDash} aria-hidden="true">—</span>;
   const intent = state === 'HEALTHY' || state === 'COMPLETED' ? 'success' : state === 'ATTENTION' ? 'orange' : state === 'CRITICAL' ? 'danger' : 'neutral';
@@ -232,7 +229,11 @@ function UniversityProgramMatrix({ matrix }: { matrix: DashboardMatrix }) {
   const counts = matrix.rows.reduce((acc, row) => { if (row.level === 'stable') acc.stable += 1; else if (row.level === 'attention') acc.attention += 1; else if (row.level === 'critical') acc.critical += 1; return acc; }, { stable: 0, attention: 0, critical: 0 });
   if (!matrix.rows.length || !matrix.columns.length) return <EmptyChart />;
   return <div className={styles.matrixWrap}>
-    <div className={styles.matrixSummary}>Стабильно: {counts.stable} · Требуют внимания: {counts.attention} · Критично: {counts.critical}</div>
+    <div className={styles.matrixSummary}>
+      <span><CheckSmall className={styles.matrixSummaryStable} size={16} fill="currentColor" aria-hidden="true" />Стабильно: {counts.stable}</span>
+      <span><AttentionStroke className={styles.matrixSummaryAttention} size={16} fill="currentColor" aria-hidden="true" />Требуют внимания: {counts.attention}</span>
+      <span><ErrorStroke className={styles.matrixSummaryCritical} size={16} fill="currentColor" aria-hidden="true" />Критично: {counts.critical}</span>
+    </div>
     <div className={styles.matrixScroll}><table className={styles.matrix}><thead><tr><th>ВУЗ</th>{matrix.columns.map((column) => <th key={column.id} title={column.direction}>{column.name}</th>)}</tr></thead><tbody>{matrix.rows.map((row) => <tr key={row.id}><th scope="row"><Link href={`/universities/${row.id}`}>{row.name}</Link><small>{row.score === null ? 'Недостаточно данных' : `Health ${row.score} · ${row.startedPrograms} из ${row.totalPrograms} запущено`}</small></th>{matrix.columns.map((column) => {
       const cell = byCell.get(`${row.id}:${column.id}`);
       if (!cell) return <td key={column.id}>—</td>;
@@ -242,7 +243,6 @@ function UniversityProgramMatrix({ matrix }: { matrix: DashboardMatrix }) {
       const href = cell.workflowInstanceId ? `/workflows/${cell.workflowInstanceId}` : `/universities/${row.id}?tab=workflow&program=${column.id}`;
       return <td key={column.id}><RtkTooltip content={details}>{cell.state === 'NOT_LINKED' ? <span aria-label={label}>{content}</span> : <Link href={href} aria-label={label}>{content}</Link>}</RtkTooltip></td>;
     })}</tr>)}</tbody></table></div>
-    <div className={styles.matrixLegend} aria-label="Легенда матрицы">{(['COMPLETED', 'HEALTHY', 'ATTENTION', 'CRITICAL', 'NOT_STARTED', 'NOT_LINKED'] as MatrixHealthState[]).map((state) => <span key={state} className={styles.matrixLegendItem}><span className={`${styles.matrixDot} ${styles[`matrix${state}`]}`}>{matrixStateMark[state]}</span>{matrixStateLabel[state]}</span>)}</div>
   </div>;
 }
 

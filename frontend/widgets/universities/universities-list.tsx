@@ -20,8 +20,8 @@ import SortDown from '@atomaro/icons/24/editor/SortDown';
 import SortUp from '@atomaro/icons/24/editor/SortUp';
 import User from '@atomaro/icons/24/communication/User';
 import BookOpen from '@atomaro/icons/24/culture/BookOpen';
-import { Button } from '@/shared/ui/rtk/button';
 import { Tabs } from '@/shared/ui/rtk/tabs';
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, Pagination } from '@/shared/ui/rtk/pagination';
 import { FilterToolbar } from '@/shared/ui/rtk/filter-surface';
 import { SearchField } from '@/shared/ui/rtk/filter-field';
 import type { ActiveFilterItem } from '@/shared/ui/rtk/active-filters';
@@ -53,8 +53,6 @@ import {
 import styles from './universities-list.module.css';
 import { UniversitiesMap } from './universities-map';
 
-const DEFAULT_PAGE_SIZE = 12;
-const PAGE_SIZE_OPTIONS = [6, 12, 24];
 type UniversityView = 'cards' | 'table' | 'map';
 const VIEW_TABS = [{ id: 'cards', label: 'Карточки' }, { id: 'table', label: 'Таблица' }, { id: 'map', label: 'Карта' }] as const;
 
@@ -366,31 +364,6 @@ function CardsSkeleton() {
   return <SkeletonGroup label="Загрузка карточек вузов"><div className={styles.cards}>{Array.from({ length: DEFAULT_PAGE_SIZE }, (_, index) => <div className={styles.card} key={index}><Skeleton variant="text" width="85%" height={20} /><Skeleton variant="text" width="55%" /><Skeleton variant="text" width="70%" /><Skeleton variant="text" width="90%" /></div>)}</div></SkeletonGroup>;
 }
 
-function Pagination({ page, pageSize, total, onPatch }: { page: number; pageSize: number; total: number; onPatch: (patch: Record<string, string | number | string[] | null>) => void }) {
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const safePage = Math.min(page, totalPages);
-  const pages = Array.from({ length: Math.min(totalPages, 5) }, (_, index) => {
-    if (totalPages <= 5) return index + 1;
-    if (safePage <= 3) return index + 1;
-    if (safePage >= totalPages - 2) return totalPages - 4 + index;
-    return safePage - 2 + index;
-  });
-  const firstItem = total === 0 ? 0 : (safePage - 1) * pageSize + 1;
-  const lastItem = Math.min(safePage * pageSize, total);
-
-  return (
-    <nav className={styles.pagination} aria-label="Пагинация списка вузов">
-      <span className={styles.paginationSummary}>{firstItem}–{lastItem} из {total}</span>
-      <div className={styles.pageButtons}>
-        <Button variant="secondary" size="s" type="button" disabled={safePage === 1} onClick={() => onPatch({ page: safePage - 1 })}>Назад</Button>
-        {pages.map((pageNumber) => <button className={pageNumber === safePage ? styles.pageButtonActive : styles.pageButton} type="button" aria-current={pageNumber === safePage ? 'page' : undefined} key={pageNumber} onClick={() => onPatch({ page: pageNumber })}>{pageNumber}</button>)}
-        <Button variant="secondary" size="s" type="button" disabled={safePage === totalPages} onClick={() => onPatch({ page: safePage + 1 })}>Далее</Button>
-      </div>
-      <label className={styles.pageSize}><span>На странице</span><select value={pageSize} onChange={(event) => onPatch({ page_size: Number(event.target.value), page: 1 })}>{PAGE_SIZE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
-    </nav>
-  );
-}
-
 function DesktopTable({ table }: { table: Table<UniversityListItem> }) {
   return (
     <div className={styles.tableScroll}>
@@ -538,7 +511,7 @@ export function UniversitiesList() {
           <p className={styles.description}>Учебные заведения, программы и задачи, требующие внимания команды.</p>
         </div>
         <div className={styles.headerActions}>
-          <Tabs items={VIEW_TABS} activeId={view} onChange={(id) => setView(id as UniversityView)} label="Представление вузов" prefix="university-view" />
+          <Tabs items={VIEW_TABS} activeId={view} onChange={(id) => setView(id as UniversityView)} label="Представление вузов" prefix="university-view" alternating />
         </div>
       </header>
       <div className={styles.filterArea}>
@@ -550,7 +523,7 @@ export function UniversitiesList() {
         <>
           {query.isFetching ? <p className={styles.fetching} role="status">Обновляем список…</p> : null}
           {view === 'cards' ? <UniversityCards items={query.data.items} /> : <TableShell><DesktopTable table={table} /></TableShell>}
-          <div className={styles.paginationSurface}><Pagination page={query.data.page} pageSize={query.data.pageSize} total={query.data.total} onPatch={goToState} /></div>
+          <Pagination label="Пагинация списка вузов" page={query.data.page} pageSize={query.data.pageSize} total={query.data.total} onPageChange={(page) => goToState({ page })} onPageSizeChange={(pageSize) => goToState({ page_size: pageSize, page: 1 })} />
         </>
       )}
     </div>

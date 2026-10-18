@@ -6,6 +6,7 @@ import { getWorkflowOverview, workflowOverviewQueryKey, type WorkflowOverviewIte
 import { FilterToolbar } from '@/shared/ui/rtk/filter-surface';
 import { Input } from '@/shared/ui/rtk/form-controls';
 import { MultiSelect } from '@/shared/ui/rtk/multiselect';
+import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/ui/rtk/pagination';
 import { Tabs } from '@/shared/ui/rtk/tabs';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { EmptyState } from '@/shared/ui/empty-state';
@@ -52,9 +53,14 @@ function options(items: WorkflowOverviewItem[], field: 'university' | 'city' | '
 export function WorkflowOverviewPage() {
   const [view, setView] = useState<View>('list');
   const [filters, setFilters] = useState<Filters>(initialFilters);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const query = useQuery({ queryKey: workflowOverviewQueryKey, queryFn: getWorkflowOverview, staleTime: 30_000 });
   const items = query.data?.items ?? [];
-  const update = (key: SelectionKey, values: string[]) => setFilters((current) => ({ ...current, [key]: values }));
+  const update = (key: SelectionKey, values: string[]) => {
+    setFilters((current) => ({ ...current, [key]: values }));
+    setPage(1);
+  };
   const filtered = items.filter((item) => {
     const search = filters.search.trim().toLocaleLowerCase('ru-RU');
     return (!search || `${item.universityName} ${item.programName ?? ''} ${item.stage.name} ${item.responsible?.name ?? ''}`.toLocaleLowerCase('ru-RU').includes(search))
@@ -65,13 +71,15 @@ export function WorkflowOverviewPage() {
       && (!filters.status.length || filters.status.includes(item.status))
       && (!filters.stage.length || filters.stage.includes(item.stageKey));
   });
-  const filterControls = () => <><label><span>Поиск</span><Input type="search" placeholder="ВУЗ, программа или этап" value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} /></label>{selects.map(({ key, label, all }) => <MultiSelect key={key} label={label} labelPlacement="outside" values={filters[key]} onChange={(values) => update(key, values)} options={key === 'status' ? statusOptions : options(items, key).map(([id, name]) => ({ id, name }))} searchable placeholder={all} hint={query.data?.limited ? 'Поиск среди загруженных процессов.' : undefined} />)}</>;
+  const currentPage = Math.min(page, Math.max(1, Math.ceil(filtered.length / pageSize)));
+  const visibleItems = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const filterControls = () => <><label><span>Поиск</span><Input type="search" placeholder="ВУЗ, программа или этап" value={filters.search} onChange={(event) => { setFilters((current) => ({ ...current, search: event.target.value })); setPage(1); }} /></label>{selects.map(({ key, label, all }) => <MultiSelect key={key} label={label} labelPlacement="outside" values={filters[key]} onChange={(values) => update(key, values)} options={key === 'status' ? statusOptions : options(items, key).map(([id, name]) => ({ id, name }))} searchable placeholder={all} hint={query.data?.limited ? 'Поиск среди загруженных процессов.' : undefined} />)}</>;
   const activeSelections = selects.filter(({ key }) => filters[key].length > 0);
   const hasFilters = Boolean(filters.search || activeSelections.length);
-  return <div className={styles.page}><header className={styles.heading}><div><h1>Workflow</h1><p>Процессы взаимодействия с ВУЗами</p></div><Tabs items={viewTabs} activeId={view} onChange={(id) => setView(id as View)} label="Представление Workflow" prefix="workflow-view" panelPrefix="workflow-view-panel" /></header>
-    <FilterToolbar activeFilters={[...(filters.search ? [{ id: 'search', label: `Поиск: ${filters.search}`, onRemove: () => setFilters((current) => ({ ...current, search: '' })) }] : []), ...activeSelections.map(({ key, label }) => ({ id: key, label: `${label}: выбрано ${filters[key].length}`, onRemove: () => update(key, []) }))]} label="Фильтры Workflow" collapsible controls={filterControls} onReset={() => setFilters(initialFilters)} resetDisabled={!hasFilters} mobileCount={Number(Boolean(filters.search)) + activeSelections.length} />
+  return <div className={styles.page}><header className={styles.heading}><div><h1>Workflow</h1><p>Процессы взаимодействия с ВУЗами</p></div><Tabs items={viewTabs} activeId={view} onChange={(id) => setView(id as View)} label="Представление Workflow" prefix="workflow-view" panelPrefix="workflow-view-panel" alternating /></header>
+    <FilterToolbar activeFilters={[...(filters.search ? [{ id: 'search', label: `Поиск: ${filters.search}`, onRemove: () => { setFilters((current) => ({ ...current, search: '' })); setPage(1); } }] : []), ...activeSelections.map(({ key, label }) => ({ id: key, label: `${label}: выбрано ${filters[key].length}`, onRemove: () => update(key, []) }))]} label="Фильтры Workflow" collapsible controls={filterControls} onReset={() => { setFilters(initialFilters); setPage(1); }} resetDisabled={!hasFilters} mobileCount={Number(Boolean(filters.search)) + activeSelections.length} />
     <section className={styles.content} id={`workflow-view-panel-${view}`} role="tabpanel" aria-labelledby={`workflow-view-${view}`}>
-        {query.isPending ? <p className={styles.message}>Загрузка процессов…</p> : !query.data ? <RouteErrorState onRetry={() => void query.refetch()} /> : <><div className={styles.summary}><strong>{filtered.length} процессов</strong>{query.data.limited ? <span>Загружена только часть процессов. Обновите страницу позже.</span> : null}{query.data.unavailableUniversities ? <span>Часть данных ВУЗов недоступна.</span> : null}</div>{filtered.length ? view === 'board' ? <WorkflowBoard items={filtered} /> : <WorkflowList items={filtered} /> : <EmptyState title="Процессы не найдены" description={items.length ? 'Измените фильтры.' : 'Процессы появятся после запуска работы с вузами.'} />}</>}
+        {query.isPending ? <p className={styles.message}>Загрузка процессов…</p> : !query.data ? <RouteErrorState onRetry={() => void query.refetch()} /> : <><div className={styles.summary}><strong>{filtered.length} процессов</strong>{query.data.limited ? <span>Загружена только часть процессов. Обновите страницу позже.</span> : null}{query.data.unavailableUniversities ? <span>Часть данных ВУЗов недоступна.</span> : null}</div>{filtered.length ? view === 'board' ? <WorkflowBoard items={filtered} /> : <div className={styles.listView}><WorkflowList items={visibleItems} /><Pagination label="Пагинация списка Workflow" page={currentPage} pageSize={pageSize} total={filtered.length} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} /></div> : <EmptyState title="Процессы не найдены" description={items.length ? 'Измените фильтры.' : 'Процессы появятся после запуска работы с вузами.'} />}</>}
     </section>
   </div>;
 }

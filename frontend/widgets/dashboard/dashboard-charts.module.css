@@ -314,7 +314,12 @@
   .skeletonChart { animation: none; }
 }
 .matrixWrap { display: flex; flex: 1; flex-direction: column; gap: var(--rtk-space-3); min-height: 0; min-width: 0; }
-.matrixSummary, .matrixLegend { color: var(--rtk-color-text-secondary); font-size: 12px; }
+.matrixSummary { color: var(--rtk-color-text-secondary); display: flex; flex-wrap: wrap; font-size: 12px; gap: var(--rtk-space-3); }
+.matrixSummary span { align-items: center; display: inline-flex; gap: var(--rtk-space-1); white-space: nowrap; }
+.matrixSummary span + span::before { content: '·'; margin-right: var(--rtk-space-1); }
+.matrixSummaryStable { color: var(--rtk-color-success); }
+.matrixSummaryAttention { color: var(--rtk-color-brand-secondary); }
+.matrixSummaryCritical { color: var(--rtk-color-danger); }
 .matrixScroll { max-height: 480px; max-width: 100%; min-width: 0; overflow: auto; }
 .matrix { border-collapse: separate; border-spacing: 0; min-width: 680px; width: 100%; }
 .matrix th, .matrix td { border-bottom: 1px solid var(--rtk-color-border); padding: var(--rtk-space-3) var(--rtk-space-4); text-align: center; white-space: nowrap; }
@@ -324,13 +329,7 @@
 .matrix tbody th { background: var(--rtk-color-surface-elevated); left: 0; max-width: 220px; min-width: 220px; position: sticky; text-align: left; z-index: 1; }
 .matrix tbody th a { color: var(--rtk-color-text-primary); display: block; font-size: 12px; overflow: hidden; text-decoration: none; text-overflow: ellipsis; }
 .matrix tbody th small { color: var(--rtk-color-text-tertiary); display: block; font-size: 10px; font-weight: 400; margin-top: 3px; }
-.matrixHEALTHY, .matrixCOMPLETED { color: var(--rtk-color-success); }
-.matrixATTENTION { color: var(--rtk-color-brand-secondary); }
-.matrixCRITICAL { color: var(--rtk-color-danger); }
-.matrixNOT_STARTED, .matrixNOT_LINKED, .matrixDash { color: var(--rtk-color-text-tertiary); font-weight: 400; }
-.matrixLegend { display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); }
-.matrixLegendItem { align-items: center; display: inline-flex; gap: 5px; }
-.matrixDot { font-size: 14px; font-weight: 700; }
+.matrixDash { color: var(--rtk-color-text-tertiary); font-weight: 400; }
 @media (max-width: 768px) { .matrixScroll { max-height: 420px; } .matrix { min-width: 620px; } }
 .matrix td { min-width: 160px; }
 .matrixTooltip { display: flex; flex-direction: column; gap: 5px; text-align: left; white-space: normal; }

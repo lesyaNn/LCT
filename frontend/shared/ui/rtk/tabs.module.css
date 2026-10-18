@@ -4,3 +4,6 @@
 .tab:hover { color: var(--rtk-color-text-primary); background: var(--rtk-color-surface-hover); }
 .tab:focus-visible, .active:focus-visible { outline: 3px solid var(--rtk-color-brand); outline-offset: -3px; }
 .active { border-bottom-color: var(--rtk-color-brand); color: var(--rtk-color-brand); }
+.alternating .tab, .alternating .active { color: var(--rtk-color-text-primary); }
+.alternating .active:nth-child(odd) { border-bottom-color: var(--rtk-color-brand); }
+.alternating .active:nth-child(even) { border-bottom-color: var(--rtk-color-brand-secondary); }

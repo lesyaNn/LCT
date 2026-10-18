@@ -6,6 +6,7 @@
 .summary { align-items: center; color: var(--rtk-color-text-secondary); display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); margin-bottom: var(--rtk-space-3); }
 .summary strong { color: var(--rtk-color-text-primary); }
 .summary span { font-size: 12px; }
+.listView { display: grid; gap: var(--rtk-space-4); min-width: 0; }
 .list { display: grid; gap: var(--rtk-space-4); grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); }
 .boardScroll { max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; padding: 2px 0 var(--rtk-space-4); }
 .board { display: flex; gap: var(--rtk-space-3); min-width: max-content; }

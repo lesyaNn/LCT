@@ -2,15 +2,16 @@ import styles from './tabs.module.css';
 
 export interface TabItem { id: string; label: string }
 
-export function Tabs({ items, activeId, onChange, label, prefix = 'tab', panelPrefix }: {
+export function Tabs({ items, activeId, onChange, label, prefix = 'tab', panelPrefix, alternating = false }: {
   items: readonly TabItem[];
   activeId: string;
   onChange: (id: string) => void;
   label: string;
   prefix?: string;
   panelPrefix?: string;
+  alternating?: boolean;
 }) {
-  return <nav className={styles.root} aria-label={label}><div className={styles.list} role="tablist">{items.map((item, index) => <button className={activeId === item.id ? styles.active : styles.tab} id={`${prefix}-${item.id}`} type="button" role="tab" aria-selected={activeId === item.id} aria-controls={panelPrefix ? `${panelPrefix}-${item.id}` : undefined} tabIndex={activeId === item.id ? 0 : -1} onClick={() => onChange(item.id)} onKeyDown={(event) => {
+  return <nav className={`${styles.root} ${alternating ? styles.alternating : ''}`} aria-label={label}><div className={styles.list} role="tablist">{items.map((item, index) => <button className={activeId === item.id ? styles.active : styles.tab} id={`${prefix}-${item.id}`} type="button" role="tab" aria-selected={activeId === item.id} aria-controls={panelPrefix ? `${panelPrefix}-${item.id}` : undefined} tabIndex={activeId === item.id ? 0 : -1} onClick={() => onChange(item.id)} onKeyDown={(event) => {
     if (!['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault();
     const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : items.length - 1)) % items.length;

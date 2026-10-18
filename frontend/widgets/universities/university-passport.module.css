@@ -103,7 +103,9 @@
   .accordionTrigger,
   .accordionTriggerActive { align-items: center; background: var(--rtk-color-surface); border: 0; color: var(--rtk-color-text-primary); cursor: pointer; display: flex; font-weight: 700; justify-content: space-between; min-height: 52px; padding: 0 var(--rtk-space-4); text-align: left; width: 100%; }
   .accordionTrigger:hover { background: var(--rtk-color-surface-hover); }
-  .accordionTriggerActive { background: var(--rtk-color-brand-soft); color: var(--rtk-color-brand); }
+  .accordionTriggerActive { background: var(--rtk-color-surface-subtle); }
+  .accordionItem:nth-child(odd) .accordionTriggerActive { box-shadow: inset 3px 0 var(--rtk-color-brand); }
+  .accordionItem:nth-child(even) .accordionTriggerActive { box-shadow: inset 3px 0 var(--rtk-color-brand-secondary); }
   .accordionTrigger svg { transition: transform 160ms ease; }
   .accordionTriggerActive svg { transform: rotate(90deg); }
   .accordionPanel { border-top: 1px solid var(--rtk-color-border); padding: var(--rtk-space-4); }

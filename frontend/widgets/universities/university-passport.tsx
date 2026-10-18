@@ -214,7 +214,7 @@ export function UniversityPassport({ id }: { id: string }) {
   return (
     <div className={styles.page}>
       <PassportHeader passport={passport} />
-      <TabbedSurface contentClassName={styles.passportContent} tabs={!mobileLayout ? <Tabs items={tabDefinitions} activeId={activeTab} onChange={(id) => selectTab(id as PassportTabId)} label="Разделы паспорта вуза" prefix="passport-tab" /> : undefined}>
+      <TabbedSurface contentClassName={styles.passportContent} tabs={!mobileLayout ? <Tabs items={tabDefinitions} activeId={activeTab} onChange={(id) => selectTab(id as PassportTabId)} label="Разделы паспорта вуза" prefix="passport-tab" alternating /> : undefined}>
       {!mobileLayout ? <div className={`${styles.desktopPanel} ${activeTab === 'overview' || activeTab === 'health' || activeTab === 'meetings' ? styles.flushPanel : ''}`} id="passport-panel" role="tabpanel" aria-labelledby={`passport-tab-${activeTab}`}>{renderContent(activeTab)}</div> : null}
       {mobileLayout ? <div className={styles.mobileAccordion} aria-label="Разделы паспорта вуза">
         {tabDefinitions.map((tab) => {
