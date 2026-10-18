@@ -1,4 +1,5 @@
 export type IconName =
+  | 'notes'
   | 'dashboard'
   | 'university'
   | 'workflow'

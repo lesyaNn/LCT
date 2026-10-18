@@ -16,6 +16,7 @@ from app.modules.assistant.router import router as assistant_router
 from app.modules.service_api.router import router as service_api_router
 
 from app.modules.search import router as search_router
+from app.modules.notes.router import router as notes_router
 from app.modules.analytics.reports_router import router as reports_router
 from app.modules.analytics.stats_router import router as report_statistics_router
 from app.modules.analytics.report_templates import router as report_templates_router
@@ -45,6 +46,7 @@ v1.include_router(assistant_router)
 v1.include_router(auth_router)
 v1.include_router(notifications_router)
 v1.include_router(search_router)
+v1.include_router(notes_router)
 v1.include_router(admin_users_router)
 v1.include_router(imports_router)
 v1.include_router(integrations_router)

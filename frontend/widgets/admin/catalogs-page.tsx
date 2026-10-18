@@ -155,13 +155,13 @@ export function CatalogsPage() {
   const openedFromPassport = searchParams.get('type') === 'agreements' && searchParams.get('kind') === 'contracts';
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [type, setType] = useState<CatalogType>(openedFromPassport ? 'agreements' : 'universities');
+  const [type, setType] = useState<CatalogType>(() => catalogDefinitions.find((item) => item.id === searchParams.get('type'))?.id ?? 'universities');
   // The combined tab renders one of two real resources at a time.
-  const [agreementKind, setAgreementKind] = useState<AgreementKind>('contracts');
-  const [search, setSearch] = useState('');
+  const [agreementKind, setAgreementKind] = useState<AgreementKind>(searchParams.get('kind') === 'licenses' ? 'licenses' : 'contracts');
+  const [search, setSearch] = useState(searchParams.get('search') ?? '');
   const [universityId, setUniversityId] = useState(openedFromPassport ? searchParams.get('universityId') ?? '' : '');
   const [agreementStatus, setAgreementStatus] = useState<AgreementStatus | ''>('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('search') ?? '');
   const [page, setPage] = useState(1);
   const [formItem, setFormItem] = useState<CatalogItem | null | undefined>(undefined);
   const [contactsItem, setContactsItem] = useState<CatalogItem | null>(null);

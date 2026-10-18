@@ -67,6 +67,7 @@ export type OpenApiDocument = {
 };
 
 export const apiGroupNames: Record<string, string> = {
+  Notes: 'Заметки',
   Universities: 'Вузы и встречи', Workflow: 'Workflow', Programs: 'Программы',
   Directions: 'Направления', Products: 'Продукты', Vendors: 'Вендоры',
   Contracts: 'Договоры', Licenses: 'Лицензии', Responsibles: 'Ответственные',

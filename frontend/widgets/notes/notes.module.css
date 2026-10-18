@@ -1,0 +1,94 @@
+.page { min-width: 0; color: var(--rtk-color-text-primary); }
+.pageHeader { align-items: center; display: flex; gap: 20px; justify-content: space-between; margin-bottom: 18px; min-height: 56px; }
+.pageHeader h1 { font-size: 34px; letter-spacing: -.025em; margin: 0 0 8px; }
+.pageHeader p { color: var(--rtk-color-text-secondary); font-size: 16px; margin: 0; }
+.workspace { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-medium); min-width: 0; }
+.list { min-width: 0; padding: clamp(18px, 2.5vw, 28px); }
+.filters { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 20px; }
+.filters input { flex: 1 1 280px; min-height: 48px; font-size: 16px; }
+.filters select { flex: 0 1 320px; min-height: 48px; font-size: 15px; }
+.noteList { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
+.noteRow { background: transparent; border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); cursor: pointer; display: flex; flex-direction: column; gap: 14px; min-width: 0; min-height: 155px; padding: 20px; text-align: left; width: 100%; color: inherit; font: inherit; transition: background .15s, border-color .15s; }
+.noteRow:hover { background: var(--rtk-color-surface-hover); border-color: var(--rtk-color-brand); }
+.noteRow.selected { background: var(--rtk-color-brand-soft); }
+.noteRow strong { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: 21px; line-height: 1.4; overflow: hidden; overflow-wrap: anywhere; width: 100%; }
+.noteRow span { color: var(--rtk-color-text-secondary); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; font-size: 15px; line-height: 1.65; overflow: hidden; overflow-wrap: anywhere; }
+.noteRow small { color: var(--rtk-color-text-tertiary); font-size: 13px; margin-top: auto; padding-top: 10px; }
+.document { min-width: 0; padding: clamp(20px, 3vw, 32px); }
+.documentHeader { align-items: center; display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 16px; }
+.documentActions { align-items: center; display: flex; gap: 4px; margin-left: auto; }
+.saveStatus, .modified { font-size: 14px; color: var(--rtk-color-text-tertiary); }
+.title { background: transparent; border: 0; color: inherit; display: block; font: inherit; font-size: clamp(30px, 4vw, 44px); font-weight: 700; letter-spacing: -.025em; margin-bottom: 20px; min-width: 0; padding: 8px 0; text-overflow: ellipsis; width: 100%; }
+.title::placeholder { color: var(--rtk-color-text-tertiary); }
+.title:focus { outline: none; box-shadow: 0 2px var(--rtk-color-brand-soft); }
+.editor { position: relative; min-width: 0; }
+.editorControls { align-items: center; background: var(--rtk-color-surface); border-bottom: 1px solid var(--rtk-color-border); display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; padding-bottom: 10px; position: sticky; top: 0; z-index: 2; }
+.exportArea { position: relative; }
+.exportMenu { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); box-shadow: var(--rtk-shadow-elevation-1); min-width: 190px; padding: 5px; position: absolute; right: 0; top: calc(100% + 6px); z-index: 10; }
+.exportMenu button { align-items: center; background: transparent; border: 0; border-radius: 5px; color: inherit; cursor: pointer; display: flex; font: inherit; font-size: 15px; gap: 20px; justify-content: space-between; padding: 12px; text-align: left; width: 100%; }
+.exportMenu button:hover, .exportMenu button:focus-visible { background: var(--rtk-color-brand-soft); color: var(--rtk-color-brand); outline: none; }
+.exportMenu small { color: var(--rtk-color-text-tertiary); font-size: 13px; }
+.exportError { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: 6px; color: var(--rtk-color-text-secondary); font-size: 13px; padding: 10px; position: absolute; right: 0; top: calc(100% + 6px); width: 230px; z-index: 10; }
+.toolbar { align-items: center; display: flex; flex-wrap: wrap; gap: 3px; }
+.toolbar button { background: transparent; border: 0; border-radius: 6px; color: var(--rtk-color-text-secondary); cursor: pointer; font-family: inherit; font-size: 16px; min-width: 40px; height: 40px; }
+.toolbar button:hover { background: var(--rtk-color-surface-hover); color: var(--rtk-color-brand); }
+.hint { color: var(--rtk-color-text-tertiary); font-size: 13px; line-height: 1.6; margin: 16px 0 24px; }
+.noteInput { position: relative; color: inherit; font: inherit; font-size: 18px; line-height: 1.75; min-height: 200px; overflow-wrap: anywhere; padding: 18px 0 4px; width: 100%; outline: none; }
+.noteInput :global(.is-editor-empty):first-child::before { color: var(--rtk-color-text-tertiary); content: attr(data-placeholder); float: left; height: 0; pointer-events: none; }
+.noteInput :global(ul[data-type='taskList']) { list-style: none; padding-left: 0; }
+.noteInput :global(ul[data-type='taskList'] > li) { align-items: flex-start; display: flex; gap: 10px; }
+.noteInput :global(ul[data-type='taskList'] > li > label) { flex: 0 0 auto; margin-top: 4px; user-select: none; }
+.noteInput :global(ul[data-type='taskList'] > li > div) { flex: 1; min-width: 0; }
+.noteInput :global(a[data-note-reference]) { background: var(--rtk-color-brand-soft); border-radius: 4px; cursor: pointer; padding: 2px 5px; text-decoration: none; }
+.noteInput :global(a[data-note-reference])::before { content: '@'; margin-right: 3px; }
+.noteInput > :first-child { margin-top: 0; }
+.noteInput > :last-child { margin-bottom: 0; }
+.noteInput h1 { font-size: 36px; line-height: 1.3; }
+.noteInput h2 { font-size: 29px; line-height: 1.3; }
+.noteInput h3 { font-size: 24px; line-height: 1.4; }
+.noteInput p { margin: 0 0 12px; }
+.noteInput blockquote { border-left: 3px solid var(--rtk-color-brand); color: var(--rtk-color-text-secondary); margin: 20px 0; padding: 4px 20px; }
+.noteInput pre { background: var(--rtk-color-surface-hover); border-radius: var(--rtk-radius-small); overflow-x: auto; padding: 20px; white-space: pre; }
+.noteInput code { background: var(--rtk-color-surface-hover); border-radius: 4px; font-size: .9em; padding: 2px 4px; }
+.noteInput pre code { padding: 0; }
+.noteInput a { color: var(--rtk-color-brand); }
+.noteInput hr { border: 0; border-top: 1px solid var(--rtk-color-border); margin: 24px 0; }
+.noteInput ul, .noteInput ol { padding-left: 28px; margin: 0 0 12px; }
+.noteInput :global(.contains-task-list) { list-style: none; padding-left: 4px; }
+.noteInput input[type='checkbox'] { accent-color: var(--rtk-color-brand); cursor: pointer; margin-right: 10px; width: 17px; height: 17px; }
+.noteInput img { max-width: 100%; height: auto; }
+.noteInput table { border-collapse: collapse; display: block; max-width: 100%; overflow: auto; }
+.noteInput th, .noteInput td { border: 1px solid var(--rtk-color-border); padding: 10px 14px; }
+.editorPopover { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); box-shadow: var(--rtk-shadow-elevation-1); position: fixed; overflow-y: auto; z-index: 100; }
+.commandMenu { position: relative; max-height: inherit; overflow-y: auto; padding: 5px; }
+.commandMenu button, .entityResults button { background: transparent; border: 0; border-radius: 5px; color: inherit; cursor: pointer; display: flex; align-items: center; font: inherit; font-size: 15px; gap: 14px; padding: 12px; text-align: left; width: 100%; }
+.commandMenu button[aria-selected='true'], .entityResults button[aria-selected='true'] { background: var(--rtk-color-brand-soft); color: var(--rtk-color-brand); }
+.commandMenu strong { font-size: 14px; min-width: 85px; }
+.commandMenu p, .entityResults p { font-size: 14px; padding: 10px; }
+.insertPanel { background: var(--rtk-color-surface); display: grid; gap: 10px; padding: 14px; }
+.inlineHeader { display: flex; justify-content: space-between; align-items: center; font-size: 16px; }
+.inlineHeader button { background: transparent; border: 0; color: inherit; cursor: pointer; font-size: 26px; }
+.entityResults { position: relative; max-height: 200px; overflow-y: auto; }
+.entityResults button > span { display: grid; gap: 5px; min-width: 0; overflow-wrap: anywhere; }
+.entityResults small { color: var(--rtk-color-text-secondary); font-size: 13px; }
+.referenceWrap { display: inline; }
+.mention { background: var(--rtk-color-brand-soft); border: 0; border-radius: 5px; color: var(--rtk-color-brand); cursor: pointer; display: inline; font: inherit; font-size: .95em; padding: 4px 7px; text-align: left; }
+.mention svg { display: inline; margin-right: 5px; vertical-align: -.15em; }
+.referenceMessage { color: var(--rtk-color-text-secondary); font-size: 13px; margin: 0 8px; }
+.notice { background: var(--rtk-color-surface-hover); border-left: 2px solid var(--rtk-color-brand); border-radius: 4px; font-size: 14px; line-height: 1.7; margin-bottom: 20px; padding: 16px; }
+.notice p { margin: 0 0 10px; }
+.notice details { margin-top: 12px; }
+.remoteContent { max-height: 280px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.empty, .listEmpty { align-items: center; color: var(--rtk-color-text-secondary); display: flex; flex-direction: column; gap: 18px; justify-content: center; text-align: center; }
+.empty { min-height: 50vh; padding: 32px; }
+.empty h2 { color: var(--rtk-color-text-primary); font-size: 26px; margin: 0; }
+.empty p, .listEmpty p { font-size: 16px; line-height: 1.7; margin: 0; }
+.listEmpty { padding: 48px 16px; }
+.listEmpty strong { font-size: 22px; }
+.listMessage { color: var(--rtk-color-text-tertiary); font-size: 14px; padding: 10px; }
+.dialogActions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+.noteRow:focus-visible, .toolbar button:focus-visible, .commandMenu button:focus-visible, .mention:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
+@media (min-width: 1100px) { .page { margin-inline: -20px; } }
+@media (max-width: 700px) { .pageHeader { align-items: center; gap: 12px; margin-bottom: 20px; } .pageHeader h1 { font-size: 30px; } .pageHeader p { display: none; } .document, .list { padding: 22px 18px; } .documentHeader { gap: 10px; } .modified { display: none; } .title { font-size: 32px; } .toolbar button { min-width: 38px; height: 42px; } .editorControls { gap: 12px; } .noteInput { font-size: 18px; min-height: 180px; } .noteList { grid-template-columns: 1fr; } .noteRow { min-height: 145px; padding: 20px; } .filters { gap: 12px; } .filters select { flex-basis: 100%; } }
+
+.toolbar button[aria-pressed="true"] { background: var(--rtk-color-brand-soft); color: var(--rtk-color-brand); }

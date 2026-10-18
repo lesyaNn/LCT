@@ -99,7 +99,7 @@ function IntegrationBlocker({ children }: { children: React.ReactNode }) {
   return <p className={styles.integrationBlocker}>{children}</p>;
 }
 
-export function UsersPage() {
+export function UsersPage({ initialUserId }: { initialUserId?: string }) {
   const { user: currentUser } = useAuth();
   const canManageUsers = hasPermission(currentUser, 'admin.users');
   const viewerKey = `${currentUser?.id ?? 'anonymous'}:${canManageUsers ? 'admin' : 'assignments'}`;
@@ -108,7 +108,7 @@ export function UsersPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [role, setRole] = useState<UserRole | 'all'>('all');
   const [page, setPage] = useState(1);
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(initialUserId ?? null);
   const [view, setView] = useState<UsersView>('table');
   const [inviteOpen, setInviteOpen] = useState(false);
   const [blockTarget, setBlockTarget] = useState<AdminUser | null>(null);
@@ -135,6 +135,16 @@ export function UsersPage() {
   const scopeOptionsQuery = useQuery({ queryKey: queryKeys.users.scopeOptions, queryFn: listUserScopeOptions, staleTime: 5 * 60_000 });
   const scopeOptions = canManageUsers ? (scopeOptionsQuery.data ?? []) : (scopeOptionsQuery.data ?? []).filter((option) => currentUser?.scope.universityIds.includes(option.id));
   const selectedUser = detailQuery.data ?? query.data?.items.find((item) => item.id === selectedUserId) ?? null;
+  const initialUserHydrated = useRef(false);
+  useEffect(() => {
+    if (!initialUserId || !selectedUser || initialUserHydrated.current) return;
+    const timer = window.setTimeout(() => {
+      initialUserHydrated.current = true;
+      setEditorRole(selectedUser.role);
+      setEditorScope(scopeValues(selectedUser.scope));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [initialUserId, selectedUser]);
   const selectedUserInitials = selectedUser?.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toLocaleUpperCase('ru-RU') || '—';
   const isSelf = Boolean(selectedUser && currentUser && selectedUser.id === currentUser.id);
   const pageCount = Math.max(1, Math.ceil((query.data?.total ?? 0) / pageSize));

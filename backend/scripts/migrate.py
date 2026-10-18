@@ -60,6 +60,8 @@ LEGACY_SQL_HEAD = "000010_audit_identity"
 # backend/migrations/*.up.sql (L8).
 # Must match backend/migrations/*.up.sql exactly.
 EXPECTED_TABLES = [
+    "notes",
+    "note_onboarding",
     "universities",
     "it_directions",
     "it_programs",

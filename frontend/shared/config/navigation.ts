@@ -7,6 +7,7 @@ export const navigationItems: NavigationItem[] = [
   { label: 'ВУЗы', href: '/universities', icon: 'university', requiredPermission: 'university.read' },
   { label: 'Workflow', href: '/workflows', icon: 'workflow', requiredPermission: 'workflow.read' },
   { label: 'Отчёты', href: '/reports', icon: 'report', requiredPermission: 'reports.read' },
+  { label: 'Заметки', href: '/notes', icon: 'notes' },
   { label: 'Аудит', href: '/audit', icon: 'audit', requiredPermission: 'audit.read' },
   { label: 'Администрирование', href: '/admin', icon: 'admin', requiredPermission: 'user_university.manage' },
   { label: 'Пользователи и права', href: '/admin/users', icon: 'admin', requiredPermission: 'admin.users' },
@@ -21,6 +22,7 @@ export const navigationItems: NavigationItem[] = [
 export const routeLabels: Record<string, string> = {
   dashboard: 'Обзор',
   notifications: 'Уведомления',
+  notes: 'Заметки',
   universities: 'ВУЗы',
   workflows: 'Workflow',
   reports: 'Отчёты',
