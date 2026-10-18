@@ -72,6 +72,7 @@ class ReportRequest(BaseModel):
         "[] is 422 (at least one column required).",
     )
     group_by: ReportGroupBy | None = Field(default=None, description="Optional summary breakdown; detail rows remain unchanged.")
+    group_bys: list[ReportGroupBy] | None = Field(default=None, description="Selected column summaries; None preserves legacy group_by behavior.")
 
     @property
     def resolved_columns(self) -> list[str]:

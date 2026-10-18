@@ -135,6 +135,17 @@ def test_selected_grouping_is_exported_with_the_rows(tmp_path, monkeypatch):
     assert doc["groups"]["buckets"] == [{"label": "МГУ", "count": 2}]
 
 
+def test_selected_columns_export_multiple_groups(tmp_path, monkeypatch):
+    from app.modules.analytics.stats import ReportStatsService, StatBucket, StatSlice
+
+    def summary(_db, _filters, dimension, **_kwargs):
+        return StatSlice(f"by_{dimension}", dimension, "rows", 1, (StatBucket(dimension, 1),))
+
+    monkeypatch.setattr(ReportStatsService, "group_slice", staticmethod(summary))
+    _, doc = _gen(tmp_path, ["university", "direction"], [{"university": "МГУ", "direction": "ИТ"}], group_bys=["university", "direction"])
+    assert [group["dimension"] for group in doc["groups"]] == ["by_university", "by_direction"]
+
+
 # ------------------------------------------------------------- serialization
 
 

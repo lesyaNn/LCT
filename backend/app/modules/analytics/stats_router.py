@@ -72,29 +72,31 @@ class ReportStatsResponse(BaseModel):
     )
     slices: list[StatSliceRead]
     grouped: StatSliceRead | None = None
+    groups: list[StatSliceRead] = Field(default_factory=list)
 
     @property
     def dimensions(self) -> list[str]:
         return list(STAT_DIMENSIONS)
 
 
-def stats_response(stats: ReportStats, columns: list[str], grouped: StatSlice | None = None) -> ReportStatsResponse:
+def stats_response(stats: ReportStats, columns: list[str], grouped: StatSlice | None = None, groups: tuple[StatSlice, ...] = ()) -> ReportStatsResponse:
     """Map the service result to the API shape (one place, no duplication)."""
+    def read_slice(item: StatSlice) -> StatSliceRead:
+        return StatSliceRead(
+            dimension=item.dimension,
+            title=item.title or DIMENSION_TITLES.get(item.dimension, item.dimension),
+            unit=item.unit,
+            total=item.total,
+            buckets=[StatBucketRead(label=b.label, count=b.count) for b in item.buckets],
+        )
+
     return ReportStatsResponse(
         university_count=stats.university_count,
         row_count=stats.row_count,
         columns=list(columns),
-        slices=[
-            StatSliceRead(
-                dimension=item.dimension,
-                title=item.title or DIMENSION_TITLES.get(item.dimension, item.dimension),
-                unit=item.unit,
-                total=item.total,
-                buckets=[StatBucketRead(label=b.label, count=b.count) for b in item.buckets],
-            )
-            for item in stats.slices
-        ],
-        grouped=StatSliceRead(dimension=grouped.dimension, title=grouped.title, unit=grouped.unit, total=grouped.total, buckets=[StatBucketRead(label=b.label, count=b.count) for b in grouped.buckets]) if grouped else None,
+        slices=[read_slice(item) for item in stats.slices],
+        grouped=read_slice(grouped) if grouped else None,
+        groups=[read_slice(item) for item in groups],
     )
 
 
@@ -111,6 +113,7 @@ class StatisticsRequest(BaseModel):
         "The aggregation itself always uses the full registry.",
     )
     group_by: ReportGroupBy | None = None
+    group_bys: list[ReportGroupBy] | None = None
 
     @property
     def resolved_columns(self) -> list[str]:
@@ -143,9 +146,10 @@ def report_statistics(
     """
     try:
         stats = ReportStatsService.build(db, request.filters, user=user)
-        grouped = ReportStatsService.group_slice(db, request.filters, request.group_by, columns=request.resolved_columns, user=user) if request.group_by else None
+        grouped = ReportStatsService.group_slice(db, request.filters, request.group_by, columns=request.resolved_columns, user=user) if request.group_bys is None and request.group_by else None
+        groups = ReportStatsService.group_slices(db, request.filters, columns=request.resolved_columns, group_bys=request.group_bys, user=user, stats=stats) if request.group_bys is not None else ()
     except BusinessException:
         raise
     except ValueError as exc:
         raise BusinessException(ErrorCode.VALIDATION_ERROR) from exc
-    return stats_response(stats, request.resolved_columns, grouped)
+    return stats_response(stats, request.resolved_columns, grouped, groups)

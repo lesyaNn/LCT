@@ -230,6 +230,7 @@ def _run_claimed_job(db: Session, job: ReportJob) -> str:
         filters=filters,
         columns=stored_columns or None,
         group_by=(job.filters or {}).get("_group_by"),
+        group_bys=(job.filters or {}).get("_group_bys"),
     )
     output = Path(job.file_path) if job.file_path else jobs.job_file_path(
         job.id, job.format

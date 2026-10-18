@@ -31,7 +31,6 @@ export interface ReportFormValues {
   productIds: string[];
   responsibleIds: string[];
   workflowStatuses: UniversityWorkflowStageStatus[];
-  groupBy: ReportGroupBy | '';
   columnIds: string[];
   format: ReportFormat;
 }
@@ -46,6 +45,7 @@ export interface ReportRequest {
   responsible_ids: string[];
   workflow_statuses: UniversityWorkflowStageStatus[];
   group_by: ReportGroupBy | null;
+  group_bys: ReportGroupBy[];
   columns: string[];
   format: ReportFormat;
 }
@@ -203,7 +203,6 @@ export const EMPTY_REPORT_FORM: ReportFormValues = {
   productIds: [],
   responsibleIds: [],
   workflowStatuses: [],
-  groupBy: '',
   columnIds: DEFAULT_REPORT_COLUMNS,
   format: 'xlsx',
 };
@@ -240,7 +239,8 @@ export function reportRequestFromForm(values: ReportFormValues): ReportRequest {
     product_ids: values.productIds,
     responsible_ids: values.responsibleIds,
     workflow_statuses: values.workflowStatuses,
-    group_by: values.groupBy || null,
+    group_by: null,
+    group_bys: [...new Set(values.columnIds.filter((id): id is ReportGroupBy => (REPORT_GROUP_IDS as readonly string[]).includes(id)))],
     columns: values.columnIds,
     format: values.format,
   };
@@ -248,6 +248,7 @@ export function reportRequestFromForm(values: ReportFormValues): ReportRequest {
 
 export function reportFormFromTemplate(tpl: ReportTemplate): ReportFormValues {
   // Migrate pre-removal selections: 'software' was a pure alias of 'product'.
+  // Legacy groupBy stays readable on the template, while current summaries follow its columns.
   const known = new Set(reportColumnDefinitions.map((column) => column.id));
   const columnIds = tpl.columns
     .map((column) => (column === 'software' ? 'product' : column))
@@ -261,7 +262,6 @@ export function reportFormFromTemplate(tpl: ReportTemplate): ReportFormValues {
     productIds: tpl.filters.product_ids ?? [],
     responsibleIds: tpl.filters.responsible_ids ?? [],
     workflowStatuses: tpl.filters.workflow_statuses ?? [],
-    groupBy: tpl.groupBy ?? '',
     columnIds: columnIds.length ? columnIds : [...DEFAULT_REPORT_COLUMNS],
     format: tpl.format,
   };
@@ -347,7 +347,7 @@ function unwrap<T>(result: Awaited<ReturnType<typeof apiFetch<T>>>, message: str
 async function createRealReportJob(request: ReportRequest): Promise<ReportJob> {
   const result = await apiFetch<unknown>('/api/v1/reports', {
     method: 'POST',
-    body: { format: request.format, filters: reportFiltersPayload(request), columns: request.columns, group_by: request.group_by },
+    body: { format: request.format, filters: reportFiltersPayload(request), columns: request.columns, group_bys: request.group_bys },
   });
   return { ...adaptReportJob(unwrap(result, 'Не удалось создать задачу отчёта.')), format: request.format, request };
 }
@@ -520,7 +520,7 @@ export async function getReportPreview(
           format: request.format,
           filters: reportFiltersPayload(request),
           columns: request.columns,
-          group_by: request.group_by,
+          group_bys: request.group_bys,
         },
       });
       return unwrap(result, 'Не удалось получить предпросмотр выборки.');
@@ -550,6 +550,7 @@ export interface ReportStatistics {
   columns: string[];
   slices: ReportStatSlice[];
   grouped?: ReportStatSlice | null;
+  groups: ReportStatSlice[];
 }
 
 /**
@@ -560,7 +561,20 @@ export interface ReportStatistics {
  */
 export async function getReportStatistics(request: ReportRequest): Promise<ReportStatistics> {
   return fromDataSource({
-    mock: async (): Promise<ReportStatistics> => ({ universityCount: 0, rowCount: 0, columns: request.columns, slices: [], grouped: null }),
+    mock: async (): Promise<ReportStatistics> => ({
+      universityCount: 0,
+      rowCount: 0,
+      columns: request.columns,
+      slices: [],
+      grouped: null,
+      groups: request.group_bys.map((id) => ({
+        dimension: `by_${id}`,
+        title: REPORT_GROUP_OPTIONS.find((option) => option.id === id)?.name ?? id,
+        unit: id === 'responsible' ? 'universities' : 'rows',
+        total: 0,
+        buckets: [],
+      })),
+    }),
     real: async () => {
       const result = await apiFetch<{
         university_count: number;
@@ -574,9 +588,10 @@ export async function getReportStatistics(request: ReportRequest): Promise<Repor
           buckets: Array<{ label: string; count: number }>;
         }>;
         grouped?: { dimension: string; title: string; unit: 'rows' | 'universities'; total: number; buckets: Array<{ label: string; count: number }> } | null;
+        groups?: Array<{ dimension: string; title: string; unit: 'rows' | 'universities'; total: number; buckets: Array<{ label: string; count: number }> }>;
       }>('/api/v1/reports/statistics', {
         method: 'POST',
-        body: { filters: reportFiltersPayload(request), columns: request.columns, group_by: request.group_by },
+        body: { filters: reportFiltersPayload(request), columns: request.columns, group_bys: request.group_bys },
       });
       const data = unwrap(result, 'Не удалось получить статистику по выборке.');
       return {
@@ -591,6 +606,7 @@ export async function getReportStatistics(request: ReportRequest): Promise<Repor
           buckets: slice.buckets,
         })),
         grouped: data.grouped ?? null,
+        groups: data.groups ?? [],
       };
     },
   });

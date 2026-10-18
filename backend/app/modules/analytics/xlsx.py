@@ -302,6 +302,7 @@ def generate_xlsx_report(
     generated_at: datetime | None = None,
     batch_size: int = 1000,
     group_by: str | None = None,
+    group_bys: list[str] | None = None,
 ) -> GeneratedReport:
     """Generate the frozen XLSX workbook from the report dataset.
 
@@ -413,9 +414,10 @@ def generate_xlsx_report(
         audit.column_dimensions["A"].width = 20
         audit.column_dimensions["B"].width = 60
 
-        if group_by:
-            summary = ReportStatsService.group_slice(db, filters, group_by, columns=resolved, user=user)
-            group_sheet = wb.create_sheet("Группировка")
+        summaries = ReportStatsService.group_slices(db, filters, columns=resolved, group_bys=group_bys, group_by=group_by, user=user)
+        for summary in summaries:
+            dimension = summary.dimension.removeprefix("by_")
+            group_sheet = wb.create_sheet(COLUMN_REGISTRY[dimension].title if group_bys is not None else "Группировка")
             group_sheet.append([summary.title])
             group_sheet.append(["Группа", "Вузов" if summary.unit == "universities" else "Строк"])
             for bucket in summary.buckets:

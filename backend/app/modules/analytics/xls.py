@@ -181,6 +181,7 @@ def generate_xls_report(
     generated_at: datetime | None = None,
     batch_size: int = 1000,
     group_by: str | None = None,
+    group_bys: list[str] | None = None,
 ) -> GeneratedReport:
     """Generate a legacy ``.xls`` workbook from the report dataset.
 
@@ -256,11 +257,12 @@ def generate_xls_report(
             sheet.col(idx).width = int(min(width, float(MAX_COLUMN_WIDTH)) * _WIDTH_UNIT)
 
         _write_filters_sheet(book, filters, styles)
-        if group_by:
-            summary = ReportStatsService.group_slice(db, filters, group_by, columns=resolved, user=user)
+        summaries = ReportStatsService.group_slices(db, filters, columns=resolved, group_bys=group_bys, group_by=group_by, user=user)
+        for summary in summaries:
             if len(summary.buckets) + 2 > XLS_MAX_ROWS:
                 raise XlsCapacityError("Группировка превышает лимит строк XLS; используйте XLSX")
-            group_sheet = book.add_sheet("Группировка")
+            dimension = summary.dimension.removeprefix("by_")
+            group_sheet = book.add_sheet(COLUMN_REGISTRY[dimension].title if group_bys is not None else "Группировка")
             group_sheet.write(0, 0, summary.title)
             group_sheet.write(1, 0, "Группа", styles["header"])
             group_sheet.write(1, 1, "Вузов" if summary.unit == "universities" else "Строк", styles["header"])

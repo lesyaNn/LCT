@@ -133,6 +133,7 @@ def generate_report_file(
         user=user,
         generated_at=generated_at,
         group_by=request.group_by,
+        group_bys=request.group_bys,
     )
 
 
@@ -152,6 +153,8 @@ def build_job_payload(request: ReportRequest, user: Any) -> dict[str, Any]:
     filters_payload = request.filters.model_dump(mode="json")
     if request.group_by:
         filters_payload["_group_by"] = request.group_by
+    if request.group_bys is not None:
+        filters_payload["_group_bys"] = request.group_bys
     return {
         "format": request.format.value,
         "filters": filters_payload,

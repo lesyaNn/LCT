@@ -486,6 +486,7 @@ def generate_pdf_report(
     user: Any | None = None,
     generated_at: datetime | None = None,
     group_by: str | None = None,
+    group_bys: list[str] | None = None,
 ) -> _xlsx.GeneratedReport:
     """Generate the frozen PDF report from the report dataset.
 
@@ -570,18 +571,19 @@ def generate_pdf_report(
             Paragraph("Ключевые показатели", heading_style),
         ]
         avg_progress = kpi.avg_workflow_progress
-        kpi_lines = (
+        kpi_lines = [
             f"Количество ВУЗов: {university_count}",
             f"Строк в отчёте: {kpi.row_count}",
-            f"Средний прогресс workflow, %: "
-            f"{avg_progress if avg_progress is not None else '—'}",
-            f"Просроченные задачи: {kpi.overdue_total}",
-        )
+        ]
+        if group_bys is None or "workflow_progress" in resolved:
+            kpi_lines.append(f"Средний прогресс workflow, %: {avg_progress if avg_progress is not None else '—'}")
+        if group_bys is None or "overdue_tasks" in resolved:
+            kpi_lines.append(f"Просроченные задачи: {kpi.overdue_total}")
         for line in kpi_lines:
             story.append(Paragraph(_xml_escape(line), body_style))
 
-        if group_by:
-            summary = ReportStatsService.group_slice(db, filters, group_by, columns=resolved, user=user)
+        summaries = ReportStatsService.group_slices(db, filters, columns=resolved, group_bys=group_bys, group_by=group_by, user=user)
+        for summary in summaries:
             story.append(Paragraph(_xml_escape(summary.title), heading_style))
             group_rows = [[
                 Paragraph("Группа", cell_header_style),
@@ -632,24 +634,28 @@ def generate_pdf_report(
         )
         story.append(table)
 
-        story.append(Paragraph("Графики", heading_style))
-        counts, grain = _progress_distribution(rows, resolved)
-        if sum(counts.values()) > 0:
-            story.append(_progress_chart(counts, grain))
-        else:
-            story.append(
-                Paragraph(
-                    _xml_escape(f"{NO_CHART_DATA_TEXT} (нет измеренного прогресса workflow)"),
-                    body_style,
-                )
-            )
-        story.append(Spacer(1, 4 * mm))
         chart_specs = (
             ("Распределение строк по статусу работы", "workflow_status"),
             ("Распределение строк по ИТ-направлениям", "direction"),
             ("Распределение строк по ИТ-продуктам", "product"),
             ("Нагрузка на ответственных", "responsible"),
         )
+        if group_bys is not None:
+            chart_specs = tuple((heading, column) for heading, column in chart_specs if column in resolved)
+        if group_bys is None or "workflow_progress" in resolved or chart_specs:
+            story.append(Paragraph("Графики", heading_style))
+        if group_bys is None or "workflow_progress" in resolved:
+            counts, grain = _progress_distribution(rows, resolved)
+            if sum(counts.values()) > 0:
+                story.append(_progress_chart(counts, grain))
+            else:
+                story.append(
+                    Paragraph(
+                        _xml_escape(f"{NO_CHART_DATA_TEXT} (нет измеренного прогресса workflow)"),
+                        body_style,
+                    )
+                )
+            story.append(Spacer(1, 4 * mm))
         for heading, column in chart_specs:
             distribution = _column_distribution(rows, resolved, column)
             if distribution:

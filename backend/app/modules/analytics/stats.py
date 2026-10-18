@@ -143,6 +143,33 @@ class ReportStatsService:
     """SQL aggregation for the report statistics (never row-by-row)."""
 
     @staticmethod
+    def group_slices(
+        db: Session,
+        filters: UnifiedFilter,
+        *,
+        columns: list[str],
+        group_bys: list[str] | None = None,
+        group_by: str | None = None,
+        user: Any | None = None,
+        stats: ReportStats | None = None,
+    ) -> tuple[StatSlice, ...]:
+        """Summaries for selected columns, or one legacy summary for old jobs."""
+        from app.modules.analytics.columns import COLUMN_REGISTRY
+
+        dimensions = group_bys if group_bys is not None else ([group_by] if group_by else [])
+        license_grain = any(COLUMN_REGISTRY[key].needs_license_join for key in columns)
+        summaries = []
+        for dimension in dict.fromkeys(dimensions):
+            if group_bys is not None and dimension not in columns:
+                continue
+            existing = stats.slice(f"by_{dimension}") if stats else None
+            if existing and (dimension == "responsible" or license_grain and existing.unit == "rows"):
+                summaries.append(existing)
+            else:
+                summaries.append(ReportStatsService.group_slice(db, filters, dimension, columns=columns, user=user))
+        return tuple(summaries)
+
+    @staticmethod
     def group_slice(
         db: Session,
         filters: UnifiedFilter,

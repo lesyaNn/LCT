@@ -55,6 +55,18 @@ def test_selected_grouping_adds_summary_sheet(tmp_path, monkeypatch):
     assert book.sheet_by_name("Группировка").cell_value(2, 1) == 2
 
 
+def test_selected_columns_add_separate_summary_sheets(tmp_path, monkeypatch):
+    from app.modules.analytics.stats import ReportStatsService, StatBucket, StatSlice
+
+    def summary(_db, _filters, dimension, **_kwargs):
+        return StatSlice(f"by_{dimension}", dimension, "rows", 1, (StatBucket(dimension, 1),))
+
+    monkeypatch.setattr(ReportStatsService, "group_slice", staticmethod(summary))
+    _, book = _read(tmp_path, [{"university": "МГУ", "direction": "ИТ"}], ["university", "direction"], group_bys=["university", "direction"])
+    assert book.sheet_names() == ["Отчёт", "Фильтры", "Наименование ВУЗа", "ИТ-направление"]
+    assert book.sheet_by_name("ИТ-направление").cell_value(2, 0) == "direction"
+
+
 # ------------------------------------------------------------- basic structure
 
 

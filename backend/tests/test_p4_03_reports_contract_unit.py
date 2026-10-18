@@ -107,6 +107,40 @@ def test_grouping_is_validated_and_frozen_with_the_job():
         ReportRequest(format="xlsx", group_by="unknown")
 
 
+def test_selected_column_summaries_are_frozen_with_the_job():
+    request = ReportRequest(format="xlsx", columns=["university", "program"], group_bys=["university", "program"])
+    payload = build_job_payload(request, _admin())
+    assert payload["filters"]["_group_bys"] == ["university", "program"]
+    assert "_group_by" not in payload["filters"]
+
+
+def test_summary_dimensions_follow_columns_and_keep_legacy_grouping(monkeypatch):
+    from app.modules.analytics.filters import UnifiedFilter
+    from app.modules.analytics.stats import ReportStatsService, StatSlice
+
+    def summary(_db, _filters, dimension, **_kwargs):
+        return StatSlice(f"by_{dimension}", dimension, "rows", 0)
+
+    monkeypatch.setattr(ReportStatsService, "group_slice", staticmethod(summary))
+    selected = ReportStatsService.group_slices(object(), UnifiedFilter(), columns=["university", "program"], group_bys=["program", "responsible", "program"])
+    legacy = ReportStatsService.group_slices(object(), UnifiedFilter(), columns=["university"], group_by="program")
+    assert [item.dimension for item in selected] == ["by_program"]
+    assert [item.dimension for item in legacy] == ["by_program"]
+
+
+def test_statistics_response_exposes_each_selected_summary():
+    from app.modules.analytics.stats import ReportStats, StatBucket, StatSlice
+    from app.modules.analytics.stats_router import stats_response
+
+    groups = (
+        StatSlice("by_university", "Вузы", "universities", 1, (StatBucket("МГУ", 1),)),
+        StatSlice("by_program", "Программы", "rows", 2, (StatBucket("ИТ", 2),)),
+    )
+    response = stats_response(ReportStats(university_count=1, row_count=2), ["university", "program"], groups=groups)
+    assert [group.dimension for group in response.groups] == ["by_university", "by_program"]
+    assert response.grouped is None
+
+
 def test_build_job_payload_identical_shape_for_all_formats():
     for fmt in ("xlsx", "pdf", "json"):
         payload = build_job_payload(ReportRequest(format=fmt), _admin())

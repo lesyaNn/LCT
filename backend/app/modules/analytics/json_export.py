@@ -158,6 +158,7 @@ def generate_json_report(
     generated_at: datetime | None = None,
     batch_size: int = 1000,
     group_by: str | None = None,
+    group_bys: list[str] | None = None,
 ) -> GeneratedReport:
     """Generate the frozen JSON export from the report dataset.
 
@@ -226,10 +227,10 @@ def generate_json_report(
                         out.write(chunk)
                 out.write("\n")
             out.write("]")
-            if group_by:
-                summary = ReportStatsService.group_slice(db, filters, group_by, columns=resolved, user=user)
-                groups = {"dimension": summary.dimension, "title": summary.title, "unit": summary.unit, "buckets": [{"label": bucket.label, "count": bucket.count} for bucket in summary.buckets]}
-                out.write(f',\n  "groups": {json.dumps(groups, ensure_ascii=False)}')
+            summaries = ReportStatsService.group_slices(db, filters, columns=resolved, group_bys=group_bys, group_by=group_by, user=user)
+            if summaries:
+                groups = [{"dimension": summary.dimension, "title": summary.title, "unit": summary.unit, "buckets": [{"label": bucket.label, "count": bucket.count} for bucket in summary.buckets]} for summary in summaries]
+                out.write(f',\n  "groups": {json.dumps(groups if group_bys is not None else groups[0], ensure_ascii=False)}')
             out.write(f',\n  "totals": {json.dumps(totals, ensure_ascii=False)}')
             out.write("\n}\n")
         tmp_path.replace(final_path)

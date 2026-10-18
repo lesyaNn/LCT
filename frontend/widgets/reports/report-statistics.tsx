@@ -99,14 +99,15 @@ function StatBarChart({ slice }: { slice: ReportStatSlice }) {
 }
 
 function StatDonutChart({ slice }: { slice: ReportStatSlice }) {
+  const unitWord = slice.unit === 'universities' ? 'вузов' : 'строк';
   return <div className={styles.statDonutLayout}>
-    <div className={styles.statDonut} role="img" aria-label={`${slice.title}. Всего ${formatCount(slice.total)} строк.`}>
+    <div className={styles.statDonut} role="img" aria-label={`${slice.title}. Всего ${formatCount(slice.total)} ${unitWord}.`}>
       <ResponsiveContainer width="100%" height="100%">
         <PieChart><Pie data={slice.buckets} dataKey="count" nameKey="label" innerRadius="58%" outerRadius="82%" paddingAngle={2} stroke="none" isAnimationActive={false}>
           {slice.buckets.map((bucket, index) => <Cell key={bucket.label} fill={segmentColors[index % segmentColors.length]} />)}
         </Pie><Tooltip content={<BucketTooltip unit={slice.unit} />} /></PieChart>
       </ResponsiveContainer>
-      <span className={styles.statDonutTotal}><strong>{formatCount(slice.total)}</strong><small>строк</small></span>
+      <span className={styles.statDonutTotal}><strong>{formatCount(slice.total)}</strong><small>{unitWord}</small></span>
     </div>
     <ul className={styles.statDonutLegend}>{slice.buckets.map((bucket, index) => <li key={bucket.label}><span style={{ background: segmentColors[index % segmentColors.length] }} aria-hidden="true" /><span>{bucket.label}</span><strong>{formatCount(bucket.count)}</strong></li>)}</ul>
   </div>;
@@ -116,20 +117,11 @@ interface ReportStatisticsPanelProps {
   statistics?: ReportStatistics;
   pending: boolean;
   error: unknown;
-  sameRowGrain: boolean;
-  groupBy?: string | null;
   onRetry: () => void;
 }
 
-const chartColumns: Record<string, string> = {
-  by_workflow_status: 'workflow_status',
-  by_direction: 'direction',
-  by_product: 'product',
-  by_responsible: 'responsible',
-};
-
 /** Only dimensions selected for export, and only at a compatible row grain. */
-export function ReportStatisticsPanel({ statistics, pending, error, sameRowGrain, groupBy, onRetry }: ReportStatisticsPanelProps) {
+export function ReportStatisticsPanel({ statistics, pending, error, onRetry }: ReportStatisticsPanelProps) {
   if (error) {
     return (
       <EmptyState
@@ -142,13 +134,9 @@ export function ReportStatisticsPanel({ statistics, pending, error, sameRowGrain
   }
   if (pending && !statistics) return <p className={styles.statEmpty}>Считаем статистику…</p>;
   if (!statistics) return null;
-  const slices = [...(groupBy && statistics.grouped ? [statistics.grouped] : []), ...['by_workflow_status', 'by_direction', 'by_product', 'by_responsible']
-    .flatMap((dimension) => statistics.slices.filter((slice) => slice.dimension === dimension))
-    .filter((slice) => slice.dimension !== statistics.grouped?.dimension)]
-    .filter((slice) => slice.buckets.length && (slice === statistics.grouped || (statistics.columns.includes(chartColumns[slice.dimension]) && (slice.unit === 'universities' || sameRowGrain))))
-    .slice(0, 4);
+  const slices = statistics.groups.filter((slice) => slice.buckets.length);
   if (!slices.length) {
-    if (statistics.universityCount > 0) return <p className={styles.statEmpty}>Для выбранного состава нет графиков с той же детализацией, что у файла.</p>;
+    if (statistics.universityCount > 0) return <p className={styles.statEmpty}>В выбранном составе нет данных для распределений.</p>;
     return <EmptyState title="Нет данных для выбранных условий" headingLevel={3} />;
   }
 
