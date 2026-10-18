@@ -53,8 +53,8 @@ import {
 import styles from './universities-list.module.css';
 import { UniversitiesMap } from './universities-map';
 
-const DEFAULT_PAGE_SIZE = 8;
-const PAGE_SIZE_OPTIONS = [8, 12, 20];
+const DEFAULT_PAGE_SIZE = 12;
+const PAGE_SIZE_OPTIONS = [6, 12, 24];
 type UniversityView = 'cards' | 'table' | 'map';
 const VIEW_TABS = [{ id: 'cards', label: 'Карточки' }, { id: 'table', label: 'Таблица' }, { id: 'map', label: 'Карта' }] as const;
 
