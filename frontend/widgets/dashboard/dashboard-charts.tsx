@@ -2,6 +2,9 @@
 
 import Link from 'next/link';
 import { useId, useRef, type ReactNode } from 'react';
+import AttentionStroke from '@atomaro/icons/24/alert/AttentionStroke';
+import TimeStroke from '@atomaro/icons/24/alert/TimeStroke';
+import CheckSmall from '@atomaro/icons/24/navigation/CheckSmall';
 import {
   CartesianGrid,
   Bar,
@@ -215,11 +218,13 @@ const matrixStateMark: Record<MatrixHealthState, string> = {
   HEALTHY: '●', ATTENTION: '!', CRITICAL: '!', NOT_STARTED: '○', COMPLETED: '✓', NOT_LINKED: '—',
 };
 
-function MatrixCellContent({ state, score }: { state: MatrixHealthState; score: number | null }) {
-  return <span className={`${styles.matrixCell} ${styles[`matrix${state}`]}`}>
-    <span aria-hidden="true" className={styles.matrixMark}>{matrixStateMark[state]}</span>
-    <span className={styles.matrixCellText}>{state === 'HEALTHY' || state === 'ATTENTION' || state === 'CRITICAL' ? <><strong>{score ?? '—'}</strong><small>{matrixStateLabel[state]}</small></> : matrixStateLabel[state]}</span>
-  </span>;
+function MatrixCellContent({ state }: { state: MatrixHealthState }) {
+  if (state === 'NOT_LINKED') return <span className={styles.matrixDash} aria-hidden="true">—</span>;
+  const intent = state === 'HEALTHY' || state === 'COMPLETED' ? 'success' : state === 'ATTENTION' ? 'orange' : state === 'CRITICAL' ? 'danger' : 'neutral';
+  const icon = state === 'HEALTHY' || state === 'COMPLETED'
+    ? <CheckSmall size={16} fill="currentColor" />
+    : state === 'NOT_STARTED' ? <TimeStroke size={16} fill="currentColor" /> : <AttentionStroke size={16} fill="currentColor" />;
+  return <StatusBadge intent={intent} icon={icon} size="md">{matrixStateLabel[state]}</StatusBadge>;
 }
 
 function UniversityProgramMatrix({ matrix }: { matrix: DashboardMatrix }) {
@@ -233,7 +238,7 @@ function UniversityProgramMatrix({ matrix }: { matrix: DashboardMatrix }) {
       if (!cell) return <td key={column.id}>—</td>;
       const label = `${row.name}, ${column.name}: ${matrixStateLabel[cell.state]}${cell.score === null || cell.state === 'COMPLETED' ? '' : `, Health ${cell.score}`}`;
       const details = <span className={styles.matrixTooltip}><strong>{row.name} · {column.name}</strong><span>Статус: {matrixStateLabel[cell.state]}</span>{cell.state === 'COMPLETED' ? <span>Workflow завершён.</span> : cell.state === 'NOT_STARTED' ? <span>Workflow ещё не запущен.</span> : cell.state === 'NOT_LINKED' ? <span>Программа не связана с ВУЗом.</span> : <>{cell.score !== null ? <span>Health Score: {cell.score}</span> : null}{cell.milestone ? <span>Текущий этап: {cell.milestone}</span> : null}{cell.factors.length ? <span>Причины: {cell.factors.join('; ')}</span> : null}</>}</span>;
-      const content = <MatrixCellContent state={cell.state} score={cell.score} />;
+      const content = <MatrixCellContent state={cell.state} />;
       const href = cell.workflowInstanceId ? `/workflows/${cell.workflowInstanceId}` : `/universities/${row.id}?tab=workflow&program=${column.id}`;
       return <td key={column.id}><RtkTooltip content={details}>{cell.state === 'NOT_LINKED' ? <span aria-label={label}>{content}</span> : <Link href={href} aria-label={label}>{content}</Link>}</RtkTooltip></td>;
     })}</tr>)}</tbody></table></div>
