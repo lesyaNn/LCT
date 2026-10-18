@@ -191,12 +191,14 @@ export async function realGetUniversityMap(filters: UniversityFilters, signal?: 
   const result = await apiFetch<Array<{
     id: string; name: string; city: string | null; region_code: string | null;
     programs_count: number; launched_programs: number; active_programs: number; active_workflow: boolean;
+    responsible_name: string | null;
   }>>(`/api/v1/universities/map?${search}`, { signal });
   if (!result.ok) throw new ApiRequestError(result.status, result.body, 'Не удалось загрузить карту вузов.', result.error);
   return result.data.map((item) => ({
     id: item.id, name: item.name, city: item.city ?? '—', regionCode: item.region_code,
     programsCount: item.programs_count, launchedPrograms: item.launched_programs,
     activePrograms: item.active_programs, activeWorkflow: item.active_workflow,
+    responsibleName: item.responsible_name ?? null,
   }));
 }
 

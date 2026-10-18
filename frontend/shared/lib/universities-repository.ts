@@ -75,6 +75,7 @@ export interface UniversityMapItem {
   launchedPrograms: number;
   activePrograms: number;
   activeWorkflow: boolean;
+  responsibleName: string | null;
 }
 
 export type UniversitySortColumn = 'name' | 'responsible' | 'programs' | 'stage' | 'last_interaction';
@@ -326,6 +327,7 @@ export async function getUniversityMap(filters: UniversityFilters, signal?: Abor
       id: item.id, name: item.name, city: item.city, regionCode: mockRegionByCity[item.city] ?? null,
       programsCount: item.programsCount, launchedPrograms: item.programStatusCounts.launched ?? 0,
       activePrograms: item.programStatusCounts.active ?? 0, activeWorkflow: item.currentStage.id !== 'completed',
+      responsibleName: item.responsible?.name ?? null,
     })),
     real: () => realGetUniversityMap(filters, signal),
   });

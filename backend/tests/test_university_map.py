@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 import app.models  # noqa: F401
 from app.core.security import CurrentUser
 from app.db.base import Base
-from app.models.catalog import ITDirection, ITProgram, University
+from app.models.catalog import ITDirection, ITProgram, Responsible, University, UniversityResponsible
 from app.models.interactions import UniversityProgram
 from app.models.workflow_instances import WorkflowInstance
 from app.modules.analytics.filters import UnifiedFilter
@@ -54,6 +54,7 @@ def test_map_selection_reuses_filters_statuses_and_security_scope():
     Base.metadata.create_all(engine, tables=[
         University.__table__, ITDirection.__table__, ITProgram.__table__,
         UniversityProgram.__table__, WorkflowInstance.__table__,
+        Responsible.__table__, UniversityResponsible.__table__,
     ])
     try:
         with Session(engine) as db:
@@ -66,7 +67,11 @@ def test_map_selection_reuses_filters_statuses_and_security_scope():
             program = ITProgram(direction_id=direction.id, name="Программа", description="")
             db.add(program)
             db.flush()
+            primary = Responsible(full_name="Яна Основная", email="primary@example.test")
+            db.add(primary)
+            db.flush()
             db.add_all([
+                UniversityResponsible(university_id=own.id, responsible_id=primary.id, is_primary=True),
                 UniversityProgram(university_id=own.id, program_id=program.id, status="launched"),
                 UniversityProgram(university_id=foreign.id, program_id=program.id, status="planned"),
                 WorkflowInstance(university_id=own.id, template_id=uuid.uuid4(), status="active"),
@@ -79,8 +84,11 @@ def test_map_selection_reuses_filters_statuses_and_security_scope():
             assert rows[0]["region_code"] is None
             assert rows[1]["region_code"] == "RU.48"
             assert rows[1]["launched_programs"] == 1
+            assert rows[1]["programs_count"] == 1
             assert rows[1]["active_workflow"] is True
+            assert rows[1]["responsible_name"] == "Яна Основная"
             assert rows[0]["launched_programs"] == 0
+            assert rows[0]["responsible_name"] is None
 
             filtered = list_universities_map(db, search=None, city=["Москва"], responsible_id=None,
                                              unified_filter=UnifiedFilter(program_ids=[program.id]), user=user)
@@ -99,7 +107,8 @@ def test_map_http_route_binds_shared_filters_and_serializes(monkeypatch):
     def fake_map(_db, **filters):
         captured.update(filters)
         return [{"id": identifier, "name": "Вуз", "city": "Москва", "region_code": "RU.48",
-                 "programs_count": 1, "launched_programs": 1, "active_programs": 0, "active_workflow": True}]
+                 "programs_count": 1, "launched_programs": 1, "active_programs": 0, "active_workflow": True,
+                 "responsible_name": "Яна Основная"}]
 
     monkeypatch.setattr(catalog_service, "list_university_map", fake_map)
     app = FastAPI()
@@ -109,5 +118,6 @@ def test_map_http_route_binds_shared_filters_and_serializes(monkeypatch):
     response = TestClient(app).get(f"/api/v1/universities/map?city=Москва&program_ids={identifier}")
     assert response.status_code == 200
     assert response.json()[0]["region_code"] == "RU.48"
+    assert response.json()[0]["responsible_name"] == "Яна Основная"
     assert captured["city"] == ["Москва"]
     assert captured["unified_filter"].program_ids == [identifier]

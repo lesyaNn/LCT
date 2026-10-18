@@ -168,6 +168,7 @@ class UniversityMapItem(BaseModel):
     launched_programs: int = 0
     active_programs: int = 0
     active_workflow: bool = False
+    responsible_name: str | None = None
 
 
 class UniversityDetail(UniversityRead):

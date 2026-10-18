@@ -62,18 +62,17 @@
 .metricText > span { color: var(--rtk-color-text-secondary); font-size: 11px; line-height: 1.25; overflow-wrap: anywhere; }
 .universityList { display: flex; flex-direction: column; gap: var(--rtk-space-3); list-style: none; margin: 0; max-height: 450px; overflow: auto; padding: 0; }
 .universityList li { min-width: 0; }
-.universityCard { composes: card from './universities-list.module.css'; gap: var(--rtk-space-2); min-height: 0; padding: var(--rtk-space-3); padding-left: calc(var(--rtk-space-3) - 2px); }
+.universityCard { composes: card from './universities-list.module.css'; cursor: pointer; gap: var(--rtk-space-2); min-height: 0; padding: var(--rtk-space-3); padding-left: calc(var(--rtk-space-3) - 2px); }
 .universityCardHeader { composes: cardHeader from './universities-list.module.css'; }
 .universityCardHeader strong { font-size: 14px; -webkit-line-clamp: 3; }
 .universityCity { align-items: center; color: var(--rtk-color-text-secondary); display: inline-flex; font-size: 11px; gap: var(--rtk-space-1); min-width: 0; }
 .universityCity svg { flex: 0 0 auto; }
 .universityPrograms { align-items: center; color: var(--rtk-color-text-secondary); display: flex; flex-wrap: wrap; font-size: 11px; gap: var(--rtk-space-2); }
-.programCount { align-items: center; display: inline-flex; gap: var(--rtk-space-1); }
-.programCount svg { flex: 0 0 auto; }
-.universityCardFooter { composes: cardFooter from './universities-list.module.css'; gap: var(--rtk-space-2); min-height: 0; padding-top: var(--rtk-space-2); }
-.launchedCount { font-size: 11px; }
-.passportLink { color: var(--rtk-color-brand); font-size: 11px; font-weight: 700; margin-left: auto; white-space: nowrap; }
-.universityCard:hover .passportLink, .universityCard:focus-visible .passportLink { text-decoration: underline; }
+.universityCardFooter { composes: cardFooter from './universities-list.module.css'; flex-wrap: nowrap; font-size: 11px; gap: var(--rtk-space-2); justify-content: flex-start; min-height: 0; padding-top: var(--rtk-space-2); }
+.universityCardMeta { composes: cardMeta from './universities-list.module.css'; gap: var(--rtk-space-1); white-space: nowrap; }
+.universityCardMeta:first-child { flex: 0 1 auto; }
+.responsibleName { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.footerDivider { align-self: center; background: var(--rtk-color-border); flex: 0 0 1px; height: 16px; }
 .emptyDetails { color: var(--rtk-color-text-secondary); font-size: 13px; margin: 0; }
 @media (max-width: 1180px) { .layout { grid-template-columns: minmax(0, 1fr) minmax(320px, 360px); } }
 @container (max-width: 360px) { .metric { flex-direction: column; } }

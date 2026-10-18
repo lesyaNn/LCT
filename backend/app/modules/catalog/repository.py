@@ -312,7 +312,7 @@ def list_universities_map(
     external_source: str | None = None,
     workflow_stage: str | Sequence[str] | None = None,
 ) -> list[dict]:
-    """One scoped selection plus two set-based status queries; no per-university IO."""
+    """One scoped selection plus set-based aggregates; no per-university IO."""
     from app.models.interactions import UniversityProgram
     from app.models.workflow_instances import WorkflowInstance
     from app.modules.universities.city_region import city_region_code
@@ -345,6 +345,7 @@ def list_universities_map(
         .where(WorkflowInstance.university_id.in_(selected), WorkflowInstance.status == "active")
         .distinct()
     ).scalars().all())
+    responsibles = primary_university_responsibles(db, [uni_id for uni_id, _, _ in rows])
     return [
         {
             "id": uni_id,
@@ -355,9 +356,36 @@ def list_universities_map(
             "launched_programs": counts.get(uni_id, {}).get("launched", 0),
             "active_programs": counts.get(uni_id, {}).get("active", 0),
             "active_workflow": uni_id in active,
+            "responsible_name": responsibles[uni_id][0].full_name if uni_id in responsibles else None,
         }
         for uni_id, name, city_name in rows
     ]
+
+
+def primary_university_responsibles(
+    db: Session, university_ids: Sequence[uuid.UUID],
+) -> dict[uuid.UUID, tuple[Responsible, bool]]:
+    """Use the same primary-first, alphabetical fallback for list and map."""
+    if not university_ids:
+        return {}
+    rows = db.execute(
+        select(
+            UniversityResponsible.university_id,
+            Responsible,
+            UniversityResponsible.is_primary,
+        )
+        .join(Responsible, Responsible.id == UniversityResponsible.responsible_id)
+        .where(UniversityResponsible.university_id.in_(list(university_ids)))
+        .order_by(
+            UniversityResponsible.university_id,
+            UniversityResponsible.is_primary.desc(),
+            Responsible.full_name.asc(),
+        )
+    ).all()
+    result: dict[uuid.UUID, tuple[Responsible, bool]] = {}
+    for uni_id, resp, primary in rows:
+        result.setdefault(uni_id, (resp, bool(primary)))
+    return result
 
 
 def university_list_presentation(
@@ -396,26 +424,9 @@ def university_list_presentation(
         return result
     day = today if today is not None else date.today()
 
-    # 1. Primary responsible: is_primary first, then alphabetical (ONE query).
-    resp_rows = db.execute(
-        select(
-            UniversityResponsible.university_id,
-            Responsible,
-            UniversityResponsible.is_primary,
-        )
-        .join(Responsible, Responsible.id == UniversityResponsible.responsible_id)
-        .where(UniversityResponsible.university_id.in_(list(university_ids)))
-        .order_by(
-            UniversityResponsible.university_id,
-            UniversityResponsible.is_primary.desc(),
-            Responsible.full_name.asc(),
-        )
-    ).all()
-    seen_resp: set[uuid.UUID] = set()
-    for uni_id, resp, primary in resp_rows:
-        if uni_id not in seen_resp and uni_id in result:
-            result[uni_id]["responsible"] = (resp, bool(primary))
-            seen_resp.add(uni_id)
+    # 1. Primary responsible: same selection as the map (ONE query).
+    for uni_id, responsible in primary_university_responsibles(db, university_ids).items():
+        result[uni_id]["responsible"] = responsible
 
     # 2. Programs GROUP BY status (ONE query).
     for uni_id, status, count in db.execute(

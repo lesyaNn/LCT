@@ -10,6 +10,7 @@ import ZoomOut from '@atomaro/icons/24/media/ZoomOut';
 import Search from '@atomaro/icons/24/action/Search';
 import Education from '@atomaro/icons/24/culture/Education';
 import Task from '@atomaro/icons/24/communication/Task';
+import User from '@atomaro/icons/24/communication/User';
 import { Button } from '@/shared/ui/rtk/button';
 import { Drawer } from '@/shared/ui/rtk/drawer';
 import { SearchableSelect } from '@/shared/ui/rtk/multiselect';
@@ -78,17 +79,22 @@ function RegionDetails({ title, stats, onClose, hideHeader = false }: { title: s
     </div>
     {stats.universities.length === 0 ? <p className={styles.emptyDetails}>По выбранным условиям вузов в этом регионе нет.</p> :
       <ul className={styles.universityList}>{stats.universities.slice(0, limit).map((item) => <li key={item.id}>
-        <Link className={styles.universityCard} href={`/universities/${item.id}`}>
+        <Link className={styles.universityCard} href={`/universities/${item.id}`} aria-label={`Открыть паспорт вуза ${item.name}`} onKeyDown={(event) => {
+          if (event.key === ' ') { event.preventDefault(); event.currentTarget.click(); }
+        }}>
           <div className={styles.universityCardHeader}><strong>{item.name}</strong></div>
           <span className={styles.universityCity}><MapIcon size={16} fill="currentColor" aria-hidden="true" />{item.city}</span>
-          <div className={styles.universityPrograms}>
-            <span className={styles.programCount}><BookOpen size={16} fill="currentColor" aria-hidden="true" />Связано программ: {item.programsCount}</span>
+          {item.launchedPrograms > 0 || item.activePrograms > 0 || item.activeWorkflow ? <div className={styles.universityPrograms}>
+            {item.launchedPrograms > 0 ? <span>{countLabel(item.launchedPrograms, 'программа запущена', 'программы запущены', 'программ запущено')}</span> : null}
             {item.activePrograms > 0 ? <StatusBadge intent="success" size="sm">{countLabel(item.activePrograms, 'программа в работе', 'программы в работе', 'программ в работе')}</StatusBadge> : null}
             {item.activeWorkflow ? <StatusBadge intent="brand" size="sm">Активный Workflow</StatusBadge> : null}
-          </div>
+          </div> : null}
           <div className={styles.universityCardFooter}>
-            {item.launchedPrograms > 0 ? <span className={styles.launchedCount}>{countLabel(item.launchedPrograms, 'программа запущена', 'программы запущены', 'программ запущено')}</span> : null}
-            <span className={styles.passportLink}>Открыть паспорт <span aria-hidden="true">→</span></span>
+            {item.responsibleName ? <>
+              <span className={styles.universityCardMeta} title={item.responsibleName}><User size={16} fill="currentColor" aria-hidden="true" /><span className={styles.responsibleName}>{item.responsibleName}</span></span>
+              <span className={styles.footerDivider} aria-hidden="true" />
+            </> : null}
+            <span className={styles.universityCardMeta}><BookOpen size={16} fill="currentColor" aria-hidden="true" />{countLabel(item.programsCount, 'ИТ-программа', 'ИТ-программы', 'ИТ-программ')}</span>
           </div>
         </Link>
       </li>)}</ul>}
