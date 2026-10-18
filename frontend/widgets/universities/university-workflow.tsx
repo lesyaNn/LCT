@@ -7,6 +7,8 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import Attachment from '@atomaro/icons/24/action/Attachment';
 import Edit from '@atomaro/icons/24/editor/Edit';
 import CheckLarge from '@atomaro/icons/24/navigation/CheckLarge';
+import CloseLarge from '@atomaro/icons/24/navigation/CloseLarge';
+import Education from '@atomaro/icons/24/culture/Education';
 import Comments from '@atomaro/icons/24/communication/Comments';
 import ErrorStroke from '@atomaro/icons/24/alert/ErrorStroke';
 import History from '@atomaro/icons/24/communication/History';
@@ -21,7 +23,7 @@ import { hasPermission } from '@/shared/lib/access-control';
 import type { WorkflowTransitionTarget } from '@/shared/lib/workflow-transition';
 import { formatDateRu, formatDateTimeRu, getRelativeDueDateRu } from '@/shared/lib/formatters';
 import { workflowStageStatusSemantics, type WorkflowStageIcon } from '@/shared/lib/status-semantics';
-import { completeWorkflowInstance, getApiUniversityWorkflow, getUniversityResponsibles, getUniversityWorkflow, getWorkflowAllowedTransitions, getWorkflowRollbackTargets, isMeetingAgendaStage, isRealWorkflowMode, listWorkflowTasksPage, universityResponsiblesQueryKey, updateWorkflowResponsible, updateWorkflowStageResponsible, updateWorkflowStageDueDate, updateWorkflowStageName, workflowQueryKey, type UniversityWorkflow, type UniversityWorkflowAttachment, type UniversityWorkflowStage, type UniversityWorkflowStageStatus, type UniversityWorkflowTask } from '@/shared/lib/universities-repository';
+import { completeWorkflowInstance, getApiUniversityWorkflow, getUniversityPassport, getUniversityResponsibles, getUniversityWorkflow, getWorkflowAllowedTransitions, getWorkflowRollbackTargets, isMeetingAgendaStage, isRealWorkflowMode, listWorkflowTasksPage, universityPassportQueryKey, universityResponsiblesQueryKey, updateWorkflowResponsible, updateWorkflowStageResponsible, updateWorkflowStageDueDate, updateWorkflowStageName, workflowQueryKey, type UniversityWorkflow, type UniversityWorkflowAttachment, type UniversityWorkflowStage, type UniversityWorkflowStageStatus, type UniversityWorkflowTask } from '@/shared/lib/universities-repository';
 import { queryKeys } from '@/shared/lib/query-keys';
 import { invalidateWorkflowRelatedQueries } from '@/shared/lib/workflow-cache';
 import { workflowAttachmentFromApi } from '@/shared/lib/workflow-attachments';
@@ -51,6 +53,7 @@ import { PassportWorkflowCard } from './passport-workflow-card';
 import { WorkflowTransitionModal, type WorkflowTransitionNotification } from './workflow-transition-modal';
 import { WorkflowRollbackModal } from './workflow-rollback-modal';
 import { PassportSectionHeader } from './passport-section-header';
+import { UniversityLocalClock } from './university-local-clock';
 import styles from './university-workflow.module.css';
 
 export type WorkflowViewMode = 'page' | 'embedded';
@@ -111,7 +114,7 @@ function StageSummary({ stage }: { stage: UniversityWorkflowStage }) {
     { key: 'attachments', icon: Attachment, label: 'Вложения', value: String(attachments), empty: attachments === 0 },
     { key: 'tasks', icon: Task, label: 'Задачи', value: String(totalTasks), empty: totalTasks === 0 },
   ];
-  return <div className={styles.stageSummary} aria-label="Сводка этапа">{items.map(({ key, icon: Icon, label, value, empty }) => <span key={key} data-empty={empty} aria-label={`${label}: ${value}`} title={`${label}: ${value}`}><Icon size={14} fill="currentColor" aria-hidden="true" /><span>{value}</span></span>)}</div>;
+  return <span className={styles.stageSummary} aria-label="Сводка этапа">{items.map(({ key, icon: Icon, label, value, empty }) => <span key={key} data-empty={empty} aria-label={`${label}: ${value}`} title={`${label}: ${value}`}><Icon size={14} fill="currentColor" aria-hidden="true" /><span>{value}</span></span>)}</span>;
 }
 
 function StageRenameAction({ stage, onSave }: { stage: UniversityWorkflowStage; onSave: (stageId: string, name: string) => Promise<void> }) {
@@ -154,16 +157,15 @@ function StageRenameAction({ stage, onSave }: { stage: UniversityWorkflowStage; 
 
 function WorkflowStageItem({ stage, selected, detailsId, onSelect }: { stage: UniversityWorkflowStage; selected: boolean; detailsId: string; onSelect: () => void }) {
   const semantics = workflowStageStatusSemantics[stage.status];
-  const titleClass = semantics.titleDecoration === 'strike' ? styles.stageTitleMuted : undefined;
+  const titleClass = stage.status === 'skipped' ? styles.stageTitleMuted : undefined;
   return (
-    <li className={`${styles.stageItem} ${selected ? styles.stageItemSelected : ''} ${semantics.muted ? styles.stageItemMuted : ''}`}>
-      <button className={`${styles.stageButton} ${semantics.emphasis === 'current' ? styles.stageButtonCurrent : ''} ${semantics.emphasis === 'error' ? styles.stageButtonError : ''}`} type="button" aria-expanded={selected} aria-controls={detailsId} aria-current={stage.status === 'current' ? 'step' : undefined} data-testid={stage.status === 'current' ? 'workflow-current-stage' : undefined} onClick={onSelect}>
-        <span className={`${styles.stageMarker} ${styles[`status-${stage.status}`]}`} aria-hidden="true"><StageStatusIcon status={stage.status} /></span>
+    <li className={`${styles.stageItem} ${selected ? styles.stageItemSelected : ''} ${semantics.muted ? styles.stageItemMuted : ''}`} data-status={stage.status}>
+      <button className={styles.stageButton} type="button" aria-expanded={selected} aria-controls={detailsId} aria-current={stage.status === 'current' ? 'step' : undefined} data-testid={stage.status === 'current' ? 'workflow-current-stage' : undefined} onClick={onSelect}>
+        <span className={`${styles.stageMarker} ${styles[`status-${stage.status}`]}`} aria-hidden="true">{stage.status === 'overdue' ? <CloseLarge size={18} fill="currentColor" /> : <StageStatusIcon status={stage.status} />}</span>
         <span className={styles.stageContent}>
           <span className={styles.stageTopline}><span className={styles.stageOrder}>{stage.orderIndex}</span><strong className={titleClass}>{stage.name}</strong></span>
           <span className={styles.stageMeta}><StatusBadge intent={semantics.intent} icon={<StageStatusIcon status={stage.status} />}>{semantics.label}</StatusBadge><StageDeadline stage={stage} /></span>
-          <StageAssignee stage={stage} />
-          <StageSummary stage={stage} />
+          <span className={styles.stageFooter}><StageAssignee stage={stage} /><StageSummary stage={stage} /></span>
         </span>
       </button>
     </li>
@@ -360,11 +362,29 @@ function WorkflowDeadlineField({ instanceId, stage, canManage, onNotify }: { ins
   return <><StageDeadline stage={stage} />{canManage ? stage.deadline ? <Tooltip content="Редактировать дедлайн"><IconButton icon={<Edit size={18} fill="currentColor" />} label="Редактировать дедлайн" size={18} onClick={() => { setValue(stage.deadline); setOpen(true); }} /></Tooltip> : <Button variant="ghost" size="s" type="button" onClick={() => { setValue(''); setOpen(true); }}>+ Дедлайн</Button> : null}{open ? <Modal title="Дедлайн этапа" onClose={() => { if (!save.isPending) setOpen(false); }}><div className={styles.editForm}><label>Дата<Input type="date" value={value} disabled={save.isPending} onChange={(event) => setValue(event.target.value)} /></label><div className={styles.editActions}><Button variant="ghost" size="s" type="button" disabled={save.isPending} onClick={() => setOpen(false)}>Отмена</Button><Button variant="primary" size="s" type="button" loading={save.isPending} disabled={save.isPending || value === stage.deadline} onClick={() => save.mutate()}>Сохранить</Button></div></div></Modal> : null}</>;
 }
 
-function WorkflowHeader({ workflow }: { workflow: UniversityWorkflow }) {
+function WorkflowHeader({ workflow, directionName, timeZone, clockLoading }: { workflow: UniversityWorkflow; directionName?: string; timeZone?: string | null; clockLoading: boolean }) {
   const progress = workflow.totalSteps ? Math.round((workflow.completedSteps / workflow.totalSteps) * 100) : 0;
+  const completed = workflow.status === 'completed' || (!workflow.status && workflow.totalSteps > 0 && workflow.completedSteps === workflow.totalSteps);
+  const status = completed ? { label: 'Завершён', intent: 'success' as const } : workflow.status === 'archived' ? { label: 'В архиве', intent: 'neutral' as const } : { label: 'В работе', intent: 'orange' as const };
+  const programName = workflow.programId && workflow.workflowName !== 'Workflow' ? workflow.workflowName : null;
+  const context = [
+    directionName && directionName !== programName ? `ИТ-направление: ${directionName}` : null,
+    programName ? `Программа: ${programName}` : workflow.workflowName !== 'Workflow' ? workflow.workflowName : null,
+    workflow.universityCity || null,
+  ].filter(Boolean).join(' · ');
   return (
     <header className={styles.pageHeader}>
-      <div className={styles.headerMain}><h1>Взаимодействие с вузом</h1>{workflow.status === 'completed' ? <div className={styles.completedState}><CheckLarge size={18} fill="currentColor" aria-hidden="true" /><strong>Workflow завершён</strong></div> : null}<p className={styles.headerContext}>{[workflow.universityName, workflow.universityCity, workflow.workflowName].filter((part, index, parts) => part && parts.findIndex((other) => other.toLocaleLowerCase('ru-RU') === part.toLocaleLowerCase('ru-RU')) === index).join(' · ')}</p></div>
+      <div className={styles.headerSummaryRow}>
+        <div className={styles.workflowSummary}>
+          <span className={styles.universityIcon} aria-hidden="true"><Education size={28} fill="currentColor" /></span>
+          <div className={styles.headerMain}>
+            <span className={styles.eyebrow}>Workflow вуза</span>
+            <div className={styles.summaryTitle}><h1>{workflow.universityName}</h1><StatusBadge intent={status.intent} size="md">{status.label}</StatusBadge></div>
+            {context ? <p className={styles.headerContext}>{context}</p> : null}
+          </div>
+        </div>
+        <div className={styles.headerClock}>{clockLoading ? <Skeleton height={96} width="270px" /> : timeZone ? <UniversityLocalClock city={workflow.universityCity} timeZone={timeZone} /> : <div className={styles.clockUnavailable}><UniversityLocalClock city={workflow.universityCity} timeZone={timeZone} /></div>}</div>
+      </div>
       <div className={styles.overallProgress}><div className={styles.progressLabel}><span>Прогресс Workflow</span><strong>{workflow.completedSteps} из {workflow.totalSteps} этапов завершено</strong></div><div className={styles.progressTrack} role="progressbar" aria-label={`Прогресс Workflow: завершено ${workflow.completedSteps} из ${workflow.totalSteps} этапов`} aria-valuemin={0} aria-valuemax={workflow.totalSteps} aria-valuenow={workflow.completedSteps}><span style={{ width: `${progress}%` }} /></div></div>
     </header>
   );
@@ -388,6 +408,8 @@ export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride 
   const queryClient = useQueryClient();
   const realWorkflow = isRealWorkflowMode();
   const query = useQuery({ queryKey: workflowQueryKey(instanceId), queryFn: () => getUniversityWorkflow(instanceId), staleTime: 30_000 });
+  const passportQuery = useQuery({ queryKey: universityPassportQueryKey(query.data?.universityId ?? ''), queryFn: () => getUniversityPassport(query.data!.universityId, queryClient), enabled: mode === 'page' && Boolean(query.data?.universityId), staleTime: 30_000 });
+  const headerProgramsQuery = useQuery({ queryKey: workflowProgramsQueryKey(query.data?.universityId ?? ''), queryFn: ({ signal }) => getWorkflowSelectorPrograms(query.data!.universityId, signal), enabled: mode === 'page' && Boolean(query.data?.programId), staleTime: 30_000 });
   const renameStageMutation = useMutation({
     mutationFn: ({ stageId, name }: { stageId: string; name: string }) => updateWorkflowStageName(instanceId, stageId, name),
     onSuccess: async (record) => {
@@ -436,7 +458,7 @@ export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride 
   if (!stages.length || !selectedStage) return <EmptyState presentation={mode === 'page' ? 'large' : 'compact'} icon={mode === 'embedded' ? <InformationStroke size={22} fill="currentColor" /> : undefined} title="Этапы Workflow пока не добавлены" description="Настроенные этапы появятся здесь после запуска процесса." />;
 
   return <div className={`${styles.page} ${mode === 'embedded' ? styles.embedded : ''}`}>
-    {mode === 'page' ? <WorkflowHeader workflow={query.data} /> : null}
+    {mode === 'page' ? <WorkflowHeader workflow={query.data} directionName={headerProgramsQuery.data?.find((program) => program.id === query.data.programId)?.direction} timeZone={passportQuery.data?.timeZone} clockLoading={passportQuery.isPending} /> : null}
     {mode === 'embedded' && query.data.status === 'completed' ? <StatusBadge intent="success">Workflow завершён</StatusBadge> : null}
     <div className={styles.layout}>
       <section className={styles.stagesPanel} aria-labelledby={`${idPrefix}-stages-title`}>

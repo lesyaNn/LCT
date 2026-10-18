@@ -503,6 +503,7 @@ export interface UniversityWorkflow {
   universityId: string;
   universityName: string;
   universityCity: string;
+  programId?: string | null;
   workflowName: string;
   responsibleId: string | null;
   responsibleName: string | null;
@@ -1015,6 +1016,7 @@ export function getApiUniversityWorkflow(instance: WorkflowInstanceApiRecord): U
     universityId: instance.university_id,
     universityName: instance.university_name ?? 'Workflow',
     universityCity: instance.university_city ?? '',
+    programId: instance.program_id ?? null,
     workflowName: instance.program_name ?? 'Workflow',
     responsibleId: instance.responsible_id ?? null,
     responsibleName: instance.responsible_name ?? null,
