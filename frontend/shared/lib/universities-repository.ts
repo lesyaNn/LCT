@@ -22,6 +22,7 @@ import {
   realGetUniversityHistory,
   realGetUniversityLicenses,
   realGetUniversityMeetings,
+  realGetUniversityMeeting,
   realGetUniversityPassport,
   realGetUniversityProducts,
   realGetUniversityPrograms,
@@ -1351,8 +1352,8 @@ export async function getUniversityLicenses(id: string, queryClient?: QueryClien
   return fromDataSource({ domain: 'passport', mock: () => getMockUniversityLicenses(id), real: () => realGetUniversityLicenses(id, queryClient) });
 }
 
-export async function getUniversityDocuments(id: string, page = 1, pageSize = 20, search = '', type = 'all', status = 'all', signal?: AbortSignal): Promise<PaginatedResult<UniversityDocumentRow> & { types: string[] }> {
-  return realGetUniversityDocuments(id, page, pageSize, search, type, status, signal);
+export async function getUniversityDocuments(id: string, page = 1, pageSize = 20, search = '', type = 'all', status = 'all', signal?: AbortSignal, documentId?: string | null): Promise<PaginatedResult<UniversityDocumentRow> & { types: string[] }> {
+  return realGetUniversityDocuments(id, page, pageSize, search, type, status, signal, documentId);
 }
 
 export async function downloadUniversityDocument(universityId: string, documentId: string): Promise<Blob> {
@@ -1372,6 +1373,10 @@ export async function createUniversityDocument(universityId: string, input: { ty
 /** Typed frontend adapter for the future university meetings endpoint. */
 export async function getUniversityMeetings(id: string, page = 1, pageSize = 20, signal?: AbortSignal): Promise<PaginatedResult<UniversityMeetingRow>> {
   return realGetUniversityMeetings(id, page, pageSize, signal);
+}
+
+export async function getUniversityMeeting(id: string, universityId: string, signal?: AbortSignal): Promise<UniversityMeetingRow> {
+  return realGetUniversityMeeting(id, universityId, signal);
 }
 
 export async function createUniversityMeeting(universityId: string, input: UniversityMeetingInput): Promise<{ id: string }> {

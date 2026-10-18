@@ -1,7 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Calendar from '@atomaro/icons/24/communication/Calendar';
 import { useAuth } from '@/shared/auth/AuthProvider';
@@ -25,6 +26,7 @@ import {
   getUniversityProducts,
   getUniversityLicenses,
   getUniversityMeetings,
+  getUniversityMeeting,
   deleteUniversityMeeting,
   universityProductsQueryKey,
   universityLicensesQueryKey,
@@ -135,6 +137,8 @@ function MeetingParticipants({ participants }: { participants: UniversityMeeting
 }
 
 function MeetingsSection({ id, canAdd }: { id: string; canAdd: boolean }) {
+  const searchParams = useSearchParams();
+  const linkedMeeting = searchParams.get('meeting');
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
@@ -144,6 +148,11 @@ function MeetingsSection({ id, canAdd }: { id: string; canAdd: boolean }) {
   const canWrite = canAdd;
   const canReadWorkflow = hasPermission(user, 'workflow.read');
   const query = useQuery({ queryKey: universityMeetingsQueryKey(id, page), queryFn: ({ signal }) => getUniversityMeetings(id, page, 20, signal), placeholderData: keepPreviousData, staleTime: 30_000 });
+  const linkedQuery = useQuery({ queryKey: ['meeting', user?.id, id, linkedMeeting], queryFn: ({ signal }) => getUniversityMeeting(linkedMeeting!, id, signal), enabled: Boolean(linkedMeeting), staleTime: 30_000 });
+  useEffect(() => {
+    if (!linkedMeeting || !query.data?.items.some((meeting) => meeting.id === linkedMeeting)) return;
+    requestAnimationFrame(() => document.getElementById(`meeting-${linkedMeeting}`)?.scrollIntoView({ block: 'center' }));
+  }, [linkedMeeting, query.data]);
   const remove = useMutation({
     mutationFn: (meetingId: string) => deleteUniversityMeeting(meetingId),
     onSuccess: async () => {
@@ -162,7 +171,9 @@ function MeetingsSection({ id, canAdd }: { id: string; canAdd: boolean }) {
   if (!query.data) return <RouteErrorState compact onRetry={() => void query.refetch()} />;
   return <section className={`${styles.section} ${styles.meetingSurface}`} aria-label="Встречи">
     <PassportSectionHeader title="Встречи" count={query.data.total} actions={canWrite ? <Button variant="primary" size="s" type="button" onClick={() => setEditor(null)}><Calendar size={16} fill="currentColor" />Добавить встречу</Button> : undefined} />
-    {query.data.items.length ? <ol className={styles.meetingTimeline}>{query.data.items.map((meeting) => <li className={styles.meetingItem} key={meeting.id}><div className={styles.meetingMarker} aria-hidden="true" /><article className={styles.meetingContent}>
+    {linkedMeeting && linkedQuery.isError ? <p className={styles.linkedUnavailable}>Встреча по ссылке удалена или недоступна.</p> : null}
+    {linkedMeeting && linkedQuery.data && !query.data.items.some((meeting) => meeting.id === linkedMeeting) ? <div className={styles.linkedMeeting}><strong>{linkedQuery.data.subject}</strong>{linkedQuery.data.occurredAt ? <time dateTime={linkedQuery.data.occurredAt}>{formatDateTimeRu(linkedQuery.data.occurredAt)}</time> : null}{linkedQuery.data.outcome !== '—' ? <p>{linkedQuery.data.outcome}</p> : null}{linkedQuery.data.nextAction !== '—' ? <p>{linkedQuery.data.nextAction}</p> : null}</div> : null}
+    {query.data.items.length ? <ol className={styles.meetingTimeline}>{query.data.items.map((meeting) => <li id={`meeting-${meeting.id}`} className={`${styles.meetingItem} ${linkedMeeting === meeting.id ? styles.meetingLinked : ''}`} key={meeting.id}><div className={styles.meetingMarker} aria-hidden="true" /><article className={styles.meetingContent}>
       <div className={styles.meetingMeta}>
         {meeting.occurredAt ? <time dateTime={meeting.occurredAt}>{formatDateTimeRu(meeting.occurredAt)}</time> : <span>Дата не назначена</span>}
         {meeting.type ? <span className={styles.meetingType}>{meetingTypeLabels[meeting.type]}</span> : null}
