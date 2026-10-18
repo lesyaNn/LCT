@@ -13,3 +13,12 @@ node -e "require('./frontend/node_modules/sharp')('frontend/public/brand/rostele
 CC BY 4.0 license, source hashes and snapshot date are embedded in the file.
 Historical alternate names are excluded; names belonging to multiple zones map
 to null. Regeneration and API behavior: `docs/UNIVERSITY_TIME_CONTACTS.md`.
+
+`rostelecom-email.png` is the same website SVG exported at 436×138 on white for
+email clients, displayed at half size. White pixels keep the original dark wordmark
+legible in dark mode. The identical file lives in
+`keycloak/themes/rostelecom/email/resources/img/rostelecom-email.png`.
+Generate with Sharp using `.resize({width:404}).flatten({background:'#ffffff'})` followed by
+`.extend({top:16,bottom:16,left:16,right:16,background:'#ffffff'}).png()`
+and copy the result to the Keycloak resource directory. CRM attaches this PNG by
+CID; preview tools embed it in HTML as a data URI.

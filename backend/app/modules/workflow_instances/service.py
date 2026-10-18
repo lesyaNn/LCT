@@ -331,12 +331,13 @@ def create_task(db: Session, instance_id: uuid.UUID, stage_id: uuid.UUID, title:
 
 
 def update_task(db: Session, instance_id: uuid.UUID, task_id: uuid.UUID,
-                *, title: str | None, status: str | None) -> WorkflowTask:
+                *, title: str | None, status: str | None) -> tuple[WorkflowTask, bool]:
     instance = get_instance_or_404(db, instance_id, lock=True)
     task = db.get(WorkflowTask, task_id)
     if task is None or task.instance_id != instance_id:
         raise NotFound("Задача не найдена")
     _editable_task_stage(instance, task.stage_id)
+    completed_now = status == "done" and task.status != "done"
     if title is not None:
         cleaned = title.strip()
         if not cleaned:
@@ -347,7 +348,7 @@ def update_task(db: Session, instance_id: uuid.UUID, task_id: uuid.UUID,
         task.completed_at = datetime.now(timezone.utc) if status == "done" else None
     db.commit()
     db.refresh(task)
-    return task
+    return task, completed_now
 
 
 def delete_task(db: Session, instance_id: uuid.UUID, task_id: uuid.UUID) -> None:

@@ -9,6 +9,7 @@ import uuid
 from sqlalchemy.orm import Session
 
 from app.core.security import CurrentUser
+from app.core.permissions import ROLE_PERMISSIONS
 from app.models.catalog import University
 from app.models.workflow_instances import WorkflowComment, WorkflowInstance
 from app.modules.admin_users.keycloak_client import KeycloakAdminClient
@@ -43,7 +44,7 @@ def _has_explicit_access(record: dict, university_id: uuid.UUID) -> bool:
 def _recipients(kc: KeycloakAdminClient, university_id: uuid.UUID, author_id: str):
     members = {
         record["id"]
-        for role in ("admin", "manager", "user")
+        for role in ("admin", "manager", "user") if "workflow.read" in ROLE_PERMISSIONS[role]
         for record in _pages(lambda first, size: kc.role_users(role, first=first, maximum=size))
     }
     for record in _pages(lambda first, size: kc.users(first=first, maximum=size)):

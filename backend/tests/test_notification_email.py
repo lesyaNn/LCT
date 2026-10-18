@@ -143,7 +143,20 @@ def test_smtp_uses_verified_tls_without_network(monkeypatch, security):
             events.append(("starttls", context))
 
         def send_message(self, message):
-            events.append(("send", message["To"], message.get_content()))
+            assert message.get_content_type() == "multipart/alternative"
+            html_part = message.get_body(preferencelist=("html",))
+            assert html_part.get_content_type() == "text/html"
+            assert html_part.get_content_charset() == "utf-8"
+            assert "Русский текст" in html_part.get_content()
+            assert message.get_payload()[1].get_content_type() == "multipart/related"
+            image_part = next(part for part in message.walk()
+                              if part.get_content_type() == "image/png")
+            assert image_part["Content-ID"] == f"<{email.LOGO_CID}>"
+            assert image_part.get_content_disposition() == "inline"
+            assert image_part.get_payload(decode=True) == email.logo_bytes()
+            assert f"cid:{email.LOGO_CID}" in html_part.get_content()
+            events.append(("send", message["To"],
+                           message.get_body(preferencelist=("plain",)).get_content()))
 
     monkeypatch.setattr(email.smtplib, "SMTP", FakeSMTP)
     monkeypatch.setattr(email.smtplib, "SMTP_SSL", FakeSMTP)
