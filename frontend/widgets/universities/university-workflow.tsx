@@ -376,12 +376,12 @@ function WorkflowHeader({ workflow, directionName, timeZone, clockLoading }: { w
   ].filter(Boolean).join(' · ');
   return (
     <header className={styles.pageHeader}>
+      <h1>Workflow вуза</h1>
       <div className={styles.headerSummaryRow}>
         <div className={styles.workflowSummary}>
           <span className={styles.universityIcon} aria-hidden="true"><Education size={28} fill="currentColor" /></span>
           <div className={styles.headerMain}>
-            <span className={styles.eyebrow}>Workflow вуза</span>
-            <div className={styles.summaryTitle}><h1>{workflow.universityName}</h1><StatusBadge intent={status.intent} size="md">{status.label}</StatusBadge></div>
+            <div className={styles.summaryTitle}><h2>{workflow.universityName}</h2><StatusBadge intent={status.intent} size="md">{status.label}</StatusBadge></div>
             {context ? <p className={styles.headerContext}>{context}</p> : null}
           </div>
         </div>
