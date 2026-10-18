@@ -130,8 +130,7 @@ export function WorkflowBoard({ items }: { items: WorkflowOverviewItem[] }) {
 
   return <>
     <DndContext sensors={sensors} collisionDetection={columnCollisionDetection} onDragStart={(event) => setDraggingId(String(event.active.id))} onDragEnd={(event) => { void finishDrag(event); }} onDragCancel={() => setDraggingId(null)}>
-      <div className={styles.boardScroll} aria-label="Доска Workflow"><div className={styles.board}>{groups.map((group, index) => <div className={styles.boardGroup} key={group.key}>
-        {groups.length > 1 ? <h2 className={styles.boardGroupTitle}>Последовательность этапов {index + 1}</h2> : null}
+      <div className={styles.boardScroll} aria-label="Доска Workflow"><div className={styles.board}>{groups.map((group) => <div className={styles.boardGroup} key={group.key}>
         <div className={styles.boardColumns}>{group.columns.map((column) => <WorkflowBoardColumn column={column} valid={validTargets.has(column.key)} active={canDrag} key={column.key} />)}</div>
       </div>)}</div></div>
       <DragOverlay>{draggingItem ? <div className={styles.dragOverlay} aria-hidden="true" inert><WorkflowCard item={draggingItem} /></div> : null}</DragOverlay>
