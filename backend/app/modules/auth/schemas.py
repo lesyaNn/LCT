@@ -9,3 +9,8 @@ class MeOut(BaseModel):
     roles: list[str] = []
     permissions: list[str] = []
     scope: dict[str, str | list[str]]
+
+
+class AuthProbe(BaseModel):
+    ok: bool
+    user: str | None

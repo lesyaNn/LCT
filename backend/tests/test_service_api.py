@@ -152,7 +152,7 @@ def test_public_license_verification_keeps_its_explicit_anonymous_contract(conte
     assert not schema["paths"][public_path]["get"].get("security")
     protected_path = "/api/v1/universities/{university_id}/licenses/{license_id}/passport.pdf"
     protected = schema["paths"][protected_path]["get"]
-    assert protected["security"] == [{"KeycloakLogin": []}]
+    assert protected["security"] == [{"HTTPBearer": []}, {"KeycloakLogin": []}]
     assert protected["x-authentication-required"] is True
 
 

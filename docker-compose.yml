@@ -98,6 +98,7 @@ services:
       AUTH_DEV_BYPASS: "false"
       APP_ENV: ${APP_ENV:-dev}
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-rtk}
+      SWAGGER_OAUTH_CLIENT_ID: ${SWAGGER_OAUTH_CLIENT_ID:-rtk-frontend}
       # External issuer as seen by browsers (P0-2: override per stand).
       KEYCLOAK_ISSUER: ${KEYCLOAK_EXTERNAL_URL:-http://localhost:8081}/realms/${KEYCLOAK_REALM:-rtk}
       KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/${KEYCLOAK_REALM:-rtk}/protocol/openid-connect/certs

@@ -1,7 +1,7 @@
 """P5-11-01: Swagger/OpenAPI contract checks.
 
-Locks: professional title/version, single KeycloakLogin OAuth2 scheme
-(Authorization Code + PKCE, no manual-token button), per-operation
+Locks: professional title/version, Bearer JWT or Keycloak OAuth2
+(Authorization Code + PKCE), per-operation
 summaries + tags, documented error responses, valid /api/v1 versioning,
 and that /docs (+ oauth2 redirect page) is served.
 """
@@ -29,7 +29,10 @@ def test_title_and_version():
 def test_keycloak_login_scheme():
     spec = _spec()
     schemes = spec["components"]["securitySchemes"]
-    assert list(schemes) == ["KeycloakLogin"], schemes
+    assert set(schemes) == {"HTTPBearer", "KeycloakLogin"}, schemes
+    assert schemes["HTTPBearer"]["type"] == "http"
+    assert schemes["HTTPBearer"]["scheme"] == "bearer"
+    assert schemes["HTTPBearer"]["bearerFormat"] == "JWT"
     flow = schemes["KeycloakLogin"]["flows"]["authorizationCode"]
     assert schemes["KeycloakLogin"]["type"] == "oauth2"
     assert flow["authorizationUrl"].endswith("/protocol/openid-connect/auth")
@@ -54,7 +57,7 @@ def test_protected_operations_reference_keycloak_login():
     for path in protected:
         ops = spec["paths"][path]
         op = next(iter(ops.values()))
-        assert op.get("security") == [{"KeycloakLogin": []}], path
+        assert op.get("security") == [{"HTTPBearer": []}, {"KeycloakLogin": []}], path
 
 
 def test_error_responses_documented():
@@ -88,7 +91,11 @@ def test_docs_and_redoc_served():
     assert "swaggerUIRedirectOauth2" in redirect.text
     # Попап обязан вернуть redirectUrl в Swagger, иначе обмен кода на токен
     # идёт с redirect_uri=null (invalid_grant/Incorrect redirect_uri).
-    assert "redirectUrl:n" in redirect.text.replace(" ", "")
+    assert "redirectUrl:oauth2.redirectUrl" in redirect.text.replace(" ", "")
+    assert redirect.headers["cache-control"] == "no-store"
+    assert app.swagger_ui_init_oauth["usePkceWithAuthorizationCodeGrant"] is True
+    assert "clientSecret" not in app.swagger_ui_init_oauth
+    assert app.swagger_ui_parameters["persistAuthorization"] is False
     redoc = client.get("/redoc")
     assert redoc.status_code == 200
     assert "redoc.standalone.js" in redoc.text
@@ -114,7 +121,7 @@ def test_all_business_operations_are_documented_and_secure():
             if (method, path) == ("get", "/api/v1/public/licenses/{license_id}/verification"):
                 assert not operation.get("security")
                 continue
-            assert operation.get("security") == [{"KeycloakLogin": []}]
+            assert operation.get("security") == [{"HTTPBearer": []}, {"KeycloakLogin": []}]
             for code in ("401", "403", "422"):
                 response = operation["responses"][code]
                 assert response["content"]["application/json"]["schema"] == {
@@ -160,3 +167,55 @@ def test_representative_examples():
         assert body["example"]
     assert spec["components"]["schemas"]["ReportRequest"].get("example")
     assert spec["components"]["schemas"]["ErrorResponse"].get("examples")
+
+
+def test_downloads_are_documented_as_binary_with_a_filename():
+    paths = _spec()["paths"]
+    for path in (
+        "/api/v1/contracts/{contract_id}/file",
+        "/api/v1/universities/{university_id}/passport/documents/{document_id}/download",
+        "/api/v1/workflow/instances/{instance_id}/attachments/{attachment_id}/download",
+        "/api/v1/reports/{job_id}/download",
+        "/api/v1/import/jobs/{job_id}/report",
+        "/api/v1/universities/{university_id}/licenses/{license_id}/passport.pdf",
+        "/api/v1/workflow/instances/{instance_id}/meeting-agenda.pdf",
+    ):
+        response = paths[path]["get"]["responses"]["200"]
+        assert "Content-Disposition" in response["headers"], path
+        assert response["content"], path
+        for media in response["content"].values():
+            assert media["schema"] == {"type": "string", "format": "binary"}, path
+
+
+def test_business_json_responses_have_schemas_and_registered_tags():
+    spec = _spec()
+    tags = {tag["name"] for tag in spec["tags"]}
+    for path, item in spec["paths"].items():
+        for method, operation in item.items():
+            assert set(operation.get("tags", [])) <= tags, (method, path)
+            if not path.startswith("/api/v1/"):
+                continue
+            for status, response in operation["responses"].items():
+                media = response.get("content", {}).get("application/json")
+                if status.startswith("2") and media:
+                    assert media.get("schema"), (method, path, status)
+
+
+def test_download_errors_use_the_actual_domain_codes():
+    paths = _spec()["paths"]
+    for path in ("/api/v1/reports/{job_id}/download", "/api/v1/import/jobs/{job_id}/report"):
+        responses = paths[path]["get"]["responses"]
+        for status, code in (("400", "REPORT_NOT_READY"), ("410", "GONE")):
+            examples = responses[status]["content"]["application/json"]["examples"]
+            assert examples[code]["value"]["error"]["code"] == code
+    document = paths["/api/v1/universities/{university_id}/passport/documents/{document_id}/download"]
+    assert "404" in document["get"]["responses"]
+    assert "429" in paths["/api/v1/catalog/overview"]["get"]["responses"]
+
+
+def test_swagger_uses_the_proxy_prefix():
+    with TestClient(app, root_path="/backend") as proxy:
+        response = proxy.get("/docs")
+    assert response.status_code == 200
+    assert "url: '/backend/openapi.json'" in response.text
+    assert "window.location.origin + '/backend/docs/oauth2-redirect.html'" in response.text

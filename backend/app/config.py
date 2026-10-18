@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     # Internal JWKS URL as seen from inside Docker network.
     keycloak_jwks_url: str = "http://keycloak:8080/realms/rtk/protocol/openid-connect/certs"
     keycloak_realm: str = "rtk"
+    swagger_oauth_client_id: str = "rtk-frontend"
     keycloak_audience: str = "rtk-api"
     # Server-only Keycloak Admin API credentials. Never exposed as NEXT_PUBLIC.
     keycloak_admin_base_url: str = "http://keycloak:8080"

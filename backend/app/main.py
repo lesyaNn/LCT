@@ -5,7 +5,7 @@ XLSX import. Interactive docs: ``/docs`` (Swagger UI), ``/redoc``,
 machine-readable spec: ``/openapi.json``.
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.openapi.utils import get_openapi
@@ -22,26 +22,12 @@ from app.core.middleware import (
     RequestSizeLimitMiddleware,
     SecurityHeadersMiddleware,
 )
-from app.schemas.errors import ERROR_MESSAGES, ErrorCode
+from app.core.openapi import document_errors
+from app.core.swagger import OAUTH2_REDIRECT_HTML
 
 import logging
 
 log = logging.getLogger("rtk.bootstrap.workflow")
-
-# Приёмная страница OAuth2-редиректа — дословный oauth2-redirect.js из
-# swagger-ui-dist@5, заинлайненный в один файл (чтобы не тянуть лишний CDN
-# и не расширять CSP). Критично передавать redirectUrl в callback: без него
-# Swagger UI шлёт обмен кода на токен с redirect_uri=null и Keycloak отвечает
-# invalid_grant/Incorrect redirect_uri.
-_OAUTH2_REDIRECT_HTML = """<!doctype html>
-<html lang="en-US">
-<head><title>Swagger UI: OAuth2 Redirect</title></head>
-<body>
-<script>
-"use strict";function run(){var e,r,t,a=window.opener.swaggerUIRedirectOauth2,o=a.state,n=a.redirectUrl;if((t=(r=/code|token|error/.test(window.location.hash)?window.location.hash.substring(1).replace("?","&"):location.search.substring(1)).split("&")).forEach((function(e,r,t){t[r]='"'+e.replace("=",'":"')+'"'})),e=(r=r?JSON.parse("{"+t.join()+"}",(function(e,r){return""===e?r:decodeURIComponent(r)})):{}).state===o,"accessCode"!==a.auth.schema.get("flow")&&"authorizationCode"!==a.auth.schema.get("flow")&&"authorization_code"!==a.auth.schema.get("flow")||a.auth.code)a.callback({auth:a.auth,token:r,isValid:e,redirectUrl:n});else if(e||a.errCb({authId:a.auth.name,source:"auth",level:"warning",message:"Authorization may be unsafe, passed state was changed in server Passed state wasn't returned from auth server"}),r.code)delete a.state,a.auth.code=r.code,a.callback({auth:a.auth,redirectUrl:n});else{let e;r.error&&(e="["+r.error+"]: "+(r.error_description?r.error_description+". ":"no accessCode received from the server. ")+(r.error_uri?"More info: "+r.error_uri:"")),a.errCb({authId:a.auth.name,source:"auth",level:"error",message:e||"[Authorization failed]: no accessCode received from the server"})}window.close()}"loading"!==document.readyState?run():document.addEventListener("DOMContentLoaded",(function(){run()}));
-</script>
-</body>
-</html>"""
 
 
 @asynccontextmanager
@@ -57,16 +43,14 @@ app = FastAPI(
     docs_url=None,  # своя страница /docs ниже: нужен oauth2_redirect_url
     redoc_url="/redoc",
     openapi_url="/openapi.json",
-    # Swagger UI: вход через Keycloak по Authorization Code + PKCE
-    # (публичный клиент rtk-frontend, без секрета). Кнопка Authorize ->
-    # KeycloakLogin открывает страницу логина Keycloak.
-    # prompt=login: страницу логина показывать всегда, даже при живой
-    # SSO-сессии (иначе Keycloak молча входит текущим пользователем).
     swagger_ui_init_oauth={
-        "clientId": "rtk-frontend",
+        "clientId": settings.swagger_oauth_client_id,
+        "appName": "CRM API",
         "usePkceWithAuthorizationCodeGrant": True,
+        "scopes": ["openid"],
         "additionalQueryStringParams": {"prompt": "login"},
     },
+    swagger_ui_parameters={"persistAuthorization": False, "displayRequestDuration": True},
     lifespan=lifespan,
     openapi_tags=[
         {"name": "Assistant", "description": "Помощник по документации и личные диалоги"},
@@ -77,7 +61,15 @@ app = FastAPI(
         {"name": "Reports", "description": "Генерация отчётов (XLSX, PDF, JSON)"},
         {"name": "Audit", "description": "Аудит действий"},
         {"name": "Import", "description": "Импорт данных из XLSX"},
-        {"name": "Admin", "description": "Администрирование"},
+        {"name": "Admin Users", "description": "Администрирование пользователей"},
+        {"name": "Contracts", "description": "Договоры и файлы"},
+        {"name": "Licenses", "description": "Лицензии и PDF-паспорта"},
+        {"name": "Education statistics", "description": "Статистика обучения"},
+        {"name": "External integrations", "description": "Внешние интеграции"},
+        {"name": "Meeting agenda", "description": "Повестки встреч"},
+        {"name": "Notifications", "description": "Уведомления"},
+        {"name": "Teacher training", "description": "Обучение преподавателей"},
+        {"name": "search", "description": "Глобальный поиск"},
         # Production tags retained as documented extensions for the catalog
         # sub-resources and operational endpoints.
         {"name": "Directions", "description": "Направления подготовки (CRUD)"},
@@ -112,38 +104,26 @@ app.include_router(v1)
 
 
 @app.get("/docs", include_in_schema=False)
-async def swagger_docs() -> HTMLResponse:
-    """Swagger UI. Своя страница вместо docs_url: нужен oauth2_redirect_url.
-
-    Путь относительный: FastAPI сам рендерит
-    ``window.location.origin + '/docs/oauth2-redirect.html'``. Абсолютный URL
-    сюда передавать нельзя — получится двойной origin и Keycloak ответит
-    «Неверный параметр: redirect_uri». Итоговый URI обязан совпадать с записью
-    у клиента rtk-frontend в Keycloak.
-    """
+async def swagger_docs(request: Request) -> HTMLResponse:
+    """Use the public proxy prefix for both schema and OAuth callback URLs."""
+    root_path = request.scope.get("root_path", "").rstrip("/")
     return get_swagger_ui_html(
-        openapi_url=app.openapi_url or "/openapi.json",
+        openapi_url=root_path + (app.openapi_url or "/openapi.json"),
         title=f"{app.title} - Swagger UI",
-        oauth2_redirect_url="/docs/oauth2-redirect.html",
+        oauth2_redirect_url=root_path + "/docs/oauth2-redirect.html",
         init_oauth=app.swagger_ui_init_oauth,
+        swagger_ui_parameters=app.swagger_ui_parameters,
     )
 
 
 @app.get("/docs/oauth2-redirect.html", include_in_schema=False)
 async def swagger_oauth2_redirect() -> HTMLResponse:
     """Приёмник OAuth2-редиректа Swagger UI (точка возврата из Keycloak)."""
-    return HTMLResponse(_OAUTH2_REDIRECT_HTML)
+    return HTMLResponse(OAUTH2_REDIRECT_HTML, headers={"Cache-Control": "no-store"})
 
 
 def custom_openapi():
-    """Единственная схема входа в спеке — KeycloakLogin (OAuth2 code + PKCE).
-
-    FastAPI выводит ``HTTPBearer`` из auth-зависимости; в Swagger UI она давала
-    вторую кнопку Authorize (ручная вставка токена), которая только путала.
-    Рантайм по-прежнему принимает Bearer JWT (зависимость не тронута) —
-    меняется только документация: все защищённые операции ссылаются на
-    KeycloakLogin. Незащищённые операции (``/health``, ``/ready``) остаются открытыми.
-    """
+    """Document either an existing Bearer JWT or Keycloak Authorization Code + PKCE."""
     if app.openapi_schema:
         return app.openapi_schema
     schema = get_openapi(
@@ -152,45 +132,31 @@ def custom_openapi():
         description=app.description,
         routes=app.routes,
         tags=app.openapi_tags,
+        servers=app.servers,
     )
     schemes = schema.setdefault("components", {}).setdefault("securitySchemes", {})
-    # Убираем автогенерированный HTTPBearer: в Swagger остаётся один вход.
-    schemes.pop("HTTPBearer", None)
-    # OAuth2 authorization code + PKCE: вход через страницу логина Keycloak
-    # прямо из Swagger UI (кнопка Authorize -> KeycloakLogin). Пароль вводится
-    # только на стороне Keycloak и никогда не касается backend/Swagger.
-    # Redirect URI зарегистрирован у клиента rtk-frontend в realm-export.json.
+    schemes["HTTPBearer"] = {
+        "type": "http", "scheme": "bearer", "bearerFormat": "JWT",
+        "description": "Вставьте access_token без префикса Bearer. Токен выдаёт Keycloak.",
+    }
     base_url = settings.keycloak_issuer.rstrip("/")
     schemes["KeycloakLogin"] = {
         "type": "oauth2",
         "description": (
-            "Вход через Keycloak (realm rtk, публичный клиент rtk-frontend, "
-            "Authorization Code + PKCE). Для авторизации нажмите кнопку "
-            "Authorize ниже: откроется страница логина Keycloak — войдите, "
-            "токен подставится автоматически."
+            "Вход через Keycloak с PKCE. Нажмите Authorize; client_secret не нужен. "
+            "Используйте один способ входа: KeycloakLogin или HTTPBearer."
         ),
         "flows": {
             "authorizationCode": {
                 "authorizationUrl": base_url + "/protocol/openid-connect/auth",
                 "tokenUrl": base_url + "/protocol/openid-connect/token",
-                "scopes": {},
+                "scopes": {"openid": "Вход через Keycloak"},
             }
         },
     }
     canonical_tag_map = {
         "universities-passport": "Universities",
         "analytics": "Analytics",
-    }
-    error_examples = {
-        "401": ErrorCode.AUTH_REQUIRED,
-        "403": ErrorCode.FORBIDDEN,
-        "404": ErrorCode.NOT_FOUND,
-        "409": ErrorCode.CONFLICT,
-        "422": ErrorCode.VALIDATION_ERROR,
-        "429": ErrorCode.RATE_LIMITED,
-        "500": ErrorCode.INTERNAL_ERROR,
-        "503": ErrorCode.EXTERNAL_SOURCE_UNAVAILABLE,
-        "504": ErrorCode.ASSISTANT_TIMEOUT,
     }
     error_schema = {"$ref": "#/components/schemas/ErrorResponse"}
     for path, path_item in schema["paths"].items():
@@ -205,36 +171,9 @@ def custom_openapi():
                 )
             operation["tags"] = [canonical_tag_map.get(tag, tag) for tag in operation.get("tags", [])]
             if path.startswith("/api/v1") and operation.get("security"):
-                operation["security"] = [{"KeycloakLogin": []}]
-                operation.setdefault("responses", {}).setdefault("401", {
-                    "description": "Требуется действительный Bearer JWT.",
-                })
-                operation.setdefault("responses", {}).setdefault("403", {
-                    "description": "Недостаточно прав.",
-                })
-            if path.startswith("/api/v1"):
-                operation.setdefault("responses", {}).setdefault("422", {
-                    "description": "Ошибка валидации запроса.",
-                })
-            for status, response in operation.get("responses", {}).items():
-                if status not in {
-                    "400", "401", "403", "404", "409", "410", "413", "415", "422", "429",
-                    "500", "503", "504",
-                }:
-                    continue
-                response.setdefault("content", {})["application/json"] = {
-                    "schema": error_schema,
-                }
-                code = error_examples.get(status, ErrorCode.HTTP_ERROR)
-                message = ERROR_MESSAGES[code]
-                response["content"]["application/json"]["examples"] = {
-                    code: {"summary": code, "value": {"error": {
-                        "code": code,
-                        "message": message,
-                        "request_id": "00000000-0000-4000-8000-000000000000",
-                        "details": {},
-                    }}}
-                }
+                # Separate objects mean OR, never require two Authorization headers.
+                operation["security"] = [{"HTTPBearer": []}, {"KeycloakLogin": []}]
+            document_errors(path, method, operation)
 
     # Representative payloads make the main flows reviewable in Swagger.
     for path, method, example in (

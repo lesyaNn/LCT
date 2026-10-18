@@ -206,7 +206,7 @@ def test_scoped_filters_rbac_and_openapi(audit_context):
     assert client.get(route).json()["total"] == 4
     assert client.get(route, params={"university_id": str(uuid.uuid4())}).json()["total"] == 0
     operation = app.openapi()["paths"][route]["get"]
-    assert operation["security"] == [{"KeycloakLogin": []}]
+    assert operation["security"] == [{"HTTPBearer": []}, {"KeycloakLogin": []}]
     assert {"200", "401", "403", "422"} <= set(operation["responses"])
     assert set(app.openapi()["paths"][route]) == {"get"}
     assert not any(

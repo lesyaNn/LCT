@@ -13,6 +13,8 @@ from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
+from app.core.openapi import file_response
+from app.modules.workflow_attachments.preview_schemas import FilePreview
 from app.core.permissions import require_permission
 from app.core.security import CurrentUser
 from app.db.session import get_db
@@ -119,6 +121,7 @@ def get_attachment_metadata(
     summary="Скачивание вложения",
     description="Скачивает байты вложения экземпляра потоково. Требуемое право: workflow.read.",
     response_class=StreamingResponse,
+    responses={200: file_response("Вложение; Content-Type соответствует формату файла")},
 )
 def download_attachment(
     instance_id: uuid.UUID,
@@ -192,7 +195,8 @@ def delete_attachment(
     return None
 
 
-@router.get("/instances/{instance_id}/attachments/{attachment_id}/preview", summary="Предпросмотр вложения")
+@router.get("/instances/{instance_id}/attachments/{attachment_id}/preview",
+            response_model=FilePreview, responses={503: {"description": "Предпросмотр или хранилище недоступны"}}, summary="Предпросмотр вложения")
 def preview_attachment(
     instance_id: uuid.UUID, attachment_id: uuid.UUID,
     offset: int = Query(default=0, ge=0, le=9900),

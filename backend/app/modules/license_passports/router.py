@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
 from app.core.errors import BusinessException
+from app.core.openapi import file_response
 from app.core.permissions import require_permission
 from app.core.security import CurrentUser
 from app.db.session import get_db
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 @router.get(
     "/universities/{university_id}/licenses/{license_id}/passport.pdf",
     response_class=Response,
-    responses={200: {"content": {"application/pdf": {}}, "description": "Паспорт лицензии A4"}},
+    responses={200: file_response("Паспорт лицензии A4", "application/pdf", disposition="inline")},
     summary="Сформировать паспорт лицензии",
     description="Актуальные серверные данные, право university.read и доступ к вузу. Этап Workflow не ограничивает генерацию.",
 )

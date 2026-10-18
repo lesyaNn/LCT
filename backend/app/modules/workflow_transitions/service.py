@@ -508,6 +508,7 @@ def add_comment(
     content = (data.content or "").strip()
     if not content:
         raise BadTransition("Comment content is required")
+    created_at = utcnow()
     comment = WorkflowComment(
         instance_id=instance_id,
         stage_id=data.stage_id,
@@ -517,6 +518,7 @@ def add_comment(
         # attribute before flush-time defaults fire, so None would leak in.
         is_internal=True,
         question_status="open" if data.is_question else "none",
+        created_at=created_at, updated_at=created_at,
     )
     db.add(comment)
     db.commit()
@@ -541,10 +543,12 @@ def add_comment_with_files(
     content = (data.content or "").strip()
     if not content:
         raise BadTransition("Comment content is required")
+    created_at = utcnow()
     comment = WorkflowComment(
         instance_id=instance_id, stage_id=data.stage_id,
         author_keycloak_sub=actor, content=content, is_internal=True,
         question_status="open" if data.is_question else "none",
+        created_at=created_at, updated_at=created_at,
     )
     keys: list[str] = []
     try:

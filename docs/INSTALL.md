@@ -86,3 +86,38 @@ python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 - Миграции: `docker compose exec backend python scripts/migrate.py status`.
 - `docker compose down` сохраняет данные; `docker compose down -v` удаляет
   базы, файлы и отчёты без восстановления.
+
+## Swagger и вход через Keycloak
+
+[Пошаговый гайд со скриншотами](SWAGGER_AUTH_GUIDE.md): вход, выполнение запроса, выход и проверка ролей.
+
+Откройте `http://localhost:8000/docs`, нажмите **Authorize** и выберите
+**KeycloakLogin** (вход через Keycloak с PKCE, `client_secret` пустой) либо
+**HTTPBearer** (готовый `access_token`, без слова `Bearer`). Достаточно одного
+способа. Проверить вход можно запросом `GET /api/v1/auth/me` через **Try it out**.
+После перезагрузки Swagger авторизуйтесь снова: токены не сохраняются в localStorage.
+
+Перед первым запуском удалённого стенда задайте реальные публичные адреса:
+
+```bash
+FRONTEND_ORIGIN=https://crm.example.org \
+SWAGGER_PUBLIC_URL=https://api.example.org python3 keycloak/render_realm.py
+```
+
+Если Swagger открыт через прокси с префиксом, укажите его в `SWAGGER_PUBLIC_URL`,
+например `https://crm.example.org/backend`, и задайте backend соответствующий
+ASGI `root_path`. `KEYCLOAK_EXTERNAL_URL` должен быть доступен браузеру, а не
+указывать на внутреннее имя контейнера.
+
+Для уже существующего realm повторный импорт не применяется. В Keycloak,
+**Clients → rtk-frontend**, обновите **Valid Redirect URIs**: адрес CRM с `/*`
+и точный публичный URL `/docs/oauth2-redirect.html`; в **Web Origins** укажите
+оба origin (схема, хост, порт, без пути). Сохраните публичный тип клиента,
+**Standard flow** и **PKCE S256**. Не удаляйте тома ради обновления этих настроек.
+При другом OAuth-клиенте задайте `SWAGGER_OAUTH_CLIENT_ID` и настройте его аналогично.
+
+Браузерная проверка обоих способов входа (нужны frontend-зависимости и Chromium
+Playwright): `node scripts/check-swagger-auth.cjs`. По умолчанию используются
+локальный backend и демо-администратор. Для другого стенда задайте
+`SWAGGER_BASE_URL`, `E2E_ADMIN_USERNAME` и `E2E_ADMIN_PASSWORD`. Проверка вызывает
+только `/auth/me` и проверяет сброс токена при перезагрузке страницы.

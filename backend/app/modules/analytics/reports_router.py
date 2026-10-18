@@ -21,7 +21,7 @@ Ordering in ``POST``: validate -> persist -> commit -> schedule the
 background worker -> return the persisted id. A persistence failure
 raises before any worker is ever started, so no fake job id can leak.
 
-Download errors are controlled (never 500): ``409`` while the job is not
+Download errors are controlled (never 500): ``400`` while the job is not
 ``ready`` (project state-conflict convention), ``410 Gone`` once
 ``expires_at`` passed or the artifact is gone, ``403``/``404`` for
 visibility. Stored paths are containment-checked against the reports
@@ -40,6 +40,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import func, select
 
+from app.core.openapi import file_response
 from app.core.permissions import require_permission, user_permissions
 from app.core.security import CurrentUser
 from app.core.errors import BusinessException, SecurityError
@@ -251,12 +252,14 @@ def get_report_job(
 
 @router.get(
     "/{job_id}/download",
+    response_class=FileResponse,
     summary="Скачать готовый отчёт",
     description=(
         "Отдаёт файл только при status=ready, свежем expires_at, "
         "существующем файле внутри reports root и доступе к job."
     ),
-    responses={401: ERROR_RESPONSES[401], 403: ERROR_RESPONSES[403],
+    responses={200: file_response("Готовый отчёт", *DOWNLOAD_MEDIA_TYPES.values()),
+               401: ERROR_RESPONSES[401], 403: ERROR_RESPONSES[403],
                404: ERROR_RESPONSES[404], 400: ERROR_RESPONSES[400],
                410: ERROR_RESPONSES[410]},
 )
