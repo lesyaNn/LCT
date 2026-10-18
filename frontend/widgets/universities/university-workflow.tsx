@@ -159,9 +159,11 @@ function WorkflowStageItem({ stage, selected, detailsId, onSelect }: { stage: Un
   const semantics = workflowStageStatusSemantics[stage.status];
   const titleClass = stage.status === 'skipped' ? styles.stageTitleMuted : undefined;
   return (
-    <li className={`${styles.stageItem} ${selected ? styles.stageItemSelected : ''} ${semantics.muted ? styles.stageItemMuted : ''}`} data-status={stage.status}>
+    <li className={`${styles.stageItem} ${semantics.muted ? styles.stageItemMuted : ''}`} data-status={stage.status}>
       <button className={styles.stageButton} type="button" aria-expanded={selected} aria-controls={detailsId} aria-current={stage.status === 'current' ? 'step' : undefined} data-testid={stage.status === 'current' ? 'workflow-current-stage' : undefined} onClick={onSelect}>
-        <span className={`${styles.stageMarker} ${styles[`status-${stage.status}`]}`} aria-hidden="true">{stage.status === 'overdue' ? <CloseLarge size={18} fill="currentColor" /> : <StageStatusIcon status={stage.status} />}</span>
+        <span className={styles.stageRail} aria-hidden="true">
+          <span className={`${styles.stageMarker} ${styles[`status-${stage.status}`]}`}>{selected ? <InformationStroke size={18} fill="currentColor" /> : stage.status === 'overdue' ? <CloseLarge size={18} fill="currentColor" /> : stage.status === 'current' ? <TimeStroke size={18} fill="currentColor" /> : <StageStatusIcon status={stage.status} />}</span>
+        </span>
         <span className={styles.stageContent}>
           <span className={styles.stageTopline}><span className={styles.stageOrder}>{stage.orderIndex}</span><strong className={titleClass}>{stage.name}</strong></span>
           <span className={styles.stageMeta}><StatusBadge intent={semantics.intent} icon={<StageStatusIcon status={stage.status} />}>{semantics.label}</StatusBadge><StageDeadline stage={stage} /></span>

@@ -73,20 +73,18 @@
 .totalLabel { color: var(--rtk-color-text-secondary); font-size: 12px; padding-top: var(--rtk-space-1); white-space: nowrap; }
 .stageList { list-style: none; margin: var(--rtk-space-4) 0 0; padding: 0; }
 .stageItem { position: relative; }
-.stageItem:not(:last-child)::before { border-left: 2px dashed var(--rtk-color-border-strong); bottom: -32px; content: ''; left: 19px; pointer-events: none; position: absolute; top: 36px; z-index: 2; }
-.stageItem[data-status='completed']:not(:last-child)::before { border-color: var(--atmr-success-on-container); border-left-style: solid; }
-.stageItem[data-status='overdue']:not(:last-child)::before { border-color: var(--atmr-error-on-container); border-left-style: solid; }
-.stageItem[data-status='current']:not(:last-child)::before { border-color: var(--rtk-color-brand-secondary); border-left-style: solid; }
-.stageItemSelected:not(:last-child)::before { border-left-width: 3px; left: 18.5px; }
 .stageItem:not(:last-child)::after { background: var(--rtk-color-border); bottom: 0; content: ''; height: 1px; left: 52px; position: absolute; right: 0; }
-.stageButton { align-items: start; background: transparent; border: 0; border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-primary); cursor: pointer; display: grid; gap: var(--rtk-space-3); grid-template-columns: 40px minmax(0, 1fr); padding: var(--rtk-space-4) var(--rtk-space-2) var(--rtk-space-4) 0; position: relative; text-align: left; width: 100%; z-index: 1; }
+.stageButton { align-items: start; background: transparent; border: 0; border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-primary); cursor: pointer; display: grid; gap: var(--rtk-space-3); grid-template-columns: 40px minmax(0, 1fr); padding: var(--rtk-space-4) var(--rtk-space-2) var(--rtk-space-4) 0; position: relative; text-align: left; width: 100%; }
 .stageButton:hover { background: var(--rtk-color-surface-hover); }
-.stageButton:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
-.stageItemSelected .stageButton { background: var(--rtk-color-surface-subtle); box-shadow: inset 0 0 0 1px var(--rtk-color-border); }
-.stageItemSelected[data-status='current'] .stageButton { background: var(--rtk-color-brand-secondary-soft); box-shadow: inset 0 0 0 1px var(--rtk-color-brand-secondary); }
-.stageItemSelected[data-status='overdue'] .stageButton { background: var(--atmr-error-container-soft); box-shadow: inset 0 0 0 1px var(--atmr-error-on-container); }
+.stageButton:focus-visible { outline: none; }
+.stageButton:focus-visible .stageContent { border-radius: var(--rtk-radius-small); outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
 .stageItemMuted .stageButton { color: var(--rtk-color-text-secondary); }
-.stageMarker { align-items: center; background: var(--rtk-color-surface); border: 2px solid var(--rtk-color-border-strong); border-radius: 50%; color: var(--rtk-color-text-secondary); display: inline-flex; height: 40px; justify-content: center; position: relative; width: 40px; z-index: 3; }
+.stageRail { align-items: center; align-self: stretch; display: flex; flex-direction: column; min-height: 40px; position: relative; width: 40px; }
+.stageItem:not(:last-child) .stageRail::after { border-left: 2px dashed var(--rtk-color-border-strong); bottom: calc(-2 * var(--rtk-space-4)); content: ''; left: 50%; pointer-events: none; position: absolute; top: 40px; transform: translateX(-50%); }
+.stageItem[data-status='completed'] .stageRail::after { border-color: var(--atmr-success-on-container); border-left-style: solid; }
+.stageItem[data-status='overdue'] .stageRail::after { border-color: var(--atmr-error-on-container); border-left-style: solid; }
+.stageItem[data-status='current'] .stageRail::after { border-color: var(--rtk-color-brand-secondary); border-left-style: solid; }
+.stageMarker { align-items: center; background: var(--rtk-color-surface); border: 2px solid var(--rtk-color-border-strong); border-radius: 50%; color: var(--rtk-color-text-secondary); display: inline-flex; flex: 0 0 40px; height: 40px; justify-content: center; position: relative; width: 40px; z-index: 1; }
 .status-completed { background: var(--atmr-success-on-container); border-color: var(--atmr-success-on-container); color: var(--rtk-color-surface); }
 .status-current { background: var(--rtk-color-brand-secondary); border-color: var(--rtk-color-brand-secondary); color: var(--rtk-color-surface); }
 .status-overdue { background: var(--atmr-error-on-container); border-color: var(--atmr-error-on-container); color: var(--rtk-color-surface); }
