@@ -7,7 +7,7 @@ Contract (frozen for the frontend)::
     POST /api/v1/import/execute        -> 202 {job_id} (async xlsx_import job)
     GET  /api/v1/import/jobs           -> 200 [ImportJobRead] (import jobs only)
     GET  /api/v1/import/jobs/{job_id}  -> 200 ImportJobRead (no filesystem path)
-    GET  /api/v1/import/jobs/{job_id}/report -> 200 errors-only xlsx (or 404/409/410)
+    GET  /api/v1/import/jobs/{job_id}/report -> 200 errors-only xlsx (or 400/404/410)
 
 RBAC: ``import.write`` gates upload + execute, ``import.read`` gates
 preview + journal. Execution owns the worker container
@@ -26,6 +26,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.openapi import file_response
 from app.core.errors import BusinessException, SecurityError
 from app.core.permissions import require_permission, user_permissions
 from app.core.security import CurrentUser
@@ -257,9 +258,13 @@ def get_import_job(
 
 @router.get(
     "/jobs/{job_id}/report",
+    response_class=FileResponse,
     summary="Скачать отчёт об ошибках",
     description="XLSX со списком построчных ошибок. 404 — ошибок нет или отчёта нет. Требуется право import.read.",
-    responses={401: ERROR_RESPONSES[401], 403: ERROR_RESPONSES[403], 404: ERROR_RESPONSES[404]},
+    responses={200: file_response("Отчёт об ошибках импорта", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+               400: {"description": "REPORT_NOT_READY — отчёт ещё формируется"},
+               410: {"description": "GONE — истёк срок скачивания"},
+               401: ERROR_RESPONSES[401], 403: ERROR_RESPONSES[403], 404: ERROR_RESPONSES[404]},
 )
 def download_import_report(
     job_id: str,

@@ -11,6 +11,8 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
+from app.core.openapi import file_response
+from app.modules.workflow_attachments.preview_schemas import FilePreview
 from app.db.session import get_db
 from app.modules.audit.service import get_audit_db
 from app.core.permissions import require_permission
@@ -143,6 +145,8 @@ def upload_university_document(
 
 @router.get(
     "/{university_id}/passport/documents/{document_id}/download",
+    response_class=FileResponse,
+    responses={200: file_response("Документ; Content-Type соответствует формату файла")},
     summary="Скачать документ вуза",
     description="Скачивает файл документа вуза с проверкой доступа. Требуется право university.read.",
 )
@@ -162,7 +166,8 @@ def download_university_document(
     return FileResponse(path, media_type=document.mime_type or "application/octet-stream", filename=document.file_name)
 
 
-@router.get("/{university_id}/passport/documents/{document_id}/preview", summary="Предпросмотр документа вуза")
+@router.get("/{university_id}/passport/documents/{document_id}/preview",
+            response_model=FilePreview, responses={503: {"description": "Предпросмотр или хранилище недоступны"}}, summary="Предпросмотр документа вуза")
 def preview_university_document(
     university_id: uuid.UUID, document_id: uuid.UUID,
     offset: int = Query(default=0, ge=0, le=9900),

@@ -16,6 +16,7 @@ from app.modules.analytics.integration import Selection
 from app.modules.analytics.repository import load_data
 from app.modules.analytics.service import build_matrix
 from app.modules.health_score.history import record_observation
+from app.modules.health_score.schemas import UniversityHealthScore
 
 router = APIRouter(prefix="/universities", tags=["Analytics"])
 logger = logging.getLogger(__name__)
@@ -92,7 +93,8 @@ def _health(university_id: UUID, db: Session, user: CurrentUser):
         "calculated_at": now,
     }
 
-@router.get("/{university_id}/health-score", summary="Текущий Health Score ВУЗа")
+@router.get("/{university_id}/health-score", response_model=UniversityHealthScore,
+            summary="Текущий Health Score ВУЗа")
 def health_score(university_id: UUID, db: Session = Depends(get_db), user: CurrentUser = Depends(require_permission("university.read"))):
     return _health(university_id, db, user)
 

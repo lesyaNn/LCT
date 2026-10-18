@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends
 from app.core.permissions import require_permission, require_role, user_permissions
 from app.core.security import CurrentUser, get_current_user
 from app.core.policies import get_data_scope
-from app.modules.auth.schemas import MeOut
+from app.modules.auth.schemas import AuthProbe, MeOut
 from app.schemas.common import ErrorResponse
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -41,6 +41,7 @@ def me(user: CurrentUser = Depends(get_current_user)):
 
 @router.get(
     "/test/authenticated",
+    response_model=AuthProbe,
     summary="Проверка аутентификации",
     description="Тестовый endpoint: 200 для любого валидного токена.",
     responses=AUTH_ERRORS,
@@ -51,6 +52,7 @@ def test_authenticated(user: CurrentUser = Depends(get_current_user)):
 
 @router.get(
     "/test/admin",
+    response_model=AuthProbe,
     summary="Проверка роли admin",
     description="Тестовый endpoint: 200 только для роли admin, иначе 403.",
     responses=AUTH_ERRORS,
@@ -61,6 +63,7 @@ def test_admin(user: CurrentUser = Depends(require_role("admin"))):
 
 @router.get(
     "/test/workflow-change",
+    response_model=AuthProbe,
     summary="Проверка права workflow.change_status",
     description="Тестовый endpoint: 200 при наличии права, иначе 403.",
     responses=AUTH_ERRORS,

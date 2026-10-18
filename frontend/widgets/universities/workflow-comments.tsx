@@ -112,7 +112,8 @@ function CommentItem({ comment, instanceId, readOnly, canManageQuestion, onNotif
   const apiAvailable = isWorkflowApiInstanceId(instanceId);
   const canEdit = !readOnly && canEditWorkflowComment(comment, user);
   const canDelete = !readOnly && isRealWorkflowMode() && canDeleteWorkflowComment(comment, user);
-  const updated = comment.updatedAt && comment.updatedAt !== comment.occurredAt ? comment.updatedAt : null;
+  // INSERT defaults can differ by microseconds; that is not a user edit.
+  const updated = comment.updatedAt && Date.parse(comment.updatedAt) - Date.parse(comment.occurredAt) >= 1000 ? comment.updatedAt : null;
   const save = useMutation({ mutationFn: (content: string) => editWorkflowComment(comment.id, content), onSuccess: async () => { setEditing(false); await invalidate(); } });
   const remove = useMutation({ mutationFn: () => deleteWorkflowComment(comment.id), onSuccess: async () => { setConfirmDelete(false); await invalidate(); }, onError: (cause) => onNotify?.({ intent: 'error', title: 'Комментарий не удалён', message: normalizeApiError(cause).message }) });
   const canCloseQuestion = canManageQuestion && comment.questionStatus === 'open' && hasPermission(user, 'workflow.comment.update') && (hasRole(user, 'admin') || hasRole(user, 'manager') || comment.authorId === user?.id);

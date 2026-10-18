@@ -31,6 +31,35 @@ from app.services.license_status import derive_license_status as _derive_license
 # ------------------------------------------------------------------ shared
 
 
+class CatalogOverviewRow(BaseModel):
+    university: str | None
+    vendor: str | None
+    product: str | None
+    contract_number: str | None
+    signed_at: date | None
+    expires_at: date | None
+    transfer_status: str | None
+    manager: str | None
+    responsibles: list[str]
+    comment: str | None
+    direction: str | None
+
+
+class CatalogDirectionCount(BaseModel):
+    code: str
+    name: str
+    programs: int
+
+
+class CatalogOverview(BaseModel):
+    total_universities: int
+    total_licenses: int
+    page: int
+    page_size: int
+    rows: list[CatalogOverviewRow]
+    directions: list[CatalogDirectionCount]
+
+
 class ResponsibleAssign(BaseModel):
     """Optional body for POST /universities/{id}/responsibles/{rid}."""
 

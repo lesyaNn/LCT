@@ -15,6 +15,8 @@ from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, Upload
 from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
+from app.core.openapi import file_response
+from app.modules.workflow_attachments.preview_schemas import FilePreview
 from app.core.permissions import require_permission, require_role
 from app.core.policies import ensure_university_visible
 from app.core.security import CurrentUser
@@ -25,6 +27,7 @@ from app.modules.catalog.contract_files import attach_contract_file, contract_or
 from app.modules.workflow_attachments.router import get_storage
 from app.modules.workflow_attachments.storage import StorageBackend
 from app.modules.catalog.schemas import (
+    CatalogOverview,
     ContractCreate,
     ContractDetail,
     ContractRead,
@@ -858,6 +861,8 @@ def upload_contract_file(
 
 @router.get(
     "/contracts/{contract_id}/file",
+    response_class=StreamingResponse,
+    responses={200: file_response("Файл договора; Content-Type соответствует формату файла")},
     tags=["Contracts"],
     summary="Скачать файл договора",
     description="Скачивает файл договора потоком; 404 если файла нет. Требуется право university.read.",
@@ -1154,6 +1159,7 @@ ERROR_RESPONSES = {
 
 @router.get(
     "/catalog/overview",
+    response_model=CatalogOverview,
     tags=["Catalog"],
     summary="Загруженные в БД данные (просмотр)",
     description=(
@@ -1176,7 +1182,9 @@ def catalog_overview(
     return service.get_catalog_overview(db, user, page=page, size=size)
 
 
-@router.get("/contracts/{contract_id}/file/preview", summary="Предпросмотр файла договора")
+@router.get("/contracts/{contract_id}/file/preview", tags=["Contracts"],
+            response_model=FilePreview, responses={503: {"description": "Предпросмотр или хранилище недоступны"}},
+            summary="Предпросмотр файла договора")
 def preview_contract_file(
     contract_id: uuid.UUID, offset: int = Query(default=0, ge=0, le=9900),
     db: Session = Depends(get_audit_db), storage: StorageBackend = Depends(get_storage),

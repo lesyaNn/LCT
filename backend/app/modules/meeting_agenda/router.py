@@ -5,6 +5,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Response
+from app.core.openapi import file_response
 from sqlalchemy.orm import Session
 
 from app.core.errors import BusinessException
@@ -45,7 +46,7 @@ def get_agenda(instance_id: UUID, response: Response, db: Database, user: Reader
 @router.get(
     "/instances/{instance_id}/meeting-agenda.pdf",
     response_class=Response,
-    responses={200: {"content": {"application/pdf": {}}, "description": "Одностраничный A4 PDF"}},
+    responses={200: file_response("Одностраничный A4 PDF", "application/pdf")},
     summary="Скачать PDF-повестку этапа встречи",
 )
 def download_agenda(instance_id: UUID, db: Database, user: Reader, stage_id: UUID | None = None) -> Response:
