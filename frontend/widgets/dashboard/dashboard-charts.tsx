@@ -243,8 +243,8 @@ function UniversityProgramMatrix({ matrix }: { matrix: DashboardMatrix }) {
 
 function AttentionList({ data }: { data: DashboardAnalytics['attentionItems'] }) {
   return (
-    <ol className={styles.attentionList}>
-      {data.slice(0, 5).map((item) => (
+    <ol className={styles.attentionList} tabIndex={0} aria-label="Приоритетные задачи">
+      {data.map((item) => (
         <li key={item.id}>
           <Link className={styles.attentionItem} href={`/universities/${item.universityId}`}>
             <span className={styles.severity} aria-label={`Приоритет: ${severityLabels[item.severity]}`}><StatusBadge intent={attentionSeverityIntent[item.severity]}>{severityLabels[item.severity]}</StatusBadge></span>
@@ -278,9 +278,9 @@ function AnalyticsGrid({ data }: { data: DashboardAnalytics }) {
       <div className={styles.funnelWide}><ChartCard title="Воронка этапов" description="Сколько взаимодействий дошли до этапа или дальше. За всё время." exportSlug="stage-funnel" exportTestId="chart-export-stage-funnel" canExport={data.stageFunnel.length > 0}>
         {data.stageFunnel.length ? <StageFunnelChart data={data.stageFunnel} /> : <EmptyChart />}
       </ChartCard></div>
-      <ChartCard title="Программы по статусам" description="Текущее распределение программ в реестре." exportSlug="programs" exportTestId="chart-export-programs" canExport={programStatuses.length > 0}>
-        {programStatuses.length ? <ProgramStatusChart data={programStatuses} /> : <EmptyChart />}
-      </ChartCard>
+      <div className={styles.priorityPanel}><ChartCard title="Приоритетные задачи" description="Элементы, требующие первоочередного внимания." exportSlug="attention" exportTestId="chart-export-attention" canExport={data.attentionItems.length > 0}>
+        {data.attentionItems.length ? <AttentionList data={data.attentionItems} /> : <EmptyChart />}
+      </ChartCard></div>
       <ChartCard title="Динамика запусков" description="Фактические и планируемые запуски за последние 12 месяцев." exportSlug="dynamics" exportTestId="chart-export-dynamics" canExport={hasLaunches}>
         {hasLaunches ? <LaunchDynamicsChart data={data.launchDynamics} /> : <EmptyChart />}
       </ChartCard>
@@ -293,9 +293,9 @@ function AnalyticsGrid({ data }: { data: DashboardAnalytics }) {
       <ChartCard title="Нагрузка по ответственным" description="Workflow, назначенные ответственному: в работе и завершённые." exportSlug="responsible-workload" exportTestId="chart-export-responsible-workload" canExport={data.responsibleWorkload.length > 0}>
         {data.responsibleWorkload.length ? <ResponsibleWorkloadChart data={data.responsibleWorkload} /> : <EmptyChart />}
       </ChartCard>
-      <div className={styles.priorityPanel}><ChartCard title="Приоритетные задачи" description="Элементы, требующие первоочередного внимания." exportSlug="attention" exportTestId="chart-export-attention" canExport={data.attentionItems.length > 0}>
-        {data.attentionItems.length ? <AttentionList data={data.attentionItems} /> : <EmptyChart />}
-      </ChartCard></div>
+      <ChartCard title="Программы по статусам" description="Текущее распределение программ в реестре." exportSlug="programs" exportTestId="chart-export-programs" canExport={programStatuses.length > 0}>
+        {programStatuses.length ? <ProgramStatusChart data={programStatuses} /> : <EmptyChart />}
+      </ChartCard>
       <div className={styles.attentionWide}><ChartCard title="ВУЗы × программы" description="Состояние взаимодействий по доступным программам." exportSlug="university-program-matrix" exportTestId="chart-export-matrix" canExport={data.matrix.rows.length > 0 && data.matrix.columns.length > 0}><UniversityProgramMatrix matrix={data.matrix} /></ChartCard></div>
     </div>
   );

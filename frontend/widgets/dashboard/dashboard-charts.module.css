@@ -23,6 +23,7 @@
 }
 .funnelWide, .attentionWide { grid-column: 1 / -1; min-width: 0; }
 .priorityPanel { min-width: 0; }
+.priorityPanel .card { max-height: 390px; }
 
 .card,
 .skeletonCard {
@@ -196,8 +197,14 @@
   list-style: none;
   margin: 0;
   min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 0;
 }
+
+.attentionList:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: -2px; }
+.priorityPanel .card[data-chart-exporting='true'] { max-height: none; }
+.priorityPanel .card[data-chart-exporting='true'] .attentionList { overflow: visible; }
 
 .attentionList li { min-width: 0; }
 
@@ -285,11 +292,13 @@
 
 @media (max-width: 1199px) {
   .card { min-height: 370px; }
+  .priorityPanel .card { max-height: 370px; }
 }
 
 @media (max-width: 767px) {
   .grid { grid-template-columns: 1fr; }
   .card { min-height: 360px; }
+  .priorityPanel .card { max-height: 360px; }
   .chartCanvas { height: 250px; }
 }
 

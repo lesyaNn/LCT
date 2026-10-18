@@ -140,7 +140,7 @@ function mapDashboardAnalytics(overview: AnalyticsOverviewDto, matrix: Analytics
     monthlyEvents: (overview.monthly_events ?? []).map((item) => { const date = new Date(`${item.month}-01T12:00:00`); return { monthKey: item.month, monthLabel: monthFormatter.format(date).replace('.', ''), count: item.count, statusChanges: item.status_changes, completed: item.completed }; }),
     topUniversities: (overview.top_universities ?? []).map((item) => ({ universityId: item.university_id, university: item.university, count: item.count })),
     responsibleWorkload: (overview.responsible_workload ?? []).map((item) => ({ responsibleId: item.responsible_id, responsible: item.responsible, inProgress: item.in_progress, completed: item.completed })),
-    attentionItems: overview.overdue_items.filter((item) => Boolean(item.university_id)).slice(0, 5).map((item, index) => ({ id: item.id ?? `overdue-${index}`, universityId: item.university_id!, universityName: item.university, problemCode: item.type === 'stage' ? 'WF-OVERDUE' : 'TASK-OVERDUE', problemLabel: item.stage ?? item.task ?? 'Просрочено', severity: item.days_overdue > 14 ? 'red' : item.days_overdue > 7 ? 'orange' : 'yellow', overdueDays: item.days_overdue })),
+    attentionItems: overview.overdue_items.filter((item) => Boolean(item.university_id)).map((item, index) => ({ id: item.id ?? `overdue-${index}`, universityId: item.university_id!, universityName: item.university, problemCode: item.type === 'stage' ? 'WF-OVERDUE' : 'TASK-OVERDUE', problemLabel: item.stage ?? item.task ?? 'Просрочено', severity: item.days_overdue > 14 ? 'red' : item.days_overdue > 7 ? 'orange' : 'yellow', overdueDays: item.days_overdue })),
   };
 }
 

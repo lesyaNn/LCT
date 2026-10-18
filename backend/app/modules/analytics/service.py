@@ -159,7 +159,7 @@ def build_overview(data: AnalyticsData, *, today: date) -> Overview:
         "workflow_distribution": [{"stage": name, "count": len(stages[name])} for name in names],
         "program_statuses": [{"status": s, "count": programs[s]} for s in PROGRAM_STATUSES],
         "expiring_licenses": licenses[:10],
-        "overdue_items": overdue[:10],
+        "overdue_items": overdue,
         "health_trend": [],
         "launch_dynamics": [{"month": f"{m // 12:04d}-{m % 12 + 1:02d}",
             "actual": launches[(m, "launched")], "planned": launches[(m, "planned")]} for m in launch_months],
