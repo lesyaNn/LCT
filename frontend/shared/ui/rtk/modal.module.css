@@ -10,5 +10,6 @@
 .close:hover { background: var(--rtk-color-surface-hover); color: var(--rtk-color-text-primary); }
 .close:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
 .body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: var(--rtk-space-5); }
-@media (max-width: 480px) { .overlay { padding: var(--rtk-space-2); } .dialog { max-height: calc(100dvh - 16px); min-width: 0; width: 100%; } .dialog.full { height: calc(100dvh - 16px); } .header, .body { padding: var(--rtk-space-4); } }
+.footer { border-top: 1px solid var(--rtk-color-border); flex: 0 0 auto; padding: var(--rtk-space-4) var(--rtk-space-5); }
+@media (max-width: 480px) { .overlay { padding: var(--rtk-space-2); } .dialog { max-height: calc(100dvh - 16px); min-width: 0; width: 100%; } .dialog.full { height: calc(100dvh - 16px); } .header, .body, .footer { padding: var(--rtk-space-4); } }
 @media (prefers-reduced-motion: reduce) { .overlay, .dialog { scroll-behavior: auto; } }

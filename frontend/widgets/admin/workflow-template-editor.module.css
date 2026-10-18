@@ -33,10 +33,15 @@
 .nameCell .defaultTasksButton:active:not(:disabled) { background: color-mix(in srgb, var(--rtk-color-brand) 18%, var(--rtk-color-surface)); }
 .nameCell .defaultTasksButton:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: 3px; }
 .defaultTasksButton svg { flex-shrink: 0; }
-.defaultTasksHint { color: var(--rtk-color-text-secondary); margin: 0; overflow-wrap: anywhere; }
-.defaultTaskList { display: flex; flex-direction: column; gap: var(--rtk-space-2); list-style: none; margin: 0; padding: 0; }
-.defaultTaskRow { align-items: center; display: flex; gap: var(--rtk-space-2); }
+.defaultTasksForm { display: flex; flex-direction: column; gap: var(--rtk-space-5); }
+.defaultTasksIntro { color: var(--rtk-color-text-secondary); line-height: 1.5; overflow-wrap: anywhere; }
+.defaultTasksIntro p { margin: 0; }
+.defaultTasksIntro .defaultTasksNote { color: var(--rtk-color-text-tertiary); margin-top: var(--rtk-space-2); }
+.defaultTasksEmpty { background: var(--rtk-color-surface-subtle); border-radius: var(--rtk-radius-medium); min-height: 216px; }
+.defaultTaskList { display: flex; flex-direction: column; list-style: none; margin: 0; padding: 0; }
+.defaultTaskRow { align-items: center; border-bottom: 1px solid var(--rtk-color-border); display: flex; gap: var(--rtk-space-2); padding: var(--rtk-space-2) 0; }
 .defaultTaskRow > input { flex: 1; min-width: 0; }
+.defaultTasksFooter { display: flex; gap: var(--rtk-space-2); justify-content: flex-end; }
 .nameDisplay { align-items: center; display: grid; gap: 2px var(--rtk-space-2); grid-template-columns: minmax(0, auto) 40px; justify-content: start; }
 .nameDisplay > span { font-weight: 650; overflow-wrap: anywhere; }
 .nameDisplay small { color: var(--rtk-color-text-tertiary); grid-column: 1 / -1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -137,6 +142,8 @@
   .nameEditor { grid-template-columns: minmax(0, 1fr) 44px 44px; }
   .modalActions { flex-direction: column-reverse; }
   .modalActions button { width: 100%; }
+  .defaultTasksFooter { flex-direction: column-reverse; }
+  .defaultTasksFooter button { width: 100%; }
   .toastViewport { bottom: var(--rtk-space-3); left: var(--rtk-space-3); right: var(--rtk-space-3); }
 }
 
