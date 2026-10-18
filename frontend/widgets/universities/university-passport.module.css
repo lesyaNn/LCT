@@ -10,7 +10,7 @@
 .eyebrow { margin: 0 0 var(--rtk-space-2); }
 .titleBlock h1 { font-size: clamp(26px, 3vw, 40px); letter-spacing: -.035em; line-height: 1.12; margin: 0; max-width: 900px; overflow-wrap: anywhere; }
 .city { color: var(--rtk-color-text-secondary); font-size: 16px; margin: var(--rtk-space-2) 0 0; }
-.headerSide { align-items: flex-end; display: flex; flex: 0 1 420px; flex-direction: column; gap: var(--rtk-space-2); min-width: 0; }
+.headerSide { flex: 0 1 420px; min-width: 0; }
 .healthSummary { composes: surface from '../../shared/ui/rtk/section-surface.module.css'; min-width: 220px; padding: var(--rtk-space-4); }
 .healthSummaryTop { align-items: flex-start; display: flex; gap: var(--rtk-space-3); justify-content: space-between; }
 .overline { color: var(--rtk-color-text-tertiary); display: block; letter-spacing: .04em; }

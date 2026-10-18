@@ -16,7 +16,6 @@ from app.db.session import get_db
 from app.models.catalog import Contract, ITProduct, ITProgram, Responsible, University, UniversityResponsible
 from app.models.interactions import Document, UniversityProduct
 from app.models.workflow_instances import InstanceStage, WorkflowInstance
-from app.models.personal_note import PersonalNote
 from app.config import settings
 from app.modules.assistant.knowledge import get_knowledge, lexical_ranking
 from app.modules.catalog.repository import like_pattern, list_universities
@@ -51,7 +50,6 @@ class SearchResults(BaseModel):
     contracts: list[SearchHit] = []
     products: list[SearchHit] = []
     responsibles: list[SearchHit] = []
-    notes: list[SearchHit] = []
     documentation: list[DocumentationHit] = []
 
 
@@ -74,14 +72,6 @@ def search(db: Session, user: CurrentUser, q: str, records_q: str | None = None)
     record_term = term if records_q is None else records_q.strip()
     pattern = like_pattern(record_term)
     result = SearchResults()
-    if user.roles.intersection({"admin", "manager", "user"}):
-        note_pattern = like_pattern(term.casefold())
-        result.notes = [SearchHit(id=note_id, title=title, subtitle=None)
-                        for note_id, title in db.execute(
-                            select(PersonalNote.id, PersonalNote.title)
-                            .where(PersonalNote.owner_sub == user.id, PersonalNote.deleted_at.is_(None))
-                            .where(PersonalNote.search_text.like(note_pattern, escape="\\"))
-                            .order_by(PersonalNote.updated_at.desc()).limit(LIMIT))]
     if len(record_term) >= 2 and "university.read" in permissions:
         rows, _ = list_universities(
             db, page=1, page_size=LIMIT, search=record_term, city=None,

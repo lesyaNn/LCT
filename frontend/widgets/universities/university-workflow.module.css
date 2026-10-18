@@ -1,8 +1,7 @@
 .page { display: flex; flex-direction: column; gap: var(--rtk-space-6); min-width: 0; }
 .embedded { gap: 0; }
 .pageHeader { display: flex; flex-direction: column; gap: var(--rtk-space-4); min-width: 0; }
-.headerTitleRow { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); justify-content: space-between; }
-.headerTitleRow h1 { color: var(--rtk-color-text-primary); font-size: clamp(28px, 3vw, 40px); letter-spacing: -.035em; margin: 0; }
+.pageHeader > h1 { color: var(--rtk-color-text-primary); font-size: clamp(28px, 3vw, 40px); letter-spacing: -.035em; margin: 0; }
 .breadcrumbs { align-items: center; color: var(--rtk-color-text-tertiary); display: flex; flex-wrap: wrap; font-size: 12px; gap: var(--rtk-space-2); }
 .breadcrumbs a { color: var(--rtk-color-brand); text-decoration: none; }
 .breadcrumbs a:hover { text-decoration: underline; }

@@ -12,7 +12,6 @@
 .mobileGroup + .mobileGroup { border-top: 1px solid var(--rtk-color-border); margin-top: var(--rtk-space-4); padding-top: var(--rtk-space-4); }
 .groupHeading { color: var(--rtk-color-text-secondary); font-size: 12px; margin: 0 0 var(--rtk-space-2); }
 .mobileCard { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); display: flex; flex-direction: column; gap: var(--rtk-space-3); padding: var(--rtk-space-4); }
-.highlightedRow { background: var(--rtk-color-surface-subtle); }
 .mobileField { align-items: flex-start; display: flex; gap: var(--rtk-space-4); justify-content: space-between; min-width: 0; }
 .mobileLabel { color: var(--rtk-color-text-tertiary); flex: 0 0 38%; font-size: 11px; line-height: 1.4; padding-top: 2px; }
 .mobileValue { align-items: flex-end; display: flex; flex: 1; flex-direction: column; font-size: 13px; gap: var(--rtk-space-1); min-width: 0; overflow-wrap: anywhere; text-align: right; }

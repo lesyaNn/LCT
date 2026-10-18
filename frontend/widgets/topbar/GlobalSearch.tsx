@@ -6,16 +6,15 @@ import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/shared/lib/api-client';
 import { searchStaticIndex } from '@/shared/config/search-index';
 import type { AuthUser } from '@/shared/types/user';
-import type { IconName } from '@/shared/types/navigation';
 import { Icon } from '@/shared/ui/rtk/icon';
 import { Input } from '@/shared/ui/rtk/form-controls';
 import styles from './global-search.module.css';
 
 type Hit = { id: string; title: string; subtitle: string | null; university_id: string | null };
 type DocumentationHit = { id: string; title: string; subtitle: string; href: string };
-type Results = { universities: Hit[]; workflows: Hit[]; documents: Hit[]; contracts: Hit[]; products: Hit[]; responsibles: Hit[]; notes: Hit[]; documentation: DocumentationHit[] };
-type Option = { key: string; title: string; subtitle: string; href: string; icon: IconName };
-const empty: Results = { universities: [], workflows: [], documents: [], contracts: [], products: [], responsibles: [], notes: [], documentation: [] };
+type Results = { universities: Hit[]; workflows: Hit[]; documents: Hit[]; contracts: Hit[]; products: Hit[]; responsibles: Hit[]; documentation: DocumentationHit[] };
+type Option = { key: string; title: string; subtitle: string; href: string; icon: 'university' | 'workflow' | 'docs' | 'admin' | 'report' | 'audit' | 'dashboard' | 'api' };
+const empty: Results = { universities: [], workflows: [], documents: [], contracts: [], products: [], responsibles: [], documentation: [] };
 
 export function GlobalSearch({ user }: { user: AuthUser }) {
   const router = useRouter();
@@ -85,7 +84,6 @@ export function GlobalSearch({ user }: { user: AuthUser }) {
     { label: 'Действия', items: staticSearch.results.filter((item) => item.kind === 'action') },
     { label: 'Вузы', items: results.universities.map((hit) => ({ key: `u-${hit.id}`, title: hit.title, subtitle: hit.subtitle || 'Паспорт вуза', href: `/universities/${hit.id}`, icon: 'university' })) },
     { label: 'Workflow', items: results.workflows.map((hit) => ({ key: `w-${hit.id}`, title: hit.title, subtitle: hit.subtitle || 'Workflow', href: `/workflows/${hit.id}`, icon: 'workflow' })) },
-    { label: 'Заметки', items: results.notes.map((hit) => ({ key: `n-${hit.id}`, title: hit.title, subtitle: hit.subtitle || 'Личная заметка', href: `/notes?note=${hit.id}`, icon: 'notes' })) },
     { label: 'Документы', items: results.documents.map((hit) => ({ key: `d-${hit.id}`, title: hit.title, subtitle: hit.subtitle || 'Документ', href: `/universities/${hit.university_id}?tab=documents`, icon: 'docs' })) },
     { label: 'Договоры', items: results.contracts.map((hit) => ({ key: `c-${hit.id}`, title: hit.title, subtitle: hit.subtitle || 'Договор', href: `/universities/${hit.university_id}?tab=documents`, icon: 'docs' })) },
     { label: 'ИТ-продукты', items: results.products.map((hit) => ({ key: `p-${hit.id}-${hit.university_id}`, title: hit.title, subtitle: hit.subtitle || 'ИТ-продукт', href: `/universities/${hit.university_id}?tab=products`, icon: 'admin' })) },

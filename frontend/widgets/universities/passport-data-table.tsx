@@ -32,7 +32,6 @@ interface PassportDataTableProps<T extends { id: string }> {
   pageSize?: number;
   serverPagination?: { page: number; pageSize: number; total: number; onPageChange: (page: number) => void };
   groupBy?: (row: T) => string;
-  highlightId?: string | null;
 }
 
 type SortDirection = 'asc' | 'desc';
@@ -48,7 +47,7 @@ function SortIcon({ direction }: { direction: SortDirection | null }) {
   return <ChevronSort size={16} fill="currentColor" />;
 }
 
-export function PassportDataTable<T extends { id: string }>({ rows, columns, mobileFields, emptyMessage, pageSize = 20, serverPagination, groupBy, highlightId }: PassportDataTableProps<T>) {
+export function PassportDataTable<T extends { id: string }>({ rows, columns, mobileFields, emptyMessage, pageSize = 20, serverPagination, groupBy }: PassportDataTableProps<T>) {
   const [sortId, setSortId] = useState<string | null>(null);
   const [direction, setDirection] = useState<SortDirection>('asc');
   const [page, setPage] = useState(1);
@@ -110,11 +109,11 @@ export function PassportDataTable<T extends { id: string }>({ rows, columns, mob
               })}
             </tr>
           </thead>
-          {visibleGroups.map((group) => <tbody key={group.label ?? 'all'}>{group.label ? <tr className={styles.groupRow} key={`group-${group.label}`}><th colSpan={columns.length} scope="rowgroup"><span>{group.label}</span><span className={styles.groupCount}>{group.rows.length}</span></th></tr> : null}{group.rows.map((row) => <tr className={row.id === highlightId ? styles.highlightedRow : undefined} key={row.id}>{columns.map((column) => <td key={column.id} className={column.id === 'actions' ? tableStyles.actionColumn : undefined}>{column.render(row)}</td>)}</tr>)}</tbody>)}
+          {visibleGroups.map((group) => <tbody key={group.label ?? 'all'}>{group.label ? <tr className={styles.groupRow} key={`group-${group.label}`}><th colSpan={columns.length} scope="rowgroup"><span>{group.label}</span><span className={styles.groupCount}>{group.rows.length}</span></th></tr> : null}{group.rows.map((row) => <tr key={row.id}>{columns.map((column) => <td key={column.id} className={column.id === 'actions' ? tableStyles.actionColumn : undefined}>{column.render(row)}</td>)}</tr>)}</tbody>)}
         </table>
       </div>
       <div className={styles.mobileCards}>
-        {visibleGroups.map((group) => <div className={styles.mobileGroup} key={group.label ?? 'all'}>{group.label ? <h3 className={styles.groupHeading}>{group.label}<span className={styles.groupCount}>{group.rows.length}</span></h3> : null}{group.rows.map((row) => <article className={`${styles.mobileCard} ${row.id === highlightId ? styles.highlightedRow : ''}`} key={row.id}>{mobileFields.map((field, index) => <div className={`${styles.mobileField} ${index === 0 ? styles.mobilePrimaryField : ''}`} key={field.label}><span className={styles.mobileLabel}>{field.label}</span><div className={styles.mobileValue}>{field.render(row)}</div></div>)}</article>)}</div>)}
+        {visibleGroups.map((group) => <div className={styles.mobileGroup} key={group.label ?? 'all'}>{group.label ? <h3 className={styles.groupHeading}>{group.label}<span className={styles.groupCount}>{group.rows.length}</span></h3> : null}{group.rows.map((row) => <article className={styles.mobileCard} key={row.id}>{mobileFields.map((field, index) => <div className={`${styles.mobileField} ${index === 0 ? styles.mobilePrimaryField : ''}`} key={field.label}><span className={styles.mobileLabel}>{field.label}</span><div className={styles.mobileValue}>{field.render(row)}</div></div>)}</article>)}</div>)}
       </div>
       {totalPages > 1 ? (
         <div className={styles.pagination} aria-label="Пагинация таблицы">

@@ -10,13 +10,6 @@ export const queryKeys = {
     count: (userId: string) => ['notifications', userId, 'count'] as const,
     list: (userId: string, filter: string, limit: number, offset: number) => ['notifications', userId, 'list', filter, limit, offset] as const,
   },
-  notes: {
-    all: (userId: string) => ['notes', userId] as const,
-    list: <T>(userId: string, params: T) => ['notes', userId, 'list', params] as const,
-    detail: (userId: string, id: string) => ['notes', userId, 'detail', id] as const,
-    folders: (userId: string) => ['notes', userId, 'folders'] as const,
-    links: (userId: string, hrefs: string[]) => ['notes', userId, 'links', hrefs] as const,
-  },
   dashboard: {
     overview: ['dashboard-overview'] as const,
     analytics: ['dashboard-analytics'] as const,

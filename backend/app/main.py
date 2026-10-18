@@ -68,7 +68,6 @@ app = FastAPI(
         {"name": "External integrations", "description": "Внешние интеграции"},
         {"name": "Meeting agenda", "description": "Повестки встреч"},
         {"name": "Notifications", "description": "Уведомления"},
-        {"name": "Notes", "description": "Личные заметки и папки"},
         {"name": "Teacher training", "description": "Обучение преподавателей"},
         {"name": "search", "description": "Глобальный поиск"},
         # Production tags retained as documented extensions for the catalog

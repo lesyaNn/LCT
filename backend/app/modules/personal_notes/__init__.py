@@ -1,1 +1,0 @@
-"""Private workspace notes."""

@@ -419,11 +419,9 @@ def get_documents(db, university_id: uuid.UUID) -> list[DocumentShort]:
 def get_documents_page(
     db, university_id: uuid.UUID, page: int, page_size: int,
     *, search: str | None = None, document_type: str | None = None,
-    status: str | None = None, document_id: uuid.UUID | None = None,
+    status: str | None = None,
 ) -> tuple[list[DocumentShort], int, list[str]]:
     conditions = [Document.university_id == university_id, Document.contract_id.is_(None), Document.license_id.is_(None)]
-    if document_id is not None:
-        conditions.append(Document.id == document_id)
     types = db.scalars(select(Document.document_type).where(*conditions).distinct().order_by(Document.document_type)).all()
     if search:
         from app.modules.catalog.repository import like_pattern

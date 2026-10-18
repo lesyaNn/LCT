@@ -46,7 +46,6 @@ import { WorkflowCreateModal } from './workflow-create-modal';
 import { PassportWorkflowCard } from './passport-workflow-card';
 import { UniversityHealth } from './university-health';
 import { UniversityLocalClock } from './university-local-clock';
-import { useNotesLauncher } from '@/widgets/notes/notes-launcher';
 import styles from './university-passport.module.css';
 
 const mobileLayoutQuery = '(max-width: 768px)';
@@ -82,7 +81,6 @@ function parseTab(value: string | null): PassportTabId {
 }
 
 function PassportHeader({ passport }: { passport: UniversityPassport }) {
-  const notes = useNotesLauncher();
   return (
     <header className={styles.header}>
       <div className={styles.headerMain}>
@@ -92,7 +90,6 @@ function PassportHeader({ passport }: { passport: UniversityPassport }) {
         </div>
         <div className={styles.headerSide}>
           <UniversityLocalClock city={passport.city} timeZone={passport.timeZone} />
-          <Button variant="ghost" size="s" type="button" onClick={() => notes?.openWithLink({ kind: 'university', title: passport.name, href: `/universities/${passport.id}` })}>Добавить в заметку</Button>
         </div>
       </div>
     </header>
@@ -201,7 +198,7 @@ export function UniversityPassport({ id }: { id: string }) {
     : tab === 'licenses'
       ? <LicensesSection id={id} />
     : tab === 'documents'
-      ? <DocumentsSection key={searchParams.get('document') ?? 'all'} id={id} />
+      ? <DocumentsSection id={id} />
     : tab === 'meetings'
       ? <MeetingsSection id={id} canAdd={hasPermission(user, 'university.edit')} />
     : tab === 'responsibles'

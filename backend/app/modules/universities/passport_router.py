@@ -106,14 +106,13 @@ def get_university_passport_documents(
     search: str | None = None,
     document_type: str | None = None,
     status: str | None = None,
-    document_id: uuid.UUID | None = None,
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(require_permission("university.read")),
 ) -> PaginatedDocuments:
     ensure_university_access(university_id, user)
     items, total, types = get_documents_page(
         db, university_id, page, page_size,
-        search=search, document_type=document_type, status=status, document_id=document_id,
+        search=search, document_type=document_type, status=status,
     )
     return PaginatedDocuments(items=items, page=page, page_size=page_size, total=total, types=types)
 

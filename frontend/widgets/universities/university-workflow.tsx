@@ -2,7 +2,7 @@
 
 import type { ComponentType, FormEvent } from 'react';
 import { useMemo, useRef, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Attachment from '@atomaro/icons/24/action/Attachment';
 import Edit from '@atomaro/icons/24/editor/Edit';
@@ -54,7 +54,6 @@ import { WorkflowTransitionModal, type WorkflowTransitionNotification } from './
 import { WorkflowRollbackModal } from './workflow-rollback-modal';
 import { PassportSectionHeader } from './passport-section-header';
 import { UniversityLocalClock } from './university-local-clock';
-import { useNotesLauncher } from '@/widgets/notes/notes-launcher';
 import styles from './university-workflow.module.css';
 
 export type WorkflowViewMode = 'page' | 'embedded';
@@ -365,8 +364,7 @@ function WorkflowDeadlineField({ instanceId, stage, canManage, onNotify }: { ins
   return <><StageDeadline stage={stage} />{canManage ? stage.deadline ? <Tooltip content="Редактировать дедлайн"><IconButton icon={<Edit size={18} fill="currentColor" />} label="Редактировать дедлайн" size={18} onClick={() => { setValue(stage.deadline); setOpen(true); }} /></Tooltip> : <Button variant="ghost" size="s" type="button" onClick={() => { setValue(''); setOpen(true); }}>+ Дедлайн</Button> : null}{open ? <Modal title="Дедлайн этапа" onClose={() => { if (!save.isPending) setOpen(false); }}><div className={styles.editForm}><label>Дата<Input type="date" value={value} disabled={save.isPending} onChange={(event) => setValue(event.target.value)} /></label><div className={styles.editActions}><Button variant="ghost" size="s" type="button" disabled={save.isPending} onClick={() => setOpen(false)}>Отмена</Button><Button variant="primary" size="s" type="button" loading={save.isPending} disabled={save.isPending || value === stage.deadline} onClick={() => save.mutate()}>Сохранить</Button></div></div></Modal> : null}</>;
 }
 
-function WorkflowHeader({ workflow, instanceId, directionName, timeZone, clockLoading }: { workflow: UniversityWorkflow; instanceId: string; directionName?: string; timeZone?: string | null; clockLoading: boolean }) {
-  const notes = useNotesLauncher();
+function WorkflowHeader({ workflow, directionName, timeZone, clockLoading }: { workflow: UniversityWorkflow; directionName?: string; timeZone?: string | null; clockLoading: boolean }) {
   const progress = workflow.totalSteps ? Math.round((workflow.completedSteps / workflow.totalSteps) * 100) : 0;
   const completed = workflow.status === 'completed' || (!workflow.status && workflow.totalSteps > 0 && workflow.completedSteps === workflow.totalSteps);
   const status = completed ? { label: 'Завершён', intent: 'success' as const } : workflow.status === 'archived' ? { label: 'В архиве', intent: 'neutral' as const } : { label: 'В работе', intent: 'orange' as const };
@@ -378,7 +376,7 @@ function WorkflowHeader({ workflow, instanceId, directionName, timeZone, clockLo
   ].filter(Boolean).join(' · ');
   return (
     <header className={styles.pageHeader}>
-      <div className={styles.headerTitleRow}><h1>Workflow вуза</h1><Button variant="ghost" size="s" type="button" onClick={() => notes?.openWithLink({ kind: 'workflow', title: `${workflow.universityName} · ${workflow.workflowName}`, href: `/workflows/${instanceId}` })}>Добавить в заметку</Button></div>
+      <h1>Workflow вуза</h1>
       <div className={styles.headerSummaryRow}>
         <div className={styles.workflowSummary}>
           <span className={styles.universityIcon} aria-hidden="true"><Education size={28} fill="currentColor" /></span>
@@ -408,8 +406,6 @@ function WorkflowGlobalResources({ instanceId, tasks, attachments, readOnly }: {
 }
 
 export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride }: { instanceId: string; mode: WorkflowViewMode; canAdvance?: boolean }) {
-  const searchParams = useSearchParams();
-  const requestedStage = mode === 'page' ? searchParams.get('stage') : null;
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const realWorkflow = isRealWorkflowMode();
@@ -435,9 +431,7 @@ export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride 
   const canRename = realWorkflow && canManage;
   const allowedTargets = realWorkflow ? allowedQuery.data?.map((item) => ({ id: item.id, orderIndex: item.order_index, name: item.name })) ?? [] : undefined;
   const rollbackTargets = realWorkflow ? rollbackQuery.data?.map((item) => ({ id: item.id, orderIndex: item.order_index, name: item.name })) ?? [] : undefined;
-  const [selection, setSelection] = useState<{ id: string | null; requestedStage: string | null } | null>(null);
-  const selectedId = selection?.requestedStage === requestedStage ? selection.id : requestedStage;
-  const setSelectedId = (id: string | null) => setSelection({ id, requestedStage });
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<(WorkflowTransitionNotification & { id: number })[]>([]);
   const notify = (item: WorkflowTransitionNotification) => {
     const id = Date.now() + Math.random();
@@ -452,9 +446,10 @@ export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride 
     attachmentTotal: resourceCounts ? resourceCounts.get(stage.templateStageId ?? '')?.attachments ?? 0 : null,
   } : stage).sort((left, right) => left.orderIndex - right.orderIndex) ?? [], [query.data, realWorkflow, tasksQuery.data, historyQuery.data, resourceCounts]);
   const historyEvents = useMemo(() => realWorkflow ? historyQuery.data ? buildWorkflowHistory(historyQuery.data, stages) : [] : buildMockWorkflowHistory(stages), [historyQuery.data, realWorkflow, stages]);
-  const selectedStage = stages.find((stage) => stage.id === selectedId)
-    ?? stages.find((stage) => stage.id === query.data?.currentStage?.id)
-    ?? stages[0] ?? null;
+  const selectedStage = useMemo(() => {
+    if (!stages.length) return null;
+    return stages.find((stage) => stage.id === selectedId) ?? stages.find((stage) => stage.id === query.data?.currentStage?.id) ?? stages[0];
+  }, [query.data?.currentStage, selectedId, stages]);
   const commonTasks = useMemo(() => (tasksQuery.data?.pages.flatMap((page) => page.items) ?? []).filter((task) => !task.stage_id).map((task) => ({ id: task.id, label: task.title, completed: task.status === 'done' })), [tasksQuery.data]);
   const commonAttachments = useMemo(() => (historyQuery.data?.attachments ?? []).filter((attachment) => !attachment.stage_id && !attachment.comment_id).map((attachment) => workflowAttachmentFromApi(attachment, null)), [historyQuery.data]);
   const idPrefix = `workflow-${instanceId.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
@@ -465,7 +460,7 @@ export function WorkflowView({ instanceId, mode, canAdvance: canAdvanceOverride 
   if (!stages.length || !selectedStage) return <EmptyState presentation={mode === 'page' ? 'large' : 'compact'} icon={mode === 'embedded' ? <InformationStroke size={22} fill="currentColor" /> : undefined} title="Этапы Workflow пока не добавлены" description="Настроенные этапы появятся здесь после запуска процесса." />;
 
   return <div className={`${styles.page} ${mode === 'embedded' ? styles.embedded : ''}`}>
-    {mode === 'page' ? <WorkflowHeader workflow={query.data} instanceId={instanceId} directionName={headerProgramsQuery.data?.find((program) => program.id === query.data.programId)?.direction} timeZone={passportQuery.data?.timeZone} clockLoading={passportQuery.isPending} /> : null}
+    {mode === 'page' ? <WorkflowHeader workflow={query.data} directionName={headerProgramsQuery.data?.find((program) => program.id === query.data.programId)?.direction} timeZone={passportQuery.data?.timeZone} clockLoading={passportQuery.isPending} /> : null}
     {mode === 'embedded' && query.data.status === 'completed' ? <StatusBadge intent="success">Workflow завершён</StatusBadge> : null}
     <div className={styles.layout}>
       <section className={styles.stagesPanel} aria-labelledby={`${idPrefix}-stages-title`}>
