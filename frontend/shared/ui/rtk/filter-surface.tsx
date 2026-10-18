@@ -62,7 +62,7 @@ export function FilterToolbar({ label, controls, periodControls, onReset, resetD
       </div>
     </FilterSurface>
     <Button className={styles.mobileTrigger} variant="secondary" size="s" type="button" onClick={() => setOpen(true)}><Filter size={16} fill="currentColor" />Фильтры{mobileCount ? ` (${mobileCount})` : ''}<ChevronDown className={styles.mobileChevron} size={20} fill="currentColor" aria-hidden="true" /></Button>
-    {open ? <Drawer title="Фильтры" onClose={() => setOpen(false)}><div className={`${styles.grid} ${styles.mobileGrid}`}>{controls(true)}</div>{periodControls ? <div className={styles.periodRow}>{periodControls}</div> : null}<div className={styles.actions}>{reset}{actions}<Button variant="primary" size="s" type="button" onClick={() => setOpen(false)}>Показать результаты</Button></div></Drawer> : null}
+    {open ? <Drawer title="Фильтры" onClose={() => setOpen(false)}><div className={`${styles.grid} ${styles.mobileGrid}`}>{controls(true)}</div>{periodControls ? <div className={styles.periodRow}>{periodControls}</div> : null}<div className={styles.actions} onClick={(event) => { if ((event.target as HTMLElement).closest('button:not(:disabled), a[href]')) setOpen(false); }}>{reset}{actions}<Button variant="primary" size="s" type="button">Показать результаты</Button></div></Drawer> : null}
     <ActiveFilters items={activeFilters} onClearAll={onReset} />
   </>;
 }
