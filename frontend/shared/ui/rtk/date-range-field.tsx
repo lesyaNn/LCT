@@ -6,7 +6,7 @@ import { Button } from './button';
 import { periodPresetOptions, periodPresetRange } from '@/shared/lib/date-period';
 import styles from './date-range-field.module.css';
 
-export function DateRangeField({ label = 'Период', from, to, onFromChange, onToChange, onRangeChange, presets = false, wideSplit = false, disabled = false, fromError, toError }: {
+export function DateRangeField({ label = 'Период', from, to, onFromChange, onToChange, onRangeChange, presets = false, disabled = false, fromError, toError }: {
   label?: string;
   from: string;
   to: string;
@@ -14,7 +14,6 @@ export function DateRangeField({ label = 'Период', from, to, onFromChange,
   onToChange: (value: string) => void;
   onRangeChange?: (from: string, to: string) => void;
   presets?: boolean;
-  wideSplit?: boolean;
   disabled?: boolean;
   fromError?: string;
   toError?: string;
@@ -26,7 +25,7 @@ export function DateRangeField({ label = 'Период', from, to, onFromChange,
     if (onRangeChange) onRangeChange(range.dateFrom, range.dateTo);
     else { onFromChange(range.dateFrom); onToChange(range.dateTo); }
   };
-  return <div className={`${styles.root}${wideSplit ? ` ${styles.wideSplit}` : ''}`} role="group" aria-label={label}>
+  return <div className={styles.root} role="group" aria-label={label}>
     <span className={styles.label}>{label}</span>
     <div className={styles.controls}>
       {presets ? <div className={styles.presets}>{periodPresetOptions.map(({ id: preset, label: text }) => <Button key={preset} variant={selectedPreset === preset ? (preset === 'current_year' ? 'orange' : 'primary') : 'secondary'} size="s" type="button" disabled={disabled} aria-pressed={selectedPreset === preset} onClick={() => selectPreset(preset)}>{text}</Button>)}</div> : null}

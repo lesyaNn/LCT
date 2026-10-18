@@ -9,6 +9,10 @@
 .list { display: grid; gap: var(--rtk-space-4); grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); }
 .boardScroll { max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; padding: 2px 0 var(--rtk-space-4); }
 .board { display: flex; gap: var(--rtk-space-3); min-width: max-content; }
+.boardGroup { display: flex; flex: 0 0 auto; flex-direction: column; gap: var(--rtk-space-2); }
+.boardGroup + .boardGroup { border-left: 1px solid var(--rtk-color-border); padding-left: var(--rtk-space-4); }
+.boardGroupTitle { color: var(--rtk-color-text-secondary); font-size: 12px; font-weight: 600; margin: 0; }
+.boardColumns { display: flex; gap: var(--rtk-space-3); }
 .column { background: var(--rtk-color-surface-subtle); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-medium); flex: 0 0 288px; min-height: 240px; padding: var(--rtk-space-3); width: 288px; }
 .column header { align-items: center; display: flex; justify-content: space-between; gap: var(--rtk-space-2); padding: 2px var(--rtk-space-1) var(--rtk-space-3); }
 .column h2 { font-size: 14px; line-height: 1.3; margin: 0; overflow-wrap: anywhere; }

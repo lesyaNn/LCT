@@ -53,19 +53,18 @@ export function ReportFilterFields({ values, options, loading, unavailable, erro
     controls={() => <>
       {fields.map(({ key, label }) => <MultiSelect key={key} label={label} labelPlacement="outside" options={options ? availableOptions(key, values, options) : []} values={values[key]} onChange={(selected) => onChange(key, selected)} searchable loading={loading} disabled={unavailable} />)}
       <MultiSelect label="Статусы этапов" labelPlacement="outside" options={statusOptions} values={values.workflowStatuses} onChange={(selected) => onChange('workflowStatuses', selected)} searchable />
+      <DateRangeField
+        label="Период"
+        presets
+        from={values.dateFrom}
+        to={values.dateTo}
+        onFromChange={(dateFrom) => onPeriodChange(dateFrom, values.dateTo)}
+        onToChange={(dateTo) => onPeriodChange(values.dateFrom, dateTo)}
+        onRangeChange={onPeriodChange}
+        fromError={errors.dateFrom?.message}
+        toError={errors.dateTo?.message}
+      />
     </>}
-    periodControls={<DateRangeField
-      label="Период взаимодействия"
-      presets
-      wideSplit
-      from={values.dateFrom}
-      to={values.dateTo}
-      onFromChange={(dateFrom) => onPeriodChange(dateFrom, values.dateTo)}
-      onToChange={(dateTo) => onPeriodChange(values.dateFrom, dateTo)}
-      onRangeChange={onPeriodChange}
-      fromError={errors.dateFrom?.message}
-      toError={errors.dateTo?.message}
-    />}
     onReset={onReset}
     resetDisabled={!activeFilters.length}
     mobileCount={activeFilters.length}

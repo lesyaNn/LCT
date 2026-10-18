@@ -7,8 +7,8 @@ import { useAuth } from '@/shared/auth/AuthProvider';
 import { hasPermission } from '@/shared/lib/access-control';
 import { normalizeApiError } from '@/shared/lib/api-errors';
 import { queryKeys } from '@/shared/lib/query-keys';
-import { getAvailableWorkflowTransitionTargets, type WorkflowTransitionTarget } from '@/shared/lib/workflow-transition';
-import { getWorkflowAllowedTransitions, isRealWorkflowMode } from '@/shared/lib/universities-repository';
+import { getAvailableWorkflowTransitionTargets, orderedWorkflowStages, type WorkflowTransitionTarget } from '@/shared/lib/workflow-transition';
+import { getWorkflowAllowedTransitions, isRealWorkflowMode, type UniversityWorkflow } from '@/shared/lib/universities-repository';
 import { workflowStageKey, type WorkflowOverviewItem } from '@/shared/lib/workflow-overview-repository';
 import { Toast } from '@/shared/ui/rtk/toast';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
@@ -16,21 +16,51 @@ import { WorkflowTransitionModal, type WorkflowTransitionNotification } from '@/
 import { WorkflowCard } from './workflow-card';
 import styles from './workflow-overview.module.css';
 
-type Column = { key: string; name: string; order: number; items: WorkflowOverviewItem[] };
+type Column = { key: string; name: string; items: WorkflowOverviewItem[] };
+type BoardGroup = { key: string; columns: Column[] };
 type PendingDrop = { item: WorkflowOverviewItem; targetStageId: string; allowedTargets?: WorkflowTransitionTarget[] };
 
 const columnCollisionDetection: CollisionDetection = (args) => args.pointerCoordinates
   ? pointerWithin(args)
   : rectIntersection(args);
 
+function workflowSequence(workflow: UniversityWorkflow) {
+  const stages = orderedWorkflowStages(workflow.stages);
+  return { stages, key: JSON.stringify([workflow.templateId, stages.map((stage) => workflowStageKey(workflow, stage))]) };
+}
+
+function boardColumnKey(sequenceKey: string, stageKey: string): string {
+  return JSON.stringify([sequenceKey, stageKey]);
+}
+
 function transitionTargets(item: WorkflowOverviewItem, allowedTargets?: WorkflowTransitionTarget[]): Map<string, string> {
-  if (item.status === 'completed') return new Map();
+  const hasIncompleteTasks = item.stage.taskTotal !== undefined
+    ? (item.stage.taskCompleted ?? 0) < item.stage.taskTotal
+    : item.stage.tasks.some((task) => !task.completed);
+  if (item.status === 'completed' || hasIncompleteTasks) return new Map();
+  const { key: sequenceKey } = workflowSequence(item.workflow);
   return new Map((allowedTargets ?? getAvailableWorkflowTransitionTargets(item.workflow.stages, item.stage))
     .map((target) => {
       const stage = item.workflow.stages.find((candidate) => candidate.id === target.id);
-      return stage ? [workflowStageKey(item.workflow, stage), stage.id] as const : null;
+      return stage ? [boardColumnKey(sequenceKey, workflowStageKey(item.workflow, stage)), stage.id] as const : null;
     })
     .filter((entry): entry is readonly [string, string] => entry !== null));
+}
+
+function workflowBoardGroups(items: WorkflowOverviewItem[]): BoardGroup[] {
+  const groups = new Map<string, BoardGroup>();
+  for (const item of items) {
+    const sequence = workflowSequence(item.workflow);
+    let group = groups.get(sequence.key);
+    if (!group) {
+      group = { key: sequence.key, columns: sequence.stages.map((stage) => ({
+        key: boardColumnKey(sequence.key, workflowStageKey(item.workflow, stage)), name: stage.name, items: [],
+      })) };
+      groups.set(sequence.key, group);
+    }
+    group.columns.find((column) => column.key === boardColumnKey(sequence.key, item.stageKey))?.items.push(item);
+  }
+  return [...groups.values()];
 }
 
 function DraggableWorkflowCard({ item, enabled }: { item: WorkflowOverviewItem; enabled: boolean }) {
@@ -66,17 +96,7 @@ export function WorkflowBoard({ items }: { items: WorkflowOverviewItem[] }) {
     useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
     useSensor(KeyboardSensor),
   );
-  const columns = useMemo(() => {
-    const map = new Map<string, Column>();
-    for (const item of items) {
-      for (const stage of item.workflow.stages) {
-        const key = workflowStageKey(item.workflow, stage);
-        if (!map.has(key)) map.set(key, { key, name: stage.name, order: stage.orderIndex, items: [] });
-      }
-      map.get(item.stageKey)?.items.push(item);
-    }
-    return [...map.values()].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, 'ru'));
-  }, [items]);
+  const groups = useMemo(() => workflowBoardGroups(items), [items]);
   const draggingItem = items.find((item) => item.instanceId === draggingId);
   const canDrag = canManage && !resolvingDrop && !pending;
   const validTargets = draggingItem && canDrag ? transitionTargets(draggingItem) : new Map<string, string>();
@@ -92,7 +112,7 @@ export function WorkflowBoard({ items }: { items: WorkflowOverviewItem[] }) {
       const allowedTargets = realWorkflow ? (await queryClient.fetchQuery({
         queryKey: queryKeys.universities.workflowAllowed(item.instanceId),
         queryFn: () => getWorkflowAllowedTransitions(item.instanceId),
-        staleTime: 30_000,
+        staleTime: 0,
       })).map((target) => ({ id: target.id, orderIndex: target.order_index, name: target.name })) : undefined;
       const targetStageId = transitionTargets(item, allowedTargets).get(targetKey);
       if (targetStageId) setPending({ item, targetStageId, allowedTargets });
@@ -110,7 +130,10 @@ export function WorkflowBoard({ items }: { items: WorkflowOverviewItem[] }) {
 
   return <>
     <DndContext sensors={sensors} collisionDetection={columnCollisionDetection} onDragStart={(event) => setDraggingId(String(event.active.id))} onDragEnd={(event) => { void finishDrag(event); }} onDragCancel={() => setDraggingId(null)}>
-      <div className={styles.boardScroll} aria-label="Доска Workflow"><div className={styles.board}>{columns.map((column) => <WorkflowBoardColumn column={column} valid={validTargets.has(column.key)} active={canDrag} key={column.key} />)}</div></div>
+      <div className={styles.boardScroll} aria-label="Доска Workflow"><div className={styles.board}>{groups.map((group, index) => <div className={styles.boardGroup} key={group.key}>
+        {groups.length > 1 ? <h2 className={styles.boardGroupTitle}>Последовательность этапов {index + 1}</h2> : null}
+        <div className={styles.boardColumns}>{group.columns.map((column) => <WorkflowBoardColumn column={column} valid={validTargets.has(column.key)} active={canDrag} key={column.key} />)}</div>
+      </div>)}</div></div>
       <DragOverlay>{draggingItem ? <div className={styles.dragOverlay} aria-hidden="true" inert><WorkflowCard item={draggingItem} /></div> : null}</DragOverlay>
     </DndContext>
     {pending ? <WorkflowTransitionModal open instanceId={pending.item.instanceId} universityId={pending.item.universityId} currentStage={pending.item.stage} stages={pending.item.workflow.stages} allowedTargets={pending.allowedTargets} initialTargetStageId={pending.targetStageId} userId={user?.id} onClose={() => setPending(null)} onSuccess={() => setPending(null)} onNotify={setNotification} /> : null}

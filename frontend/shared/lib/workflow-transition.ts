@@ -16,8 +16,12 @@ export interface WorkflowTransitionDraft {
   updatedAt: string;
 }
 
+export function orderedWorkflowStages(stages: UniversityWorkflowStage[]): UniversityWorkflowStage[] {
+  return stages.slice().sort((left, right) => left.orderIndex - right.orderIndex);
+}
+
 export function getAvailableWorkflowTransitionTargets(stages: UniversityWorkflowStage[], currentStage: UniversityWorkflowStage): WorkflowTransitionTarget[] {
-  const ordered = stages.slice().sort((left, right) => left.orderIndex - right.orderIndex);
+  const ordered = orderedWorkflowStages(stages);
   return ordered
     .filter((target) => target.orderIndex > currentStage.orderIndex)
     .filter((target) => target.status !== 'completed' && target.status !== 'skipped')

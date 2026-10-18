@@ -43,7 +43,9 @@
 .unmapped { background: var(--rtk-color-surface-subtle); border: 0; border-top: 1px solid var(--rtk-color-border); color: var(--rtk-color-brand); cursor: pointer; font: inherit; font-size: 12px; padding: var(--rtk-space-3) var(--rtk-space-5); text-align: left; }
 .unmapped:hover, .unmapped:focus-visible { text-decoration: underline; }
 .noResults { color: var(--rtk-color-text-secondary); font-size: 13px; margin: 0; padding: var(--rtk-space-3) var(--rtk-space-5); }
-.attribution { color: var(--rtk-color-text-tertiary); font-size: 10px; margin: 0; padding: 0 var(--rtk-space-5) var(--rtk-space-3); }
+.attribution { color: var(--rtk-color-text-tertiary); font-size: 11px; padding: 0 var(--rtk-space-5) var(--rtk-space-3); }
+.attribution summary { cursor: pointer; width: fit-content; }
+.attribution p { line-height: 1.4; margin: var(--rtk-space-2) 0 0; }
 .attribution a { color: inherit; text-decoration: underline; }
 .loading { align-items: center; background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-medium); color: var(--rtk-color-text-secondary); display: flex; justify-content: center; min-height: 380px; }
 .sidePanel { max-height: 660px; overflow: auto; }

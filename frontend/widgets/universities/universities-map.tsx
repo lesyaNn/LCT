@@ -288,7 +288,10 @@ export function UniversitiesMap({ filters, scopeKey }: { filters: UniversityFilt
         </div>
         {unmapped.universities.length > 0 ? <button type="button" className={styles.unmapped} onClick={() => setSelected('unmapped')}>Без определённого региона: {unmapped.universities.length} вузов · Показать</button> : null}
         {dataQuery.data.length === 0 ? <p className={styles.noResults}>По выбранным условиям вузов не найдено. Измените фильтры, чтобы увидеть их на карте.</p> : null}
-        <p className={styles.attribution}>Границы: <a href="https://www.naturalearthdata.com/" target="_blank" rel="noreferrer">Natural Earth</a> · Города: <a href="https://www.geonames.org/" target="_blank" rel="noreferrer">GeoNames</a> (CC BY 4.0). Статус и границы ряда территорий оспариваются; картографическая классификация Natural Earth не означает всеобщего признания.</p>
+        <details className={styles.attribution}>
+          <summary>Источники карты</summary>
+          <p>Границы: <a href="https://www.naturalearthdata.com/" target="_blank" rel="noreferrer">Natural Earth</a> · Города: <a href="https://www.geonames.org/about.html" target="_blank" rel="noreferrer">GeoNames</a> (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a>). Данные городов обработаны для привязки к регионам. Статус и границы ряда территорий оспариваются.</p>
+        </details>
       </div>
       {selected && !mobile ? <aside className={styles.sidePanel}><RegionDetails key={`${selected}-${JSON.stringify(filters)}`} title={selectedTitle} stats={selectedStats} onClose={() => setSelected(null)} /></aside> : null}
     </div>
