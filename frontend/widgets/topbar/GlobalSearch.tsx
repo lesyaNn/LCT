@@ -47,6 +47,13 @@ export function GlobalSearch({ user }: { user: AuthUser }) {
   }, []);
 
   useEffect(() => {
+    const viewport = window.matchMedia('(max-width: 768px)');
+    const closeOnLayoutChange = () => { setOpen(false); setMobile(false); input.current?.blur(); };
+    viewport.addEventListener('change', closeOnLayoutChange);
+    return () => viewport.removeEventListener('change', closeOnLayoutChange);
+  }, []);
+
+  useEffect(() => {
     if (!open || mobile) return;
     const update = () => {
       const rect = root.current?.getBoundingClientRect();

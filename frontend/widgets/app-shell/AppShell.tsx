@@ -22,7 +22,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
     const updateLayoutMode = () => {
       const isMobile = window.innerWidth <= 768;
       setCollapsed(!isMobile && window.innerWidth < 1200);
-      if (isMobile) setMobileOpen(false);
+      if (!isMobile) setMobileOpen(false);
     };
 
     updateLayoutMode();
