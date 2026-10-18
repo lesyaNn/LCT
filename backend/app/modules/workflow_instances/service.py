@@ -373,7 +373,7 @@ def create_instance(
     today: date | None = None,
     external_application: ExternalApplication | None = None,
 ) -> InstanceDetail:
-    """Atomic creation: header + snapshot + pointers + creation transition."""
+    """Atomically create header, stage snapshots, default tasks and transition."""
     university = db.get(University, university_id)
     if university is None:
         raise NotFound("University not found")
@@ -422,6 +422,16 @@ def create_instance(
 
     snapshots: list[InstanceStage] = []
     for position, (stage, due) in enumerate(zip(template_stages, dues), start=1):
+        db.add_all([
+            WorkflowTask(
+                instance_id=instance.id,
+                stage_id=stage.id,
+                title=title,
+                description="",
+                status="open",
+            )
+            for title in stage.default_tasks
+        ])
         snapshots.append(
             InstanceStage(
                 instance_id=instance.id,

@@ -19,6 +19,7 @@ interface WorkflowTemplateStageApiRecord {
   is_required: boolean;
   is_active: boolean;
   sla_days: number | null;
+  default_tasks: string[];
   created_at: string;
   updated_at: string;
 }
@@ -52,6 +53,7 @@ export interface WorkflowTemplateStage {
   isRequired: boolean;
   isActive: boolean;
   slaDays: number | null;
+  defaultTasks: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -93,6 +95,7 @@ export interface CreateWorkflowStageInput {
   isRequired: boolean;
   slaDays: number | null;
   orderIndex?: number;
+  defaultTasks?: string[];
 }
 
 export interface UpdateWorkflowStageInput {
@@ -102,6 +105,7 @@ export interface UpdateWorkflowStageInput {
   isRequired?: boolean;
   isActive?: boolean;
   slaDays?: number | null;
+  defaultTasks?: string[];
 }
 
 export class WorkflowTemplateApiError extends ApiRequestError {
@@ -137,6 +141,7 @@ function stageFromApi(stage: WorkflowTemplateStageApiRecord): WorkflowTemplateSt
     isRequired: stage.is_required,
     isActive: stage.is_active,
     slaDays: stage.sla_days,
+    defaultTasks: stage.default_tasks ?? [],
     createdAt: stage.created_at,
     updatedAt: stage.updated_at,
   };
@@ -197,6 +202,7 @@ async function addRealWorkflowStage(templateId: string, input: CreateWorkflowSta
       description: input.description,
       is_required: input.isRequired,
       sla_days: input.slaDays,
+      default_tasks: input.defaultTasks ?? [],
       ...(input.orderIndex === undefined ? {} : { order_index: input.orderIndex }),
     },
   });
@@ -212,6 +218,7 @@ async function updateRealWorkflowStage(templateId: string, stageId: string, inpu
   if (input.isRequired !== undefined) body.is_required = input.isRequired;
   if (input.isActive !== undefined) body.is_active = input.isActive;
   if (input.slaDays !== undefined) body.sla_days = input.slaDays;
+  if (input.defaultTasks !== undefined) body.default_tasks = input.defaultTasks;
   const result = await apiFetch<WorkflowTemplateStageApiRecord>(`/api/v1/workflow/templates/${encodeURIComponent(templateId)}/stages/${encodeURIComponent(stageId)}`, { method: 'PATCH', body });
   if (!result.ok) return fail(result.status, result.body, result.error, 'Не удалось сохранить этап.');
   return stageFromApi(result.data);

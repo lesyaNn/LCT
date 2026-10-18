@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Annotated
 
 from pydantic import BaseModel, Field
 from app.schemas.validation import NonBlankText
@@ -43,6 +44,8 @@ class TemplateRead(BaseModel):
 
 # ------------------------------------------------------------------- stages
 
+DefaultTaskTitle = Annotated[NonBlankText, Field(min_length=1, max_length=512)]
+
 
 class StageCreate(BaseModel):
     name: NonBlankText = Field(min_length=1, max_length=512)
@@ -53,6 +56,7 @@ class StageCreate(BaseModel):
     is_required: bool = True
     is_active: bool = True
     sla_days: int | None = Field(default=None, ge=0)
+    default_tasks: list[DefaultTaskTitle] = Field(default_factory=list)
 
 
 class StageUpdate(BaseModel):
@@ -62,6 +66,7 @@ class StageUpdate(BaseModel):
     is_required: bool | None = None
     is_active: bool | None = None
     sla_days: int | None = Field(default=None, ge=0)
+    default_tasks: list[DefaultTaskTitle] = Field(default_factory=list)
 
 
 class StageRead(BaseModel):
@@ -73,6 +78,7 @@ class StageRead(BaseModel):
     is_required: bool
     is_active: bool
     sla_days: int | None
+    default_tasks: list[str]
     created_at: datetime
     updated_at: datetime
 

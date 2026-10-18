@@ -28,6 +28,30 @@ test('isolated admin edits a real Workflow template and persists it', async ({ p
   await page.reload();
   await expect(page.getByText('Первый этап', { exact: true })).toBeVisible();
 
+  const tasksButton = page.getByRole('button', { name: 'Задачи по умолчанию этапа «Первый этап»', exact: true });
+  await tasksButton.click();
+  const tasksDialog = page.getByRole('dialog', { name: 'Задачи этапа по умолчанию' });
+  await tasksDialog.getByRole('button', { name: 'Добавить задачу', exact: true }).click();
+  await tasksDialog.getByLabel('Название задачи 1', { exact: true }).fill('Проверить документы');
+  await tasksDialog.getByRole('button', { name: 'Добавить задачу', exact: true }).click();
+  await tasksDialog.getByLabel('Название задачи 2', { exact: true }).fill('Позвонить');
+  await tasksDialog.getByRole('button', { name: 'Сохранить', exact: true }).click();
+  await expect(tasksDialog).not.toBeVisible();
+  await page.reload();
+  await expect(tasksButton).toContainText('2');
+  await tasksButton.click();
+  await expect(tasksDialog.getByLabel('Название задачи 1', { exact: true })).toHaveValue('Проверить документы');
+  await expect(tasksDialog.getByLabel('Название задачи 2', { exact: true })).toHaveValue('Позвонить');
+  await tasksDialog.getByLabel('Название задачи 1', { exact: true }).fill('Согласовать документы');
+  await tasksDialog.getByRole('button', { name: 'Удалить задачу 2', exact: true }).click();
+  await tasksDialog.getByRole('button', { name: 'Сохранить', exact: true }).click();
+  await expect(tasksDialog).not.toBeVisible();
+  await page.reload();
+  await expect(tasksButton).toContainText('1');
+  await tasksButton.click();
+  await expect(tasksDialog.getByLabel('Название задачи 1', { exact: true })).toHaveValue('Согласовать документы');
+  await tasksDialog.getByRole('button', { name: 'Отмена', exact: true }).click();
+
   await page.goto('/admin/workflow/templates');
   const row = page.getByRole('listitem').filter({ hasText: name });
   await expect(row).toBeVisible();

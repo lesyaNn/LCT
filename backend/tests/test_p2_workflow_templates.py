@@ -193,6 +193,78 @@ def _order(db, template_id):
     ).all()
 
 
+def test_stage_default_tasks_persist_and_patch_is_scoped(client):
+    template = _template(client)
+    stage = _stage(client, template["id"], default_tasks=["  Проверить документы  ", "Позвонить"])
+    url = f'/api/v1/workflow/templates/{template["id"]}/stages/{stage["id"]}'
+    assert stage["default_tasks"] == ["Проверить документы", "Позвонить"]
+    renamed = client.patch(url, json={"name": "Новое название"})
+    assert renamed.status_code == 200
+    assert renamed.json()["default_tasks"] == stage["default_tasks"]
+    updated = client.patch(url, json={"default_tasks": ["Новая задача"]})
+    assert updated.status_code == 200
+    detail = client.get(f'/api/v1/workflow/templates/{template["id"]}').json()
+    assert detail["stages"][0]["default_tasks"] == ["Новая задача"]
+    other = _template(client)
+    assert client.patch(
+        f'/api/v1/workflow/templates/{other["id"]}/stages/{stage["id"]}',
+        json={"default_tasks": []},
+    ).status_code == 404
+    assert client.patch(url, json={"default_tasks": None}).status_code == 422
+    cleared = client.patch(url, json={"default_tasks": []})
+    assert cleared.status_code == 200
+    assert cleared.json()["default_tasks"] == []
+
+
+def test_default_tasks_are_copied_for_all_active_stages_only_on_launch(client, db):
+    from app.models.catalog import University
+
+    template = _template(client)
+    first = _stage(client, template["id"], default_tasks=["Документы", "Звонок"])
+    second = _stage(client, template["id"], default_tasks=["Согласование"])
+    _stage(client, template["id"], is_active=False, default_tasks=["Не копировать"])
+    _stage(client, template["id"])
+    university = University(name=f"Default tasks {_tag()}", city="Москва")
+    db.add(university)
+    db.commit()
+
+    def launch():
+        response = client.post('/api/v1/workflow/instances', json={
+            "university_id": str(university.id), "template_id": template["id"],
+        })
+        assert response.status_code == 201, response.text
+        return response.json()
+
+    def tasks(instance_id):
+        response = client.get(f'/api/v1/workflow/instances/{instance_id}/tasks')
+        assert response.status_code == 200, response.text
+        return response.json()["items"]
+
+    running = launch()
+    assert [stage["tasks_total"] for stage in running["stages"]] == [2, 1, 0]
+    original = tasks(running["id"])
+    assert {(task["stage_id"], task["title"], task["status"]) for task in original} == {
+        (first["id"], "Документы", "open"), (first["id"], "Звонок", "open"),
+        (second["id"], "Согласование", "open"),
+    }
+    task = next(task for task in original if task["stage_id"] == first["id"])
+    changed = client.patch(f'/api/v1/workflow/instances/{running["id"]}/tasks/{task["id"]}',
+                           json={"title": "Выполнено в процессе", "status": "done"})
+    assert changed.status_code == 200, changed.text
+    stage_url = f'/api/v1/workflow/templates/{template["id"]}/stages/{first["id"]}'
+    assert client.patch(stage_url, json={"default_tasks": ["Новая задача"]}).status_code == 200
+    existing = tasks(running["id"])
+    assert len(existing) == 3
+    assert any(task["title"] == "Выполнено в процессе" and task["status"] == "done" for task in existing)
+    new_running = launch()
+    new_tasks = tasks(new_running["id"])
+    assert {task["title"] for task in new_tasks} == {"Новая задача", "Согласование"}
+    assert all(task["status"] == "open" for task in new_tasks)
+    assert {task["id"] for task in new_tasks}.isdisjoint(task["id"] for task in original)
+    assert client.patch(stage_url, json={"default_tasks": []}).status_code == 200
+    assert [task["title"] for task in tasks(launch()["id"])] == ["Согласование"]
+
+
 # ================================================================== schema
 
 

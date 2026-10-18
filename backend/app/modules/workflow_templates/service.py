@@ -222,6 +222,7 @@ def create_stage(
     is_required: bool,
     is_active: bool,
     sla_days: int | None,
+    default_tasks: list[str] | None = None,
 ) -> StageRead:
     _lock_template(db, template_id)  # serialize same-template writers (§8)
     top = _max_order(db, template_id)
@@ -246,6 +247,7 @@ def create_stage(
         is_required=is_required,
         is_active=is_active,
         sla_days=sla_days,
+        default_tasks=list(default_tasks or []),
     )
     db.add(obj)
     if "audit_context" in db.info:
@@ -262,6 +264,7 @@ def create_stage(
         new_value: dict = {"audit_object_type": "workflow_stage",
                            "template_id": str(template_id), "name": obj.name,
                            "order_index": obj.order_index, "is_active": obj.is_active}
+        new_value["default_tasks"] = obj.default_tasks
         if template_name:
             new_value["template_name"] = template_name
         AuditService(db).log_event(
@@ -305,13 +308,14 @@ def patch_stage(
     is_required: bool | None,
     is_active: bool | None,
     sla_days: int | None,
+    default_tasks: list[str] | None = None,
 ) -> StageRead:
     _lock_template(db, template_id)  # serialize same-template writers (§8)
     obj = _require_stage(db, template_id, stage_id)
     old = {"audit_object_type": "workflow_stage",
            "name": obj.name, "order_index": obj.order_index,
            "is_active": obj.is_active, "is_required": obj.is_required,
-           "sla_days": obj.sla_days}
+           "sla_days": obj.sla_days, "default_tasks": list(obj.default_tasks)}
     if "name" in fields and name is not None:
         obj.name = name
     if "description" in fields:
@@ -324,6 +328,8 @@ def patch_stage(
         obj.is_active = is_active
     if "sla_days" in fields:
         obj.sla_days = sla_days
+    if "default_tasks" in fields:
+        obj.default_tasks = list(default_tasks or [])
     if "order_index" in fields and order_index is not None:
         _move_stage(db, obj, order_index)
     if "audit_context" in db.info:
@@ -339,7 +345,7 @@ def patch_stage(
         new_value = {"audit_object_type": "workflow_stage",
                      "name": obj.name, "order_index": obj.order_index,
                      "is_active": obj.is_active, "is_required": obj.is_required,
-                     "sla_days": obj.sla_days}
+                     "sla_days": obj.sla_days, "default_tasks": obj.default_tasks}
         if template_name:
             new_value["template_name"] = template_name
             old["template_name"] = template_name

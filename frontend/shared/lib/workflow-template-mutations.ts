@@ -72,6 +72,7 @@ export function useAddWorkflowStage(templateId: string) {
           isRequired: input.isRequired,
           isActive: true,
           slaDays: input.slaDays,
+          defaultTasks: input.defaultTasks ?? [],
           createdAt: now,
           updatedAt: now,
         };
@@ -117,6 +118,7 @@ export function useUpdateWorkflowStage(templateId: string) {
       if (patch.isRequired !== undefined) optimisticPatch.isRequired = patch.isRequired;
       if (patch.isActive !== undefined) optimisticPatch.isActive = patch.isActive;
       if (patch.slaDays !== undefined) optimisticPatch.slaDays = patch.slaDays;
+      if (patch.defaultTasks !== undefined) optimisticPatch.defaultTasks = patch.defaultTasks;
       queryClient.setQueryData<WorkflowTemplate>(detailKey, (current) => patchWorkflowStage(current, stageId, optimisticPatch));
       return { previous };
     },

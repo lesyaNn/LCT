@@ -148,6 +148,7 @@ def create_stage(
         is_required=data.is_required,
         is_active=data.is_active,
         sla_days=data.sla_days,
+        default_tasks=data.default_tasks,
     )
 
 
@@ -176,4 +177,5 @@ def patch_stage(
         is_required=data.is_required,
         is_active=data.is_active,
         sla_days=data.sla_days,
+        default_tasks=data.default_tasks,
     )

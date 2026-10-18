@@ -1,6 +1,7 @@
 """P2-01-01 canonical ORM for workflow templates/stages.
 
-Runtime-only description of SQL migration ``000011_workflow_templates``
+Runtime-only description of SQL migrations ``000011_workflow_templates``
+and ``000049_stage_default_tasks``
 (which is the schema source of truth): types, nullability, FK, constraints
 and indexes mirror the ``*.up.sql`` exactly. Never drives DDL.
 
@@ -20,6 +21,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -57,6 +59,10 @@ class WorkflowStage(UUIDPKMixin, TimestampMixin, Base):
             initially="DEFERRED",
         ),
         CheckConstraint("order_index >= 1", name="ck_workflow_stages_order_index_ge_1"),
+        CheckConstraint(
+            "jsonb_typeof(default_tasks) = 'array'",
+            name="ck_workflow_stages_default_tasks_array",
+        ),
         Index("ix_workflow_stages_template_id", "template_id"),
         Index("ix_workflow_stages_template_order", "template_id", "order_index"),
     )
@@ -75,5 +81,8 @@ class WorkflowStage(UUIDPKMixin, TimestampMixin, Base):
     is_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     sla_days: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+    default_tasks: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, default=list, server_default="[]"
+    )
 
     template: Mapped["WorkflowTemplate"] = relationship(back_populates="stages")

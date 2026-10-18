@@ -768,9 +768,9 @@ def test_migration_chain_has_report_jobs_and_latest_head():
     spec.loader.exec_module(module)
     versions = [v for v, _, _ in module._discover()]
     assert "000044_assistant_conversations" in versions
-    assert versions[-1] == "000048_notification_email_delivery"
+    assert versions[-1] == "000049_stage_default_tasks"
     assert "000033_product_program" in versions
-    assert len(versions) == 48
+    assert len(versions) == 49
     assert "report_jobs" in module.EXPECTED_TABLES
     assert "assistant_turns" in module.EXPECTED_TABLES
 

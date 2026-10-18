@@ -28,6 +28,15 @@
 .dragHandle:active { cursor: grabbing; }
 .dragHandle:disabled { cursor: not-allowed; opacity: .4; }
 .nameCell { overflow: hidden; }
+.nameCell .defaultTasksButton { background: var(--rtk-color-brand-soft); border: 0; border-radius: 999px; color: var(--rtk-color-brand); font-size: 14px; gap: var(--rtk-space-2); margin-top: var(--rtk-space-2); min-height: 36px; padding: 0 var(--rtk-space-3); }
+.nameCell .defaultTasksButton:hover:not(:disabled) { background: color-mix(in srgb, var(--rtk-color-brand) 12%, var(--rtk-color-surface)); color: var(--rtk-color-brand); }
+.nameCell .defaultTasksButton:active:not(:disabled) { background: color-mix(in srgb, var(--rtk-color-brand) 18%, var(--rtk-color-surface)); }
+.nameCell .defaultTasksButton:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: 3px; }
+.defaultTasksButton svg { flex-shrink: 0; }
+.defaultTasksHint { color: var(--rtk-color-text-secondary); margin: 0; overflow-wrap: anywhere; }
+.defaultTaskList { display: flex; flex-direction: column; gap: var(--rtk-space-2); list-style: none; margin: 0; padding: 0; }
+.defaultTaskRow { align-items: center; display: flex; gap: var(--rtk-space-2); }
+.defaultTaskRow > input { flex: 1; min-width: 0; }
 .nameDisplay { align-items: center; display: grid; gap: 2px var(--rtk-space-2); grid-template-columns: minmax(0, auto) 40px; justify-content: start; }
 .nameDisplay > span { font-weight: 650; overflow-wrap: anywhere; }
 .nameDisplay small { color: var(--rtk-color-text-tertiary); grid-column: 1 / -1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

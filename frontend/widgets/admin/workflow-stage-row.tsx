@@ -10,12 +10,16 @@ import Edit from '@atomaro/icons/24/editor/Edit';
 import Trash from '@atomaro/icons/24/action/Trash';
 import CheckLarge from '@atomaro/icons/24/navigation/CheckLarge';
 import CloseLarge from '@atomaro/icons/24/navigation/CloseLarge';
+import MenuPlusBullets from '@atomaro/icons/24/navigation/MenuPlusBullets';
+import ChevronRight from '@atomaro/icons/24/navigation/ChevronRight';
 import { IconButton } from '@/shared/ui/rtk/icon-button';
+import { Button } from '@/shared/ui/rtk/button';
 import { Input, NumberStepper, Switch } from '@/shared/ui/rtk/form-controls';
 import { Tooltip } from '@/shared/ui/rtk/tooltip';
 import { normalizeApiError } from '@/shared/lib/api-errors';
 import type { UpdateWorkflowStageInput, WorkflowTemplateStage } from '@/shared/lib/workflow-templates-repository';
 import styles from './workflow-template-editor.module.css';
+import { StageDefaultTasksModal } from './workflow-stage-default-tasks';
 
 interface WorkflowStageRowProps {
   stage: WorkflowTemplateStage;
@@ -31,6 +35,7 @@ interface WorkflowStageRowProps {
 
 export function WorkflowStageRow({ stage, index, count, saving, orderDirty, readOnly = false, onMove, onUpdate, onDelete }: WorkflowStageRowProps) {
   const [editingName, setEditingName] = useState(false);
+  const [tasksOpen, setTasksOpen] = useState(false);
   const [nameDraft, setNameDraft] = useState(stage.name);
   const [nameError, setNameError] = useState('');
   const [slaDraft, setSlaDraft] = useState(stage.slaDays);
@@ -96,6 +101,7 @@ export function WorkflowStageRow({ stage, index, count, saving, orderDirty, read
     <span className={styles.orderCell} data-label="№">{index + 1}</span>
     <div className={styles.nameCell} data-label="Название">
       {editingName ? <div className={styles.nameEditor}><Input autoFocus value={nameDraft} maxLength={512} required aria-required="true" disabled={saving || readOnly} aria-label={`Название этапа ${index + 1}`} aria-invalid={Boolean(nameError)} aria-describedby={nameError ? `${stage.id}-name-error` : undefined} onFocus={(event) => event.currentTarget.select()} onChange={(event) => { setNameDraft(event.target.value); if (nameError) setNameError(''); }} onKeyDown={handleNameKeyDown} onBlur={() => { if (!saving && !readOnly) void saveName(); }} /><IconButton icon={<CheckLarge size={18} fill="currentColor" />} label="Сохранить название" size={18} disabled={saving || readOnly} onMouseDown={(event) => event.preventDefault()} onClick={() => void saveName()} /><IconButton icon={<CloseLarge size={18} fill="currentColor" />} label="Отменить редактирование" size={18} disabled={saving} onMouseDown={(event) => event.preventDefault()} onClick={cancelName} />{nameError ? <small id={`${stage.id}-name-error`} className={styles.inlineError} role="alert">{nameError}</small> : null}</div> : <div className={styles.nameDisplay}><span>{stage.name}</span>{stage.description ? <small>{stage.description}</small> : null}<IconButton icon={<Edit size={18} fill="currentColor" />} label={`Изменить название этапа «${stage.name}»`} size={18} disabled={saving || orderDirty || readOnly} onClick={() => { setNameDraft(stage.name); setNameError(''); setEditingName(true); }} /></div>}
+      <Button type="button" variant="ghost" size="s" className={styles.defaultTasksButton} aria-label={`Задачи по умолчанию этапа «${stage.name}»`} disabled={saving || orderDirty || readOnly || stage.id.startsWith('temp:stage:')} onClick={() => setTasksOpen(true)}><MenuPlusBullets size={20} fill="currentColor" aria-hidden="true" /><span>Задачи этапа · {stage.defaultTasks.length}</span><ChevronRight size={18} fill="currentColor" aria-hidden="true" /></Button>
     </div>
     <div className={styles.controlCell} data-label="Обязательный"><Switch checked={stage.isRequired} label={`Этап «${stage.name}» обязательный`} disabled={saving || orderDirty || readOnly} onChange={(checked) => { void onUpdate(stage.id, { isRequired: checked }).catch(() => undefined); }} /></div>
     <div className={styles.controlCell} data-label="Активный"><Switch checked={stage.isActive} label={`Этап «${stage.name}» активен`} disabled={saving || orderDirty || readOnly} onChange={(checked) => { void onUpdate(stage.id, { isActive: checked }, checked ? 'Этап включён' : 'Этап отключён').catch(() => undefined); }} /></div>
@@ -106,5 +112,6 @@ export function WorkflowStageRow({ stage, index, count, saving, orderDirty, read
       {stage.isActive ? <Tooltip content="Мягкое удаление: этап будет отключён"><IconButton icon={<Trash size={18} fill="currentColor" />} label={`Удалить этап «${stage.name}»`} size={18} disabled={saving || orderDirty || readOnly} className={styles.deleteButton} onClick={() => onDelete(stage)} /></Tooltip> : <span className={styles.inactiveLabel}>Отключён</span>}
       {saving ? <span className={styles.rowSaving} role="status">Сохранение…</span> : null}
     </div>
+    {tasksOpen ? <StageDefaultTasksModal stage={stage} pending={saving} onClose={() => setTasksOpen(false)} onSave={(defaultTasks) => onUpdate(stage.id, { defaultTasks }, 'Задачи этапа сохранены')} /> : null}
   </li>;
 }

@@ -382,6 +382,7 @@ const workflowTemplates = new Map<string, WorkflowTemplate>([
       isRequired: index !== 2,
       isActive: true,
       slaDays: 5 + index,
+      defaultTasks: [],
       createdAt: templateTimestamp,
       updatedAt: templateTimestamp,
     })),
@@ -389,7 +390,7 @@ const workflowTemplates = new Map<string, WorkflowTemplate>([
 ]);
 
 function cloneTemplate(template: WorkflowTemplate): WorkflowTemplate {
-  return { ...template, stages: template.stages.map((stage) => ({ ...stage })) };
+  return { ...template, stages: template.stages.map((stage) => ({ ...stage, defaultTasks: [...stage.defaultTasks] })) };
 }
 
 export function mockListWorkflowTemplates(page: number, pageSize: number): WorkflowTemplatePage {
@@ -444,6 +445,7 @@ export function mockAddWorkflowStage(templateId: string, input: CreateWorkflowSt
     isRequired: input.isRequired,
     isActive: true,
     slaDays: input.slaDays,
+    defaultTasks: [...(input.defaultTasks ?? [])],
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -463,6 +465,7 @@ export function mockUpdateWorkflowStage(templateId: string, stageId: string, inp
     ...(input.isRequired === undefined ? {} : { isRequired: input.isRequired }),
     ...(input.isActive === undefined ? {} : { isActive: input.isActive }),
     ...(input.slaDays === undefined ? {} : { slaDays: input.slaDays }),
+    ...(input.defaultTasks === undefined ? {} : { defaultTasks: [...input.defaultTasks] }),
     updatedAt: now(),
   });
   if (input.orderIndex !== undefined) {
