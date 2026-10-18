@@ -12,9 +12,9 @@
 .cardTop { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-3); justify-content: space-between; padding: var(--rtk-space-4) var(--rtk-space-5) var(--rtk-space-2); }
 .cardTop h2 { color: var(--rtk-color-text-primary); font-size: 18px; margin: 0; }
 .cardTop p { color: var(--rtk-color-text-secondary); font-size: 12px; margin: 4px 0 0; }
-.cardActions { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); }
-.regionPicker { flex: 0 1 220px; max-width: 220px; }
-.controls { align-items: center; display: flex; flex-wrap: wrap; gap: 2px; }
+.cardActions { align-items: center; display: flex; flex: 0 0 auto; flex-wrap: nowrap; gap: var(--rtk-space-2); max-width: 100%; }
+.regionPicker { flex: 0 1 220px; max-width: 220px; min-width: 0; width: 220px; }
+.controls { align-items: center; display: flex; flex: 0 0 auto; gap: 2px; }
 .controls button { min-height: 36px; }
 .viewport { background: var(--rtk-color-surface-subtle); min-height: 280px; overflow: hidden; position: relative; }
 .svg { cursor: grab; display: block; height: clamp(320px, 40vw, 560px); touch-action: none; user-select: none; width: 100%; }
@@ -85,7 +85,7 @@
   .kpis > div { gap: 2px var(--rtk-space-2); padding: var(--rtk-space-3); }
   .kpis strong { font-size: 18px; }
   .cardTop { align-items: flex-start; }
-  .cardActions { width: 100%; }
+  .cardActions { flex-wrap: wrap; width: 100%; }
   .regionPicker { flex-basis: 100%; max-width: none; }
   .svg { height: 320px; }
 }
