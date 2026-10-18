@@ -37,6 +37,7 @@ from app.modules.workflow_templates.router import router as workflow_templates_r
 from app.modules.workflow_transitions.router import router as workflow_transitions_router
 from app.modules.health_score.router import router as health_score_router
 from app.modules.notifications.router import router as notifications_router
+from app.modules.personal_notes.router import router as personal_notes_router
 
 v1 = APIRouter(prefix="/api/v1")
 v1.include_router(license_passports_router)
@@ -44,6 +45,7 @@ v1.include_router(service_api_router)
 v1.include_router(assistant_router)
 v1.include_router(auth_router)
 v1.include_router(notifications_router)
+v1.include_router(personal_notes_router)
 v1.include_router(search_router)
 v1.include_router(admin_users_router)
 v1.include_router(imports_router)
