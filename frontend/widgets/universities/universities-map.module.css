@@ -52,7 +52,7 @@
 .close:hover, .close:focus-visible { background: var(--rtk-color-surface-hover); color: var(--rtk-color-text-primary); }
 .detailsMetrics { border-bottom: 1px solid var(--rtk-color-border); display: grid; gap: var(--rtk-space-2); grid-template-columns: repeat(3, minmax(0, 1fr)); padding-bottom: var(--rtk-space-4); }
 .metric { align-items: flex-start; background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); display: flex; gap: var(--rtk-space-2); min-height: 94px; min-width: 0; padding: var(--rtk-space-2); }
-.metricIcon { align-items: center; background: var(--rtk-color-brand-soft); border-radius: 50%; color: var(--rtk-color-brand); display: inline-flex; flex: 0 0 30px; height: 30px; justify-content: center; }
+.metricIcon { align-items: center; background: var(--rtk-color-brand-soft); border-radius: 50%; color: var(--rtk-color-brand); display: inline-flex; flex: 0 0 30px; height: 30px; justify-content: center; width: 30px; }
 .metricText { display: flex; flex-direction: column; gap: var(--rtk-space-1); min-width: 0; }
 .metricText strong { color: var(--rtk-color-text-primary); font-size: 20px; font-variant-numeric: tabular-nums; line-height: 1; }
 .metricText > span { color: var(--rtk-color-text-secondary); font-size: 11px; line-height: 1.25; overflow-wrap: anywhere; }
