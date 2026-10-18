@@ -40,5 +40,6 @@
 @media (max-width: 768px) {
   .root .trigger { min-height: 48px; }
   .option { min-height: 44px; }
+  .optionContent strong, .optionContent small { overflow-wrap: anywhere; white-space: normal; }
   .search input { min-height: 44px; }
 }

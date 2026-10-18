@@ -119,6 +119,9 @@
 @media (max-width: 480px) {
   .workflowCard,
   .timelineCard { padding: var(--rtk-space-4); }
+  .workflowItemTop { flex-wrap: wrap; }
+  .workflowItemTop strong { flex-basis: 100%; }
+  .workflowItemStatus { margin-left: 0; }
   .progressLabel { align-items: flex-start; flex-direction: column; }
 }
 
