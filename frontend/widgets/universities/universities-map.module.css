@@ -5,7 +5,7 @@
 .kpis span { font-size: 12px; line-height: 1.25; }
 .kpis strong { color: var(--rtk-color-text-primary); font-size: 21px; font-variant-numeric: tabular-nums; line-height: 1.15; }
 .updating { color: var(--rtk-color-text-secondary); font-size: 12px; margin: 0; }
-.layout { align-items: stretch; display: grid; gap: var(--rtk-space-4); grid-template-columns: minmax(0, 1fr) minmax(290px, 330px); min-width: 0; }
+.layout { align-items: stretch; display: grid; gap: var(--rtk-space-4); grid-template-columns: minmax(0, 1fr) minmax(400px, 460px); min-width: 0; }
 .layout:not(:has(.sidePanel)) { grid-template-columns: minmax(0, 1fr); }
 .mapCard, .sidePanel { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-medium); box-shadow: var(--rtk-shadow-elevation-1); min-width: 0; }
 .mapCard { display: flex; flex-direction: column; overflow: hidden; }
@@ -13,8 +13,7 @@
 .cardTop h2 { color: var(--rtk-color-text-primary); font-size: 18px; margin: 0; }
 .cardTop p { color: var(--rtk-color-text-secondary); font-size: 12px; margin: 4px 0 0; }
 .cardActions { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2); }
-.regionPicker { background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border-strong); border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-primary); cursor: pointer; font: inherit; font-size: 12px; height: 36px; max-width: 210px; padding: 0 var(--rtk-space-2); }
-.regionPicker:focus-visible { border-color: var(--rtk-color-brand); outline: 2px solid var(--rtk-color-brand-soft); }
+.regionPicker { flex: 0 1 220px; max-width: 220px; }
 .controls { align-items: center; display: flex; flex-wrap: wrap; gap: 2px; }
 .controls button { min-height: 36px; }
 .viewport { background: var(--rtk-color-surface-subtle); min-height: 280px; overflow: hidden; position: relative; }
@@ -48,26 +47,36 @@
 .attribution p { line-height: 1.4; margin: var(--rtk-space-2) 0 0; }
 .attribution a { color: inherit; text-decoration: underline; }
 .loading { align-items: center; background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-medium); color: var(--rtk-color-text-secondary); display: flex; justify-content: center; min-height: 380px; }
-.sidePanel { max-height: 660px; overflow: auto; }
-.details { display: flex; flex-direction: column; gap: var(--rtk-space-4); min-width: 0; padding: var(--rtk-space-4); }
+.sidePanel { background: var(--rtk-color-surface-subtle); max-height: 660px; overflow: auto; }
+.details { background: var(--rtk-color-surface-subtle); container-type: inline-size; display: flex; flex-direction: column; gap: var(--rtk-space-4); min-width: 0; padding: var(--rtk-space-4); }
 .detailsHeader { align-items: flex-start; display: flex; gap: var(--rtk-space-2); justify-content: space-between; }
 .eyebrow { color: var(--rtk-color-brand); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
 .details h3 { font-size: 17px; line-height: 1.3; margin: 4px 0 0; }
 .close { background: transparent; border: 0; border-radius: var(--rtk-radius-small); color: var(--rtk-color-text-secondary); cursor: pointer; font-size: 24px; height: 32px; line-height: 1; width: 32px; }
 .close:hover, .close:focus-visible { background: var(--rtk-color-surface-hover); color: var(--rtk-color-text-primary); }
-.detailsMetrics { border-bottom: 1px solid var(--rtk-color-border); display: flex; flex-wrap: wrap; gap: var(--rtk-space-2) var(--rtk-space-3); padding-bottom: var(--rtk-space-4); }
-.detailsMetrics span { color: var(--rtk-color-text-secondary); font-size: 12px; }
-.detailsMetrics strong { color: var(--rtk-color-text-primary); font-variant-numeric: tabular-nums; }
+.detailsMetrics { border-bottom: 1px solid var(--rtk-color-border); display: grid; gap: var(--rtk-space-2); grid-template-columns: repeat(3, minmax(0, 1fr)); padding-bottom: var(--rtk-space-4); }
+.metric { align-items: flex-start; background: var(--rtk-color-surface); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); display: flex; gap: var(--rtk-space-2); min-height: 94px; min-width: 0; padding: var(--rtk-space-2); }
+.metricIcon { align-items: center; background: var(--rtk-color-brand-soft); border-radius: 50%; color: var(--rtk-color-brand); display: inline-flex; flex: 0 0 30px; height: 30px; justify-content: center; }
+.metricText { display: flex; flex-direction: column; gap: var(--rtk-space-1); min-width: 0; }
+.metricText strong { color: var(--rtk-color-text-primary); font-size: 20px; font-variant-numeric: tabular-nums; line-height: 1; }
+.metricText > span { color: var(--rtk-color-text-secondary); font-size: 11px; line-height: 1.25; overflow-wrap: anywhere; }
 .universityList { display: flex; flex-direction: column; gap: var(--rtk-space-3); list-style: none; margin: 0; max-height: 450px; overflow: auto; padding: 0; }
-.universityList li { border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); display: flex; flex-direction: column; gap: 5px; min-width: 0; padding: var(--rtk-space-3); }
-.universityList li > strong { color: var(--rtk-color-text-primary); font-size: 13px; line-height: 1.35; }
-.universityList li > span { color: var(--rtk-color-text-secondary); font-size: 12px; }
-.universityMeta { align-items: center; color: var(--rtk-color-text-secondary); display: flex; flex-wrap: wrap; font-size: 11px; gap: 4px var(--rtk-space-2); }
-.universityMeta > span:not(:last-child)::after { content: ' ·'; }
-.universityList a { align-self: flex-start; color: var(--rtk-color-brand); font-size: 12px; font-weight: 700; margin-top: var(--rtk-space-1); text-decoration: none; }
-.universityList a:hover, .universityList a:focus-visible { text-decoration: underline; }
+.universityList li { min-width: 0; }
+.universityCard { composes: card from './universities-list.module.css'; gap: var(--rtk-space-2); min-height: 0; padding: var(--rtk-space-3); padding-left: calc(var(--rtk-space-3) - 2px); }
+.universityCardHeader { composes: cardHeader from './universities-list.module.css'; }
+.universityCardHeader strong { font-size: 14px; -webkit-line-clamp: 3; }
+.universityCity { align-items: center; color: var(--rtk-color-text-secondary); display: inline-flex; font-size: 11px; gap: var(--rtk-space-1); min-width: 0; }
+.universityCity svg { flex: 0 0 auto; }
+.universityPrograms { align-items: center; color: var(--rtk-color-text-secondary); display: flex; flex-wrap: wrap; font-size: 11px; gap: var(--rtk-space-2); }
+.programCount { align-items: center; display: inline-flex; gap: var(--rtk-space-1); }
+.programCount svg { flex: 0 0 auto; }
+.universityCardFooter { composes: cardFooter from './universities-list.module.css'; gap: var(--rtk-space-2); min-height: 0; padding-top: var(--rtk-space-2); }
+.launchedCount { font-size: 11px; }
+.passportLink { color: var(--rtk-color-brand); font-size: 11px; font-weight: 700; margin-left: auto; white-space: nowrap; }
+.universityCard:hover .passportLink, .universityCard:focus-visible .passportLink { text-decoration: underline; }
 .emptyDetails { color: var(--rtk-color-text-secondary); font-size: 13px; margin: 0; }
-@media (max-width: 1080px) { .layout { grid-template-columns: minmax(0, 1fr) minmax(250px, 290px); } }
+@media (max-width: 1180px) { .layout { grid-template-columns: minmax(0, 1fr) minmax(320px, 360px); } }
+@container (max-width: 360px) { .metric { flex-direction: column; } }
 @media (max-width: 768px) {
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .layout { grid-template-columns: minmax(0, 1fr); }
@@ -82,7 +91,7 @@
   .kpis strong { font-size: 18px; }
   .cardTop { align-items: flex-start; }
   .cardActions { width: 100%; }
-  .regionPicker { max-width: none; width: 100%; }
+  .regionPicker { flex-basis: 100%; max-width: none; }
   .svg { height: 320px; }
 }
 @media (prefers-reduced-motion: reduce) { .region { transition: none; } }

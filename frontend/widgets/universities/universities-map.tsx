@@ -7,8 +7,12 @@ import MapIcon from '@atomaro/icons/24/navigation/Map';
 import BookOpen from '@atomaro/icons/24/culture/BookOpen';
 import ZoomIn from '@atomaro/icons/24/media/ZoomIn';
 import ZoomOut from '@atomaro/icons/24/media/ZoomOut';
+import Search from '@atomaro/icons/24/action/Search';
+import Education from '@atomaro/icons/24/culture/Education';
+import Task from '@atomaro/icons/24/communication/Task';
 import { Button } from '@/shared/ui/rtk/button';
 import { Drawer } from '@/shared/ui/rtk/drawer';
+import { SearchableSelect } from '@/shared/ui/rtk/multiselect';
 import { StatusBadge } from '@/shared/ui/rtk/status-badge';
 import { RouteErrorState } from '@/shared/ui/route-error-state';
 import { getUniversityMap, universitiesMapQueryKey, type UniversityFilters, type UniversityMapItem } from '@/shared/lib/universities-repository';
@@ -67,22 +71,26 @@ function RegionDetails({ title, stats, onClose, hideHeader = false }: { title: s
       <div><span className={styles.eyebrow}>Регион</span><h3>{title}</h3></div>
       <button type="button" className={styles.close} onClick={onClose} aria-label="Закрыть сведения о регионе">×</button>
     </div> : null}
-    <div className={styles.detailsMetrics}>
-      <span>{countLabel(stats.universities.length, 'вуз', 'вуза', 'вузов')}</span>
-      <span>{countLabel(stats.launched, 'программа запущена', 'программы запущены', 'программ запущено')}</span>
-      <span>{countLabel(stats.activeWorkflow, 'вуз с активным Workflow', 'вуза с активным Workflow', 'вузов с активным Workflow')}</span>
+    <div className={styles.detailsMetrics} aria-label="Показатели региона">
+      <div className={styles.metric}><span className={styles.metricIcon}><Education size={18} fill="currentColor" aria-hidden="true" /></span><span className={styles.metricText}><strong>{stats.universities.length}</strong><span>Вузы</span></span></div>
+      <div className={styles.metric}><span className={styles.metricIcon}><BookOpen size={18} fill="currentColor" aria-hidden="true" /></span><span className={styles.metricText}><strong>{stats.launched}</strong><span>Программ запущено</span></span></div>
+      <div className={styles.metric}><span className={styles.metricIcon}><Task size={18} fill="currentColor" aria-hidden="true" /></span><span className={styles.metricText}><strong>{stats.activeWorkflow}</strong><span>Вузов с Workflow</span></span></div>
     </div>
     {stats.universities.length === 0 ? <p className={styles.emptyDetails}>По выбранным условиям вузов в этом регионе нет.</p> :
       <ul className={styles.universityList}>{stats.universities.slice(0, limit).map((item) => <li key={item.id}>
-        <strong>{item.name}</strong>
-        <span>{item.city}</span>
-        <div className={styles.universityMeta}>
-          <span>Связано программ: {item.programsCount}</span>
-          {item.launchedPrograms > 0 ? <span>{countLabel(item.launchedPrograms, 'программа запущена', 'программы запущены', 'программ запущено')}</span> : null}
-          {item.activePrograms > 0 ? <span>{countLabel(item.activePrograms, 'программа в работе', 'программы в работе', 'программ в работе')}</span> : null}
-          {item.activeWorkflow ? <StatusBadge intent="brand">Активный Workflow</StatusBadge> : null}
-        </div>
-        <Link href={`/universities/${item.id}`}>Открыть паспорт <span aria-hidden="true">→</span></Link>
+        <Link className={styles.universityCard} href={`/universities/${item.id}`}>
+          <div className={styles.universityCardHeader}><strong>{item.name}</strong></div>
+          <span className={styles.universityCity}><MapIcon size={16} fill="currentColor" aria-hidden="true" />{item.city}</span>
+          <div className={styles.universityPrograms}>
+            <span className={styles.programCount}><BookOpen size={16} fill="currentColor" aria-hidden="true" />Связано программ: {item.programsCount}</span>
+            {item.activePrograms > 0 ? <StatusBadge intent="success" size="sm">{countLabel(item.activePrograms, 'программа в работе', 'программы в работе', 'программ в работе')}</StatusBadge> : null}
+            {item.activeWorkflow ? <StatusBadge intent="brand" size="sm">Активный Workflow</StatusBadge> : null}
+          </div>
+          <div className={styles.universityCardFooter}>
+            {item.launchedPrograms > 0 ? <span className={styles.launchedCount}>{countLabel(item.launchedPrograms, 'программа запущена', 'программы запущены', 'программ запущено')}</span> : null}
+            <span className={styles.passportLink}>Открыть паспорт <span aria-hidden="true">→</span></span>
+          </div>
+        </Link>
       </li>)}</ul>}
     {stats.universities.length > limit ? <Button variant="ghost" size="s" onClick={() => setLimit((current) => current + 30)}>Показать ещё</Button> : null}
   </div>;
@@ -262,10 +270,7 @@ export function UniversitiesMap({ filters, scopeKey }: { filters: UniversityFilt
         <div className={styles.cardTop}>
           <div><h2>География взаимодействий</h2><p>Выберите регион, чтобы увидеть его вузы</p></div>
           <div className={styles.cardActions}>
-          <select className={styles.regionPicker} aria-label="Перейти к региону" value={selected && selected !== 'unmapped' ? selected : ''} onChange={(event) => selectFromPicker(event.target.value)}>
-            <option value="">Найти регион</option>
-            {regions?.map((region) => <option value={region.code} key={region.code}>{region.name}</option>)}
-          </select>
+          <SearchableSelect className={styles.regionPicker} label="Найти регион" labelPlacement="hidden" placeholder="Найти регион" value={selected && selected !== 'unmapped' ? selected : ''} onChange={selectFromPicker} options={regions?.map((region) => ({ id: region.code, name: region.name })) ?? []} clearable={false} triggerIcon={<Search size={18} fill="currentColor" aria-hidden="true" />} />
           <div className={styles.controls} aria-label="Масштаб карты">
             <Button size="s" variant="ghost" onClick={() => zoom(1.3)} aria-label="Увеличить карту"><ZoomIn size={18} fill="currentColor" /></Button>
             <Button size="s" variant="ghost" onClick={() => zoom(1 / 1.3)} aria-label="Уменьшить карту"><ZoomOut size={18} fill="currentColor" /></Button>

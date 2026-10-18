@@ -16,10 +16,11 @@ type SelectProps = {
   searchable?: boolean; loading?: boolean; disabled?: boolean; placeholder?: string;
   renderOption?: (option: MultiSelectOption) => ReactNode; hint?: string; className?: string;
   labelPlacement?: 'inside' | 'outside' | 'hidden'; selectionMode?: 'single' | 'multiple'; clearable?: boolean;
+  triggerIcon?: ReactNode;
   searchValue?: string; onSearchChange?: (value: string) => void; remoteSearch?: boolean;
 };
 
-export function MultiSelect({ id, testId, ariaInvalid, ariaDescribedBy, label, options, values, onChange, searchable = false, loading = false, disabled = false, placeholder = 'Не выбрано', renderOption, hint, className = '', labelPlacement = 'inside', selectionMode = 'multiple', clearable = true, searchValue, onSearchChange, remoteSearch = false }: SelectProps) {
+export function MultiSelect({ id, testId, ariaInvalid, ariaDescribedBy, label, options, values, onChange, searchable = false, loading = false, disabled = false, placeholder = 'Не выбрано', renderOption, hint, className = '', labelPlacement = 'inside', selectionMode = 'multiple', clearable = true, triggerIcon, searchValue, onSearchChange, remoteSearch = false }: SelectProps) {
   const [internalSearch, setInternalSearch] = useState('');
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<MenuPosition | null>(null);
@@ -83,7 +84,7 @@ export function MultiSelect({ id, testId, ariaInvalid, ariaDescribedBy, label, o
   const select = <div className={`${styles.root} ${disabled ? styles.disabled : ''} ${className}`} ref={rootRef}>
     <button id={id} data-testid={testId} data-invalid={ariaInvalid || undefined} type="button" className={styles.trigger} aria-label={labelPlacement === 'hidden' ? `${label}: ${selectedOptions.map((option) => option.name).join(', ') || placeholder}` : labelPlacement === 'outside' ? label : undefined} aria-describedby={ariaDescribedBy} aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? menuId : undefined} disabled={disabled} onClick={() => { const dialog = rootRef.current?.closest<HTMLElement>('[role="dialog"]'); setPortalHost(dialog?.parentElement ?? document.body); if (open) { setSearch(''); setPosition(null); } setOpen((current) => !current); }} onKeyDown={(event) => { if (event.key === 'Escape' && open) { event.stopPropagation(); close(); } }}>
       <span className={styles.summaryText}>{labelPlacement === 'inside' ? <strong>{label}</strong> : null}<small>{selectedOptions.length ? selectedOptions.map((option) => option.name).slice(0, 2).join(', ') + (selectedOptions.length > 2 ? ` +${selectedOptions.length - 2}` : '') : placeholder}</small></span>
-      <ChevronDown size={16} fill="currentColor" aria-hidden="true" />
+      {triggerIcon ?? <ChevronDown size={16} fill="currentColor" aria-hidden="true" />}
     </button>
     {open && position && portalHost ? createPortal(<div id={menuId} ref={menuRef} className={styles.menu} style={position} onKeyDown={onMenuKeyDown}>
       {hint ? <p className={styles.hint}>{hint}</p> : null}
