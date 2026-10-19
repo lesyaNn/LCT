@@ -44,6 +44,7 @@ export const DOC_SECTION_DEFINITIONS: Array<{ id: string; title: string; topics:
     { slug: 'documents', title: 'Документы и лицензии' },
     { slug: 'reports', title: 'Отчёты и предпросмотр' },
     { slug: 'history', title: 'История изменений и аудит' },
+    { slug: 'notes', title: 'Личные заметки' },
     { slug: 'notifications', title: 'Уведомления' },
     { slug: 'system-search', title: 'Поиск по системе и документации' },
     { slug: 'assistant', title: 'ИИ-помощник' },
