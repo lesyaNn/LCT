@@ -10,6 +10,7 @@ export type StaticSearchResult = { kind: 'action' | 'navigation'; key: string; t
 // Routes and permissions remain defined in navigation.ts. These terms only
 // describe existing pages and actions that can be reached from those pages.
 const pageKeywords: Record<string, Metadata> = {
+  '/notes': { description: 'Личные рабочие заметки', keywords: ['заметки', 'записи', 'блокнот', 'личные заметки'] },
   '/dashboard': { description: 'Обзор показателей и задач', keywords: ['главная', 'сводка', 'показатели'] },
   '/universities': { description: 'Список и паспорта ВУЗов', keywords: ['вуз', 'вузы', 'университет', 'учебное заведение', 'документ', 'договор', 'лицензия', 'ответственный'] },
   '/workflows': { description: 'Процессы, этапы и задачи ВУЗов', keywords: ['воркфлоу', 'процесс', 'маршрут', 'этап', 'дедлайн', 'срок', 'задача', 'комментарий', 'вложение', 'запуск'] },

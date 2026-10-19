@@ -120,8 +120,8 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
   return result;
 }
 
-/** Authenticated binary GET; shared by all read-only file download domains. */
-export async function apiDownload(path: string, signal?: AbortSignal): Promise<ApiResult<Blob>> {
+/** Authenticated binary download, optionally generated from a JSON payload. */
+export async function apiDownload(path: string, signal?: AbortSignal, options: Pick<ApiOptions, 'method' | 'body'> = {}): Promise<ApiResult<Blob>> {
   const keycloak = isKeycloakMode() ? await ensureKeycloak() : null;
   if (!keycloak?.authenticated) return { ok: false, status: 401, error: 'AUTH_REQUIRED — войдите в систему' };
   let token: string | null;
@@ -130,7 +130,12 @@ export async function apiDownload(path: string, signal?: AbortSignal): Promise<A
   if (!token) return { ok: false, status: 401, error: 'AUTH_REQUIRED — войдите в систему' };
   const fetchBlob = async (accessToken: string): Promise<ApiResult<Blob>> => {
     try {
-      const response = await fetch(`${apiBaseUrl()}${path}`, { headers: { Authorization: `Bearer ${accessToken}` }, signal });
+      const response = await fetch(`${apiBaseUrl()}${path}`, {
+        method: options.method ?? 'GET',
+        headers: { Authorization: `Bearer ${accessToken}`, ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
+        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        signal,
+      });
       if (!response.ok) {
         const raw = await response.text().catch(() => '');
         let body: unknown;

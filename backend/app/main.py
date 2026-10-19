@@ -53,6 +53,7 @@ app = FastAPI(
     swagger_ui_parameters={"persistAuthorization": False, "displayRequestDuration": True},
     lifespan=lifespan,
     openapi_tags=[
+        {"name": "Notes", "description": "Личные заметки и упоминания доступных сущностей CRM"},
         {"name": "Assistant", "description": "Помощник по документации и личные диалоги"},
         {"name": "Auth", "description": "Аутентификация через Keycloak"},
         {"name": "Universities", "description": "Каталог ВУЗов и паспорта"},
