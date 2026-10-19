@@ -9,6 +9,7 @@ export function Icon({ name, size = 20 }: IconProps) {
   const common = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', 'aria-hidden': true };
 
   const paths: Record<IconProps['name'], React.ReactNode> = {
+    notes: <><path d="M5 3h14v14l-4 4H5V3Z" /><path d="M15 21v-4h4M8 7h8M8 11h8M8 15h4" /></>,
     dashboard: <><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></>,
     university: <><path d="m3 9 9-5 9 5-9 5-9-5Z" /><path d="M6 11v5c2.9 2.3 9.1 2.3 12 0v-5M21 9v7" /></>,
     workflow: <><circle cx="6" cy="6" r="2.5" /><circle cx="18" cy="6" r="2.5" /><circle cx="12" cy="18" r="2.5" /><path d="M8.5 6h7M7.5 8l3 7.5M16.5 8l-3 7.5" /></>,

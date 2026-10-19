@@ -2,6 +2,7 @@
 
 import html
 import re
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
@@ -19,6 +20,8 @@ from app.models.workflow_instances import InstanceStage, WorkflowInstance
 from app.config import settings
 from app.modules.assistant.knowledge import get_knowledge, lexical_ranking
 from app.modules.catalog.repository import like_pattern, list_universities
+from app.models.note import Note
+from app.modules.notes.service import snippet
 
 router = APIRouter(prefix="/search", tags=["search"])
 LIMIT = 5
@@ -43,7 +46,12 @@ class DocumentationHit(BaseModel):
     href: str
 
 
+class NoteHit(SearchHit):
+    updated_at: datetime
+
+
 class SearchResults(BaseModel):
+    notes: list[NoteHit] = []
     universities: list[SearchHit] = []
     workflows: list[WorkflowHit] = []
     documents: list[SearchHit] = []
@@ -72,6 +80,16 @@ def search(db: Session, user: CurrentUser, q: str, records_q: str | None = None)
     record_term = term if records_q is None else records_q.strip()
     pattern = like_pattern(record_term)
     result = SearchResults()
+    if user.id:
+        # Notes use the original query: static navigation aliases must not
+        # remove words from the user's own writing.
+        note_pattern = like_pattern(term)
+        notes = db.execute(select(Note.id, Note.title, Note.content, Note.updated_at).where(
+            Note.owner_sub == user.id,
+            or_(Note.title.ilike(note_pattern, escape="\\"), Note.content.ilike(note_pattern, escape="\\")),
+        ).order_by(Note.updated_at.desc(), Note.id).limit(LIMIT))
+        result.notes = [NoteHit(id=id, title=title or "Без названия", subtitle=snippet(content, term),
+                               updated_at=updated_at) for id, title, content, updated_at in notes]
     if len(record_term) >= 2 and "university.read" in permissions:
         rows, _ = list_universities(
             db, page=1, page_size=LIMIT, search=record_term, city=None,
