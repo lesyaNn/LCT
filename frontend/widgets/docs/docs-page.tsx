@@ -20,12 +20,23 @@ interface DocsPageProps {
   initialArticleId?: string;
 }
 
+function plainTextFromMarkdown(markdown: string): string {
+  return markdown
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/^#{1,6}\s*/gm, '')
+    .replace(/[*_`>|~]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function articleSearchText(article: DocsArticle): string {
-  return `${article.title} ${article.sectionTitle} ${article.headings.join(' ')} ${article.content}`.toLocaleLowerCase('ru-RU');
+  return `${article.title} ${article.sectionTitle} ${plainTextFromMarkdown(article.content)}`.toLocaleLowerCase('ru-RU');
 }
 
 function searchFragment(article: DocsArticle, query: string): string {
-  const plain = article.content.replace(/!\[[^\]]*\]\([^)]*\)|\[[^\]]*\]\([^)]*\)|[#*`>|]/g, ' ').replace(/\s+/g, ' ').trim();
+  const plain = plainTextFromMarkdown(article.content);
   const position = plain.toLocaleLowerCase('ru-RU').indexOf(query);
   const start = Math.max(0, position - 45);
   return `${start ? '…' : ''}${plain.slice(start, start + 105)}${start + 105 < plain.length ? '…' : ''}`;
@@ -34,7 +45,9 @@ function searchFragment(article: DocsArticle, query: string): string {
 function DocsNavigation({ sections, activeArticleId, query, onQueryChange, onNavigate }: { sections: DocsSection[]; activeArticleId?: string; query: string; onQueryChange: (value: string) => void; onNavigate?: () => void }) {
   const articles = sections.flatMap((section) => section.articles);
   const normalizedQuery = query.trim().toLocaleLowerCase('ru-RU');
-  const results = normalizedQuery ? articles.filter((article) => articleSearchText(article).includes(normalizedQuery)).slice(0, 12) : [];
+  const results = normalizedQuery ? articles.filter((article) => articleSearchText(article).includes(normalizedQuery))
+    .sort((left, right) => Number(right.title.toLocaleLowerCase('ru-RU').includes(normalizedQuery)) - Number(left.title.toLocaleLowerCase('ru-RU').includes(normalizedQuery)))
+    .slice(0, 12) : [];
   return <>
     <label className={styles.searchField}><Search size={18} fill="currentColor" aria-hidden="true" /><span className={styles.visuallyHidden}>Поиск по документации</span><Input type="search" value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="Поиск по документации" aria-label="Поиск по документации" /></label>
     {normalizedQuery ? <div className={styles.searchResults} aria-label="Результаты поиска">{results.length ? results.map((article) => <Link className={styles.searchResult} href={article.href} key={article.id} onClick={onNavigate}><strong>{article.title}</strong><span>{searchFragment(article, normalizedQuery)}</span></Link>) : <EmptyState icon={<Search size={18} fill="currentColor" />} title="Ничего не найдено" description="Попробуйте изменить поисковый запрос." headingLevel={3} />}</div> : null}
@@ -51,30 +64,45 @@ function DocsNavigation({ sections, activeArticleId, query, onQueryChange, onNav
   </>;
 }
 
+const imageDimensions: Record<string, [number, number]> = {
+  'docs-audit.jpg': [1090, 390],
+  'docs-catalogs.jpg': [1150, 850],
+  'docs-dashboard-matrix.jpg': [1090, 620],
+  'docs-dashboard.jpg': [1235, 810],
+  'docs-health-score.jpg': [1150, 900],
+  'docs-import.jpg': [1090, 430],
+  'docs-notifications.jpg': [1150, 350],
+  'docs-passport-documents.jpg': [1150, 510],
+  'docs-passport-licenses.jpg': [1090, 530],
+  'docs-passport-overview.jpg': [1150, 830],
+  'docs-passport-products.jpg': [1100, 445],
+  'docs-reports-form.jpg': [1150, 900],
+  'docs-reports-preview.jpg': [1130, 905],
+  'docs-reports-statistics.jpg': [1130, 905],
+  'docs-universities-cards.jpg': [1150, 690],
+  'docs-universities-map.jpg': [1090, 760],
+  'docs-universities-table.jpg': [1150, 800],
+  'docs-workflow-default-tasks.jpg': [1150, 850],
+  'docs-workflow-detail-top.jpg': [1150, 850],
+  'docs-workflow-kanban.jpg': [1150, 850],
+  'docs-workflow-list.jpg': [1150, 840],
+  'docs-workflow-template-editor.jpg': [1150, 850],
+};
+
 const markdownComponents: Components = {
   code: ({ children, ...props }) => String(children).trim() === ':edit:'
     ? <span className={styles.inlineIcon} role="img" aria-label="Редактировать"><Edit size={18} fill="currentColor" /></span>
     : <code {...props}>{children}</code>,
   a: ({ href, children, ...props }) => {
-    if (href?.startsWith('/docs')) return <Link href={href} {...props}>{children}</Link>;
+    if (href?.startsWith('/')) return <Link href={href} {...props}>{children}</Link>;
     return <a href={href} target={href?.startsWith('#') ? undefined : '_blank'} rel={href?.startsWith('#') ? undefined : 'noopener noreferrer'} {...props}>{children}</a>;
   },
   table: ({ children, ...props }) => <div className={styles.tableWrap}><table {...props}>{children}</table></div>,
   pre: ({ children, ...props }) => <pre className={styles.codeBlock} {...props}>{children}</pre>,
   img: ({ src, alt }) => {
     if (!src || typeof src !== 'string' || !src.startsWith('/docs/images/')) return null;
-    const dimensions: Record<string, [number, number]> = {
-      'docs-programs-products.jpg': [1100, 545],
-      'docs-workflow-list.png': [2348, 1650],
-      'docs-workflow-current-stage.png': [1544, 886],
-      'docs-workflow-history.png': [1284, 642],
-      'universities-cards.png': [2316, 1710],
-      'universities-table.png': [2296, 1688],
-      'university-passport.png': [3336, 1812],
-      'workflow-templates.png': [2352, 662],
-    };
-    const [width, height] = dimensions[src.split('/').at(-1) ?? ''] ?? [1200, 760];
-    return <span className={styles.figure} role="figure" aria-label={alt ?? ''}><Image src={src} alt={alt ?? ''} width={width} height={height} unoptimized /><span className={styles.caption}>{alt}</span></span>;
+    const [width, height] = imageDimensions[src.split('/').at(-1) ?? ''] ?? [1200, 760];
+    return <span className={styles.figure} role="figure" aria-label={alt ?? ''}><Image src={src} alt={alt ?? ''} width={width} height={height} sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 900px" loading="lazy" /><span className={styles.caption}>{alt}</span></span>;
   },
 };
 
@@ -88,10 +116,10 @@ function DocsLanding({ docs }: { docs: DocsSnapshot }) {
     ['user-guide/getting-started', 'Начало работы', 'Основные возможности CRM и первые действия.'],
     ['user-guide/universities', 'Работа с вузами', 'Паспорт, программы, продукты и ответственные.'],
     ['user-guide/workflow', 'Workflow', 'Этапы, комментарии, файлы и задачи.'],
-    ['admin-guide/import', 'Импорт', 'Загрузка данных из Excel.'],
+    ['user-guide/notifications', 'Уведомления', 'События, которые требуют внимания.'],
     ['user-guide/reports', 'Отчёты', 'Фильтрация, формирование и выгрузка.'],
   ];
-  return <div className={styles.landing}><p className={styles.eyebrow}>Помощь по CRM</p><h1>Справочный центр CRM</h1><p>Здесь собраны инструкции по работе с системой — от поиска вуза и запуска Workflow до импорта данных, отчётов и администрирования.</p><div className={styles.landingCards}>{cards.map(([id, title, description]) => { const article = docs.articles.find((item) => item.id === id); return article ? <Link href={article.href} key={id}><strong>{title}</strong><span>{description}</span></Link> : null; })}</div></div>;
+  return <div className={styles.landing}><p className={styles.eyebrow}>Помощь по CRM</p><h1>Справочный центр CRM</h1><p>Здесь собраны инструкции по работе с системой: поиск вуза, паспорт, Workflow, уведомления и отчёты. Разделы для руководителя и администратора находятся в навигации.</p><div className={styles.landingCards}>{cards.map(([id, title, description]) => { const article = docs.articles.find((item) => item.id === id); return article ? <Link href={article.href} key={id}><strong>{title}</strong><span>{description}</span></Link> : null; })}</div></div>;
 }
 
 export function DocsPage({ docs, initialArticleId }: DocsPageProps) {
