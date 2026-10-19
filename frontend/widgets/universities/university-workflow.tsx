@@ -92,7 +92,7 @@ function StageDeadline({ stage }: { stage: UniversityWorkflowStage }) {
 
 function StageAssignee({ stage }: { stage: UniversityWorkflowStage }) {
   const responsible = stage.responsible;
-  if (!responsible) return null;
+  if (!responsible) return <span className={styles.stageResponsible}><User size={14} fill="currentColor" aria-hidden="true" />Ответственный не назначен</span>;
   const email = responsible.email ?? 'Email не указан';
   const role = responsible.role ?? 'Роль не указана';
   return (
