@@ -535,6 +535,8 @@ def test_provider_limits_sources_but_keeps_large_length_checks_server_side():
     def respond(request):
         body = json.loads(request.content)
         assert body["format"]["properties"]["source_ids"]["items"]["enum"] == ["source-1"]
+        assert body["format"]["properties"]["source_ids"]["minItems"] == 1
+        assert "source_ids" in body["format"]["required"]
         assert "maxLength" not in body["format"]["properties"]["answer"]
         return httpx.Response(
             200,
@@ -555,6 +557,21 @@ def test_provider_limits_sources_but_keeps_large_length_checks_server_side():
     with pytest.raises(BusinessException) as raised:
         Ollama(Settings(), httpx.MockTransport(respond)).chat([], source_ids=["source-1"])
     assert raised.value.code == ErrorCode.ASSISTANT_INVALID_RESPONSE
+
+
+def test_small_answer_budget_uses_one_source_and_short_prompt(knowledge):
+    provider = fake_provider()
+    store = fake_conversations()
+    assistant = Assistant(Settings(assistant_enabled=True, assistant_answer_tokens=128), knowledge, provider)
+
+    result = assistant.chat(ChatIn(message="Где взять файл отчёта в PDF?"), "user", store)
+
+    messages = provider.chat.call_args.args[0]
+    documents = json.loads(messages[-1]["content"])["documentation"]
+    assert len(documents) == 1
+    assert provider.chat.call_args.kwargs["source_ids"] == [documents[0]["id"]]
+    assert "до 25 слов" in messages[0]["content"]
+    assert result.model == "qwen3:1.7b"
 
 
 def test_provider_reuses_http_client_without_user_credentials():

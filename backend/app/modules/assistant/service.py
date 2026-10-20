@@ -89,8 +89,11 @@ def prompt(
     history: tuple[tuple[str, str], ...],
     *,
     context_tokens: int = 4096,
+    answer_tokens: int = 256,
 ) -> list[dict[str, str]]:
     system = SYSTEM_PROMPT
+    if answer_tokens <= 128:
+        system += "\nОтветь одним коротким предложением до 25 слов. Если используешь выдержку, укажи её ID в source_ids."
     if not chunks:
         system += (
             "\nПодходящих фрагментов для этого вопроса нет. Не утверждай факты о CRM. "
@@ -234,6 +237,9 @@ class Assistant:
                 # history and can ask a contextual clarification without docs.
                 if chunks and query != data.message:
                     chunks, mode = retrieve(snapshot, query, role, self.provider)
+                if self.config.assistant_answer_tokens <= 128:
+                    # Keep CPU-only deployments within the model/proxy timeout.
+                    chunks = chunks[:1]
             model = None
             answer = ModelAnswer(answer=boundary or INSUFFICIENT, basis="insufficient")
             sources = []
@@ -250,6 +256,7 @@ class Assistant:
                         chunks,
                         prepared.history,
                         context_tokens=self.config.assistant_context_tokens,
+                        answer_tokens=self.config.assistant_answer_tokens,
                     ),
                     source_ids=[chunk.id for chunk in chunks],
                 )
