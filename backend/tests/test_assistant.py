@@ -158,14 +158,17 @@ def test_inference_is_explicitly_labeled(knowledge):
 
 
 @pytest.mark.parametrize("page", [None, "workflow", "reports"])
-def test_unknown_question_never_uses_model_general_knowledge(knowledge, page):
-    provider = fake_provider()
+def test_no_evidence_still_allows_model_to_clarify_but_not_use_general_knowledge(knowledge, page):
+    provider = Mock(spec=Ollama)
+    provider.chat.return_value = ModelAnswer(answer="Я помогаю с CRM. Какой раздел хотите разобрать?", basis="insufficient")
     answer = Assistant(Settings(assistant_enabled=True), knowledge, provider).chat(
         ChatIn(message="Какая погода в Антарктиде?", page=page), "user", fake_conversations()
     )
     assert answer.basis == "insufficient" and answer.sources == []
-    assert answer.model is None
-    provider.chat.assert_not_called()
+    assert answer.model == "qwen3:1.7b"
+    assert provider.chat.call_args.kwargs["source_ids"] == []
+    assert json.loads(provider.chat.call_args.args[0][-1]["content"])["documentation"] == []
+    assert "не отвечай из общих знаний" in provider.chat.call_args.args[0][0]["content"]
 
 
 def test_fabricated_sources_fail_without_persisting(knowledge):

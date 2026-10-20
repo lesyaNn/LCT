@@ -23,6 +23,7 @@ workflows:
               - npm run lint
               - npm run typecheck
               - npm run test:network
+              - npm run test:assistant-proxy
               - npm run build
 
   frontend-e2e-smoke:
