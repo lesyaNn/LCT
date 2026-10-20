@@ -6,7 +6,7 @@ import pytest
 
 from app.config import settings
 from app.modules.notifications.email import render_message, target_path
-from app.modules.notifications.email_templates import LOGO_CID, render_html_message
+from app.modules.notifications.email_templates import LOGO_PATH, render_html_message
 from scripts.preview_notification_emails import EXAMPLES, example_notification
 
 
@@ -47,7 +47,7 @@ def test_all_scenarios_preserve_text_and_destination(monkeypatch, example):
     assert html.tags.count("h1") == 1
     assert not {"script", "iframe", "link"}.intersection(html.tags)
     assert len(html.images) == 1
-    assert html.images[0]["src"] == f"cid:{LOGO_CID}"
+    assert html.images[0]["src"] == settings.frontend_origin + LOGO_PATH
     assert html.images[0]["alt"] == "Ростелеком — ИТ Школа"
 
 
@@ -64,7 +64,7 @@ def test_escaping_multiline_and_long_dynamic_values(monkeypatch):
     assert notification.message in "".join(html.text)
     assert notification.title in "".join(html.text)
     assert "script" not in html.tags and len(html.images) == 1
-    assert html.images[0]["src"] == f"cid:{LOGO_CID}"
+    assert html.images[0]["src"] == settings.frontend_origin + LOGO_PATH
     assert html.links == [settings.frontend_origin + target_path(notification)] * 2
     assert "%2F" in html.links[0] and "%26" in html.links[0]
 
@@ -79,8 +79,26 @@ def test_no_action_without_usable_origin(monkeypatch, origin):
     subject, body = render_message(row)
     html = EmailHTML(render_html_message(subject, body))
     assert html.links == []
+    assert html.images == []
+    assert "Ростелеком — ИТ Школа" in "".join(html.text)
     assert row.message in "".join(html.text)
     assert "Если кнопка" not in "".join(html.text)
+
+
+def test_public_logo_asset_matches_offline_preview(monkeypatch):
+    from base64 import b64decode
+    from pathlib import Path
+
+    from app.modules.notifications.email_templates import logo_bytes, render_preview_message
+
+    monkeypatch.setattr(settings, "frontend_origin", "https://crm.example.test/")
+    subject, body = render_message(example_notification(EXAMPLES[0]))
+    outgoing = EmailHTML(render_html_message(subject, body))
+    preview = EmailHTML(render_preview_message(subject, body))
+    assert outgoing.images[0]["src"] == "https://crm.example.test" + LOGO_PATH
+    assert b64decode(preview.images[0]["src"].split(",", 1)[1]) == logo_bytes()
+    public = Path(__file__).resolve().parents[2] / "frontend" / "public"
+    assert (public / LOGO_PATH.lstrip("/")).read_bytes() == logo_bytes()
 
 
 @pytest.mark.parametrize("suffix", [

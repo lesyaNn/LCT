@@ -98,9 +98,15 @@ The design follows `frontend/styles/globals.css`: purple `#7700ff`, orange
 `#ff4f12`, page `#f4f4f7`, primary text `#101828`, 18px cards and 10px buttons.
 The header uses the site's original horizontal logo exported to a 436×138 PNG with white padding,
 displayed at 218×69 with a white backing for readability in both color schemes.
-CRM attaches it inline using a Content-ID in the HTML part's `multipart/related`
-container; the original `text/plain` alternative stays unchanged. No remote
-request is needed for CRM images. Keycloak serves the matching PNG from its email
+CRM loads it from `${FRONTEND_ORIGIN}/brand/rostelecom-email.png`, served by the
+frontend's public directory. The message has only `text/plain` and `text/html`
+alternatives, with no CID resource or image attachment. `FRONTEND_ORIGIN` must be
+the public CRM origin (HTTPS in production), reachable without authentication;
+localhost/private-only origins cannot supply images to a recipient's mail client.
+An unusable origin renders the company name as text instead of a broken image.
+Recipients can still disable external images in their mail settings; alt text is
+provided. Deploy the updated frontend asset along with the worker change.
+Keycloak serves the matching PNG from its email
 theme's public resources URL; when rendering without a request URL, the company
 name is shown as text. Both paths retain alt text and the automatic-message footer.
 Brand fonts fall back to Arial; no external fonts or styles load.

@@ -5,6 +5,8 @@ import smtplib
 import threading
 import time
 import uuid
+from email import policy
+from email.parser import BytesParser
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
@@ -127,6 +129,7 @@ def test_smtp_uses_verified_tls_without_network(monkeypatch, security):
     monkeypatch.setattr(settings, "smtp_security", security)
     monkeypatch.setattr(settings, "smtp_host", "smtp.example.test")
     monkeypatch.setattr(settings, "smtp_from_email", "crm@example.test")
+    monkeypatch.setattr(settings, "frontend_origin", "https://crm.example.test")
     monkeypatch.setattr(email.ssl, "create_default_context", lambda: context)
 
     class FakeSMTP:
@@ -143,25 +146,29 @@ def test_smtp_uses_verified_tls_without_network(monkeypatch, security):
             events.append(("starttls", context))
 
         def send_message(self, message):
+            # Verify the serialized message received by a mail client, not just
+            # the Python object: logo must not become a MIME attachment again.
+            message = BytesParser(policy=policy.default).parsebytes(message.as_bytes(policy=policy.SMTP))
             assert message.get_content_type() == "multipart/alternative"
             html_part = message.get_body(preferencelist=("html",))
             assert html_part.get_content_type() == "text/html"
             assert html_part.get_content_charset() == "utf-8"
             assert "Русский текст" in html_part.get_content()
-            assert message.get_payload()[1].get_content_type() == "multipart/related"
-            image_part = next(part for part in message.walk()
-                              if part.get_content_type() == "image/png")
-            assert image_part["Content-ID"] == f"<{email.LOGO_CID}>"
-            assert image_part.get_content_disposition() == "inline"
-            assert image_part.get_payload(decode=True) == email.logo_bytes()
-            assert f"cid:{email.LOGO_CID}" in html_part.get_content()
+            assert [part.get_content_type() for part in message.iter_parts()] == [
+                "text/plain", "text/html",
+            ]
+            assert list(message.iter_attachments()) == []
+            assert all(part.get_filename() is None and "Content-ID" not in part
+                       for part in message.walk())
+            assert 'src="https://crm.example.test/brand/rostelecom-email.png"' in html_part.get_content()
+            assert "cid:" not in html_part.get_content()
             events.append(("send", message["To"],
                            message.get_body(preferencelist=("plain",)).get_content()))
 
     monkeypatch.setattr(email.smtplib, "SMTP", FakeSMTP)
     monkeypatch.setattr(email.smtplib, "SMTP_SSL", FakeSMTP)
     email.send_email("user@example.test", "Назначение", "Русский текст")
-    assert events[-1] == ("send", "user@example.test", "Русский текст\n")
+    assert events[-1] == ("send", "user@example.test", "Русский текст\r\n")
     if security == "starttls":
         assert ("starttls", context) in events
     else:

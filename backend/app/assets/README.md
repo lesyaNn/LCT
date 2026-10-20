@@ -17,8 +17,10 @@ to null. Regeneration and API behavior: `docs/UNIVERSITY_TIME_CONTACTS.md`.
 `rostelecom-email.png` is the same website SVG exported at 436×138 on white for
 email clients, displayed at half size. White pixels keep the original dark wordmark
 legible in dark mode. The identical file lives in
-`keycloak/themes/rostelecom/email/resources/img/rostelecom-email.png`.
+`keycloak/themes/rostelecom/email/resources/img/rostelecom-email.png` and
+`frontend/public/brand/rostelecom-email.png`.
 Generate with Sharp using `.resize({width:404}).flatten({background:'#ffffff'})` followed by
 `.extend({top:16,bottom:16,left:16,right:16,background:'#ffffff'}).png()`
-and copy the result to the Keycloak resource directory. CRM attaches this PNG by
-CID; preview tools embed it in HTML as a data URI.
+and copy the result to both public resource directories. CRM references the
+frontend copy by an absolute public URL without adding an email attachment;
+preview tools embed the backend copy in HTML as a data URI.
