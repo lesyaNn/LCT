@@ -218,6 +218,7 @@ npm run typecheck
 npm run test:network
 npm run test:service-api
 npm run test:university-time
+npm run test:assistant-proxy
 npm run build
 ```
 
@@ -230,7 +231,7 @@ python -m pytest tests -q
 
 DB-тестам нужна отдельная PostgreSQL-база через `TEST_DATABASE_URL`. Её имя должно содержать `test`: фикстура пересоздаёт тестовую схему и применяет SQL-миграции. Без такой базы DB-тесты пропускаются. Известные проблемы общего набора отмечены в [аудите](docs/PROJECT_AUDIT_2026-10-20.md); пропущенные проверки не считаются успешными.
 
-SourceCraft CI запускает frontend lint, typecheck, тест графа и сборку. Браузерный smoke запускается отдельно на настроенном стенде. Условия Playwright-сценариев: [frontend/e2e/README.md](frontend/e2e/README.md).
+SourceCraft CI запускает frontend lint, typecheck, тесты графа и таймаута API-прокси, затем сборку. Браузерный smoke запускается отдельно на настроенном стенде. Условия Playwright-сценариев: [frontend/e2e/README.md](frontend/e2e/README.md).
 
 ## Архитектура и документация
 

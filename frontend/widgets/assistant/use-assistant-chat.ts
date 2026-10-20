@@ -12,6 +12,14 @@ export interface ChatMessage {
   createdAt: string;
   sources?: AssistantSource[];
   error?: string;
+  welcome?: boolean;
+  afterId?: string | null;
+}
+
+const welcomeText = 'Здравствуйте! Я помощник CRM ИТ Школы Ростелекома. Подскажу, как работать с вузами, Workflow, документами и отчётами. Выберите быстрый вопрос или напишите свой.';
+
+function welcomeMessage(afterId: string | null): ChatMessage {
+  return { id: `welcome:${crypto.randomUUID()}`, role: 'assistant', text: welcomeText, createdAt: new Date().toISOString(), welcome: true, afterId };
 }
 
 function restoredMessages(turns: AssistantTurn[]): ChatMessage[] {
@@ -19,6 +27,17 @@ function restoredMessages(turns: AssistantTurn[]): ChatMessage[] {
     { id: `${turn.turn_id}:question`, role: 'user' as const, text: turn.question, createdAt: turn.created_at },
     ...(turn.answer?.trim() ? [{ id: `${turn.turn_id}:answer`, role: 'assistant' as const, text: turn.answer, createdAt: turn.created_at, sources: turn.sources }] : []),
   ]);
+}
+
+function mergeHistory(current: ChatMessage[], turns: AssistantTurn[]): ChatMessage[] {
+  const result = [...restoredMessages(turns), ...current.filter(item => item.id.startsWith('local:'))];
+  // Welcome messages are UI events, not fake user turns sent to the model.
+  // Anchor them in the existing timeline so history refreshes cannot reorder them.
+  for (const item of current.filter(message => message.welcome)) {
+    const anchor = item.afterId == null ? -1 : result.findIndex(message => message.id === item.afterId);
+    result.splice(item.afterId != null && anchor === -1 ? result.length : anchor + 1, 0, item);
+  }
+  return result;
 }
 
 function assistantError(result: Extract<ApiResult<unknown>, { ok: false }>): string {
@@ -84,7 +103,7 @@ export function useAssistantChat(userId: string, pathname: string) {
         const history = await readHistory(conversation.id);
         if (!active) return;
         if (!history.ok) { setRestoreError(assistantError(history)); return; }
-        setMessages(restoredMessages(history.data.turns));
+        setMessages(current => mergeHistory(current, history.data.turns));
         context.current = { id: conversation.id, revision: history.data.revision };
         setRestoreError('');
       } catch {
@@ -115,7 +134,7 @@ export function useAssistantChat(userId: string, pathname: string) {
         if (!refreshed.ok) {
           if (refreshed.status === 404) {
             context.current = { id: null, revision: null };
-            setMessages((current) => current.filter((item) => item.id.startsWith('local:')));
+            setMessages((current) => [welcomeMessage(null), ...current.filter((item) => item.id.startsWith('local:'))]);
             return true;
           }
           fail(assistantError(refreshed));
@@ -123,7 +142,7 @@ export function useAssistantChat(userId: string, pathname: string) {
         }
         // Keep this version even if the following model request fails.
         context.current = { id, revision: refreshed.data.revision };
-        setMessages((current) => [...restoredMessages(refreshed.data.turns), ...current.filter((item) => item.id.startsWith('local:'))]);
+        setMessages((current) => mergeHistory(current, refreshed.data.turns));
         return true;
       }
       const post = () => assistantRepository.chat(question, assistantPage(pathname), context.current.id, context.current.revision);
@@ -141,7 +160,9 @@ export function useAssistantChat(userId: string, pathname: string) {
         const reply = result.data;
         context.current = { id: reply.conversation_id, revision: reply.revision };
         setRestoreError('');
-        setMessages((current) => [...current.map((item) => item.id === localId ? { ...item, id: `${reply.turn_id}:question`, error: undefined } : item), {
+        setMessages((current) => [...current.map((item) => item.id === localId
+          ? { ...item, id: `${reply.turn_id}:question`, error: undefined }
+          : item.afterId === localId ? { ...item, afterId: `${reply.turn_id}:question` } : item), {
           id: `${reply.turn_id}:answer`, role: 'assistant', text: reply.answer, createdAt: reply.created_at, sources: reply.sources,
         }]);
       } catch {
@@ -154,14 +175,18 @@ export function useAssistantChat(userId: string, pathname: string) {
     return true;
   }, [pathname, restoring]);
 
+  const appendWelcome = useCallback(() => {
+    setMessages(current => [...current, welcomeMessage(current.at(-1)?.id ?? null)]);
+  }, []);
+
   return {
-    messages, sending, restoring, restoreError, sendMessage,
+    messages, sending, restoring, restoreError, sendMessage, appendWelcome,
     retry: (message: ChatMessage) => sendMessage(message.text, message.id),
     retryRestore: () => { if (!sendingRef.current) { setRestoring(true); setRestoreAttempt((value) => value + 1); } },
     startNew: () => {
       if (sendingRef.current || restoring) return false;
       context.current = { id: null, revision: null };
-      setMessages([]);
+      setMessages([welcomeMessage(null)]);
       setRestoreError('');
       return true;
     },

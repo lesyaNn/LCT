@@ -6,6 +6,7 @@ import { useAuth } from '@/shared/auth/AuthProvider';
 import { canAccessRoute } from '@/shared/config/navigation';
 import { normalizeApiError } from '@/shared/lib/api-errors';
 import { notificationPresentation, notificationTarget, type Notification, type NotificationFilter } from '@/shared/lib/notifications-repository';
+import { Button } from '@/shared/ui/rtk/button';
 import { NotificationRow } from '@/widgets/topbar/NotificationsPopover';
 import { useNotifications } from '@/widgets/topbar/notifications-state';
 import styles from './notifications.module.css';
@@ -51,7 +52,7 @@ export function NotificationInbox() {
 
   return <section className={styles.page} aria-labelledby="notifications-title">
     <div className={styles.pageHeading}><div><h1 id="notifications-title">Уведомления</h1><p>Важные события по вашей работе с ВУЗами.</p></div>
-      <button type="button" className={styles.markAll} disabled={unreadCount === 0 || markingAll} onClick={markAll}>Отметить все как прочитанные</button>
+      <Button type="button" variant="orange" className={styles.markAll} disabled={unreadCount === 0 || markingAll} onClick={markAll}>Отметить все как прочитанные</Button>
     </div>
     <div className={styles.filters} role="group" aria-label="Фильтр уведомлений">{filters.map((option) =>
       <button key={option.value} type="button" aria-pressed={filter === option.value} className={filter === option.value ? styles.activeFilter : ''}
