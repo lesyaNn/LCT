@@ -36,7 +36,7 @@ order: 2
 
 ![Воронка этапов Workflow](/docs/images/docs-dashboard-funnel.jpg)
 
-![Приоритетные задачи Обзора](/docs/images/docs-dashboard-priorities.jpg)
+![Приоритетные задачи Обзора](/docs/images/docs-dashboard-priorities-20261020.png)
 
 ![Динамика событий и топ вузов по взаимодействиям](/docs/images/docs-dashboard-trends.jpg)
 

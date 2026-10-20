@@ -78,7 +78,7 @@ const imageDimensions: Record<string, [number, number]> = {
   'docs-dashboard-distribution.jpg': [2720, 1240],
   'docs-dashboard-funnel.jpg': [2720, 1250],
   'docs-dashboard-matrix.jpg': [2720, 1210],
-  'docs-dashboard-priorities.jpg': [1370, 690],
+  'docs-dashboard-priorities-20261020.png': [1366, 820],
   'docs-dashboard-trends.jpg': [2720, 840],
   'docs-dashboard-20261020.jpg': [2720, 1490],
   'docs-health-reasons.jpg': [2730, 1500],
