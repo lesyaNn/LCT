@@ -85,13 +85,12 @@ async function mockSession(page: Page, failFirst = false, contract?: { catalog: 
   return mutations;
 }
 
-test('API method viewer, schema download and read-only navigation', async ({ page }, testInfo) => {
+test('API guide, live method viewer, schema download and read-only navigation', async ({ page }, testInfo) => {
   const mutations = await mockSession(page);
   await page.goto('/api', { waitUntil: 'domcontentloaded', timeout: 60_000 });
   await expect(page.getByRole('heading', { name: 'API', exact: true, level: 1 })).toBeVisible();
   await expect(page.getByRole('link', { name: 'API', exact: true })).toBeVisible();
-  await expect(page.getByRole('tab', { name: 'Все методы' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByRole('tab', { name: 'Подключение и примеры' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Создание вуза', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Скачать OpenAPI' })).toBeEnabled();
   await page.getByRole('tab', { name: 'Все методы' }).click();
   await expect(page.getByText('Найдено методов: 2')).toBeVisible();
@@ -110,21 +109,21 @@ test('API method viewer, schema download and read-only navigation', async ({ pag
   await page.getByRole('button', { name: 'Скачать OpenAPI' }).click();
   expect((await download).suggestedFilename()).toBe('crm-openapi.json');
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole('tab', { name: 'Все методы' }).click();
-  await expect(page.getByText('Найдено методов: 2')).toBeVisible();
+  await page.getByRole('tab', { name: 'Подключение и примеры' }).click();
+  await expect(page.getByRole('heading', { name: 'Создание вуза', exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   expect(await page.getByRole('tabpanel').evaluate(element => element.getBoundingClientRect().right <= window.innerWidth)).toBe(true);
   expect(await page.getByRole('button', { name: 'Скачать OpenAPI' }).evaluate(element => element.getBoundingClientRect().right <= window.innerWidth)).toBe(true);
-  await page.screenshot({ path: testInfo.outputPath('api-method-mobile.png') });
+  await page.screenshot({ path: testInfo.outputPath('api-guide-mobile.png') });
   expect(mutations).toEqual([]);
 });
 
-test('API error and Retry remain available when contract fails', async ({ page }) => {
+test('guide remains readable when API contract fails and Retry reloads it', async ({ page }) => {
   await mockSession(page, true);
   await page.goto('/api', { waitUntil: 'domcontentloaded', timeout: 60_000 });
   const error = page.getByRole('alert').filter({ hasText: 'Не удалось загрузить контракт API' });
   await expect(error).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Открыть инструкцию' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Что можно делать' })).toBeVisible();
   await page.getByRole('button', { name: 'Повторить загрузку' }).click();
   await expect(page.getByRole('button', { name: 'Скачать OpenAPI' })).toBeEnabled();
   await expect(error).toHaveCount(0);

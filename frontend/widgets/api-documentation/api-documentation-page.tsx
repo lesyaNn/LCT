@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { apiFetch } from '@/shared/lib/api-client';
 import {
   apiGroupNames, filterOperations, mediaExample, operationCurl, readableDescription,
@@ -69,9 +71,9 @@ function OperationDetails({ operation, document }: { operation: ApiOperation; do
   </div>;
 }
 
-export function ApiDocumentationPage() {
+export function ApiDocumentationPage({ guide }: { guide: string }) {
   const { user } = useAuth();
-  const [tab, setTab] = useState('methods');
+  const [tab, setTab] = useState('guide');
   const [catalog, setCatalog] = useState<ServiceApiCatalog | null>(null);
   const [document, setDocument] = useState<OpenApiDocument | null>(null);
   const [error, setError] = useState('');
@@ -109,7 +111,7 @@ export function ApiDocumentationPage() {
   const groups = useMemo(() => [...new Set(catalog?.operations.flatMap(item => item.tags) ?? [])]
     .sort((left, right) => (apiGroupNames[left] ?? left).localeCompare(apiGroupNames[right] ?? right, 'ru')), [catalog]);
   const operations = useMemo(() => filterOperations(catalog?.operations ?? [], query, method, group, allowedOnly), [catalog, query, method, group, allowedOnly]);
-  const tabs = [{ id: 'methods', label: 'Все методы' }, { id: 'errors', label: 'Ошибки и ограничения' }];
+  const tabs = [{ id: 'guide', label: 'Подключение и примеры' }, { id: 'methods', label: 'Все методы' }, { id: 'errors', label: 'Ошибки и ограничения' }];
 
   function downloadSchema() {
     if (!document) return;
@@ -127,6 +129,12 @@ export function ApiDocumentationPage() {
       <p className={styles.hint}>Справочник загружается с текущего бэкенда. Просмотр документации не создаёт и не удаляет данные CRM.</p>
       {error ? <div className={styles.notice} role="alert"><p>{error}</p><Button onClick={() => setAttempt(value => value + 1)}>Повторить загрузку</Button></div> : !catalog ? <p role="status">Загрузка контракта API…</p> : null}
       <div className={styles.panel} id={`api-panel-${tab}`} role="tabpanel" aria-labelledby={`api-tab-${tab}`}>
+      {tab === 'guide' ? <article className={styles.markdown}><ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+        table: ({ children, ...props }) => <div className={styles.tableWrap}><table {...props}>{children}</table></div>,
+        pre: ({ children }) => <pre className={styles.code}>{children}</pre>,
+        a: ({ href, children }) => <a href={href} rel={href?.startsWith('https://') ? 'noopener noreferrer' : undefined}>{children}</a>,
+        img: () => null,
+      }}>{guide}</ReactMarkdown></article> : null}
       {tab === 'methods' && catalog && document ? <>
         <div className={styles.filters}>
           <label>Поиск<Input type="search" aria-label="Поиск методов" placeholder="Путь или название метода" value={query} onChange={event => setQuery(event.target.value)} /></label>
