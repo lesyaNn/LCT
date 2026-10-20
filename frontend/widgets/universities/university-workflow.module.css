@@ -6,7 +6,9 @@
 .breadcrumbs a { color: var(--rtk-color-brand); text-decoration: none; }
 .breadcrumbs a:hover { text-decoration: underline; }
 .headerSummaryRow { align-items: stretch; display: grid; gap: var(--rtk-space-4); grid-template-columns: minmax(0, 1fr) auto; min-width: 0; }
-.workflowSummary { composes: surface from '../../shared/ui/rtk/section-surface.module.css'; align-items: center; display: flex; gap: var(--rtk-space-4); min-width: 0; }
+.workflowSummary { composes: surface from '../../shared/ui/rtk/section-surface.module.css'; align-items: center; color: inherit; cursor: pointer; display: flex; gap: var(--rtk-space-4); min-width: 0; text-decoration: none; transition: background-color 160ms ease, box-shadow 160ms ease; }
+.workflowSummary:hover { background: var(--rtk-color-surface-hover); box-shadow: var(--rtk-shadow-elevation-2); }
+.workflowSummary:focus-visible { outline: 2px solid var(--rtk-color-brand); outline-offset: 2px; }
 .universityIcon { align-items: center; align-self: flex-start; background: var(--rtk-color-brand-soft); border-radius: var(--rtk-radius-medium); color: var(--rtk-color-brand); display: inline-flex; flex: 0 0 52px; height: 52px; justify-content: center; }
 .headerMain { display: flex; flex: 1 1 auto; flex-direction: column; gap: var(--rtk-space-2); min-width: 0; }
 .summaryTitle { align-items: center; display: flex; flex-wrap: wrap; gap: var(--rtk-space-2) var(--rtk-space-3); min-width: 0; }

@@ -33,6 +33,7 @@
 .page td p { margin: 4px 0; }
 .code { border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); background: var(--rtk-color-surface-hover); padding: var(--rtk-space-4); overflow: auto; max-height: 600px; max-width: 100%; font: .85rem/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre; }
 .markdown { line-height: 1.7; min-width: 0; }
+.markdown p:empty, .markdown p:has(> a:empty:only-child) { display: none; }
 .markdown h1 { font-size: 1.6rem; }
 .markdown h2 { margin-top: var(--rtk-space-7); }
 .markdown a { color: var(--rtk-color-brand); }
