@@ -93,6 +93,10 @@ class Ollama:
             # Constrained decoding can only cite the supplied fragments, not
             # invent a look-alike identifier. Still validate again in service.
             schema["properties"]["source_ids"]["items"]["enum"] = source_ids
+            # Small local models otherwise omit this optional field even when
+            # they label their answer as grounded in documentation.
+            schema["properties"]["source_ids"]["minItems"] = 1
+            schema["required"].append("source_ids")
         elif source_ids is not None:
             # A conversation without evidence may clarify, not invent facts
             # or references. Keep the public response shape unchanged.
