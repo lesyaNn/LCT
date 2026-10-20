@@ -3,7 +3,7 @@
   "displayName": "RTK EdTech CRM",
   "enabled": true,
   "loginTheme": "rostelecom",
-  "emailTheme": "rostelecom",
+  "emailTheme": "lct-crm",
   "internationalizationEnabled": false,
   "supportedLocales": ["ru"],
   "defaultLocale": "ru",

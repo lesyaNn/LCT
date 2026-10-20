@@ -64,6 +64,9 @@ services:
       KC_DB_URL: jdbc:postgresql://postgres:5432/${KEYCLOAK_DB:-keycloak}
       KC_DB_USERNAME: ${KEYCLOAK_DB_USER:-keycloak}
       KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-change-me}
+      # Browser-facing URL; set to the exact public Keycloak URL behind the proxy.
+      KC_HOSTNAME: ${KEYCLOAK_EXTERNAL_URL:-http://localhost:8081}
+      KC_PROXY_HEADERS: ${KEYCLOAK_PROXY_HEADERS:-xforwarded}
     ports:
       # Published: browsers + admin console reach the IdP directly.
       - "8081:8080"
