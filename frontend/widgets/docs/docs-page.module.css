@@ -57,7 +57,10 @@
 .codeBlock :global(.hljs-title), .codeBlock :global(.hljs-name), .codeBlock :global(.hljs-built_in) { color: var(--rtk-color-danger); }
 .markdown blockquote { border-left: 3px solid var(--rtk-color-brand); color: var(--rtk-color-text-secondary); margin: 0 0 var(--rtk-space-4); padding: var(--rtk-space-1) var(--rtk-space-4); }
 .figure { display: block; margin: var(--rtk-space-5) 0 var(--rtk-space-7); }
-.figure img { border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); display: block; height: auto; max-width: 100%; width: 100%; }
+.figure a { display: inline-block; max-width: 100%; cursor: zoom-in; }
+.portraitFigureLink { width: min(100%, 440px); }
+.portraitFigureLink img { width: 100%; }
+.figure img { border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); display: block; height: auto; max-width: 100%; width: auto; }
 .caption { color: var(--rtk-color-text-secondary); display: block; font-size: 12px; margin-top: var(--rtk-space-2); text-align: center; }
 .landing { margin: 0 auto; max-width: 900px; }
 .landing h1 { font-size: clamp(28px, 3vw, 38px); letter-spacing: -.03em; margin: 0 0 var(--rtk-space-4); }

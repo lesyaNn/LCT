@@ -69,7 +69,7 @@ export function AssistantWidget({ user, pathname, open, onOpen, onClose }: { use
   const [showHint, setShowHint] = useState(false);
   const [showLauncher, setShowLauncher] = useState(false);
   const [allQuestions, setAllQuestions] = useState(false);
-  const { messages, restoring, restoreError, sending, sendMessage, retry, retryRestore } = useAssistantChat(user.id, pathname);
+  const { messages, restoring, restoreError, sending, sendMessage, retry, retryRestore, startNew } = useAssistantChat(user.id, pathname);
   const quickReplies = useQuery({
     queryKey: ['assistant', 'quick-replies', user.id], enabled: open, staleTime: 300_000,
     queryFn: async () => {
@@ -85,6 +85,7 @@ export function AssistantWidget({ user, pathname, open, onOpen, onClose }: { use
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const previousScroll = useRef({ open: false, restoring: true });
   const hintKey = `crm-ai-assistant-hint:v1:${user.id}`;
   const launcherKey = `crm-ai-assistant-launcher-hidden:v1:${user.id}`;
 
@@ -108,10 +109,16 @@ export function AssistantWidget({ user, pathname, open, onOpen, onClose }: { use
   }, [open, hintKey]);
 
   useEffect(() => {
+    const previous = previousScroll.current;
+    previousScroll.current = { open, restoring };
     if (!open) return;
-    inputRef.current?.focus();
-    requestAnimationFrame(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }));
-  }, [open, messages.length, sending]);
+    if (!previous.open) inputRef.current?.focus();
+    // Opening/restoring starts at the welcome text, not the old last message.
+    // Once the user sends a question, follow the new replies as before.
+    const showWelcome = !previous.open || restoring || previous.restoring || messages.length === 0;
+    const frame = requestAnimationFrame(() => scrollRef.current?.scrollTo({ top: showWelcome ? 0 : scrollRef.current.scrollHeight }));
+    return () => cancelAnimationFrame(frame);
+  }, [open, messages.length, sending, restoring]);
 
   useEffect(() => {
     const viewport = window.visualViewport;
@@ -173,10 +180,14 @@ export function AssistantWidget({ user, pathname, open, onOpen, onClose }: { use
         <IconButton icon="close" label="Закрыть ИИ-помощника" className={styles.panelClose} onClick={onClose} />
       </header>
 
+      <div className={styles.toolbar}><Button type="button" variant="ghost" size="s" disabled={sending || restoring} onClick={() => {
+        if (startNew()) { setInput(''); setAllQuestions(false); inputRef.current?.focus(); }
+      }}>Новый диалог</Button></div>
+
       <div ref={scrollRef} className={styles.scroll} aria-live="polite">
-        <div className={styles.messageRow}>
+        <div className={styles.messageRow} data-testid="assistant-welcome">
           <div className={styles.messageAvatar}><Image src={robot} alt="" width={43} height={43} /></div>
-          <div className={`${styles.bubble} ${styles.assistantBubble} ${styles.greeting}`}><p>Здравствуйте! 👋<br />Я ваш помощник системы ИТ Школа Ростелекома. Могу подсказать, как работать с разделами, помочь найти нужные данные и ответить на вопросы по отчётам, статусам и настройкам.</p></div>
+          <div className={`${styles.bubble} ${styles.assistantBubble} ${styles.greeting}`}><p>Здравствуйте! Я помощник CRM ИТ Школы Ростелекома. Подскажу, как работать с вузами, Workflow, документами и отчётами. Выберите быстрый вопрос или напишите свой.</p></div>
         </div>
         <div className={styles.quickMenu}>
           <div className={styles.quickQuestions} id="assistant-quick-questions" aria-label="Быстрые вопросы">{(allQuestions ? questions : questions.slice(0, 4)).map(question => <Button key={question.id} type="button" variant="secondary" className={styles.quickButton} disabled={sending || restoring} onClick={() => sendMessage(question.question)}>{question.question}<Icon name="chevron-right" size={17} /></Button>)}</div>

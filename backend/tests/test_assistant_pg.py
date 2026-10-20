@@ -112,6 +112,31 @@ def test_predefined_answers_persist_without_model_and_keep_owner_revision_guards
     assert knowledge.mock_calls == []
 
 
+def test_greeting_after_report_is_durable_and_failed_requests_do_not_advance_revision(pg):
+    from app.modules.assistant.greetings import GREETING_ANSWER
+
+    config = Settings(assistant_enabled=True)
+    provider, knowledge = Mock(), Mock()
+    assistant = Assistant(config, knowledge, provider)
+    with Session(pg) as db:
+        store = Conversations(db, "alice", "user", config)
+        first = assistant.chat(ChatIn(message="Как скачать отчёт?"), "user", store)
+        greeting = assistant.chat(ChatIn(message="привет, как дела?", conversation_id=first.conversation_id, expected_revision=1), "user", store)
+        assert greeting.answer == GREETING_ANSWER and greeting.revision == 2
+        assert greeting.model is None and greeting.sources == []
+        with pytest.raises(BusinessException) as error:
+            assistant.chat(ChatIn(message="Не вижу нужный вуз", conversation_id=first.conversation_id, expected_revision=1), "user", store)
+        assert error.value.code == ErrorCode.CONFLICT
+        assert store.history(first.conversation_id, 1, 50).conversation.revision == 2
+        last = assistant.chat(ChatIn(message="Не вижу нужный вуз", conversation_id=first.conversation_id, expected_revision=2), "user", store)
+        assert last.revision == 3
+    with Session(pg) as db:
+        history = Conversations(db, "alice", "user", config).history(first.conversation_id, 1, 50)
+        assert [turn.question for turn in history.items] == ["Как скачать отчёт?", "привет, как дела?", "Не вижу нужный вуз"]
+        assert history.items[1].answer == GREETING_ANSWER
+    assert provider.mock_calls == knowledge.mock_calls == []
+
+
 @pytest.mark.parametrize("subject,role", [("bob", "user"), ("bob", "admin"), ("alice", "manager")])
 def test_other_subject_or_changed_role_cannot_access_history(pg, knowledge, subject, role):
     with Session(pg) as db:
