@@ -4,7 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 import type { AssistantChatReply, AssistantQuickReplies, AssistantTurn } from '../shared/lib/assistant-repository';
 
 test.use({ launchOptions: process.env.E2E_CHROMIUM_PATH ? { executablePath: process.env.E2E_CHROMIUM_PATH } : {} });
-type Fixture = { catalog: AssistantQuickReplies; replies: Record<string, AssistantChatReply> };
+type Fixture = { catalog: AssistantQuickReplies; replies: Record<string, AssistantChatReply & { model: string | null }> };
 let fixture: Fixture;
 test.beforeAll(() => {
   test.skip(!process.env.E2E_ASSISTANT_PYTHON, 'Set E2E_ASSISTANT_PYTHON to a backend Python environment.');
@@ -23,7 +23,8 @@ provider, knowledge, repository = Mock(), Mock(), Mock()
 repository.prepare.return_value = Prepared(uuid4(), 0, (), True)
 repository.save.side_effect = lambda prepared, question, result: result
 assistant = Assistant(Settings(assistant_enabled=True), knowledge, provider)
-replies = {reply.question: assistant.chat(ChatIn(message=reply.question), 'user', repository).model_dump(mode='json') for reply in QUICK_REPLIES}
+questions = [reply.question for reply in QUICK_REPLIES] + ['привет, как дела?']
+replies = {question: assistant.chat(ChatIn(message=question), 'user', repository).model_dump(mode='json') for question in questions}
 assert provider.mock_calls == [] and knowledge.mock_calls == []
 print(json.dumps({'catalog': quick_replies(CurrentUser(id='test', roles={'user'})).model_dump(), 'replies': replies}, ensure_ascii=False))
 `;
@@ -32,12 +33,18 @@ print(json.dumps({'catalog': quick_replies(CurrentUser(id='test', roles={'user'}
   }));
 });
 
-async function session(page: Page, failCatalog = false) {
+async function session(page: Page, failCatalog = false, options: { revisionRaces?: number; turnLimit?: boolean } = {}) {
   const conversationId = crypto.randomUUID();
   const history: AssistantTurn[] = [];
   const requests: Array<{ message: string; conversation_id?: string; expected_revision?: number }> = [];
   const errors: string[] = [];
   let catalogCalls = 0;
+  let races = options.revisionRaces ?? 0;
+  const addTurn = (question: string) => {
+    const turn = { ...fixture.replies[question], question, conversation_id: conversationId, turn_id: crypto.randomUUID(), revision: history.length + 1 };
+    history.push(turn);
+    return turn;
+  };
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/realms/rtk/**', async route => {
     const url = new URL(route.request().url());
@@ -70,15 +77,20 @@ async function session(page: Page, failCatalog = false) {
     if (pathname.endsWith('/assistant/chat')) {
       const request = route.request().postDataJSON();
       requests.push(request);
+      if (request.conversation_id && (races > 0 || options.turnLimit || request.expected_revision !== history.length)) {
+        if (races > 0) { races -= 1; addTurn('Что означает статус?'); }
+        await route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: {
+          code: 'CONFLICT', details: options.turnLimit ? { reason: 'turn_limit' } : { field: 'revision' },
+        } }) });
+        return;
+      }
       const reply = fixture.replies[request.message];
       if (!reply) { await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { code: 'ASSISTANT_UNAVAILABLE', message: 'Unavailable' } }) }); return; }
-      const turn = { ...reply, question: request.message, conversation_id: conversationId, turn_id: crypto.randomUUID(), revision: history.length + 1 };
-      history.push(turn);
-      body = turn;
+      body = addTurn(request.message);
     }
     await route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
   });
-  return { requests, errors };
+  return { requests, errors, addTurn };
 }
 
 async function open(page: Page) {
@@ -123,4 +135,109 @@ test('failed catalog can be retried while regular questions remain available', a
   await dialog.getByRole('button', { name: 'Отправить вопрос', exact: true }).click();
   await expect(dialog.getByText(fixture.replies['Где найти контакты вуза?'].answer, { exact: true })).toBeVisible();
   expect(checks.errors).toEqual([]);
+});
+
+test('greeting after reports is a real backend answer and a failed model request does not break the next FAQ', async ({ page }) => {
+  const checks = await session(page);
+  const dialog = await open(page);
+  const input = dialog.getByLabel('Напишите вопрос', { exact: true });
+  const send = dialog.getByRole('button', { name: 'Отправить вопрос', exact: true });
+  await dialog.getByRole('button', { name: 'Как скачать отчёт?', exact: true }).click();
+  await expect(dialog.getByText(fixture.replies['Как скачать отчёт?'].answer, { exact: true })).toBeVisible();
+  await input.fill('привет, как дела?');
+  await send.click();
+  await expect(dialog.locator('time')).toHaveCount(4);
+  expect(fixture.replies['привет, как дела?'].model).toBeNull();
+  await expect(dialog.getByRole('alert')).toHaveCount(0);
+  await input.fill('Произвольный вопрос для недоступной модели');
+  await send.click();
+  await expect(dialog.getByText('Модель помощника сейчас недоступна. Попробуйте позже.')).toBeVisible();
+  expect(checks.requests.filter(request => request.message.startsWith('Произвольный'))).toHaveLength(1);
+  await dialog.getByRole('button', { name: 'Не вижу нужный вуз', exact: true }).click();
+  await expect(dialog.getByText(fixture.replies['Не вижу нужный вуз'].answer, { exact: true })).toBeVisible();
+  expect(checks.requests.at(-1)?.expected_revision).toBe(2);
+  expect(checks.errors).toEqual([]);
+});
+
+test('another tab revision is synchronized before the next ordinary question', async ({ page }) => {
+  const checks = await session(page);
+  const dialog = await open(page);
+  await dialog.getByRole('button', { name: 'Как скачать отчёт?', exact: true }).click();
+  await expect(dialog.getByText(fixture.replies['Как скачать отчёт?'].answer, { exact: true })).toBeVisible();
+  checks.addTurn('Что означает статус?');
+  await dialog.getByRole('button', { name: 'Не вижу нужный вуз', exact: true }).click();
+  await expect(dialog.getByText(fixture.replies['Не вижу нужный вуз'].answer, { exact: true })).toBeVisible();
+  await expect(dialog.getByText(fixture.replies['Что означает статус?'].answer, { exact: true })).toBeVisible();
+  expect(checks.requests.map(request => request.expected_revision)).toEqual([undefined, 2]);
+  await expect(dialog.getByRole('alert')).toHaveCount(0);
+  expect(checks.errors).toEqual([]);
+});
+
+test('a revision race is recovered once without duplicating the user message', async ({ page }) => {
+  const checks = await session(page, false, { revisionRaces: 1 });
+  const dialog = await open(page);
+  await dialog.getByRole('button', { name: 'Как скачать отчёт?', exact: true }).click();
+  await expect(dialog.getByText(fixture.replies['Как скачать отчёт?'].answer, { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Не вижу нужный вуз', exact: true }).click();
+  await expect(dialog.getByText(fixture.replies['Не вижу нужный вуз'].answer, { exact: true })).toBeVisible();
+  expect(checks.requests.map(request => request.expected_revision)).toEqual([undefined, 1, 2]);
+  await expect(dialog.getByText('Не вижу нужный вуз', { exact: true })).toHaveCount(2); // Button and one question.
+  await expect(dialog.getByRole('alert')).toHaveCount(0);
+  expect(checks.errors).toEqual([]);
+});
+
+test('repeated races are bounded and a manual retry uses fresh history', async ({ page }) => {
+  const checks = await session(page, false, { revisionRaces: 2 });
+  const dialog = await open(page);
+  await dialog.getByRole('button', { name: 'Как скачать отчёт?', exact: true }).click();
+  await expect(dialog.getByText(fixture.replies['Как скачать отчёт?'].answer, { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Не вижу нужный вуз', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('История диалога снова изменилась.');
+  expect(checks.requests).toHaveLength(3);
+  await dialog.getByRole('button', { name: 'Повторить', exact: true }).click();
+  await expect(dialog.getByText(fixture.replies['Не вижу нужный вуз'].answer, { exact: true })).toBeVisible();
+  expect(checks.requests.at(-1)?.expected_revision).toBe(3);
+  await expect(dialog.getByRole('alert')).toHaveCount(0);
+});
+
+test('welcome is visible on every opening and a new dialog preserves saved history', async ({ page }, testInfo) => {
+  const checks = await session(page);
+  for (let index = 0; index < 12; index += 1) checks.addTurn('Что означает статус?');
+  const dialog = await open(page);
+  const welcome = dialog.getByTestId('assistant-welcome');
+  await expect(welcome).toBeInViewport();
+  await expect(dialog.getByRole('button', { name: 'Новый диалог', exact: true })).toBeEnabled();
+  await dialog.getByRole('button', { name: 'Не вижу нужный вуз', exact: true }).click();
+  await expect(dialog.getByText(fixture.replies['Не вижу нужный вуз'].answer, { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Закрыть ИИ-помощника' }).click();
+  await page.getByRole('button', { name: 'Открыть ИИ-помощника', exact: true }).click();
+  await expect(welcome).toBeInViewport();
+  await dialog.getByRole('button', { name: 'Новый диалог', exact: true }).click();
+  await expect(dialog.locator('time')).toHaveCount(0);
+  await expect(welcome).toBeInViewport();
+  await dialog.getByLabel('Напишите вопрос', { exact: true }).fill('привет, как дела?');
+  await dialog.getByRole('button', { name: 'Отправить вопрос', exact: true }).click();
+  await expect(dialog.locator('time')).toHaveCount(2);
+  expect(checks.requests.at(-1)?.conversation_id).toBeUndefined();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await dialog.getByRole('button', { name: 'Закрыть ИИ-помощника' }).click();
+  await page.getByRole('button', { name: 'Открыть ИИ-помощника', exact: true }).click();
+  await expect(welcome).toBeInViewport();
+  await expect.poll(() => dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('assistant-welcome-mobile.png'), fullPage: true });
+  expect(checks.errors).toEqual([]);
+});
+
+test('turn limit offers a new dialog rather than an automatic retry loop', async ({ page }) => {
+  const checks = await session(page, false, { turnLimit: true });
+  const dialog = await open(page);
+  await dialog.getByRole('button', { name: 'Как скачать отчёт?', exact: true }).click();
+  await expect(dialog.getByText(fixture.replies['Как скачать отчёт?'].answer, { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Не вижу нужный вуз', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('достигнут лимит сообщений');
+  expect(checks.requests).toHaveLength(2);
+  await dialog.getByRole('button', { name: 'Новый диалог', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Не вижу нужный вуз', exact: true }).click();
+  await expect(dialog.getByText(fixture.replies['Не вижу нужный вуз'].answer, { exact: true })).toBeVisible();
+  expect(checks.requests.at(-1)?.conversation_id).toBeUndefined();
 });
