@@ -3,6 +3,7 @@
 import type { ComponentType, FormEvent } from 'react';
 import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Attachment from '@atomaro/icons/24/action/Attachment';
 import Edit from '@atomaro/icons/24/editor/Edit';
@@ -378,13 +379,13 @@ function WorkflowHeader({ workflow, directionName, timeZone, clockLoading }: { w
     <header className={styles.pageHeader}>
       <h1>Workflow вуза</h1>
       <div className={styles.headerSummaryRow}>
-        <div className={styles.workflowSummary}>
+        <Link className={styles.workflowSummary} href={`/universities/${encodeURIComponent(workflow.universityId)}`} aria-label={`Открыть паспорт вуза ${workflow.universityName}`}>
           <span className={styles.universityIcon} aria-hidden="true"><Education size={28} fill="currentColor" /></span>
           <div className={styles.headerMain}>
             <div className={styles.summaryTitle}><h2>{workflow.universityName}</h2><StatusBadge intent={status.intent} size="md">{status.label}</StatusBadge></div>
             {context ? <p className={styles.headerContext}>{context}</p> : null}
           </div>
-        </div>
+        </Link>
         <div className={styles.headerClock}>{clockLoading ? <Skeleton height={96} width="270px" /> : timeZone ? <UniversityLocalClock city={workflow.universityCity} timeZone={timeZone} /> : <div className={styles.clockUnavailable}><UniversityLocalClock city={workflow.universityCity} timeZone={timeZone} /></div>}</div>
       </div>
       <div className={styles.overallProgress}><div className={styles.progressLabel}><span>Прогресс Workflow</span><strong>{workflow.completedSteps} из {workflow.totalSteps} этапов завершено</strong></div><div className={styles.progressTrack} role="progressbar" aria-label={`Прогресс Workflow: завершено ${workflow.completedSteps} из ${workflow.totalSteps} этапов`} aria-valuemin={0} aria-valuemax={workflow.totalSteps} aria-valuenow={workflow.completedSteps}><span style={{ width: `${progress}%` }} /></div></div>
