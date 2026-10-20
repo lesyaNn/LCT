@@ -93,13 +93,16 @@ again — but it reads live reference data, so run it on a disposable stand:
 ```bash
 cd frontend
 E2E_BASE_URL=http://localhost:3000 \
-E2E_MANAGER_USERNAME=... E2E_MANAGER_PASSWORD=... \
+E2E_MANAGER_USERNAME=<isolated-admin-login> E2E_MANAGER_PASSWORD=<isolated-admin-password> \
 npm run test:e2e:catalogs
 ```
 
 Use an account whose data scope reaches at least one university, otherwise the
-Вузы tab legitimately renders the empty state. The catalog write endpoints
-require the `admin` or `manager` role.
+Вузы tab legitimately renders the empty state. The current catalog write
+endpoints require the `admin` role. The catalog scenario still reads credentials
+from the historically named `E2E_MANAGER_*` variables: supply a dedicated admin
+of the disposable stand, not a real manager. Do not widen manager permissions
+to satisfy an old test description.
 
 ## External integrations (Stage 11)
 

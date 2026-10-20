@@ -1,45 +1,67 @@
-# Интеграция по API
+# API сервиса
 
-- **Base URL**: `http://localhost:8000/api/v1` (через frontend — same-origin `/api/v1`).
-- **Спека**: `/openapi.json`, Swagger `/docs`, ReDoc `/redoc`. Схема Bearer
-  называется `BearerAuth` (Keycloak JWT, realm `rtk`).
-- **Аутентификация**: Authorization: `Bearer <Keycloak access token>`.
-  Проверка: `GET /api/v1/auth/me`. 401 — `AUTH_REQUIRED`, 403 — `FORBIDDEN`.
-- **Пагинация**: `page` (1-based) + `page_size` (есть в паспортных и list endpoints).
-- **Фильтрация**: UnifiedFilter (`date_from/date_to`, `university_ids`,
-  `direction_ids`, `program_ids`, `product_ids`, `responsible_ids`,
-  `workflow_statuses`) — единая семантика для аналитики и отчётов.
-- **Ошибки**: единый `ErrorResponse` (`detail` + код); 422 — валидация.
+Основной путь `/api/v1`. При обращении из frontend используется прокси того же origin. Для локального прямого обращения: `http://localhost:8000/api/v1`.
+
+Полная схема формируется из подключённых маршрутов: `/openapi.json` на backend. Swagger находится в `/docs`, ReDoc в `/redoc`. Внутри CRM есть отдельная страница `/api` с фильтрами методов, схемами, правами и примерами. `GET /api/v1/service-api` и `GET /api/v1/openapi.json` требуют JWT.
+
+## Вход
+
+Используется Keycloak access token с проверкой RS256, issuer, audience и срока действия. В запросе нужен `Authorization: Bearer <access_token>`. Swagger предлагает альтернативные схемы HTTPBearer и KeycloakLogin с PKCE; достаточно одной. ID token не заменяет access token. [Настройка Swagger](SWAGGER_AUTH_GUIDE.md).
+
+Роль задаёт разрешённые действия, а назначения вузов задают область данных. Администратор каталогов и руководитель имеют разные права. Публичная проверка лицензии `/api/v1/public/licenses/{license_id}/verification` является отдельным явно открытым методом; остальные бизнес-методы проверяют авторизацию.
 
 ## Основные группы
-| Группа | Примеры |
-|---|---|
-| Universities | `GET /universities`, `GET /universities/{id}/passport?include=health_score,audit` |
-| Health Score | `GET /universities/health-score?ids=a,b` (batch ≤50), `GET /universities/{id}/health-score` |
-| Workflow | `POST /workflow/instances`, `GET /workflow/instances/{id}`, `POST .../transition`, `.../comments`, `.../tasks`, attachments |
-| Teachers/Students | `GET /teachers/...`, `GET /universities/{id}/students` (через students-модуль) |
-| Catalog | `/directions /programs /products /vendors /responsibles` |
-| Analytics/Reports | `GET /analytics/...`, `POST /reports` (202) → `GET /reports/{job}` → `GET /reports/{job}/download` |
-| Import | `POST /import/...` (staging + worker) |
-| External (Stage 11) | `GET /universities/{id}/external-data?source=lms\|website`, `POST /integrations/sync`, `GET /integrations/metrics`, `POST /workflow/instances/from-external` |
 
-## Пример (Python, stdlib)
+Все пути таблицы указаны относительно `/api/v1`. Поддерживаемые методы, поля и условия доступа смотрите в актуальном OpenAPI.
+
+| Группа | Точки входа |
+|---|---|
+| Вузы | `/universities`, `/universities/map`, `/universities/{university_id}/passport` |
+| История и оценка | `/universities/{university_id}/history`, `/universities/{university_id}/health-score` |
+| Справочники | `/directions`, `/programs`, `/products`, `/vendors`, `/responsibles`, `/contracts`, `/licenses` |
+| Workflow | `/workflow/templates`, `/workflow/instances`, переходы, задачи, комментарии и вложения |
+| Отчёты | `/reports`, `/reports/preview`, `/reports/statistics`, `/reports/templates` |
+| Импорт | `/import/upload`, `/import/sheets/preview`, `/import/execute`, `/import/jobs` |
+| Обучение | `/universities/{university_id}/education-statistics`, `/universities/{university_id}/teachers` |
+| Заметки | `/notes`, `/notes/mentions`, `/notes/export/pdf` |
+| Помощник | `/assistant/chat`, `/assistant/quick-replies`, `/assistant/conversations` |
+| Прочее | `/search`, `/notifications`, `/audit`, `/admin/users`, `/integrations` |
+
+Для паспорта поддерживается дополнительный блок `?include=audit`. Health Score имеет отдельный маршрут; `include=health_score` не является допустимым значением. Старые несмонтированные роутеры не входят в поставляемый API, даже если их файлы остались в репозитории.
+
+Большинство списков используют `page` и `page_size`. Например, ответ списка вузов содержит `items`, `total`, `page` и `page_size`. Заметки используют `offset` и `limit`. Не считайте способ пагинации универсальным для всех методов.
+
+## Пример чтения
+
 ```python
-import json, urllib.request
-token = "<access token>"
-req = urllib.request.Request(
-  "http://localhost:8000/api/v1/universities",
-  headers={"Authorization": f"Bearer {token}"},
+import json
+import urllib.request
+
+request = urllib.request.Request(
+    "http://localhost:8000/api/v1/universities?page=1&page_size=20",
+    headers={"Authorization": "Bearer <access_token>"},
 )
-print(json.load(urllib.request.urlopen(req))[0]["id"])
+with urllib.request.urlopen(request) as response:
+    result = json.load(response)
+for university in result["items"]:
+    print(university["id"], university["name"])
 ```
 
-## Webhooks / Rate limiting
-Live LMS/Website API-контракты пока не настроены. По умолчанию external endpoints возвращают
-`EXTERNAL_SOURCE_UNAVAILABLE` (503), без подмены данных. Заявки, загруженные через
-общий `/admin/import` из XLS/XLSX (`catalog_type=applications`), доступны как
-`mode=import` и могут создавать Workflow без live-адаптера. Только в непроизводственном окружении
-`EXTERNAL_ADAPTER_MODE=mock` включает явные тестовые adapters; `POST /integrations/sync`
-записывает тестовый snapshot в БД. У студентов источник и время синхронизации хранятся в
-`students`, заявки сайта — в `external_applications` с уникальным `(source, external_id)`.
-Создание Workflow из заявки атомарно и повторный запрос возвращает существующий instance.
+## Ошибки и задания
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Проверьте правильность заполнения полей.",
+    "request_id": "00000000-0000-4000-8000-000000000000",
+    "details": {}
+  }
+}
+```
+
+401 означает отсутствие или проблему токена, 403 отсутствие права, 404 отсутствие либо недоступность объекта, 409 конфликт данных или версии, 422 ошибку валидации. У конкретных маршрутов есть дополнительные коды. При превышении лимита возвращается 429.
+
+Создание отчёта возвращает 202 и задание. Проверяйте `/reports/{job_id}` до готовности, затем скачивайте `/reports/{job_id}/download`. Поддерживаются XLS, XLSX, PDF и JSON. Файловый ответ нужно читать как бинарные данные, а не JSON. Для обработки заданий должен работать worker.
+
+Полный контракт, примеры фильтров, экспортов и сервисного клиента: [инструкция API](../frontend/public/docs/api/integration.md). Внешние LMS и сайт по умолчанию отключены; их контракты описаны отдельно в [EXTERNAL_EDUCATION_CONTRACTS.md](EXTERNAL_EDUCATION_CONTRACTS.md). Модуль тендеров не реализован.

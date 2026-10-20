@@ -1,66 +1,58 @@
-# Перечень библиотек и компонентов
+# Зависимости и образы
 
-> Снимок на develop. Версии backend — замерены в собранном образе
-> (`python -c "from importlib.metadata import distributions"`),
-> frontend — из `frontend/package.json`, инфраструктура — из
-> `Dockerfile`/`docker-compose.yml`. Лицензии — по метаданным пакетов
-> и PyPI; перед релизом сверять с первоисточником.
+Сверено с манифестами `main` на 20.10.2026. Это версии из репозитория, а не замер установленных пакетов на внешнем стенде. Backend фиксирует зависимости в `backend/pyproject.toml`, frontend устанавливается через `npm ci` по `frontend/package-lock.json`.
 
-Интерактивная документация API: `http://localhost:8000/docs` (Swagger UI),
-`http://localhost:8000/redoc`, машиночитаемая спека — `/openapi.json`.
+## Backend
 
-## Backend (`backend/`, Python 3.12, FastAPI)
+Контейнер использует Python 3.12. Манифест допускает Python начиная с 3.11.
 
-| Пакет | Версия | Лицензия | Назначение |
-|---|---|---|---|
-| fastapi | 0.141.1 | MIT | HTTP API, валидация, OpenAPI |
-| uvicorn | 0.53.0 | BSD-3-Clause | ASGI-сервер |
-| starlette | 1.6.0 | BSD-3-Clause | HTTP-ядро FastAPI |
-| pydantic | 2.13.5 | MIT | DTO/схемы |
-| pydantic-settings | 2.15.0 | MIT | Конфигурация |
-| sqlalchemy | 2.0.54 | MIT | ORM |
-| alembic | 1.20.0 | MIT | Миграции БД |
-| psycopg (+binary) | 3.3.5 | LGPL-3.0-or-later | Драйвер PostgreSQL |
-| python-jose | 3.5.0 | MIT | Проверка Keycloak JWT |
-| cryptography | 50.0.1 | Apache-2.0 AND BSD | Криптобэкенд jose |
-| python-multipart | 0.0.32 | Apache-2.0 | multipart/XLSX upload |
-| openpyxl | 3.1.5 | MIT | Парсинг XLSX импорта |
-| httpx | 0.28.1 | BSD-3-Clause | HTTP-клиент |
-| pytest | 9.1.1 | MIT | Тесты |
-
-В `pyproject.toml` дополнительно задекларированы (для следующих этапов,
-в runtime-образ пока не входят): `redis`, `minio`, `openpyxl` ✓,
-`reportlab`, `python-dateutil`. Код, их использующий
-(`app/infrastructure/*`), работает с guarded-импортами и fallback
-на in-memory/local — приложение стартует без них.
-
-## Frontend (`frontend/`, Next.js App Router + React + TypeScript)
-
-| Пакет | Версия | Лицензия | Назначение |
-|---|---|---|---|
-| next | ^16.3.5 | MIT | App Router, SSR/static build |
-| react / react-dom | ^19.1.1 | MIT | UI |
-| keycloak-js | ^26.0.0 | Apache-2.0 | Keycloak login |
-| typescript | ^5.9.2 | Apache-2.0 | Типизация |
-| eslint / eslint-config-next | ^9.36.0 / ^16.3.5 | MIT | Lint |
-| @types/react, @types/react-dom | ^19.1.x | MIT | Типы |
-
-## Инфраструктура (Docker Compose)
-
-| Образ | Тег | Лицензия | Сервис |
-|---|---|---|---|
-| postgres | 16-alpine | PostgreSQL Licence | БД `rtk` + `keycloak` (порт хоста 5433) |
-| quay.io/keycloak/keycloak | 26.7.4 | Apache-2.0 | Keycloak, realm `rtk` (порт 8081) |
-| python (база backend) | 3.12-slim | PSF | Образ backend (`:8000`) |
-| node (сборка и рантайм frontend) | 22-alpine | OpenJS Foundation | Next standalone (`:3000`) |
-
-## Порты и точки входа
-
-| Компонент | URL |
+| Пакет | Версия в pyproject.toml |
 |---|---|
-| Frontend | http://localhost:3000 |
-| Backend Swagger UI | http://localhost:8000/docs |
-| Backend ReDoc | http://localhost:8000/redoc |
-| OpenAPI JSON | http://localhost:8000/openapi.json |
-| Keycloak | http://localhost:8081 (realm `rtk`) |
-| PostgreSQL | localhost:5433, user `rtk`, db `rtk` |
+| FastAPI | 0.116.1 |
+| Uvicorn | 0.35.0 |
+| SQLAlchemy | 2.0.43 |
+| Pydantic | 2.11.7 |
+| pydantic-settings | 2.10.1 |
+| psycopg | 3.3.4 |
+| python-jose | 3.5.0 |
+| httpx | 0.28.1 |
+| redis | 6.4.0 |
+| minio | 7.2.18 |
+| openpyxl | 3.1.5 |
+| xlrd | 2.0.2 |
+| xlwt | 1.3.0 |
+| ReportLab | 4.4.9 |
+| pypdfium2 | 5.14.0 |
+| rarfile | 4.2 |
+| python-multipart | 0.0.32 |
+| python-dateutil | 2.9.0.post0 |
+| email-validator | 2.3.0 |
+| Alembic | 1.16.5 |
+
+Эти зависимости устанавливаются в runtime-образ, а не оставлены для будущих этапов. Alembic остаётся в зависимостях для совместимости; действующая схема управляется SQL-миграциями и `scripts/migrate.py`, не Alembic upgrade.
+
+Дополнение `[dev]`: pytest 9.0.3, httpx 0.28.1, Ruff 0.15.13 и pypdf 6.10.0. PDF-генерация использует системные DejaVu-шрифты из Dockerfile.
+
+## Frontend
+
+| Пакет | Версия в package-lock.json |
+|---|---|
+| Next.js | 16.3.5 |
+| React | 19.3.0 |
+| TypeScript | 5.9.3 |
+| Tiptap React | 3.32.0 |
+
+В интерфейсе также используются TanStack Query и Table, React Hook Form, Zod, Recharts, dnd-kit, keycloak-js, react-markdown, jsPDF и html-to-image. Версии с `^` в package.json являются диапазонами; для воспроизводимой установки нужен lock-файл. Docker и SourceCraft CI используют Node.js 22.
+
+## Docker Compose
+
+| Сервис | Образ |
+|---|---|
+| postgres | `postgres:16-alpine` |
+| keydb | `redis:7-alpine` |
+| keycloak | `quay.io/keycloak/keycloak:26.7.4` |
+| backend и worker | Сборка из `python:3.12-slim` |
+| frontend | Сборка и runtime из `node:22-alpine` |
+| ollama, дополнительный профиль | `ollama/ollama:0.13.5` |
+
+Опубликованы порты 3000, 8000 и 8081. PostgreSQL и Redis доступны только во внутренней сети Compose. Точные версии, которые фактически запущены на конкретном сервере, проверяются в его образах отдельно.

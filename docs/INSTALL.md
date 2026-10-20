@@ -1,123 +1,133 @@
-# Установка
+# Установка и обновление
 
-## Требования
+Инструкция сверена с Compose и кодом на 20.10.2026. Команды выполняются из корня репозитория. Нужны Docker и Docker Compose v2. Python на хосте нужен только для вспомогательных Python-скриптов. Для Bash-скриптов на Windows используйте WSL или Git Bash; основные команды Compose работают в PowerShell.
 
-- Docker + Docker Compose v2, 4 ГБ RAM, ~10 ГБ диска.
-- Порты наружу: `3000` (CRM), `8000` (backend API), `8081` (Keycloak).
-  PostgreSQL и KeyDB наружу не публикуются (internal only) — доступ через
-  `docker compose exec`.
+## Первый запуск
 
-## Запуск (сборка и установка)
+Скопируйте `.env.example` в `.env`, если своего файла ещё нет. Задайте пароли `POSTGRES_PASSWORD`, `KEYCLOAK_DB_PASSWORD` и `KEYCLOAK_ADMIN_PASSWORD`. Не заменяйте уже настроенный `.env` шаблоном при обновлении.
 
 ```bash
-cp .env.example .env
+docker compose config --quiet
 docker compose up -d --build
-./scripts/wait-healthy.sh
+docker compose ps
 ```
 
-`up --build` собирает образы backend (Python 3.12, FastAPI) и frontend
-(Next.js, production build) и стартует весь стек: `postgres`, `keydb`,
-`keycloak`, `backend`, `worker`, `frontend`. При старте backend автоматически
-применяет SQL-миграции (`scripts/migrate.py up` + `verify`).
+Запускаются PostgreSQL 16, Redis 7 под именем `keydb`, Keycloak, backend, worker и frontend. Обычный запуск не включает модель ИИ и SMTP-сервер. Первое скачивание образов и сборка требуют сети; срок готовности зависит от компьютера.
 
-Проверка:
+Backend выполняет `baseline`, затем SQL-миграции `up` и `verify`. Worker использует тот же образ с другой командой запуска и ждёт готовности backend. Данные приложения и Keycloak находятся в разных базах одного PostgreSQL.
+
+| Сервис | Локальный адрес |
+|---|---|
+| CRM | http://localhost:3000 |
+| Backend | http://localhost:8000 |
+| Swagger | http://localhost:8000/docs |
+| ReDoc | http://localhost:8000/redoc |
+| Keycloak | http://localhost:8081 |
+
+PostgreSQL и Redis не имеют опубликованных портов. Для SQL-консоли при стандартном пользователе и имени базы:
 
 ```bash
-docker compose ps
-curl -sf http://localhost:8000/health
-curl -sf http://localhost:8081/realms/rtk
+docker compose exec postgres psql -U rtk -d rtk
 ```
 
-## Демо-данные
+Проверка API в Bash:
 
-Только после healthy-старта, идемпотентно (повторный запуск безопасен):
+```bash
+curl -fsS http://localhost:8000/health
+curl -fsS http://localhost:8000/ready
+```
+
+В Windows PowerShell используйте `curl.exe` либо `Invoke-RestMethod`. Эти два маршрута не проверяют доступность модели, SMTP или выполнение фоновых заданий. Проверяйте также `docker compose ps` и логи нужного сервиса.
+
+## Демо
 
 ```bash
 docker compose exec -e SEED_DEMO_DATA=true backend python -m app.scripts.seed_demo
-```
-
-Полный маршрут Workflow на 14 этапов (опционально):
-
-```bash
+docker compose exec -e DEMO_MODE=true backend python -m app.scripts.provision_demo_scope
 docker compose exec backend python scripts/create_workflow_template.py
 ```
 
-Всё сразу одной командой (локальное демо без внешнего интернета):
+Seed добавляет пять демонстрационных вузов и связанные каталоги. Скрипт scope назначает `manager` три демо-вуза, `user` один; после него нужен повторный вход. Отдельная команда создаёт стандартный шаблон на 14 этапов. Экземпляр Workflow затем запускается из интерфейса. Автоматического создания пятиэтапного шаблона и Workflow в текущем seed нет.
+
+Демо-логины realm `rtk`: `admin/admin123`, `manager/manager123`, `user/user123`. Они импортируются только при создании realm. Консоль Keycloak использует пароль `KEYCLOAK_ADMIN_PASSWORD`, а не пароль демо-пользователя приложения. [Подробности seed](DEMO_SEED.md).
+
+## Помощник
 
 ```bash
-./scripts/demo-setup.sh
+python backend/scripts/start_assistant.py
 ```
 
-Состав seed — в [DEMO_SEED.md](DEMO_SEED.md).
+Скрипт подключает дополнительный Compose-файл, запускает Ollama, скачивает модели и готовит индекс. Модель устанавливается в контейнере. При обновлениях сохраняйте тот же набор Compose-файлов:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.assistant.yml --profile assistant up -d --build
+docker compose -f docker-compose.yml -f docker-compose.assistant.yml exec -T backend python -m scripts.assistant check
+```
+
+Без дополнительного файла backend снова получит стандартную настройку с выключенным помощником. Одного добавления `ASSISTANT_ENABLED=true` в корневой `.env` недостаточно: базовый Compose не передаёт эту переменную. [Полная инструкция](ASSISTANT.md).
+
+## Публичные адреса и Swagger
+
+Задайте `KEYCLOAK_EXTERNAL_URL`, `FRONTEND_ORIGIN` и `SWAGGER_PUBLIC_URL` для своего стенда. Адрес Keycloak должен открываться браузером, а не указывать на внутреннее имя контейнера. Перед импортом нового realm подготовьте callback и web origins. Скрипт читает переменные процесса, не корневой `.env`.
+
+Bash:
+
+```bash
+FRONTEND_ORIGIN=https://crm.example.org SWAGGER_PUBLIC_URL=https://api.example.org python3 keycloak/render_realm.py
+```
+
+PowerShell:
+
+```powershell
+$env:FRONTEND_ORIGIN = 'https://crm.example.org'
+$env:SWAGGER_PUBLIC_URL = 'https://api.example.org'
+python keycloak/render_realm.py
+```
+
+Это примеры адресов, замените их своими. Скрипт изменяет файл импорта realm. Для существующего realm импорт пропускается: обновите `Clients / rtk-frontend` вручную. В Valid Redirect URIs нужны адрес CRM с `/*` и точный адрес backend `/docs/oauth2-redirect.html`; Web Origins содержит origin каждого сервиса без пути. Префикс прокси учитывается в `SWAGGER_PUBLIC_URL` и ASGI `root_path`.
+
+Публичные параметры frontend собираются в JavaScript. После изменения адресов пересоберите frontend. Корневой `.env` не передаётся всем контейнерам целиком: проверяйте `environment` и `build.args` в Compose. Для новых backend-параметров при необходимости добавьте отдельный Compose override.
+
+В Swagger нажмите Authorize и используйте один способ: KeycloakLogin с PKCE либо HTTPBearer с готовым access token без слова Bearer. Проверьте `GET /api/v1/auth/me`. [Гайд со скриншотами](SWAGGER_AUTH_GUIDE.md).
 
 ## Обновление
 
+Сначала сделайте резервную копию. Затем из нужной ветки:
+
 ```bash
-docker compose pull
+git pull --ff-only
 docker compose up -d --build
+docker compose exec backend python scripts/migrate.py status
+docker compose exec backend python scripts/migrate.py verify
+docker compose logs --tail 100 backend worker
 ```
 
-## Бэкап
+Если помощник включён, замените команду `up` вариантом с двумя Compose-файлами. После обновления проверьте вход, доступ назначенного пользователя, открытие паспорта и выполнение тестового отчёта на своём стенде. Keycloak не обновляет существующий realm повторным импортом; изменение пароля в `.env` также не меняет пароль уже созданной роли PostgreSQL.
 
-- Тома: `pgdata` (БД), `keydbdata` (кэш), `workflow-storage` (файлы),
-  `reports-storage` (отчёты), `import-staging` (staging импорта).
-- БД: `docker compose exec postgres pg_dump -U rtk -d rtk > backup.sql`.
+## Резервная копия
 
-## Секреты
-
-Значения `change-me` в `.env.example` — **только для локального
-хакатон-стенда**. Для любого общего стенда сгенерируйте по 32+ символов
-энтропии на секрет:
+Нужны обе базы PostgreSQL и файловые тома. Для выгрузки баз не используйте перенаправление бинарного dump через старый Windows PowerShell. Создайте отдельный каталог `backups`, затем сформируйте файлы внутри контейнера:
 
 ```bash
-python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc -f /tmp/crm.dump'
+docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$KEYCLOAK_DB" -Fc -f /tmp/keycloak.dump'
+docker compose cp postgres:/tmp/crm.dump ./backups/crm.dump
+docker compose cp postgres:/tmp/keycloak.dump ./backups/keycloak.dump
 ```
 
-Замените `POSTGRES_PASSWORD`, `KEYCLOAK_DB_PASSWORD`,
-`KEYCLOAK_ADMIN_PASSWORD` (и при наличии — `S3_*` ключи) в `.env`;
-`.env` не коммитится (`.gitignore`).
+Файловые тома: `workflow-storage`, `reports-storage`, `import-staging`. Для помощника дополнительно `assistant-models` и `assistant-index`. Архивируйте файлы согласованно с базой, при остановленной записи, и проверяйте восстановление в отдельном окружении. Физические имена томов зависят от имени Compose-проекта, по умолчанию `team26`. Резервная копия Git не заменяет эту копию данных.
 
-## Troubleshooting
+`docker compose down` сохраняет тома. Флаг `-v` удаляет базы и файлы и не нужен для обновления или исправления настроек входа.
 
-- Keycloak не healthy: ждите 60–90 с (первый старт + импорт realm).
-- Повторный импорт realm пропускается (`Realm already exists. Import skipped`);
-  для полного сброса Keycloak нужен чистый volume (`docker compose down -v`).
-- Backend ждёт `postgres` + `keydb` + `keycloak` (depends_on healthy).
-- Миграции: `docker compose exec backend python scripts/migrate.py status`.
-- `docker compose down` сохраняет данные; `docker compose down -v` удаляет
-  базы, файлы и отчёты без восстановления.
+## Диагностика
 
-## Swagger и вход через Keycloak
+| Симптом | Что проверить |
+|---|---|
+| Нет вузов у пользователя | Назначения `university_ids`, затем новый вход для обновления токена |
+| Помощник выключен | Дополнительный Compose-файл и `scripts.assistant check` |
+| Отчёт остаётся в очереди | Состояние и логи worker, общие тома отчётов и импорта |
+| Письма не уходят | SMTP и `EMAIL_NOTIFICATIONS_ENABLED`; встроенное уведомление не означает доставку письма |
+| Swagger не завершает вход | Публичный callback, Web Origins, issuer и audience |
+| Backend не стартует | Логи применения SQL-миграций и подключение к PostgreSQL |
 
-[Пошаговый гайд со скриншотами](SWAGGER_AUTH_GUIDE.md): вход, выполнение запроса, выход и проверка ролей.
-
-Откройте `http://localhost:8000/docs`, нажмите **Authorize** и выберите
-**KeycloakLogin** (вход через Keycloak с PKCE, `client_secret` пустой) либо
-**HTTPBearer** (готовый `access_token`, без слова `Bearer`). Достаточно одного
-способа. Проверить вход можно запросом `GET /api/v1/auth/me` через **Try it out**.
-После перезагрузки Swagger авторизуйтесь снова: токены не сохраняются в localStorage.
-
-Перед первым запуском удалённого стенда задайте реальные публичные адреса:
-
-```bash
-FRONTEND_ORIGIN=https://crm.example.org \
-SWAGGER_PUBLIC_URL=https://api.example.org python3 keycloak/render_realm.py
-```
-
-Если Swagger открыт через прокси с префиксом, укажите его в `SWAGGER_PUBLIC_URL`,
-например `https://crm.example.org/backend`, и задайте backend соответствующий
-ASGI `root_path`. `KEYCLOAK_EXTERNAL_URL` должен быть доступен браузеру, а не
-указывать на внутреннее имя контейнера.
-
-Для уже существующего realm повторный импорт не применяется. В Keycloak,
-**Clients → rtk-frontend**, обновите **Valid Redirect URIs**: адрес CRM с `/*`
-и точный публичный URL `/docs/oauth2-redirect.html`; в **Web Origins** укажите
-оба origin (схема, хост, порт, без пути). Сохраните публичный тип клиента,
-**Standard flow** и **PKCE S256**. Не удаляйте тома ради обновления этих настроек.
-При другом OAuth-клиенте задайте `SWAGGER_OAUTH_CLIENT_ID` и настройте его аналогично.
-
-Браузерная проверка обоих способов входа (нужны frontend-зависимости и Chromium
-Playwright): `node scripts/check-swagger-auth.cjs`. По умолчанию используются
-локальный backend и демо-администратор. Для другого стенда задайте
-`SWAGGER_BASE_URL`, `E2E_ADMIN_USERNAME` и `E2E_ADMIN_PASSWORD`. Проверка вызывает
-только `/auth/me` и проверяет сброс токена при перезагрузке страницы.
+Базовый Compose использует Keycloak `start-dev` и локальные пароли-примеры. Публикация стенда требует отдельной настройки TLS, секретов, адресов и резервирования. Состояние проверки репозитория: [аудит](PROJECT_AUDIT_2026-10-20.md).

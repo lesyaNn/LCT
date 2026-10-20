@@ -1,72 +1,55 @@
-# Demo data
+# Демонстрационные данные
 
-Idempotent production-ready seed: `backend/app/scripts/seed_demo.py`.
-Safe to rerun any number of times — reruns create no duplicates, perform no
-extra workflow transitions and emit no audit noise.
+Актуальный вход: `backend/app/scripts/seed_demo.py`. Общий seed переиспользует записи по естественным ключам и не очищает рабочие таблицы. Для стандартного демонстрационного набора используйте именно его, а не старые альтернативные seed-скрипты.
 
-## Dry run (writes nothing)
+## Проверочный запуск
 
 ```bash
 docker compose exec backend python -m app.scripts.seed_demo --dry-run
 ```
 
-PowerShell:
+Режим проверяет план и откатывает изменения. Он требует доступной схемы PostgreSQL.
 
-```powershell
-docker compose exec backend python -m app.scripts.seed_demo --dry-run
-```
-
-## Production execution (explicit confirmation required)
+## Добавление данных
 
 ```bash
 docker compose exec -e SEED_DEMO_DATA=true backend python -m app.scripts.seed_demo
 ```
 
-PowerShell (one line):
+Без `SEED_DEMO_DATA=true` либо аргумента `--confirm-production` скрипт завершится с сообщением Demo seeding is disabled. Команду можно повторять: существующие записи находятся по имени, email, связям и номерам документов. Даты новых демонстрационных записей рассчитываются относительно дня их первого создания; повторный запуск не освежает старые сроки.
 
-```powershell
-docker compose exec -e SEED_DEMO_DATA=true backend python -m app.scripts.seed_demo
-```
+| Сущность | Набор для чистой базы |
+|---|---|
+| Вузы | 5 |
+| Направления | 6 |
+| Программы | 9 |
+| Вендоры | 5 |
+| Продукты | 10 |
+| Ответственные | 5 |
+| Связи вузов и программ | 9 |
+| Связи вузов и продуктов | 10 |
+| Договоры | 4 |
+| Лицензии | 4 |
+| Встречи | 5 |
 
-Alternative confirmation: `python -m app.scripts.seed_demo --confirm-production`.
-Without `SEED_DEMO_DATA=true` (or `--confirm-production`) the script prints
-`Demo seeding is disabled.` and exits WITHOUT touching the database.
-No interactive `input()` — works in Docker/CI.
+Таблица описывает набор, а не обещает столько новых записей на заполненной базе. В текущем `run_seed` нет создания шаблона на пять этапов, экземпляров Workflow и переходов между этапами. Старое описание этих действий в docstring скрипта не соответствует его исполняемому коду.
 
-## What is created
-
-| Entity | Count | Natural key |
-|---|---|---|
-| Universities | 5 | `name` |
-| Directions | 6 | `code` (`IB-DEMO` … `NET-DEMO`) |
-| Programs | 9 | `name` + direction (existing `DevOps-инженерия` is reused) |
-| Vendors | 5 | `name` |
-| Products | 10 | `vendor` + `name` + `version` (always with program + version) |
-| Responsibles | 5 | `email` (+ primary link per university) |
-| University programs | 9 | university + program |
-| University products | 10 | university + product |
-| Contracts | 4 | `ДОГ-ДЕМО-01` … `ДОГ-ДЕМО-04` |
-| Licenses | 4 | `ЛИЦ-ДЕМО-01` … `ЛИЦ-ДЕМО-04` (`ЛИЦ-ДЕМО-02` expires in ~20 days) |
-| Workflow template | 1 | `Демонстрационный маршрут взаимодействия с вузом` (5 stages) |
-| Workflow instances | 5 | one per university, on its target stage |
-| Meetings | 5 | university + subject |
-
-Notes:
-
-- Relative dates (`today ± N days`) are computed ONLY at first creation;
-  reruns never re-date existing rows.
-- Workflow moves go through the canonical `transition_instance` service
-  (never direct `current_stage_id` writes); instances already on target are
-  left untouched.
-- No `vendor_contacts` are created: the codebase currently exposes only
-  read models for them (no create service) — the seed prints a warning.
-- `Attention=true` demo is skipped (`[SKIP]`): the business API does not
-  support its safe creation.
-- No existing data is ever deleted or modified; no raw SQL writes; no
-  hardcoded UUIDs; no secrets in output.
-
-## Tests
+## Видимость демо-вузов
 
 ```bash
-cd backend && python -m pytest tests/test_seed_demo.py -q
+docker compose exec -e DEMO_MODE=true backend python -m app.scripts.provision_demo_scope
 ```
+
+Команда работает с существующими демо-аккаунтами Keycloak: руководителю назначаются первые три вуза, пользователю первый из них. Администратору назначения не нужны. Скрипт проверяет идентичность демо-учётных записей и меняет их атрибут `university_ids`. После выполнения повторите вход, чтобы обновить токен.
+
+## Шаблон Workflow
+
+```bash
+docker compose exec backend python scripts/create_workflow_template.py
+```
+
+Команда создаёт или приводит к стандартному виду отдельный шаблон на 14 этапов. Пятый этап необязательный; произвольные SLA не задаются. После создания шаблона выберите вуз и программу и запустите Workflow из интерфейса. Запуск backend сам по себе шаблонов не создаёт.
+
+Вспомогательный `scripts/demo-setup.sh` запускает больше действий, включая legacy seed, и не эквивалентен этим трём отдельным командам. Для него нужны Bash, заранее доступные образы и зависимости; первая сборка на чистом компьютере не является офлайн-запуском.
+
+Два старых тестовых модуля seed и автоматического Workflow сейчас имеют ошибки импорта устаревших констант. Это зафиксировано в [аудите](PROJECT_AUDIT_2026-10-20.md), а не скрыто утверждением о полностью пройденных тестах.
