@@ -31,14 +31,18 @@
 .pageHeading p { margin: 0; color: #667085; }
 .markAll { flex: 0 0 auto; }
 .filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
-.filters button { padding: 9px 16px; border: 1px solid #e5e1eb; border-radius: 100px; background: white; color: #475467; cursor: pointer; }
-.filters .activeFilter { background: #633db7; border-color: #633db7; color: white; }
+.filters button { padding: 9px 16px; border: 1px solid var(--rtk-color-border-strong); border-radius: 100px; background: var(--rtk-color-surface); color: var(--rtk-color-text-primary); cursor: pointer; }
+.filters button:hover:not(.activeFilter) { background: var(--rtk-color-brand-soft); border-color: var(--rtk-color-brand); color: var(--rtk-color-brand); }
+.filters .activeFilter { background: var(--rtk-color-brand); border-color: var(--rtk-color-brand); color: var(--rtk-color-text-inverse); }
+.filters .activeFilter:hover { background: var(--rtk-color-brand-hover); border-color: var(--rtk-color-brand-hover); }
+.filters button:focus-visible { outline: 3px solid var(--rtk-color-brand); outline-offset: 2px; }
 .inboxList { border: 1px solid #eae6f0; border-radius: 14px; overflow: hidden; background: white; }
 .inboxItem { align-items: flex-start; padding: 18px 20px; }
 .inboxText { flex: 1; gap: 7px; }
 .inboxText > span { font-size: 14px; }
 .newLabel { font-size: 11px; color: #633db7; font-weight: 700; }
 .pagination { display: flex; justify-content: center; align-items: center; gap: 16px; margin-top: 22px; color: #667085; font-size: 13px; }
-.pagination button { border: 1px solid #ded6ef; border-radius: 8px; padding: 8px 12px; background: white; color: #5e3ba6; cursor: pointer; }
+.pagination button { border: 1px solid var(--rtk-color-border-strong); border-radius: 8px; padding: 8px 12px; background: var(--rtk-color-surface); color: var(--rtk-color-brand); cursor: pointer; }
+.pagination button:hover:not(:disabled) { background: var(--rtk-color-brand-soft); border-color: var(--rtk-color-brand); }
 .pagination button:disabled { opacity: .45; cursor: default; }
 @media (max-width: 600px) { .page { padding: 22px 14px 55px; } .pageHeading { display: block; } .markAll { margin-top: 16px; } .dropdown { position: fixed; right: 14px; top: calc(var(--topbar-height) + 8px); } }

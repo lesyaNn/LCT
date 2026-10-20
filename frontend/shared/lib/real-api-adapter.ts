@@ -89,7 +89,7 @@ async function passport(id: string, include = '', signal?: AbortSignal): Promise
 /** The aggregate is the sole backend source for passport-only blocks. */
 async function passportBundle(id: string, queryClient?: QueryClient): Promise<ApiPassport> {
   if (!queryClient) return passport(id);
-  return queryClient.ensureQueryData({
+  return queryClient.fetchQuery({
     queryKey: queryKeys.universities.passportBundle(id),
     queryFn: ({ signal }) => passport(id, '', signal),
     staleTime: 30_000,
