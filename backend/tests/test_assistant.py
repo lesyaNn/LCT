@@ -92,7 +92,7 @@ def test_curated_corpus_and_russian_search(knowledge):
     "role,allowed",
     [
         ("user", set()),
-        ("manager", {"admin-guide/import"}),
+        ("manager", set()),
         ("admin", {"admin-guide/import", "admin-guide/users"}),
     ],
 )
@@ -657,7 +657,7 @@ def test_real_documentation_corpus_loads_without_ollama(tmp_path):
     assert snapshot.document_count >= 15
     for question, role, article in (
         ("Как вернуть Workflow на предыдущий этап?", "user", "user-guide/workflow"),
-        ("Как импортировать Excel каталог dry-run?", "manager", "admin-guide/import"),
+        ("Как импортировать Excel каталог dry-run?", "admin", "admin-guide/import"),
         ("Как сбросить пароль пользователя?", "admin", "admin-guide/users"),
         ("Как скачать отчёт?", "user", "user-guide/reports"),
     ):

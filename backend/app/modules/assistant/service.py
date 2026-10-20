@@ -9,6 +9,7 @@ from functools import lru_cache
 
 from app.config import Settings
 from app.core.errors import BusinessException
+from app.modules.assistant.greetings import GREETING_VERSION, greeting_reply
 from app.modules.assistant.knowledge import Chunk, KnowledgeBase, direct_faq, faq_text, retrieve
 from app.modules.assistant.provider import Ollama
 from app.modules.assistant.quick_replies import QUICK_REPLY_VERSION, match_quick_reply
@@ -162,16 +163,17 @@ class Assistant:
         if not self.config.assistant_enabled:
             raise BusinessException(ErrorCode.ASSISTANT_DISABLED)
         quick = match_quick_reply(data.message)
-        if quick is not None:
+        greeting = greeting_reply(data.message)
+        if quick is not None or greeting is not None:
             prepared = conversations.prepare(data)
             result = ChatOut(
                 conversation_id=prepared.id,
                 turn_id=uuid.uuid4(),
                 revision=prepared.revision + 1,
-                answer=quick.answer,
-                basis="insufficient" if quick.clarification else "documentation",
-                sources=[] if quick.clarification else [quick.source()],
-                knowledge_version=QUICK_REPLY_VERSION,
+                answer=quick.answer if quick is not None else greeting,
+                basis="documentation" if quick is not None and not quick.clarification else "insufficient",
+                sources=[quick.source()] if quick is not None and not quick.clarification else [],
+                knowledge_version=QUICK_REPLY_VERSION if quick is not None else GREETING_VERSION,
                 retrieval_mode="lexical",
                 model=None,
                 created_at=datetime.now(UTC),

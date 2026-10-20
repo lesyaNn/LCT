@@ -22,6 +22,7 @@
 .headerTitle h2 { font-size: 20px; font-weight: 750; line-height: 1.2; margin: 0; }
 .headerTitle p { color: var(--rtk-color-text-secondary); font-size: 14px; margin: 4px 0 0; }
 .panelClose { align-self: flex-start; flex: 0 0 auto; margin-left: auto; }
+.toolbar { display: flex; flex: 0 0 auto; justify-content: flex-end; padding: 0 var(--rtk-space-5); }
 .scroll { display: flex; flex: 1 1 auto; flex-direction: column; gap: var(--rtk-space-4); min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding: var(--rtk-space-3) var(--rtk-space-5) var(--rtk-space-5); scrollbar-color: var(--rtk-color-border-strong) transparent; }
 .messageRow { align-items: flex-start; display: flex; gap: var(--rtk-space-2); min-width: 0; }
 .userRow { flex-direction: row-reverse; }
