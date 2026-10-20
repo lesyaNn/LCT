@@ -21,3 +21,4 @@
 }
 .tooltip strong { font-size: 12px; }
 .tooltip span { color: var(--rtk-color-text-secondary); }
+@media (max-width: 768px) { .hideOnMobile { display: none; } }

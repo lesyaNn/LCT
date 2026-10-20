@@ -176,6 +176,7 @@ export function UniversityPassport({ id }: { id: string }) {
   const searchParams = useSearchParams();
   const { user } = useAuth();
   const activeTab = parseTab(searchParams.get('tab'));
+  const [collapsedMobileTab, setCollapsedMobileTab] = useState<{ universityId: string; tab: PassportTabId } | null>(null);
   const query = useQuery({ queryKey: universityPassportQueryKey(id), queryFn: () => getUniversityPassport(id, queryClient), staleTime: 30_000 });
   const activeTabDefinition = useMemo(() => tabDefinitions.find((tab) => tab.id === activeTab) ?? tabDefinitions[0], [activeTab]);
 
@@ -218,8 +219,11 @@ export function UniversityPassport({ id }: { id: string }) {
       {!mobileLayout ? <div className={`${styles.desktopPanel} ${activeTab === 'overview' || activeTab === 'health' || activeTab === 'meetings' ? styles.flushPanel : ''}`} id="passport-panel" role="tabpanel" aria-labelledby={`passport-tab-${activeTab}`}>{renderContent(activeTab)}</div> : null}
       {mobileLayout ? <div className={styles.mobileAccordion} aria-label="Разделы паспорта вуза">
         {tabDefinitions.map((tab) => {
-          const isOpen = activeTab === tab.id;
-          return <section className={styles.accordionItem} key={tab.id}><button className={isOpen ? styles.accordionTriggerActive : styles.accordionTrigger} type="button" aria-expanded={isOpen} onClick={() => selectTab(tab.id)}><span>{tab.label}</span><ArrowRight size={18} fill="currentColor" /></button>{isOpen ? <div className={`${styles.accordionPanel} ${tab.id === 'overview' || tab.id === 'health' || tab.id === 'meetings' ? styles.flushPanel : ''}`}>{renderContent(tab.id)}</div> : null}</section>;
+          const isOpen = activeTab === tab.id && (collapsedMobileTab?.universityId !== id || collapsedMobileTab.tab !== tab.id);
+          return <section className={styles.accordionItem} key={tab.id}><button className={isOpen ? styles.accordionTriggerActive : styles.accordionTrigger} type="button" aria-expanded={isOpen} onClick={() => {
+            setCollapsedMobileTab(isOpen ? { universityId: id, tab: tab.id } : null);
+            if (!isOpen && activeTab !== tab.id) selectTab(tab.id);
+          }}><span>{tab.label}</span><ArrowRight size={18} fill="currentColor" /></button>{isOpen ? <div className={`${styles.accordionPanel} ${tab.id === 'overview' || tab.id === 'health' || tab.id === 'meetings' ? styles.flushPanel : ''}`}>{renderContent(tab.id)}</div> : null}</section>;
         })}
       </div> : null}
       </TabbedSurface>

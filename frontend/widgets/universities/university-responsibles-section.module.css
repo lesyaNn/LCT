@@ -31,6 +31,7 @@
 .actions { border-top: 1px solid var(--rtk-color-border); display: flex; gap: var(--rtk-space-2); justify-content: flex-end; padding-top: var(--rtk-space-4); }
 .actions button { min-width: 120px; }
 @media (max-width: 768px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
   .cardHeader .removeButton { height: 44px; width: 44px; }
   .copyAction { flex-basis: 44px; height: 44px; }
   .contactRow .copyButton { height: 44px; width: 44px; }

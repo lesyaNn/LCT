@@ -4,7 +4,7 @@ import { useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import styles from './tooltip.module.css';
 
-export function Tooltip({ content, children }: { content: ReactNode; children: ReactNode }) {
+export function Tooltip({ content, children, hideOnMobile = false }: { content: ReactNode; children: ReactNode; hideOnMobile?: boolean }) {
   const id = useId();
   const hostRef = useRef<HTMLSpanElement>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
@@ -21,6 +21,6 @@ export function Tooltip({ content, children }: { content: ReactNode; children: R
   };
   return <span className={styles.host} ref={hostRef} onMouseEnter={show} onMouseLeave={() => setPosition(null)} onFocusCapture={show} onBlurCapture={() => setPosition(null)}>
     <span aria-describedby={hasContent ? id : undefined}>{children}</span>
-    {hasContent && position && typeof document !== 'undefined' ? createPortal(<span className={styles.tooltip} id={id} role="tooltip" style={{ left: position.left, top: position.top }}>{content}</span>, document.body) : null}
+    {hasContent && position && typeof document !== 'undefined' ? createPortal(<span className={`${styles.tooltip} ${hideOnMobile ? styles.hideOnMobile : ''}`} id={id} role="tooltip" style={{ left: position.left, top: position.top }}>{content}</span>, document.body) : null}
   </span>;
 }

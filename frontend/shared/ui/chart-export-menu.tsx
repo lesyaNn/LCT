@@ -65,7 +65,7 @@ export function ChartExportMenu({ filenameSlug, targetRef, testId }: ChartExport
 
   return (
     <div className={styles.root} data-chart-export-ui ref={rootRef}>
-      <Tooltip content="Скачать график как PNG или PDF">
+      <Tooltip content="Скачать график как PNG или PDF" hideOnMobile>
         <Button
           aria-expanded={open}
           aria-haspopup="menu"
