@@ -53,11 +53,11 @@ function MarkdownAnswer({ text }: { text: string }) {
 function Message({ message, user, onRetry, onNotHelpful, sending }: { message: ChatMessage; user: AuthUser; onRetry: (message: ChatMessage) => void; onNotHelpful?: () => void; sending: boolean }) {
   const isUser = message.role === 'user';
   const time = new Date(message.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-  return <div className={`${styles.messageRow} ${isUser ? styles.userRow : ''}`}>
+  return <div className={`${styles.messageRow} ${isUser ? styles.userRow : ''}`} data-testid={message.welcome ? 'assistant-welcome' : undefined}>
     <div className={styles.messageAvatar}>{isUser ? <Avatar initials={user.initials} size="m" /> : <Image src={robot} alt="" width={43} height={43} />}</div>
     <div className={`${styles.bubble} ${isUser ? styles.userBubble : styles.assistantBubble}`}>
       {isUser ? <p className={styles.userText}>{message.text}</p> : <><MarkdownAnswer text={message.text} />{message.sources && <SourceLinks sources={message.sources} />}</>}
-      <time className={styles.time} dateTime={message.createdAt}>{time}</time>
+      <time className={styles.time} dateTime={message.createdAt} data-testid={message.welcome ? 'assistant-welcome-time' : 'assistant-turn-time'}>{time}</time>
       {!isUser && onNotHelpful && <Button className={styles.feedbackButton} type="button" variant="ghost" size="s" disabled={sending} onClick={onNotHelpful}>Ответ не подходит</Button>}
       {message.error && <div className={styles.messageError} role="alert"><span>{message.error}</span><Button type="button" variant="ghost" size="s" disabled={sending} onClick={() => onRetry(message)}>Повторить</Button></div>}
     </div>
@@ -69,7 +69,7 @@ export function AssistantWidget({ user, pathname, open, onOpen, onClose }: { use
   const [showHint, setShowHint] = useState(false);
   const [showLauncher, setShowLauncher] = useState(false);
   const [allQuestions, setAllQuestions] = useState(false);
-  const { messages, restoring, restoreError, sending, sendMessage, retry, retryRestore, startNew } = useAssistantChat(user.id, pathname);
+  const { messages, restoring, restoreError, sending, sendMessage, retry, retryRestore, startNew, appendWelcome } = useAssistantChat(user.id, pathname);
   const quickReplies = useQuery({
     queryKey: ['assistant', 'quick-replies', user.id], enabled: open, staleTime: 300_000,
     queryFn: async () => {
@@ -81,11 +81,11 @@ export function AssistantWidget({ user, pathname, open, onOpen, onClose }: { use
   const questions = quickReplies.data ?? [];
   const notHelpful = questions.find(question => question.id === 'answer-not-helpful');
   const lastMessage = messages.at(-1);
-  const showFeedback = lastMessage?.role === 'assistant' && messages.at(-2)?.text !== notHelpful?.question;
+  const showFeedback = lastMessage?.role === 'assistant' && !lastMessage.welcome && messages.at(-2)?.text !== notHelpful?.question;
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  const previousScroll = useRef({ open: false, restoring: true });
+  const welcomed = useRef(false);
   const hintKey = `crm-ai-assistant-hint:v1:${user.id}`;
   const launcherKey = `crm-ai-assistant-launcher-hidden:v1:${user.id}`;
 
@@ -109,14 +109,19 @@ export function AssistantWidget({ user, pathname, open, onOpen, onClose }: { use
   }, [open, hintKey]);
 
   useEffect(() => {
-    const previous = previousScroll.current;
-    previousScroll.current = { open, restoring };
+    if (!open) { welcomed.current = false; return; }
+    if (restoring || welcomed.current) return;
+    const frame = requestAnimationFrame(() => {
+      welcomed.current = true;
+      appendWelcome();
+      inputRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open, restoring, appendWelcome]);
+
+  useEffect(() => {
     if (!open) return;
-    if (!previous.open) inputRef.current?.focus();
-    // Opening/restoring starts at the welcome text, not the old last message.
-    // Once the user sends a question, follow the new replies as before.
-    const showWelcome = !previous.open || restoring || previous.restoring || messages.length === 0;
-    const frame = requestAnimationFrame(() => scrollRef.current?.scrollTo({ top: showWelcome ? 0 : scrollRef.current.scrollHeight }));
+    const frame = requestAnimationFrame(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }));
     return () => cancelAnimationFrame(frame);
   }, [open, messages.length, sending, restoring]);
 
@@ -185,20 +190,16 @@ export function AssistantWidget({ user, pathname, open, onOpen, onClose }: { use
       }}>Новый диалог</Button></div>
 
       <div ref={scrollRef} className={styles.scroll} aria-live="polite">
-        <div className={styles.messageRow} data-testid="assistant-welcome">
-          <div className={styles.messageAvatar}><Image src={robot} alt="" width={43} height={43} /></div>
-          <div className={`${styles.bubble} ${styles.assistantBubble} ${styles.greeting}`}><p>Здравствуйте! Я помощник CRM ИТ Школы Ростелекома. Подскажу, как работать с вузами, Workflow, документами и отчётами. Выберите быстрый вопрос или напишите свой.</p></div>
-        </div>
+        {restoring && <p className={styles.info} role="status">Загружаем диалог…</p>}
+        {restoreError && <div className={styles.restoreError} role="alert"><span>Не удалось загрузить предыдущий диалог: {restoreError}</span><Button type="button" variant="ghost" size="s" disabled={sending} onClick={retryRestore}>Повторить</Button></div>}
+        {messages.map((message) => <Message key={message.id} message={message} user={user} onRetry={retry} onNotHelpful={notHelpful && showFeedback && message.id === lastMessage?.id ? () => { sendMessage(notHelpful.question); } : undefined} sending={sending || restoring} />)}
+        {sending && <p className={styles.info} role="status">Помощник печатает<span className={styles.dots}>…</span></p>}
         <div className={styles.quickMenu}>
           <div className={styles.quickQuestions} id="assistant-quick-questions" aria-label="Быстрые вопросы">{(allQuestions ? questions : questions.slice(0, 4)).map(question => <Button key={question.id} type="button" variant="secondary" className={styles.quickButton} disabled={sending || restoring} onClick={() => sendMessage(question.question)}>{question.question}<Icon name="chevron-right" size={17} /></Button>)}</div>
           {questions.length > 4 && <Button type="button" variant="ghost" size="s" aria-expanded={allQuestions} aria-controls="assistant-quick-questions" onClick={() => setAllQuestions(value => !value)}>{allQuestions ? 'Свернуть вопросы' : 'Все быстрые вопросы'}</Button>}
           {quickReplies.isPending && <p className={styles.info}>Загружаем быстрые вопросы…</p>}
           {quickReplies.isError && <p className={styles.info}>Быстрые вопросы недоступны. <Button type="button" variant="ghost" size="s" onClick={() => void quickReplies.refetch()}>Загрузить снова</Button></p>}
         </div>
-        {restoring && <p className={styles.info} role="status">Загружаем диалог…</p>}
-        {restoreError && <div className={styles.restoreError} role="alert"><span>Не удалось загрузить предыдущий диалог: {restoreError}</span><Button type="button" variant="ghost" size="s" disabled={sending} onClick={retryRestore}>Повторить</Button></div>}
-        {messages.map((message) => <Message key={message.id} message={message} user={user} onRetry={retry} onNotHelpful={notHelpful && showFeedback && message.id === lastMessage?.id ? () => { sendMessage(notHelpful.question); } : undefined} sending={sending || restoring} />)}
-        {sending && <p className={styles.info} role="status">Помощник печатает<span className={styles.dots}>…</span></p>}
       </div>
 
       <form className={styles.composer} onSubmit={submit}>

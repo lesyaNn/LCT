@@ -19,6 +19,9 @@ from app.modules.assistant.router import quick_replies
 from app.modules.assistant.repository import Prepared
 from app.modules.assistant.schemas import ChatIn
 from app.modules.assistant.service import Assistant
+from app.modules.assistant.knowledge import KnowledgeBase
+from app.modules.assistant.schemas import ModelAnswer
+from pathlib import Path
 provider, knowledge, repository = Mock(), Mock(), Mock()
 repository.prepare.return_value = Prepared(uuid4(), 0, (), True)
 repository.save.side_effect = lambda prepared, question, result: result
@@ -26,6 +29,11 @@ assistant = Assistant(Settings(assistant_enabled=True), knowledge, provider)
 questions = [reply.question for reply in QUICK_REPLIES] + ['привет, как дела?']
 replies = {question: assistant.chat(ChatIn(message=question), 'user', repository).model_dump(mode='json') for question in questions}
 assert provider.mock_calls == [] and knowledge.mock_calls == []
+provider.chat.return_value = ModelAnswer(answer='Давайте проще: сначала откройте Отчёты. Что сейчас вызывает затруднение: найти раздел или выбрать формат?', basis='insufficient')
+knowledge = KnowledgeBase(Path('../frontend/public/docs'), Path('var/browser-fixture-no-index.json'), 'unused')
+repository.prepare.return_value = Prepared(uuid4(), 1, (('Как скачать отчёт?', 'Откройте Отчёты и выберите формат.'),), False)
+replies['я не понимаю'] = Assistant(Settings(assistant_enabled=True), knowledge, provider).chat(ChatIn(message='я не понимаю'), 'user', repository).model_dump(mode='json')
+assert provider.chat.call_count == 1
 print(json.dumps({'catalog': quick_replies(CurrentUser(id='test', roles={'user'})).model_dump(), 'replies': replies}, ensure_ascii=False))
 `;
   fixture = JSON.parse(execFileSync(process.env.E2E_ASSISTANT_PYTHON!, ['-B', '-c', code], {
@@ -146,7 +154,7 @@ test('greeting after reports is a real backend answer and a failed model request
   await expect(dialog.getByText(fixture.replies['Как скачать отчёт?'].answer, { exact: true })).toBeVisible();
   await input.fill('привет, как дела?');
   await send.click();
-  await expect(dialog.locator('time')).toHaveCount(4);
+  await expect(dialog.getByTestId('assistant-turn-time')).toHaveCount(4);
   expect(fixture.replies['привет, как дела?'].model).toBeNull();
   await expect(dialog.getByRole('alert')).toHaveCount(0);
   await input.fill('Произвольный вопрос для недоступной модели');
@@ -200,24 +208,33 @@ test('repeated races are bounded and a manual retry uses fresh history', async (
   await expect(dialog.getByRole('alert')).toHaveCount(0);
 });
 
-test('welcome is visible on every opening and a new dialog preserves saved history', async ({ page }, testInfo) => {
+test('each reopening appends a welcome at the bottom and preserves history order', async ({ page }, testInfo) => {
   const checks = await session(page);
   for (let index = 0; index < 12; index += 1) checks.addTurn('Что означает статус?');
   const dialog = await open(page);
-  const welcome = dialog.getByTestId('assistant-welcome');
+  const welcome = dialog.getByTestId('assistant-welcome').last();
   await expect(welcome).toBeInViewport();
+  await expect(dialog.getByTestId('assistant-turn-time')).toHaveCount(24);
+  await expect(dialog.getByTestId('assistant-turn-time').first()).not.toBeInViewport();
   await expect(dialog.getByRole('button', { name: 'Новый диалог', exact: true })).toBeEnabled();
   await dialog.getByRole('button', { name: 'Не вижу нужный вуз', exact: true }).click();
   await expect(dialog.getByText(fixture.replies['Не вижу нужный вуз'].answer, { exact: true })).toBeVisible();
+  await expect(dialog.getByTestId('assistant-welcome')).toHaveCount(1);
+  const timeline = dialog.locator('[data-testid="assistant-welcome"], [data-testid="assistant-turn-time"]');
+  expect((await timeline.evaluateAll(elements => elements.map(element => element.getAttribute('data-testid')))).slice(-3)).toEqual(['assistant-welcome', 'assistant-turn-time', 'assistant-turn-time']);
   await dialog.getByRole('button', { name: 'Закрыть ИИ-помощника' }).click();
   await page.getByRole('button', { name: 'Открыть ИИ-помощника', exact: true }).click();
   await expect(welcome).toBeInViewport();
+  await expect(dialog.getByTestId('assistant-welcome')).toHaveCount(2);
+  await expect(dialog.getByTestId('assistant-turn-time')).toHaveCount(26);
+  await expect(dialog.getByTestId('assistant-turn-time').first()).not.toBeInViewport();
   await dialog.getByRole('button', { name: 'Новый диалог', exact: true }).click();
-  await expect(dialog.locator('time')).toHaveCount(0);
+  await expect(dialog.getByTestId('assistant-turn-time')).toHaveCount(0);
+  await expect(dialog.getByTestId('assistant-welcome')).toHaveCount(1);
   await expect(welcome).toBeInViewport();
   await dialog.getByLabel('Напишите вопрос', { exact: true }).fill('привет, как дела?');
   await dialog.getByRole('button', { name: 'Отправить вопрос', exact: true }).click();
-  await expect(dialog.locator('time')).toHaveCount(2);
+  await expect(dialog.getByTestId('assistant-turn-time')).toHaveCount(2);
   expect(checks.requests.at(-1)?.conversation_id).toBeUndefined();
   await page.setViewportSize({ width: 390, height: 844 });
   await dialog.getByRole('button', { name: 'Закрыть ИИ-помощника' }).click();
@@ -226,6 +243,24 @@ test('welcome is visible on every opening and a new dialog preserves saved histo
   await expect.poll(() => dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('assistant-welcome-mobile.png'), fullPage: true });
   expect(checks.errors).toEqual([]);
+});
+
+test('free-form confusion gets a model reply in context, not a canned button answer', async ({ page }) => {
+  const checks = await session(page);
+  const dialog = await open(page);
+  await dialog.getByRole('button', { name: 'Как скачать отчёт?', exact: true }).click();
+  await expect(dialog.getByText(fixture.replies['Как скачать отчёт?'].answer, { exact: true })).toBeVisible();
+  await dialog.getByLabel('Напишите вопрос', { exact: true }).fill('я не понимаю');
+  await dialog.getByRole('button', { name: 'Отправить вопрос', exact: true }).click();
+  await expect(dialog.getByText(fixture.replies['я не понимаю'].answer, { exact: true })).toBeVisible();
+  expect(fixture.replies['я не понимаю'].model).toBe('qwen3:1.7b');
+  expect(checks.requests.at(-1)?.expected_revision).toBe(1);
+  await expect(dialog.getByRole('alert')).toHaveCount(0);
+  await dialog.getByRole('button', { name: 'Закрыть ИИ-помощника' }).click();
+  await page.getByRole('button', { name: 'Открыть ИИ-помощника', exact: true }).click();
+  await expect(dialog.getByTestId('assistant-welcome')).toHaveCount(2);
+  await expect(dialog.getByTestId('assistant-turn-time')).toHaveCount(4);
+  await expect(dialog.getByTestId('assistant-welcome').last()).toBeInViewport();
 });
 
 test('turn limit offers a new dialog rather than an automatic retry loop', async ({ page }) => {
