@@ -176,7 +176,7 @@ function FilePreviewContent({ children, path, name, size, version = '' }: FilePr
       <header className={styles.header}><div><strong title={name}>{name}</strong><small>{name.split('.').pop()?.toUpperCase()} {typeof size === 'number' ? `· ${formatFileSize(size)}` : size ? `· ${size}` : ''}</small></div><button type="button" onClick={close} aria-label="Закрыть предпросмотр">×</button></header>
       <div className={styles.body} aria-busy={loading}>
         <div className={`${styles.skeleton} ${styles[category]} ${!loading ? styles.skeletonDone : ''}`} aria-hidden={!loading} role="status" aria-label="Загрузка предпросмотра">{Array.from({ length: category === 'image' ? 1 : 8 }, (_, index) => <span key={index} />)}</div>
-        <div className={`${styles.result} ${loading ? styles.resultLoading : ''}`}>
+        <div className={`${styles.result} ${loading ? styles.resultLoading : ''}`} data-kind={error ? 'error' : data?.kind}>
         {error ? <div role="alert"><p>{error}</p><button type="button" onClick={() => { setData(null); setError(''); setImageReady(false); setRetry((value) => value + 1); }}>Повторить</button></div> : null}
         {data?.kind === 'image' && !error ? <ZoomableImage src={data.src!} name={name} width={data.width!} height={data.height!} onLoad={() => setImageReady(true)} onError={() => setError('Не удалось отобразить страницу или изображение. Файл можно скачать.')} /> : null}
         {data?.kind === 'document' ? <article className={styles.content}>{data.blocks?.map((block, index) => block.style === 'heading' ? <h3 key={index}>{block.text}</h3> : <p key={index}>{block.style === 'list' ? '• ' : ''}{block.text}</p>)}</article> : null}
