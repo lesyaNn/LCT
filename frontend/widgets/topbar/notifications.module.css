@@ -38,7 +38,7 @@
 
 .pageItem { border-bottom: 1px solid var(--rtk-color-border); }
 .pageItem:last-child { border-bottom: 0; }
-.pageItem .itemInner { gap: var(--rtk-space-3); min-height: 88px; padding: var(--rtk-space-3); }
+.pageItem .itemInner { gap: var(--rtk-space-3); min-height: 96px; padding: var(--rtk-space-4); }
 .pageItem .itemHeading strong { font-size: 15px; }
 .pageItem .itemHeading time { font-size: 12px; }
 .pageItem .description { font-size: 13px; margin-top: var(--rtk-space-1); }

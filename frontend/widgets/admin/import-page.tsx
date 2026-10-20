@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import Download from '@atomaro/icons/24/action/Download';
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
 import { useAuth } from '@/shared/auth/AuthProvider';
 import { formatDateTimeRu } from '@/shared/lib/formatters';
@@ -174,7 +175,7 @@ function JobDetails({ job, onClose }: { job: ImportJob; onClose: () => void }) {
     <dl className={styles.detailsList}><div><dt>Лист</dt><dd>{job.sheet ?? '—'}</dd></div><div><dt>Создан</dt><dd>{formatDateTimeRu(job.createdAt)}</dd></div><div><dt>Кто</dt><dd>{job.createdBy ?? '—'}</dd></div><div><dt>Режим</dt><dd>{job.dryRun ? 'Dry-run' : 'Импорт'}</dd></div><div><dt>Прогресс</dt><dd>{job.progress === null ? '—' : `${job.progress}%`}</dd></div><div><dt>Всего строк</dt><dd>{summary?.total_rows ?? '—'}</dd></div><div><dt>Добавлено</dt><dd>{summary?.inserted ?? '—'}</dd></div><div><dt>Обновлено</dt><dd>{summary?.updated ?? '—'}</dd></div><div><dt>Пропущено</dt><dd>{summary?.skipped ?? '—'}</dd></div><div><dt>Ошибок</dt><dd>{summary?.errors_total ?? summary?.errors.length ?? '—'}</dd></div></dl>
     {summary?.truncated ? <p className={styles.muted}>Список ошибок сокращён; полное число показано выше.</p> : null}
     {job.error ? <FormErrorBanner>{job.error}</FormErrorBanner> : null}
-    {job.errorReportUrl ? <Button type="button" variant="ghost" size="s" loading={downloading} onClick={() => void download()}>Скачать отчёт об ошибках</Button> : null}
+    {job.errorReportUrl ? <Button type="button" variant="orange" size="s" loading={downloading} disabled={downloading} onClick={() => void download()}><Download size={16} fill="currentColor" />Скачать отчёт об ошибках</Button> : null}
     {downloadError ? <FormErrorBanner>{downloadError}</FormErrorBanner> : null}
     {summary?.errors.length ? <div className={styles.errors}><h3>Ошибки по строкам</h3><TableShell ariaLabel="Ошибки импорта"><table className={tableStyles.table}><thead><tr><th>Строка</th><th>Колонка</th><th>Ошибка</th></tr></thead><tbody>{summary.errors.map((item, index) => <tr key={`${item.row}-${item.field}-${index}`}><td>{item.row}</td><td>{item.sourceField ?? item.field}</td><td>{item.error}</td></tr>)}</tbody></table></TableShell></div> : null}
     {!summary && job.status === 'processing' ? <p className={styles.muted}>Результат появится после завершения обработки.</p> : null}

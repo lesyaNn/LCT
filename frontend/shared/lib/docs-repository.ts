@@ -34,16 +34,20 @@ export interface DocsSnapshot {
 export const DOC_SECTION_DEFINITIONS: Array<{ id: string; title: string; topics: DocsTopicDefinition[] }> = [
   { id: 'user-guide', title: 'Руководство пользователя', topics: [
     { slug: 'getting-started', title: 'Начало работы' },
-    { slug: 'overview', title: 'Обзор' },
-    { slug: 'universities', title: 'Вузы' },
+    { slug: 'overview', title: 'Обзор и аналитика' },
+    { slug: 'universities', title: 'Вузы: список, таблица и карта' },
     { slug: 'passport', title: 'Паспорт вуза' },
-    { slug: 'programs-products', title: 'Программы и продукты' },
-    { slug: 'workflow', title: 'Workflow' },
-    { slug: 'comments-files', title: 'Комментарии и файлы' },
+    { slug: 'programs-products', title: 'ИТ-направления, программы и продукты' },
+    { slug: 'health-score', title: 'Health Score' },
+    { slug: 'workflow', title: 'Workflow: от запуска до завершения' },
+    { slug: 'comments-files', title: 'Комментарии, вложения и повестка' },
     { slug: 'documents', title: 'Документы и лицензии' },
-    { slug: 'reports', title: 'Отчёты' },
-    { slug: 'history', title: 'История изменений' },
-    { slug: 'health-score', title: 'Health Score и матрица' },
+    { slug: 'reports', title: 'Отчёты и предпросмотр' },
+    { slug: 'history', title: 'История изменений и аудит' },
+    { slug: 'notes', title: 'Личные заметки' },
+    { slug: 'notifications', title: 'Уведомления' },
+    { slug: 'system-search', title: 'Поиск по системе и документации' },
+    { slug: 'assistant', title: 'ИИ-помощник' },
   ] },
   { id: 'admin-guide', title: 'Для администратора', topics: [
     { slug: 'catalogs', title: 'Управление каталогами' },
@@ -57,7 +61,7 @@ export const DOC_SECTION_DEFINITIONS: Array<{ id: string; title: string; topics:
     { slug: 'admin', title: 'Администратор' },
   ] },
   { id: 'help', title: 'Помощь', topics: [{ slug: 'faq', title: 'Частые вопросы' }] },
-  { id: 'api', title: 'API', topics: [{ slug: 'integration', title: 'Подключение и примеры' }] },
+  { id: 'api', title: 'API', topics: [{ slug: 'integration', title: 'API: методы и контракт' }] },
 ];
 
 const contentRoots = [

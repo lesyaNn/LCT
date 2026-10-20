@@ -133,6 +133,7 @@ export function ApiDocumentationPage({ guide }: { guide: string }) {
         table: ({ children, ...props }) => <div className={styles.tableWrap}><table {...props}>{children}</table></div>,
         pre: ({ children }) => <pre className={styles.code}>{children}</pre>,
         a: ({ href, children }) => <a href={href} rel={href?.startsWith('https://') ? 'noopener noreferrer' : undefined}>{children}</a>,
+        img: () => null,
       }}>{guide}</ReactMarkdown></article> : null}
       {tab === 'methods' && catalog && document ? <>
         <div className={styles.filters}>

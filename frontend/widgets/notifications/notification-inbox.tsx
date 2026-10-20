@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/shared/auth/AuthProvider';
 import { canAccessRoute } from '@/shared/config/navigation';
 import { normalizeApiError } from '@/shared/lib/api-errors';
-import { notificationTarget, notificationTime, type Notification, type NotificationFilter } from '@/shared/lib/notifications-repository';
+import { notificationPresentation, notificationTarget, type Notification, type NotificationFilter } from '@/shared/lib/notifications-repository';
+import { NotificationRow } from '@/widgets/topbar/NotificationsPopover';
 import { useNotifications } from '@/widgets/topbar/notifications-state';
 import styles from './notifications.module.css';
 
@@ -56,13 +57,9 @@ export function NotificationInbox() {
       <button key={option.value} type="button" aria-pressed={filter === option.value} className={filter === option.value ? styles.activeFilter : ''}
         onClick={() => { setFilter(option.value); setPage(0); }}>{option.label}</button>)}</div>
     {(error || actionError) && <p className={styles.error} role="alert">{actionError || error} <button type="button" onClick={() => { setActionError(''); void refresh(); }}>Повторить</button></p>}
-    {loading ? <p className={styles.empty} role="status">Загружаем уведомления…</p> : items.length ? <ul className={styles.inboxList}>{items.map((item) => <li key={item.id}>
-      <button type="button" className={`${styles.inboxItem} ${!item.is_read ? styles.unread : ''}`} onClick={() => openItem(item)}>
-        <span className={`${styles.priority} ${styles[item.priority.toLowerCase()]}`} aria-hidden="true" />
-        <span className={styles.inboxText}><strong>{item.title}</strong><span>{item.message}</span><small>{notificationTime(item.created_at)}</small></span>
-        {!item.is_read && <span className={styles.newLabel}>Новое</span>}
-      </button>
-    </li>)}</ul> : !error && <p className={styles.empty}>Здесь пока нет уведомлений.</p>}
+    {loading ? <p className={styles.empty} role="status">Загружаем уведомления…</p> : items.length ? <ul className={styles.inboxList} aria-label="Список уведомлений">{items.map((item) =>
+      <NotificationRow key={item.id} notification={notificationPresentation(item)} onOpen={() => openItem(item)} variant="page" />
+    )}</ul> : !error && <p className={styles.empty}>Здесь пока нет уведомлений.</p>}
     {total > PAGE_SIZE && <nav className={styles.pagination} aria-label="Страницы уведомлений">
       <button type="button" disabled={page === 0} onClick={() => setPage((value) => value - 1)}>Назад</button>
       <span>Страница {page + 1} из {Math.ceil(total / PAGE_SIZE)}</span>
