@@ -38,7 +38,7 @@ export const DOC_SECTION_DEFINITIONS: Array<{ id: string; title: string; topics:
     { slug: 'universities', title: 'Вузы: список, таблица и карта' },
     { slug: 'passport', title: 'Паспорт вуза' },
     { slug: 'programs-products', title: 'ИТ-направления, программы и продукты' },
-    { slug: 'health-score', title: 'Health Score и матрица программ' },
+    { slug: 'health-score', title: 'Health Score' },
     { slug: 'workflow', title: 'Workflow: от запуска до завершения' },
     { slug: 'comments-files', title: 'Комментарии, вложения и повестка' },
     { slug: 'documents', title: 'Документы и лицензии' },
