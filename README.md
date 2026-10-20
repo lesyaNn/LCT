@@ -167,13 +167,15 @@ docker compose -f docker-compose.yml -f docker-compose.assistant.yml --profile a
 
 Swagger поддерживает два альтернативных способа входа: `KeycloakLogin` с Authorization Code и PKCE либо `HTTPBearer` с готовым access token. В поле HTTPBearer вставляется только токен. В обычном запросе нужен заголовок `Authorization: Bearer <access_token>`.
 
+[Пошаговый гайд по входу в Swagger со скриншотами](docs/SWAGGER_AUTH_GUIDE.md): оба способа авторизации, выполнение запросов, выход и проверка прав доступа.
+
 ```bash
 curl http://localhost:8000/api/v1/auth/me -H "Authorization: Bearer <access_token>"
 ```
 
 `GET /api/v1/service-api` возвращает каталог методов и ограничения. `GET /api/v1/openapi.json` возвращает схему через API-прокси. Оба запроса защищены JWT. Публичная проверка лицензии является отдельным явно открытым маршрутом.
 
-Для серверной интеграции администратор отдельно настраивает сервисный клиент Keycloak, роль, audience и доступные вузы. Общего секретного ключа для всех интеграций нет. [Примеры запросов](frontend/public/docs/api/integration.md), [справка по API](docs/API_INTEGRATION.md), [вход в Swagger](docs/SWAGGER_AUTH_GUIDE.md).
+Для серверной интеграции администратор отдельно настраивает сервисный клиент Keycloak, роль, audience и доступные вузы. Общего секретного ключа для всех интеграций нет. [Примеры запросов](frontend/public/docs/api/integration.md), [справка по API](docs/API_INTEGRATION.md).
 
 ## Настройки
 
