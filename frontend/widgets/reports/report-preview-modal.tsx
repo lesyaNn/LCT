@@ -64,7 +64,7 @@ export function ReportPreviewModal({ request, preview, previewPending, previewEr
       <div className={styles.previewParameter}><Filter size={18} fill="currentColor" aria-hidden="true" /><span><small>Фильтры</small><strong>{selectedFilters}</strong></span></div>
       <div className={styles.previewParameter}><DocumentText size={18} fill="currentColor" aria-hidden="true" /><span><small>Состав · {request.format.toUpperCase()}</small><strong title={columns.join(', ')}>{columns.length} колонок: {columns.join(' · ')}</strong></span></div>
     </div>
-    <div className={styles.previewTabs}><Tabs items={[{ id: 'report', label: 'Отчёт' }, { id: 'statistics', label: 'Статистика' }]} activeId={tab} onChange={setTab} label="Разделы предпросмотра" prefix="report-preview" /></div>
+    <div><Tabs items={[{ id: 'report', label: 'Отчёт' }, { id: 'statistics', label: 'Статистика' }]} activeId={tab} onChange={setTab} label="Разделы предпросмотра" prefix="report-preview" segmented /></div>
     <div className={styles.previewTabContent} role="tabpanel" aria-labelledby={`report-preview-${tab}`}>
       {tab === 'report' ? <>
         {spreadsheet ? <div className={styles.previewSheetTabs}><Tabs items={[{ id: 'data', label: 'Отчёт' }, { id: 'filters', label: 'Фильтры' }, ...groupDimensions.map((group) => ({ id: `group-${group.id}`, label: group.label }))]} activeId={sheet} onChange={setSheet} label="Листы книги" prefix="report-preview-sheet" /></div> : null}

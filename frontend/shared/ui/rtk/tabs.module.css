@@ -7,3 +7,7 @@
 .alternating .tab, .alternating .active { color: var(--rtk-color-text-primary); }
 .alternating .active:nth-child(odd) { border-bottom-color: var(--rtk-color-brand); }
 .alternating .active:nth-child(even) { border-bottom-color: var(--rtk-color-brand-secondary); }
+.segmented { border: 0; }
+.segmented .list { background: var(--rtk-color-surface-subtle); border-radius: var(--rtk-radius-small); display: inline-flex; gap: 2px; padding: 3px; }
+.segmented .tab, .segmented .active { border: 0; border-radius: var(--rtk-radius-small); min-height: 38px; }
+.segmented .active { background: var(--rtk-color-surface-elevated); box-shadow: var(--rtk-shadow-elevation-1); }

@@ -66,10 +66,6 @@
 .previewParameter span { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .previewParameter small { color: var(--rtk-color-text-secondary); font-size: 11px; }
 .previewParameter strong { color: var(--rtk-color-text-primary); display: -webkit-box; font-size: 12px; line-height: 1.45; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-.previewTabs :global([role="tablist"]) { background: var(--rtk-color-surface-subtle); border-radius: var(--rtk-radius-small); display: inline-flex; gap: 2px; padding: 3px; }
-.previewTabs :global([role="tab"]) { border: 0; border-radius: var(--rtk-radius-small); min-height: 38px; }
-.previewTabs :global([aria-selected="true"]) { background: var(--rtk-color-surface-elevated); box-shadow: var(--rtk-shadow-elevation-1); }
-.previewTabs nav { border: 0; }
 .previewTabContent { flex: 1 1 auto; min-height: 420px; min-width: 0; }
 .previewSheetTabs { margin-bottom: var(--rtk-space-3); }
 .previewDocument { background: var(--rtk-color-surface-elevated); border: 1px solid var(--rtk-color-border); border-radius: var(--rtk-radius-small); min-width: 0; overflow: hidden; }

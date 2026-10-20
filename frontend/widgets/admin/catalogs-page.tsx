@@ -223,7 +223,6 @@ export function CatalogsPage() {
     <TabbedSurface tabs={<Tabs items={catalogDefinitions} activeId={type} onChange={(id) => chooseType(id as CatalogType)} label="Каталоги" prefix="catalog-tab" />}>
       <div data-testid="catalog-tabs">
         <section id="catalog-panel" role="tabpanel" aria-labelledby={`catalog-tab-${type}`} className={styles.panel}>
-          {type === 'agreements' ? <div className={styles.agreementSwitch} role="group" aria-label="Тип записи"><Button type="button" variant={agreementKind === 'contracts' ? 'primary' : 'secondary'} size="s" data-testid="catalog-agreements-contracts" aria-pressed={agreementKind === 'contracts'} onClick={() => chooseKind('contracts')}>Договоры</Button><Button type="button" variant={agreementKind === 'licenses' ? 'primary' : 'secondary'} size="s" data-testid="catalog-agreements-licenses" aria-pressed={agreementKind === 'licenses'} onClick={() => chooseKind('licenses')}>Лицензии</Button></div> : null}
           <FilterToolbar
             embedded
             label="Фильтры каталога"
@@ -233,6 +232,7 @@ export function CatalogsPage() {
             onReset={resetFilters}
             resetDisabled={!search && !universityId && !agreementStatus}
           />
+          {type === 'agreements' ? <Tabs items={[{ id: 'contracts', label: 'Договоры', testId: 'catalog-agreements-contracts' }, { id: 'licenses', label: 'Лицензии', testId: 'catalog-agreements-licenses' }]} activeId={agreementKind} onChange={(id) => chooseKind(id as AgreementKind)} label="Тип записи" prefix="catalog-agreement" segmented /> : null}
           <div className={styles.surface}>
             <div className={styles.surfaceHeader}><div><p>{query.data ? `Найдено: ${query.data.total}` : 'Загрузка…'}</p></div></div>
             {query.isPending ? <TableSkeleton rows={5} columns={5} label="Загрузка каталога" />
