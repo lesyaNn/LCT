@@ -273,3 +273,4 @@ SourceCraft CI запускает frontend lint, typecheck, тесты граф�
 | [Время и контакты](docs/UNIVERSITY_TIME_CONTACTS.md) | Местные часы и копирование |
 | [Ограничения](docs/CONSTRAINTS.md) | Что требует дополнительной настройки |
 | [Аудит актуальности](docs/PROJECT_AUDIT_2026-10-20.md) | Проверенные факты и результаты проверок |
+# LCT
